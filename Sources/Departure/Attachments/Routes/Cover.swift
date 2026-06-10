@@ -34,7 +34,7 @@ public struct Cover: RouteDeclaration, Sendable {
 
     /// Creates a cover declaration.
     ///
-    /// - Important: Set ``providesNavigation`` to `false` when the route destination
+    /// - Important: Set `providesNavigation` to `false` when the route destination
     ///   already provides its own navigation container.
     public init<R: Route>(
         _ routeType: R.Type,

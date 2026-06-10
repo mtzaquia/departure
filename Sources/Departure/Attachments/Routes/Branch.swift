@@ -24,7 +24,7 @@ import Foundation
 
 /// Groups declarations under a branch selection value.
 ///
-/// Use ``Branch`` inside ``View/routes(id:branch:_:)`` so routes are discoverable even when
+/// Use ``Branch`` inside ``SwiftUICore/View/routes(id:branch:_:)`` so routes are discoverable even when
 /// a branch view has not been built yet.
 ///
 /// ```swift
@@ -40,7 +40,7 @@ import Foundation
 /// ```
 ///
 /// - Important: Declarations inside ``Branch`` are discovery-only until a matching
-///   ``View/routeBranch(_:)`` adopts them.
+///   ``SwiftUICore/View/routeBranch(_:)`` adopts them.
 public struct Branch<Selection: Hashable>: Sendable where Selection: Sendable {
     let selection: Selection
     let declarations: [RouteScopeDeclaration]

@@ -32,7 +32,7 @@ public extension View {
     ///     }
     /// ```
     ///
-    /// - Important: ``id`` is the scope ID used by ``Router/UnwindTarget/id(_:)``.
+    /// - Important: `id` is the scope ID used by ``Router/UnwindTarget/id(_:)``.
     func routes<ID: Hashable>(
         id: ID? = AnyHashable?.none,
         @RouteDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration]
@@ -57,7 +57,7 @@ public extension View {
     ///     }
     /// ```
     ///
-    /// - Important: Place branch content under ``View/routeBranch(_:)`` so branch-local
+    /// - Important: Place branch content under ``SwiftUICore/View/routeBranch(_:)`` so branch-local
     ///   presentations are hosted by the selected branch view.
     func routes<ID: Hashable, Selection: Hashable>(
         id: ID? = AnyHashable?.none,
