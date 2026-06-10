@@ -66,12 +66,22 @@ struct AlertRoute: Route, Equatable {
 }
 
 struct DroppedRoute: Route, Equatable {
-    func resolveRoute() async -> (any Route)? {
-        nil
+    func resolveRoute() async -> RouteResolution {
+        .drop
     }
 
     func destination() -> some View {
         Text("Dropped")
+    }
+}
+
+struct ReroutingRoute: Route, Equatable {
+    func resolveRoute() async -> RouteResolution {
+        .reroute(LoginRoute())
+    }
+
+    func destination() -> some View {
+        Text("Rerouting")
     }
 }
 

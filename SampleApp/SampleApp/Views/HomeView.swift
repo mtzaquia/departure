@@ -32,12 +32,23 @@ struct HomeView: View {
             Button("Show message") {
                 routing(.present(MessageRoute()))
             }
+
+            Section {
+                LabeledContent {
+                    Text(Storage.shared.emoji)
+                } label: {
+                    Text("Current emoji")
+                    Text("Change from settings")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .navigationTitle("Home")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Profile", systemImage: "person") {
-                    routing(.perform(OpenProfileAction()))
+                    routing(.present(ProfileRoute()))
                 }
             }
         }

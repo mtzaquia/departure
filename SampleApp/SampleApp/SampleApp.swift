@@ -29,23 +29,15 @@ final class Storage {
 
     var isLoggedIn = false
     var appearanceSaveCount = 0
+    var emoji: String = "🎉"
 }
 
-struct OpenProfileAction: Action {
+struct RandomizeEmojiAction: Action {
     func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
-        guard context.isRunning(in: ProfileRoute.self) else {
-            throw .reroute(ProfileRoute())
-        }
+        Storage.shared.emoji = ["⚡️", "🎸", "✈️", "🇮🇹", "🎉", "👀"].randomElement() ?? ""
     }
 }
 
-struct OpenAppearanceSettingsAction: Action {
-    func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
-        guard context.isRunning(in: AppearanceSettingsRoute.self) else {
-            throw .reroute(AppearanceSettingsRoute())
-        }
-    }
-}
 
 struct SaveAppearanceSettingsAction: Action {
     func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {

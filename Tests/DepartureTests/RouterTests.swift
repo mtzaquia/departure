@@ -80,6 +80,23 @@ struct RouterTests {
         #expect(router.path.isEmpty)
     }
 
+    @Test func routeResolutionReroutePresentsResolvedRoute() async {
+        let router = Router()
+
+        router.root.hydrateRoutes(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(LoginRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(ReroutingRoute())
+
+        #expect(router.path.count == 1)
+        #expect(router.path.last?.route is LoginRoute)
+    }
+
     @Test func normalPresentationResolvesAndDismissesFromDeclaringScope() async throws {
         let router = Router()
 
