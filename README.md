@@ -211,6 +211,23 @@ Inside a high-priority route, normal and high-priority declarations behave like 
 
 High priority changes presentation context, not route lookup. Branch routes are still resolved with the same crawling rules; when a high-priority branch route is selected, the high-priority window uses the active branch presentation scope.
 
+### High-Priority Window Environment
+
+`windowDestination` customizes destinations presented through Departure's separate high-priority window. Use it to explicitly forward environment values that should cross the `UIWindow` boundary.
+
+```swift
+WithRouter {
+  AppRoot()
+} windowDestination: { destination, environment in
+  destination
+    .environment(\.locale, environment.locale)
+    .environment(\.dynamicTypeSize, environment.dynamicTypeSize)
+    .environment(\.colorScheme, environment.colorScheme)
+}
+```
+
+Without `windowDestination`, high-priority destinations are presented unchanged. Normal in-tree presentations do not use this hook.
+
 ```mermaid
 flowchart TD
     normal["Normal app flow"]

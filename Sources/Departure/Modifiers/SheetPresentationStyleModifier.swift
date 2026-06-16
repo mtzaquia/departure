@@ -41,12 +41,19 @@ struct SheetPresentationStyleModifier: ViewModifier {
 
 struct HighPrioritySheetHost: View {
     @Environment(Router.self) private var router
+    let windowDestinationBuilder: WindowDestinationBuilder
 
     var body: some View {
         let presentation = router.highPriorityRoutePresentationBinding(matching: .sheet)
 
-        HighPriorityPresentationWindowBridge(route: presentation) { route, onDismiss in
-            HighPrioritySheetPresenter(route: route, onDismiss: onDismiss)
+        HighPriorityPresentationWindowBridge(
+            route: presentation,
+            windowDestinationBuilder: windowDestinationBuilder
+        ) { presentation, onDismiss in
+            HighPrioritySheetPresenter(
+                onDismiss: onDismiss,
+                destination: presentation.destination
+            )
                 .environment(router)
                 .environment(\.routing, RoutingAction(router: router))
         }
@@ -57,8 +64,8 @@ struct HighPrioritySheetHost: View {
 // MARK: - Private
 
 private struct HighPrioritySheetPresenter: View {
-    let route: RoutePresentation
     let onDismiss: @MainActor () -> Void
+    let destination: AnyView
 
     @State private var isPresented = false
 
@@ -66,10 +73,7 @@ private struct HighPrioritySheetPresenter: View {
         Color.clear
             .ignoresSafeArea()
             .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
-                RouteView(
-                    scope: route.scope,
-                    providesNavigation: route.providesNavigation
-                )
+                destination
             }
             .onLifecycleEvent { event in
                 if case .installedInWindow(isInitial: true) = event {

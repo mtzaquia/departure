@@ -22,46 +22,12 @@
 
 import SwiftUI
 
-public struct RouteView: View {
-    let scope: RouteScope
-    let providesNavigation: Bool
+struct WindowDestinationBuilder {
+    let build: (RouteView, EnvironmentValues) -> AnyView
 
-    @Environment(Router.self) private var router
-
-    init(scope: RouteScope, providesNavigation: Bool = false) {
-        self.scope = scope
-        self.providesNavigation = providesNavigation
-    }
-
-    public var body: some View {
-        content
-            .environment(\.routeScope, scope)
-            .environment(\.routing, RoutingAction(router: router))
-            .onLifecycleEvent { event in
-                switch event {
-                case .updated:
-                    break
-
-                case .installedInWindow:
-                    router.routeScopeDidInstallInView(scope)
-
-                case .removedFromWindow, .deinitialized:
-                    router.routeScopeDidLeaveView(scope)
-                }
-            }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        let destination = (scope.route?.destination()).map(AnyView.init)
-
-        if providesNavigation {
-            NavigationStack {
-                destination
-            }
-        } else {
-            destination
+    init<Wrapped: View>(@ViewBuilder _ build: @escaping (RouteView, EnvironmentValues) -> Wrapped) {
+        self.build = { destination, environment in
+            AnyView(build(destination, environment))
         }
     }
-
 }

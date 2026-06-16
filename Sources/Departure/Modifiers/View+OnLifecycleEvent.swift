@@ -36,12 +36,14 @@ import UIKit
 
 struct ViewLifecycleBridge: UIViewRepresentable {
     enum Event {
+        case updated(EnvironmentValues)
         case installedInWindow(isInitial: Bool)
         case removedFromWindow
         case deinitialized
     }
 
     let onEvent: @MainActor (Event) -> Void
+    @Environment(\.self) private var environment
 
     func makeUIView(context: Context) -> LifecycleView {
         LifecycleView(onEvent: onEvent)
@@ -49,6 +51,7 @@ struct ViewLifecycleBridge: UIViewRepresentable {
 
     func updateUIView(_ uiView: LifecycleView, context: Context) {
         uiView.onEvent = onEvent
+        uiView.onEvent(.updated(environment))
     }
 
     static func dismantleUIView(_ uiView: LifecycleView, coordinator: ()) {
@@ -105,12 +108,14 @@ import AppKit
 
 struct ViewLifecycleBridge: NSViewRepresentable {
     enum Event {
+        case updated(EnvironmentValues)
         case installedInWindow(isInitial: Bool)
         case removedFromWindow
         case deinitialized
     }
 
     let onEvent: @MainActor (Event) -> Void
+    @Environment(\.self) private var environment
 
     func makeNSView(context: Context) -> LifecycleView {
         LifecycleView(onEvent: onEvent)
@@ -118,6 +123,7 @@ struct ViewLifecycleBridge: NSViewRepresentable {
 
     func updateNSView(_ nsView: LifecycleView, context: Context) {
         nsView.onEvent = onEvent
+        nsView.onEvent(.updated(environment))
     }
 
     static func dismantleNSView(_ nsView: LifecycleView, coordinator: ()) {

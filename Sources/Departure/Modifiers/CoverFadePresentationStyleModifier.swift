@@ -53,13 +53,17 @@ struct CoverFadePresentationStyleModifier: ViewModifier {
 
 struct HighPriorityCoverFadeHost: View {
     @Environment(Router.self) private var router
+    let windowDestinationBuilder: WindowDestinationBuilder
 
     var body: some View {
         let presentation = router.highPriorityRoutePresentationBinding(matching: .cover(.fade))
 
-        HighPriorityPresentationWindowBridge(route: presentation) { route, onDismiss in
+        HighPriorityPresentationWindowBridge(
+            route: presentation,
+            windowDestinationBuilder: windowDestinationBuilder
+        ) { presentation, onDismiss in
             HighPriorityCoverFadePresenter(
-                route: route,
+                presentation: presentation,
                 router: router,
                 onDismiss: onDismiss
             )
@@ -79,7 +83,7 @@ private struct CoverFadeModalPresenter: View {
 
     var body: some View {
         CrossDissolveModalPresenter(
-            route: route,
+            presentation: route.map(RouteDestinationSnapshot.init(route:)),
             router: router,
             onDismiss: {
                 route = nil
@@ -89,13 +93,13 @@ private struct CoverFadeModalPresenter: View {
 }
 
 private struct HighPriorityCoverFadePresenter: View {
-    let route: RoutePresentation
+    let presentation: RouteDestinationSnapshot
     let router: Router
     let onDismiss: @MainActor () -> Void
 
     var body: some View {
         CrossDissolveModalPresenter(
-            route: route,
+            presentation: presentation,
             router: router,
             onDismiss: onDismiss
         )
@@ -103,7 +107,7 @@ private struct HighPriorityCoverFadePresenter: View {
 }
 
 private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
-    let route: RoutePresentation?
+    let presentation: RouteDestinationSnapshot?
     let router: Router
     let onDismiss: @MainActor () -> Void
 
@@ -113,7 +117,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 
     func updateUIViewController(_ controller: Controller, context: Context) {
         controller.update(
-            route: route,
+            presentation: presentation,
             router: router,
             onDismiss: onDismiss
         )
@@ -124,7 +128,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
     }
 
     final class Controller: UIViewController, UIAdaptivePresentationControllerDelegate {
-        private var pendingRoute: RoutePresentation?
+        private var pendingPresentation: RouteDestinationSnapshot?
         private var router: Router?
         private var onDismiss: (@MainActor () -> Void)?
         private var presentedRouteID: RoutePresentation.ID?
@@ -141,20 +145,22 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         }
 
         func update(
-            route: RoutePresentation?,
+            presentation: RouteDestinationSnapshot?,
             router: Router,
             onDismiss: @escaping @MainActor () -> Void
         ) {
             self.router = router
             self.onDismiss = onDismiss
 
-            guard let route else {
-                pendingRoute = nil
+            guard let presentation else {
+                pendingPresentation = nil
                 dismissPresentedRoute(animated: true)
                 return
             }
 
-            pendingRoute = route
+            if pendingPresentation?.route.id != presentation.route.id {
+                pendingPresentation = presentation
+            }
 
             guard view.window != nil else {
                 return
@@ -175,15 +181,18 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 
         private func presentPendingRouteIfNeeded() {
             guard
-                let pendingRoute,
+                let pendingPresentation,
                 let router
             else {
                 return
             }
 
-            if presentedRouteID == pendingRoute.id {
-                hostingController?.rootView = rootView(for: pendingRoute, router: router)
-                self.pendingRoute = nil
+            if presentedRouteID == pendingPresentation.route.id {
+                hostingController?.rootView = rootView(
+                    router: router,
+                    destination: pendingPresentation.destination
+                )
+                self.pendingPresentation = nil
                 return
             }
 
@@ -193,7 +202,10 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
             }
 
             let hostingController = UIHostingController(
-                rootView: rootView(for: pendingRoute, router: router)
+                rootView: rootView(
+                    router: router,
+                    destination: pendingPresentation.destination
+                )
             )
             hostingController.view.backgroundColor = .clear
             hostingController.modalPresentationStyle = .overFullScreen
@@ -201,18 +213,18 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
             hostingController.presentationController?.delegate = self
 
             self.hostingController = hostingController
-            self.presentedRouteID = pendingRoute.id
-            self.pendingRoute = nil
+            self.presentedRouteID = pendingPresentation.route.id
+            self.pendingPresentation = nil
 
             present(hostingController, animated: true)
         }
 
-        private func rootView(for route: RoutePresentation, router: Router) -> AnyView {
+        private func rootView(
+            router: Router,
+            destination: AnyView
+        ) -> AnyView {
             AnyView(
-                RouteView(
-                    scope: route.scope,
-                    providesNavigation: route.providesNavigation
-                )
+                destination
                 .environment(router)
                 .environment(\.routing, RoutingAction(router: router))
             )
@@ -232,36 +244,33 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 }
 #else
 private struct HighPriorityCoverFadePresenter: View {
-    let route: RoutePresentation
+    let presentation: RouteDestinationSnapshot
     let router: Router
 
     init(
-        route: RoutePresentation,
+        presentation: RouteDestinationSnapshot,
         router: Router,
         onDismiss _: @escaping @MainActor () -> Void
     ) {
-        self.route = route
+        self.presentation = presentation
         self.router = router
     }
 
     var body: some View {
         CrossDissolveModalPresenter(
-            route: route,
-            router: router
+            presentation: presentation,
+            router: router,
         )
     }
 }
 
 private struct CrossDissolveModalPresenter: View {
-    let route: RoutePresentation?
+    let presentation: RouteDestinationSnapshot?
     let router: Router
 
     var body: some View {
-        if let route {
-            RouteView(
-                scope: route.scope,
-                providesNavigation: route.providesNavigation
-            )
+        if let presentation {
+            presentation.destination
             .environment(router)
             .environment(\.routing, RoutingAction(router: router))
         }

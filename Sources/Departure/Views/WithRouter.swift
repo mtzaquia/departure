@@ -32,6 +32,7 @@ import SwiftUI
 public struct WithRouter<Content: View>: View {
     @State var router: Router
     @ViewBuilder let content: Content
+    let windowDestinationBuilder: WindowDestinationBuilder
 
     /// The hosted content.
     public var body: some View {
@@ -39,9 +40,9 @@ public struct WithRouter<Content: View>: View {
             .environment(\.routeScope, router.root)
             .environment(\.routing, RoutingAction(router: router))
             .background {
-                HighPrioritySheetHost()
-                HighPriorityCoverSlideHost()
-                HighPriorityCoverFadeHost()
+                HighPrioritySheetHost(windowDestinationBuilder: windowDestinationBuilder)
+                HighPriorityCoverSlideHost(windowDestinationBuilder: windowDestinationBuilder)
+                HighPriorityCoverFadeHost(windowDestinationBuilder: windowDestinationBuilder)
             }
             .environment(router)
     }
@@ -52,5 +53,25 @@ public struct WithRouter<Content: View>: View {
     public init(router: Router? = nil, @ViewBuilder content: () -> Content) {
         self._router = State(wrappedValue: router ?? Router())
         self.content = content()
+        self.windowDestinationBuilder = WindowDestinationBuilder { destination, _ in
+            destination
+        }
+    }
+
+    /// Creates a router host with a high-priority window destination customizer.
+    ///
+    /// Pass a ``Router`` when app code needs to keep an explicit reference.
+    ///
+    /// `windowDestination` customizes destinations presented through Departure's
+    /// separate high-priority window. Use it to explicitly forward environment
+    /// values that should cross the `UIWindow` boundary.
+    public init<WindowContent: View>(
+        router: Router? = nil,
+        @ViewBuilder _ content: () -> Content,
+        @ViewBuilder windowDestination: @escaping (RouteView, EnvironmentValues) -> WindowContent
+    ) {
+        self._router = State(wrappedValue: router ?? Router())
+        self.content = content()
+        self.windowDestinationBuilder = WindowDestinationBuilder(windowDestination)
     }
 }

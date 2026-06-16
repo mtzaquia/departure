@@ -62,6 +62,9 @@ private struct RouteBranchModifier: ViewModifier {
             .environment(\.routeScope, branchScope)
             .onLifecycleEvent { event in
                 switch event {
+                case .updated:
+                    break
+
                 case .installedInWindow:
                     if let parentScope {
                         parentScope.registerBranchScope(branchScope, for: branch)
