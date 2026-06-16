@@ -30,9 +30,14 @@ struct LoginView: View {
     @State private var password = ""
 
     @Environment(Router.self) private var router
+    @Environment(\.sampleWindowBadge) private var sampleWindowBadge
 
     var body: some View {
         List {
+            Section {
+                LabeledContent("Window environment", value: sampleWindowBadge)
+            }
+
             TextField("E-mail", text: $email)
             SecureField("Password", text: $password)
 
@@ -48,6 +53,13 @@ struct LoginView: View {
             }
 
             Section {
+                Button("Replace with high-priority cover") {
+                    routing(.present(LoginReplacementRoute()))
+                }
+                .bold()
+
+                Text("A second high-priority cover attached to the same scope should replace this login cover.")
+
                 Button("Present alert") {
                     Task {
                         await router.present(AlertRoute())
@@ -67,5 +79,26 @@ struct LoginView: View {
                 }
             }
         }
+    }
+}
+
+struct LoginReplacementView: View {
+    @Environment(\.routing) private var routing
+    @Environment(\.sampleWindowBadge) private var sampleWindowBadge
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("Window environment", value: sampleWindowBadge)
+            }
+
+            Text("This high-priority cover replaced the login high-priority cover.")
+
+            Button("Dismiss replacement") {
+                routing(.unwind())
+            }
+            .bold()
+        }
+        .navigationTitle("Replacement")
     }
 }

@@ -53,6 +53,7 @@ struct LandingView: View {
         }
         .routes(branch: $tab) {
             Cover(LoginRoute.self, priority: .high)
+            Cover(LoginReplacementRoute.self, priority: .high)
             Cover(AlertRoute.self, priority: .high, transition: .fade, providesNavigation: false)
 
             Branch(.home) {

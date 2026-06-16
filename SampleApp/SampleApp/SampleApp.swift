@@ -49,6 +49,10 @@ struct SaveAppearanceSettingsAction: Action {
     }
 }
 
+extension EnvironmentValues {
+    @Entry var sampleWindowBadge: String = "not forwarded"
+}
+
 @main
 struct DepartureSampleApp: App {
     init() {
@@ -61,6 +65,10 @@ struct DepartureSampleApp: App {
                 NavigationStack {
                     StartView()
                 }
+                .environment(\.sampleWindowBadge, "forwarded from app window")
+            } windowDestination: { destination, environment in
+                destination
+                    .environment(\.sampleWindowBadge, environment.sampleWindowBadge)
             }
         }
     }
