@@ -24,6 +24,8 @@ import SwiftUI
 
 /// Performs routing commands from SwiftUI views.
 ///
+/// This compatibility type is deprecated. Use ``Router`` from the SwiftUI environment instead.
+///
 /// ```swift
 /// @Environment(\.routing) private var routing
 ///
@@ -31,6 +33,7 @@ import SwiftUI
 ///     routing(.present(SettingsRoute()))
 /// }
 /// ```
+@available(*, deprecated, message: "Use `@Environment(Router.self)` and call methods on `Router` instead.")
 public struct RoutingAction: Equatable {
     /// A routing command.
     public enum Request {
@@ -72,17 +75,23 @@ extension RoutingAction {
             switch request {
             case let .present(route):
                 Task {
-                    await router.requestRoute(route)
+                    await router.present(route)
                 }
 
             case let .unwind(target, route):
                 Task {
-                    await router.unwindAndWait(to: target, thenPresent: route)
+                    guard await router.unwind(to: target) else {
+                        return
+                    }
+
+                    if let route {
+                        await router.present(route)
+                    }
                 }
 
             case let .perform(action):
                 Task {
-                    await router.performAction(action)
+                    await router.perform(action)
                 }
             }
         }
@@ -92,8 +101,11 @@ extension RoutingAction {
 public extension EnvironmentValues {
     /// Routes from the nearest ``WithRouter``.
     ///
+    /// This compatibility value is deprecated. Use ``Router`` from the SwiftUI environment instead.
+    ///
     /// ```swift
     /// @Environment(\.routing) private var routing
     /// ```
+    @available(*, deprecated, message: "Use `@Environment(Router.self)` instead.")
     @Entry var routing = RoutingAction { _ in }
 }
