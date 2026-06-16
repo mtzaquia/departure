@@ -28,7 +28,7 @@ struct AppearanceSettingsView: View {
     @State private var storage = Storage.shared
 
     @Environment(\.colorScheme) private var effectiveColorScheme
-    @Environment(\.routing) private var routing
+    @Environment(Router.self) private var router
 
     var body: some View {
         List {
@@ -43,17 +43,23 @@ struct AppearanceSettingsView: View {
 
             Section {
                 Button("Re-present this") {
-                    routing(.present(AppearanceSettingsRoute()))
+                    Task {
+                        await router.present(AppearanceSettingsRoute())
+                    }
                 }
 
                 Button("Present authentication settings") {
-                    routing(.present(AuthenticationSettingsRoute()))
+                    Task {
+                        await router.present(AuthenticationSettingsRoute())
+                    }
                 }
             }
 
             Section("Actions") {
                 Button("Save appearance") {
-                    routing(.perform(SaveAppearanceSettingsAction()))
+                    Task {
+                        await router.perform(SaveAppearanceSettingsAction())
+                    }
                 }
 
                 Text("Saved \(storage.appearanceSaveCount) time(s)")

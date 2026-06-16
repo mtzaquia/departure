@@ -24,13 +24,15 @@ import Departure
 import SwiftUI
 
 struct ProfileView: View {
-    @Environment(\.routing) private var routing
+    @Environment(Router.self) private var router
 
     var body: some View {
         List {
             Button("Sign out", role: .destructive) {
                 Storage.shared.isLoggedIn = false
-                routing(.unwind(to: .root))
+                Task {
+                    await router.unwind(to: .root)
+                }
             }
         }
         .navigationTitle("Profile")
