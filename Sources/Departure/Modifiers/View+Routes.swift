@@ -119,10 +119,10 @@ private struct RoutesModifier: ViewModifier {
             .environment(\.branchRouteDeclarations, accumulatedBranchRouteDeclarations)
             .onLifecycleEvent { event in
                 switch event {
-                case .updated, .installedInWindow:
+                case .installedInWindow, .updated(isInstalledInWindow: true):
                     hydrateScope()
 
-                case .removedFromWindow, .deinitialized:
+                case .removedFromWindow, .deinitialized, .updated(isInstalledInWindow: false):
                     break
                 }
             }

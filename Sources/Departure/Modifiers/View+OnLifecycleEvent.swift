@@ -36,7 +36,7 @@ import UIKit
 
 struct ViewLifecycleBridge: UIViewRepresentable {
     enum Event {
-        case updated
+        case updated(isInstalledInWindow: Bool)
         case installedInWindow(isInitial: Bool)
         case removedFromWindow
         case deinitialized
@@ -50,7 +50,7 @@ struct ViewLifecycleBridge: UIViewRepresentable {
 
     func updateUIView(_ uiView: LifecycleView, context: Context) {
         uiView.onEvent = onEvent
-        uiView.onEvent(.updated)
+        uiView.onEvent(.updated(isInstalledInWindow: uiView.window != nil))
     }
 
     static func dismantleUIView(_ uiView: LifecycleView, coordinator: ()) {
@@ -107,7 +107,7 @@ import AppKit
 
 struct ViewLifecycleBridge: NSViewRepresentable {
     enum Event {
-        case updated
+        case updated(isInstalledInWindow: Bool)
         case installedInWindow(isInitial: Bool)
         case removedFromWindow
         case deinitialized
@@ -121,7 +121,7 @@ struct ViewLifecycleBridge: NSViewRepresentable {
 
     func updateNSView(_ nsView: LifecycleView, context: Context) {
         nsView.onEvent = onEvent
-        nsView.onEvent(.updated)
+        nsView.onEvent(.updated(isInstalledInWindow: nsView.window != nil))
     }
 
     static func dismantleNSView(_ nsView: LifecycleView, coordinator: ()) {
