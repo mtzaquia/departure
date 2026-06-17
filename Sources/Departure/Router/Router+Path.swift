@@ -367,7 +367,6 @@ extension Router {
 #if DEBUG
         log.departureDebug("Route scope unmounted: \(routeScope.departureDebugDescription).")
 #endif
-        removeFromPath(routeScope)
     }
 
     func waitForRouteScopesToLeaveView(_ routeScopes: [RouteScope]) async {

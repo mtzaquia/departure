@@ -122,7 +122,7 @@ private struct RoutesModifier: ViewModifier {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
                     hydrateScope()
 
-                case .removedFromWindow, .deinitialized, .updated(isInstalledInWindow: false):
+                case .dismantled, .deinitialized, .updated(isInstalledInWindow: false):
                     break
                 }
             }

@@ -38,7 +38,7 @@ struct ViewLifecycleBridge: UIViewRepresentable {
     enum Event {
         case updated(isInstalledInWindow: Bool)
         case installedInWindow(isInitial: Bool)
-        case removedFromWindow
+        case dismantled
         case deinitialized
     }
 
@@ -54,12 +54,13 @@ struct ViewLifecycleBridge: UIViewRepresentable {
     }
 
     static func dismantleUIView(_ uiView: LifecycleView, coordinator: ()) {
-        uiView.notifyDeinitialized()
+        uiView.notifyDismantled()
     }
 
     final class LifecycleView: UIView {
         var onEvent: @MainActor (Event) -> Void
         private var hasInstalledInWindow = false
+        private var hasDismantled = false
         private var hasDeinitialized = false
 
         init(onEvent: @escaping @MainActor (Event) -> Void) {
@@ -78,7 +79,7 @@ struct ViewLifecycleBridge: UIViewRepresentable {
 
             guard window != nil else {
                 if hasInstalledInWindow {
-                    onEvent(.removedFromWindow)
+                    onEvent(.updated(isInstalledInWindow: false))
                 }
                 return
             }
@@ -86,6 +87,15 @@ struct ViewLifecycleBridge: UIViewRepresentable {
             let isInitial = hasInstalledInWindow == false
             hasInstalledInWindow = true
             onEvent(.installedInWindow(isInitial: isInitial))
+        }
+
+        func notifyDismantled() {
+            guard hasDismantled == false else {
+                return
+            }
+
+            hasDismantled = true
+            onEvent(.dismantled)
         }
 
         func notifyDeinitialized() {
@@ -109,7 +119,7 @@ struct ViewLifecycleBridge: NSViewRepresentable {
     enum Event {
         case updated(isInstalledInWindow: Bool)
         case installedInWindow(isInitial: Bool)
-        case removedFromWindow
+        case dismantled
         case deinitialized
     }
 
@@ -125,12 +135,13 @@ struct ViewLifecycleBridge: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ nsView: LifecycleView, coordinator: ()) {
-        nsView.notifyDeinitialized()
+        nsView.notifyDismantled()
     }
 
     final class LifecycleView: NSView {
         var onEvent: @MainActor (Event) -> Void
         private var hasInstalledInWindow = false
+        private var hasDismantled = false
         private var hasDeinitialized = false
 
         init(onEvent: @escaping @MainActor (Event) -> Void) {
@@ -148,7 +159,7 @@ struct ViewLifecycleBridge: NSViewRepresentable {
 
             guard window != nil else {
                 if hasInstalledInWindow {
-                    onEvent(.removedFromWindow)
+                    onEvent(.updated(isInstalledInWindow: false))
                 }
                 return
             }
@@ -156,6 +167,15 @@ struct ViewLifecycleBridge: NSViewRepresentable {
             let isInitial = hasInstalledInWindow == false
             hasInstalledInWindow = true
             onEvent(.installedInWindow(isInitial: isInitial))
+        }
+
+        func notifyDismantled() {
+            guard hasDismantled == false else {
+                return
+            }
+
+            hasDismantled = true
+            onEvent(.dismantled)
         }
 
         func notifyDeinitialized() {

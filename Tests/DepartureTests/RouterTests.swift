@@ -126,6 +126,59 @@ struct RouterTests {
         #expect(router.pendingRoute == nil)
     }
 
+    @Test func routeRequestFromMountedInactiveBranchWaitsForTargetBranchScope() async {
+        let router = Router()
+        let (selection, selectedTab) = tabSelection(.wallet)
+
+        router.root.hydrateRoutes(
+            id: nil,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.home) {
+                        Push(HomeDetailRoute.self)
+                    }
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.wallet) {
+                        Push(TransactionRoute.self)
+                    }
+                )
+            )
+        )
+
+        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        walletScope.hydrateRoutes(
+            id: AnyHashable(AppTab.wallet),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(TransactionRoute.self)._routeDeclarations),
+            ]
+        )
+        router.root.registerBranchScope(walletScope, for: AppTab.wallet)
+
+        await router.requestRoute(HomeDetailRoute())
+
+        #expect(selectedTab() == .home)
+        #expect(router.path.isEmpty)
+        #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.home))
+
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        homeScope.hydrateRoutes(
+            id: AnyHashable(AppTab.home),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+            ]
+        )
+        router.root.registerBranchScope(homeScope, for: AppTab.home)
+        router.resumePendingRoute(for: AppTab.home, in: router.root)
+
+        #expect(router.path.count == 1)
+        #expect(router.path.last?.route is HomeDetailRoute)
+        #expect(router.pendingRoute == nil)
+    }
+
     @Test func unresolvedRoutesAndUndeclaredRoutesAreDropped() async {
         let router = Router()
 
@@ -257,6 +310,29 @@ struct RouterTests {
 
         #expect(router.path.isEmpty)
         #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue == nil)
+    }
+
+    @Test func routeScopeLeavingViewUnmountsWithoutRemovingRouterPath() async throws {
+        let router = Router()
+
+        router.root.hydrateRoutes(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(HomeDetailRoute())
+        let pushedScope = try #require(router.path.last)
+
+        router.routeScopeDidInstallInView(pushedScope)
+        router.routeScopeDidLeaveView(pushedScope)
+
+        #expect(pushedScope.isMounted == false)
+        #expect(router.path.count == 1)
+        #expect(router.path.last === pushedScope)
+        #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue != nil)
     }
 
     @Test func unwindDismissesCurrentRoute() async {
@@ -456,6 +532,23 @@ struct RouterTests {
 
         #expect(router.routePresentationBinding(from: homeScope, matching: .push).wrappedValue == nil)
     }
+
+    #if DEBUG
+    @Test func branchScopeRegistrationIsIdempotentAndKeepsDebugIdentityAfterUnregister() {
+        let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let branchScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+
+        #expect(parentScope.registerBranchScope(branchScope, for: AppTab.home))
+        #expect(parentScope.registerBranchScope(branchScope, for: AppTab.home) == false)
+        #expect(branchScope.departureDebugDescription == "branchScope#home")
+
+        parentScope.unregisterBranchScope(branchScope, for: AppTab.home)
+        parentScope.unregisterBranchScope(branchScope, for: AppTab.home)
+
+        #expect(branchScope.parent == nil)
+        #expect(branchScope.departureDebugDescription == "branchScope#home")
+    }
+    #endif
 
     @Test func highPriorityPresentationUsesActiveLocalBranchScope() async {
         let router = Router()

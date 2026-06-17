@@ -45,7 +45,7 @@ public struct RouteView: View {
                 case .installedInWindow:
                     router.routeScopeDidInstallInView(scope)
 
-                case .removedFromWindow, .deinitialized:
+                case .dismantled, .deinitialized:
                     router.routeScopeDidLeaveView(scope)
                 }
             }

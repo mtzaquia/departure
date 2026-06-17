@@ -62,19 +62,29 @@ private struct RouteBranchModifier: ViewModifier {
             .environment(\.routeScope, branchScope)
             .onLifecycleEvent { event in
                 switch event {
-                case .updated:
-                    break
+                case .updated(isInstalledInWindow: true):
+                    registerBranchScope()
+
+                case .updated(isInstalledInWindow: false):
+                    parentScope?.unregisterBranchScope(branchScope, for: branch)
 
                 case .installedInWindow:
-                    if let parentScope {
-                        parentScope.registerBranchScope(branchScope, for: branch)
-                        router.resumePendingRoute(for: branch, in: parentScope)
-                    }
+                    registerBranchScope()
 
-                case .removedFromWindow, .deinitialized:
+                case .dismantled, .deinitialized:
                     parentScope?.unregisterBranchScope(branchScope, for: branch)
                 }
             }
+    }
+
+    private func registerBranchScope() {
+        guard let parentScope else {
+            return
+        }
+
+        if parentScope.registerBranchScope(branchScope, for: branch) {
+            router.resumePendingRoute(for: branch, in: parentScope)
+        }
     }
 
     private var adoptedDeclarations: [RouteScopeDeclaration] {
