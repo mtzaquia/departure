@@ -49,13 +49,13 @@ extension ObjectIdentifier {
 
 extension Action {
     var departureDebugDescription: String {
-        "\(departureDebugName(for: type(of: self)))(id: \(id.departureDebugDescription))"
+        "\(departureDebugName(for: type(of: self)))#\(id.departureDebugDescription)"
     }
 }
 
 extension Route {
     var departureDebugDescription: String {
-        "\(departureDebugName(for: type(of: self)))(id: \(id.departureDebugDescription))"
+        "\(departureDebugName(for: type(of: self)))#\(id.departureDebugDescription)"
     }
 }
 
@@ -72,7 +72,7 @@ extension AnyRouteDeclaration {
             presentationDescription = "cover.\(transition)@\(priority)"
         }
 
-        let drivesPresentationDescription = drivesPresentation ? "" : ", discoveryOnly"
+        let drivesPresentationDescription = drivesPresentation ? "" : ", discovery"
         return "\(departureDebugName(for: routeType))[\(presentationDescription)\(drivesPresentationDescription)]"
     }
 }
@@ -83,13 +83,16 @@ private func departureDebugName(for type: Any.Type) -> String {
 
 extension RouteScope {
     var departureDebugDescription: String {
-        let branchDescription = isFlatScope ? "" : ", activeBranch: \(activeBranch.departureDebugDescription)"
-
         if let route {
-            return "scope(id: \(id.departureDebugDescription), route: \(route.departureDebugDescription)\(branchDescription))"
+            return "routeScope#\(id.departureDebugDescription)(\(route.departureDebugDescription))"
         }
 
-        return "scope(id: \(id.departureDebugDescription), route: root\(branchDescription))"
+        if debugKind == .branch {
+            return "branchScope#\(id.departureDebugDescription)"
+        }
+
+        let branchDescription = isFlatScope ? "" : ", active=\(activeBranch.departureDebugDescription)"
+        return "rootScope#\(id.departureDebugDescription)\(branchDescription)"
     }
 
     var branchDebugDescription: String? {

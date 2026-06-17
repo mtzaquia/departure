@@ -41,6 +41,10 @@ final class RouteScope: Identifiable {
     private var branchScopes: [Branch.ID: RouteScope] = [:]
     private var unmountObservers: [@MainActor () -> Void] = []
 
+    #if DEBUG
+    private(set) var debugKind = DebugKind.root
+    #endif
+
     private(set) var isMounted = false
     private(set) var sourceEnvironment = EnvironmentValues()
 
@@ -94,33 +98,48 @@ final class RouteScope: Identifiable {
         return true
     }
 
-    func registerBranchScope(_ routeScope: RouteScope, for branch: AnyHashable) {
+    @discardableResult
+    func registerBranchScope(_ routeScope: RouteScope, for branch: AnyHashable) -> Bool {
+        #if DEBUG
+        routeScope.debugKind = .branch
+        #endif
+
+        guard branchScopes[branch] !== routeScope else {
+            routeScope.parent = self
+            return false
+        }
+
         routeScope.parent = self
         branchScopes[branch] = routeScope
 #if DEBUG
         log.departureDebug(
-            "Branch scope registered: branch \(branch.departureDebugDescription), parent: \(departureDebugDescription), scope: \(routeScope.departureDebugDescription)."
+            "branch registered | branch=\(branch.departureDebugDescription) | parent=\(departureDebugDescription) | scope=\(routeScope.departureDebugDescription)"
         )
 #endif
+        return true
     }
 
     func unregisterBranchScope(_ routeScope: RouteScope, for branch: AnyHashable) {
-        guard branchScopes[branch] === routeScope else {
+        guard let registeredScope = branchScopes[branch] else {
+            return
+        }
+
+        guard registeredScope === routeScope else {
 #if DEBUG
             log.departureDebug(
-                "Branch scope unregister skipped: branch \(branch.departureDebugDescription) did not match scope \(routeScope.departureDebugDescription)."
+                "branch unregister skipped | branch=\(branch.departureDebugDescription) | reason=scope mismatch | scope=\(routeScope.departureDebugDescription)"
             )
 #endif
             return
         }
 
-        branchScopes[branch] = nil
-        routeScope.parent = nil
 #if DEBUG
         log.departureDebug(
-            "Branch scope unregistered: branch \(branch.departureDebugDescription), scope: \(routeScope.departureDebugDescription)."
+            "branch unregistered | branch=\(branch.departureDebugDescription) | scope=\(routeScope.departureDebugDescription)"
         )
 #endif
+        branchScopes[branch] = nil
+        routeScope.parent = nil
     }
 
     func mount() {
@@ -179,6 +198,15 @@ final class RouteScope: Identifiable {
     }
 }
 
+#if DEBUG
+extension RouteScope {
+    enum DebugKind {
+        case root
+        case branch
+    }
+}
+#endif
+
 // MARK: - Hydration
 
 extension RouteScope {
@@ -210,7 +238,7 @@ extension RouteScope {
 #if DEBUG
         let branchDescription = branchDebugDescription.map { ", branches: \($0)" } ?? ""
         log.departureDebug(
-            "Route scope hydrated routes: \(departureDebugDescription), declarations: \(routeDeclarations.count)\(branchDescription)."
+            "routes hydrated | scope=\(departureDebugDescription) | declarations=\(routeDeclarations.count)\(branchDescription)"
         )
 #endif
     }
@@ -222,7 +250,7 @@ extension RouteScope {
         branches[branchIndex].hookAttachments = hookDeclarations
 #if DEBUG
         log.departureDebug(
-            "Route scope hydrated hooks: \(departureDebugDescription), hooks: \(hookDeclarations.count)."
+            "hooks hydrated | scope=\(departureDebugDescription) | hooks=\(hookDeclarations.count)"
         )
 #endif
     }
