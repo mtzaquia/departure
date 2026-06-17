@@ -5,14 +5,14 @@ Departure is a lightweight, expressive routing framework for SwiftUI.
 It lets visible views declare the routes they own, then lets any active route ask Departure to present a route by type. Departure finds the closest visible owner and uses SwiftUI presentation APIs such as pushes, sheets, and full-screen covers.
 
 ```swift
-routing(.present(SettingsRoute()))
+await router.present(SettingsRoute())
 ```
 
 The point is to keep navigation local without forcing every feature to receive a pile of callbacks.
 
 ## Install
 
-Departure is available via Swift Package Manager, and requires `Swift 6.2`.
+Departure is available via Swift Package Manager.
 
 ```swift
 dependencies: [
@@ -64,11 +64,13 @@ Attach routes to the view scope that owns them:
 
 ```swift
 struct HomeView: View {
-  @Environment(\.routing) private var routing
+  @Environment(Router.self) private var router
 
   var body: some View {
     Button("Settings") {
-      routing(.present(SettingsRoute()))
+      Task {
+        await router.present(SettingsRoute())
+      }
     }
     .routes {
       Sheet(SettingsRoute.self)
@@ -112,7 +114,7 @@ Route requests are resolved by visible ownership.
 
 ```mermaid
 flowchart TD
-    request["routing(.present(ReceiptRoute()))"]
+    request["await router.present(ReceiptRoute())"]
     active["Start at active route scope"]
     owns{"Did this scope declare ReceiptRoute?"}
     previous["Move to previous visible owner"]
@@ -249,7 +251,7 @@ Return:
 
 ## Actions
 
-Actions are fire-and-forget work values that run against the active route context.
+Actions are work values that run against the active route context.
 
 ```swift
 struct SaveDraftAction: Action {
@@ -263,15 +265,17 @@ struct SaveDraftAction: Action {
 }
 ```
 
-Run an action from SwiftUI through `routing`:
+Run an action from SwiftUI through the router:
 
 ```swift
 struct ToolbarView: View {
-  @Environment(\.routing) private var routing
+  @Environment(Router.self) private var router
 
   var body: some View {
     Button("Save") {
-      routing(.perform(SaveDraftAction()))
+      Task {
+        await router.perform(SaveDraftAction())
+      }
     }
   }
 }
@@ -334,23 +338,23 @@ If an intercepted action throws `.reroute(route)` from its original implementati
 Unwind is the counterpart to presentation: instead of asking for a new route, a view asks Departure to dismiss the current route or dismiss back to a known route scope.
 
 ```swift
-routing(.unwind())
+await router.unwind()
 ```
 
-`routing(.unwind())` dismisses the current route. If the current route is the only route in the path, it unwinds to the root scope.
+`await router.unwind()` dismisses the current route. If the current route is the only route in the path, it unwinds to the root scope.
 
 Use an explicit target when you want to dismiss more than one route:
 
 ```swift
-routing(.unwind(to: .root))
-routing(.unwind(to: .id("settings-flow")))
+await router.unwind(to: .root)
+await router.unwind(to: .id("settings-flow"))
 ```
 
 | API | Behavior |
 | --- | --- |
-| `routing(.unwind())` | Dismisses the current route. |
-| `routing(.unwind(to: .root))` | Clears all presented routes and returns to the root scope. |
-| `routing(.unwind(to: .id(id)))` | Keeps the matching route scope and dismisses everything after it. |
+| `await router.unwind()` | Dismisses the current route. |
+| `await router.unwind(to: .root)` | Clears all presented routes and returns to the root scope. |
+| `await router.unwind(to: .id(id))` | Keeps the matching route scope and dismisses everything after it. |
 
 Scope IDs are useful when a view owns a named flow:
 
@@ -365,19 +369,26 @@ SettingsFlowView()
 You can also ask Departure to present another route after the unwind completes:
 
 ```swift
-routing(.unwind(thenPresent: ProfileRoute()))
-routing(.unwind(to: .root, thenPresent: LoginRoute(nextRoute: ProfileRoute())))
+await router.unwind()
+await router.present(ProfileRoute())
+
+if await router.unwind(to: .id("settings-flow")) {
+  await router.present(LoginRoute(nextRoute: ProfileRoute()))
+}
 ```
 
 For example, a completion screen can dismiss itself and continue with a route owned by an earlier visible scope:
 
 ```swift
 struct CompletionView: View {
-  @Environment(\.routing) private var routing
+  @Environment(Router.self) private var router
 
   var body: some View {
     Button("Done") {
-      routing(.unwind(thenPresent: SummaryRoute()))
+      Task {
+        await router.unwind()
+        await router.present(SummaryRoute())
+      }
     }
   }
 }
@@ -386,7 +397,19 @@ struct CompletionView: View {
 Departure removes the route scopes from its path first, then waits for any mounted dismissed route views to leave SwiftUI before requesting the continuation route. The continuation is a normal route request: it resolves, crawls visible scopes, selects branches, observes priority, and may still be dropped if no eligible declaration exists.
 
 > [!NOTE]
-> `thenPresent` does not bypass routing rules. It only sequences dismissal before the next request.
+> `unwind(to:)` returns `false` when an explicit target is not found. Check the return value before presenting a continuation route when you need the same behavior as the deprecated `thenPresent` request.
+
+## Compatibility
+
+`RoutingAction` and `EnvironmentValues.routing` remain available for existing apps, but they are deprecated. Prefer reading `Router` directly from the environment:
+
+```swift
+@Environment(Router.self) private var router
+
+await router.present(SettingsRoute())
+await router.perform(SaveDraftAction())
+await router.unwind(to: .root)
+```
 
 ## License
 

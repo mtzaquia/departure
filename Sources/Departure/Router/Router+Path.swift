@@ -21,14 +21,10 @@
 //
 
 extension Router {
-    func unwindAndWait(
-        to target: UnwindTarget?,
-        thenPresent route: (any Route)?
-    ) async {
+    @discardableResult
+    func unwindAndWait(to target: UnwindTarget?) async -> Bool {
 #if DEBUG
-        log.departureDebug(
-            "Unwind requested: target: \(String(describing: target)), thenPresent: \(route?.departureDebugDescription ?? "nil")."
-        )
+        log.departureDebug("Unwind requested: target: \(String(describing: target)).")
 #endif
 
         switch unwindResolution(for: target) {
@@ -36,20 +32,13 @@ extension Router {
 #if DEBUG
             log.departureDebug("Unwind skipped: no route to unwind.")
 #endif
-            if let route {
-#if DEBUG
-                log.departureDebug("Unwind thenPresent requested without unwind: \(route.departureDebugDescription).")
-#endif
-                await requestRoute(route)
-            }
-
-            return
+            return true
 
         case .targetNotFound:
 #if DEBUG
             log.departureDebug("Unwind dropped: target not found: \(String(describing: target)).")
 #endif
-            return
+            return false
 
         case let .keepPathThrough(targetPathIndex):
             let removedScopes = routeScopesRemovedByKeepingPathThrough(targetPathIndex)
@@ -70,12 +59,7 @@ extension Router {
             log.departureDebug("Unwind completed: removed scope(s) left view.")
 #endif
 
-            if let route {
-#if DEBUG
-                log.departureDebug("Unwind thenPresent requesting route: \(route.departureDebugDescription).")
-#endif
-                await requestRoute(route)
-            }
+            return true
         }
     }
 

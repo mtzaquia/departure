@@ -29,7 +29,7 @@ struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
 
-    @Environment(\.routing) private var routing
+    @Environment(Router.self) private var router
 
     var body: some View {
         List {
@@ -38,12 +38,20 @@ struct LoginView: View {
 
             Button("Log in") {
                 Storage.shared.isLoggedIn = true
-                routing(.unwind(thenPresent: nextRoute))
+                Task {
+                    await router.unwind()
+
+                    if let nextRoute {
+                        await router.present(nextRoute)
+                    }
+                }
             }
 
             Section {
                 Button("Present alert") {
-                    routing(.present(AlertRoute()))
+                    Task {
+                        await router.present(AlertRoute())
+                    }
                 }
                 .bold()
                 Text("An alert attached to an ancestor scope with high priority should replace this screen.")
@@ -53,7 +61,9 @@ struct LoginView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
-                    routing(.unwind())
+                    Task {
+                        await router.unwind()
+                    }
                 }
             }
         }

@@ -24,12 +24,14 @@ import Departure
 import SwiftUI
 
 struct StartView: View {
-    @Environment(\.routing) private var routing
+    @Environment(Router.self) private var router
 
     var body: some View {
         ZStack {
             Button("Start", action: {
-                routing(.present(LandingRoute()))
+                Task {
+                    await router.present(LandingRoute())
+                }
             })
         }
         .routes {

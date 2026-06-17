@@ -24,29 +24,39 @@ import Departure
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(\.routing) private var routing
+    @Environment(Router.self) private var router
 
     var body: some View {
         List {
             Button("Appearance") {
-                routing(.present(AppearanceSettingsRoute()))
+                Task {
+                    await router.present(AppearanceSettingsRoute())
+                }
             }
 
             Button("Authentication") {
-                routing(.present(AuthenticationSettingsRoute()))
+                Task {
+                    await router.present(AuthenticationSettingsRoute())
+                }
             }
 
             Button("Profile") {
-                routing(.present(ProfileRoute()))
+                Task {
+                    await router.present(ProfileRoute())
+                }
             }
 
             Section("Actions") {
                 Button("Save appearance") {
-                    routing(.perform(SaveAppearanceSettingsAction()))
+                    Task {
+                        await router.perform(SaveAppearanceSettingsAction())
+                    }
                 }
 
                 Button("New emoji") {
-                    routing(.perform(RandomizeEmojiAction()))
+                    Task {
+                        await router.perform(RandomizeEmojiAction())
+                    }
                 }
             }
         }

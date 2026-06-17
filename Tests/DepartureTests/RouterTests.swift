@@ -27,6 +27,62 @@ import Testing
 @MainActor
 @Suite
 struct RouterTests {
+    @Test func routersCompareByIdentity() {
+        let router = Router()
+        let sameRouter = router
+        let otherRouter = Router()
+
+        #expect(router == sameRouter)
+        #expect(router != otherRouter)
+        #expect(router.id != otherRouter.id)
+    }
+
+    @Test func publicRoutingActionsDispatchThroughRouter() async {
+        let router = Router()
+        let actionRecorder = AsyncActionRecorder()
+
+        router.root.hydrateRoutes(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.present(HomeDetailRoute())
+
+        #expect(router.path.count == 1)
+        #expect(router.path.last?.route is HomeDetailRoute)
+
+        await router.unwind()
+
+        #expect(router.path.isEmpty)
+
+        router.path = [RouteScope(id: RootRoute().id, route: RootRoute())]
+        await router.perform(RecordingProbeAction(recorder: actionRecorder))
+
+        #expect(await actionRecorder.values() == [true])
+    }
+
+    @Test func publicUnwindReportsMissingTargetBeforeContinuation() async {
+        let router = Router()
+        router.root.hydrateRoutes(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+
+        let didUnwind = await router.unwind(to: .id("missing"))
+        if didUnwind {
+            await router.present(SettingsRoute())
+        }
+
+        #expect(didUnwind == false)
+        #expect(router.path.isEmpty)
+    }
+
     @Test func routeRequestSelectsInactiveBranchAndWaitsForMountedBranchScope() async {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.wallet)
@@ -211,7 +267,7 @@ struct RouterTests {
         router.path = [firstScope, secondScope]
         router.highPrioritySegmentStartIndex = 1
 
-        await router.unwindAndWait(to: nil, thenPresent: nil)
+        await router.unwindAndWait(to: nil)
 
         #expect(router.path.count == 1)
         #expect(router.path.last === firstScope)
@@ -226,7 +282,7 @@ struct RouterTests {
         router.path = [firstScope, secondScope]
         router.highPrioritySegmentStartIndex = 1
 
-        await router.unwindAndWait(to: .id(RootRoute().id), thenPresent: nil)
+        await router.unwindAndWait(to: .id(RootRoute().id))
 
         #expect(router.path.count == 1)
         #expect(router.path.last === firstScope)
@@ -241,13 +297,13 @@ struct RouterTests {
         router.path = [firstScope, secondScope]
         router.highPrioritySegmentStartIndex = 1
 
-        await router.unwindAndWait(to: .root, thenPresent: nil)
+        await router.unwindAndWait(to: .root)
 
         #expect(router.path.isEmpty)
         #expect(router.highPrioritySegmentStartIndex == nil)
     }
 
-    @Test func unwindThenPresentWaitsForMountedRouteScopeToLeaveView() async {
+    @Test func sequentialUnwindThenPresentWaitsForMountedRouteScopeToLeaveView() async {
         let router = Router()
         let loginScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
@@ -264,7 +320,11 @@ struct RouterTests {
         router.routeScopeDidInstallInView(loginScope)
 
         let unwindTask = Task {
-            await router.unwindAndWait(to: nil, thenPresent: SettingsRoute())
+            guard await router.unwind(to: nil) else {
+                return
+            }
+
+            await router.present(SettingsRoute())
         }
 
         await Task.yield()
@@ -273,13 +333,13 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
 
         router.routeScopeDidLeaveView(loginScope)
-        await unwindTask.value
+        _ = await unwindTask.value
 
         #expect(router.path.count == 1)
         #expect(router.path.last?.route is SettingsRoute)
     }
 
-    @Test func unwindThenPresentCutsPathBeforeWaitingForAllRemovedScopes() async {
+    @Test func sequentialUnwindThenPresentCutsPathBeforeWaitingForAllRemovedScopes() async {
         let router = Router()
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -299,7 +359,11 @@ struct RouterTests {
         router.routeScopeDidInstallInView(thirdScope)
 
         let unwindTask = Task {
-            await router.unwindAndWait(to: .root, thenPresent: SettingsRoute())
+            guard await router.unwind(to: .root) else {
+                return
+            }
+
+            await router.present(SettingsRoute())
         }
 
         await Task.yield()
@@ -313,7 +377,7 @@ struct RouterTests {
         #expect(router.path.isEmpty)
 
         router.routeScopeDidLeaveView(thirdScope)
-        await unwindTask.value
+        _ = await unwindTask.value
 
         #expect(router.path.count == 1)
         #expect(router.path.last?.route is SettingsRoute)
@@ -347,7 +411,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(profileScope)
 
         let unwindTask = Task {
-            await router.unwindAndWait(to: .root, thenPresent: nil)
+            await router.unwindAndWait(to: .root)
         }
 
         await Task.yield()
@@ -357,7 +421,7 @@ struct RouterTests {
 
         router.routeScopeDidLeaveView(profileScope)
         router.routeScopeDidLeaveView(landingScope)
-        await unwindTask.value
+        _ = await unwindTask.value
 
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }

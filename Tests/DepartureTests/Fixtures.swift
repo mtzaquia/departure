@@ -96,6 +96,26 @@ final class ActionRecorder {
     var bools: [Bool] = []
 }
 
+actor AsyncActionRecorder {
+    private var bools: [Bool] = []
+
+    func append(_ value: Bool) {
+        bools.append(value)
+    }
+
+    func values() -> [Bool] {
+        bools
+    }
+}
+
+struct RecordingProbeAction: Action {
+    let recorder: AsyncActionRecorder
+
+    func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
+        await recorder.append(context.isRunning(in: RootRoute.self))
+    }
+}
+
 @MainActor
 func tabSelection(_ value: AppTab) -> (Binding<AppTab>, @MainActor () -> AppTab) {
     final class Storage {

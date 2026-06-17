@@ -25,7 +25,7 @@ import SwiftUI
 /// A request to present a destination view.
 ///
 /// Declare route types with ``SwiftUICore/View/routes(id:_:)``, then request instances with
-/// ``RoutingAction``.
+/// ``Router``.
 ///
 /// ```swift
 /// struct SettingsRoute: Route {
@@ -34,7 +34,7 @@ import SwiftUI
 ///     }
 /// }
 ///
-/// routing(.present(SettingsRoute()))
+/// await router.present(SettingsRoute())
 /// ```
 public protocol Route: Identifiable, Sendable where ID == ObjectIdentifier {
     /// Returns the resolution result whenever attempting to present this route.

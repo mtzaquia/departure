@@ -24,13 +24,15 @@ import Departure
 import SwiftUI
 
 struct HomeView: View {
-    @Environment(\.routing) private var routing
+    @Environment(Router.self) private var router
 
     var body: some View {
         List {
             Text("Welcome home.")
             Button("Show message") {
-                routing(.present(MessageRoute()))
+                Task {
+                    await router.present(MessageRoute())
+                }
             }
 
             Section {
@@ -48,7 +50,9 @@ struct HomeView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Profile", systemImage: "person") {
-                    routing(.present(ProfileRoute()))
+                    Task {
+                        await router.present(ProfileRoute())
+                    }
                 }
             }
         }

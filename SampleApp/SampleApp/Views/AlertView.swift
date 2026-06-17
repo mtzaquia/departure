@@ -24,7 +24,7 @@ import Departure
 import SwiftUI
 
 struct AlertView: View {
-    @Environment(\.routing) private var routing
+    @Environment(Router.self) private var router
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -36,7 +36,9 @@ struct AlertView: View {
                 Text("This is an alert!")
 
                 Button("Dismiss with unwind") {
-                    routing(.unwind())
+                    Task {
+                        await router.unwind()
+                    }
                 }
                 .bold()
 
