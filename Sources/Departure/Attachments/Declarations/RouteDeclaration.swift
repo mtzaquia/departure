@@ -104,7 +104,7 @@ extension [RouteScopeDeclaration] {
     }
 }
 
-/// A value accepted by ``View/routes(id:_:)``.
+/// A value accepted by ``SwiftUICore/View/routes(id:_:)``.
 ///
 /// ``Push``, ``Sheet``, and ``Cover`` conform to this protocol.
 public protocol RouteDeclaration {

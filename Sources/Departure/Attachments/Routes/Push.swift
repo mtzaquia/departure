@@ -32,7 +32,7 @@ public struct Push: RouteDeclaration, Sendable {
 
     /// Creates a push declaration.
     ///
-    /// - Important: The declaring view must be inside a SwiftUI ``NavigationStack``.
+    /// - Important: The declaring view must be inside a SwiftUI `NavigationStack`.
     public init<R: Route>(_ routeType: R.Type) {
         self.declaration = AnyRouteDeclaration(
             routeType: routeType,

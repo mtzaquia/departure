@@ -31,7 +31,7 @@ public extension View {
     /// ```
     ///
     /// - Important: The value must match a ``Branch`` value declared by
-    ///   ``View/routes(id:branch:_:)``.
+    ///   ``SwiftUICore/View/routes(id:branch:_:)``.
     func routeBranch<Branch: Hashable>(_ branch: Branch) -> some View {
         modifier(RouteBranchModifier(branch: AnyHashable(branch)))
     }

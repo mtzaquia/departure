@@ -24,7 +24,7 @@ import SwiftUI
 
 /// A request to present a destination view.
 ///
-/// Declare route types with ``View/routes(id:_:)``, then request instances with
+/// Declare route types with ``SwiftUICore/View/routes(id:_:)``, then request instances with
 /// ``RoutingAction``.
 ///
 /// ```swift
@@ -37,16 +37,26 @@ import SwiftUI
 /// routing(.present(SettingsRoute()))
 /// ```
 public protocol Route: Identifiable, Sendable where ID == ObjectIdentifier {
-    /// Returns the route that should be matched.
+    /// Returns the resolution result whenever attempting to present this route.
     ///
-    /// Return `self` for ordinary routing, another ``Route`` to redirect, or `nil` to
-    /// drop the request.
+    /// Despite asynchronous, routing is suspended until this function returns. On a re-route, the target route is also evaluated.
+    /// Provide a quick resolution to avoid the app standing idle. The implementer is also responsible for ensuring no recursion occurs.
     ///
     /// ```swift
-    /// func resolveRoute() async -> (any Route)? {
-    ///     isLoggedIn ? self : LoginRoute()
+    /// func resolveRoute() async -> RouteResolution {
+    ///     isLoggedIn ? .allow : .reroute(LoginRoute())
     /// }
     /// ```
+    ///
+    /// - Returns: A route evaluation resolution.
+    func resolveRoute() async -> RouteResolution
+
+    /// Resolves the final route that should be used.
+    ///
+    /// - Important: this function is deprecated, prefer  ``Route/resolveRoute()-56snl`` returning ``RouteResolution`` instead.
+    ///
+    /// - Returns: The route to be used, or `nil` to drop the request.
+    @available(*, deprecated, message: "Use `resolveRoute()` returning `RouteResolution`.")
     func resolveRoute() async -> (any Route)?
 
     /// The view shown for this route.
@@ -65,7 +75,30 @@ public extension Route {
         ObjectIdentifier(Self.self)
     }
 
+    @available(*, deprecated, message: "Use `resolveRoute()` returning `RouteResolution`.")
     func resolveRoute() async -> (any Route)? {
         self
     }
+
+    func resolveRoute() async -> RouteResolution {
+        let result: (any Route)? = await resolveRoute()
+        
+        return switch result {
+        case .some(let route) where route.id == self.id: .allow
+        case .some(let route): .reroute(route)
+        case .none: .drop
+        }
+    }
+}
+
+// MARK: - Supporting types
+
+/// The result of a ``Route/resolveRoute()-56snl`` evaluation.
+public enum RouteResolution {
+    /// The router is allowed to present the requested route.
+    case allow
+    /// The router should present a different route instead.
+    case reroute(any Route)
+    /// The router should ignore the request.
+    case drop
 }

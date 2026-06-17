@@ -28,22 +28,31 @@ extension Router {
         log.departureDebug("Route requested: \(route.departureDebugDescription)")
 #endif
 
-        guard let resolvedRoute = await route.resolveRoute() else {
+        let resolvedRoute: (any Route)?
+
+        let resolutionResult: RouteResolution = await route.resolveRoute()
+        switch resolutionResult {
+        case .allow:
+            resolvedRoute = route
+
+        case .reroute(let newRoute):
 #if DEBUG
-            log.departureDebug("Route dropped: \(route.departureDebugDescription) resolved to nil.")
+            log.departureDebug(
+                "Route rerouted: \(route.departureDebugDescription) -> \(newRoute.departureDebugDescription)"
+            )
 #endif
-            return
+            resolvedRoute = newRoute
+
+        case .drop:
+#if DEBUG
+            log.departureDebug("Route dropped.")
+#endif
+            resolvedRoute = nil
         }
+
+        guard let resolvedRoute else { return }
 
         let resolvedRouteType = type(of: resolvedRoute)
-#if DEBUG
-        if resolvedRouteType != type(of: route) {
-            log.departureDebug(
-                "Route resolved: \(route.departureDebugDescription) -> \(resolvedRoute.departureDebugDescription)"
-            )
-        }
-#endif
-
         guard let matchedDeclaration = firstDeclaration(including: resolvedRouteType) else {
 #if DEBUG
             log.departureDebug(

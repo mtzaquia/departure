@@ -32,7 +32,7 @@ public struct AnyHookDeclaration: Sendable {
     let kind: Kind
 }
 
-/// A value accepted by ``View/hooks(_:)``.
+/// A value accepted by ``SwiftUICore/View/hooks(_:)``.
 public protocol HookDeclaration {
     var _hookDeclarations: [AnyHookDeclaration] { get }
 }

@@ -37,16 +37,16 @@ struct SettingsView: View {
             }
 
             Button("Profile") {
-                routing(.perform(OpenProfileAction()))
+                routing(.present(ProfileRoute()))
             }
 
             Section("Actions") {
-                Button("Open appearance with action") {
-                    routing(.perform(OpenAppearanceSettingsAction()))
+                Button("Save appearance") {
+                    routing(.perform(SaveAppearanceSettingsAction()))
                 }
 
-                Button("Save appearance with action") {
-                    routing(.perform(SaveAppearanceSettingsAction()))
+                Button("New emoji") {
+                    routing(.perform(RandomizeEmojiAction()))
                 }
             }
         }

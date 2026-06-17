@@ -24,7 +24,7 @@ import SwiftUI
 
 /// The routing engine installed by ``WithRouter``.
 ///
-/// Consumer views send commands through ``EnvironmentValues/routing``.
+/// Consumer views send commands through ``SwiftUICore/EnvironmentValues/routing``.
 @Observable
 public final class Router {
     struct PendingRoute {
@@ -43,7 +43,7 @@ public final class Router {
         /// Unwinds every presented route.
         case root
 
-        /// Unwinds to the scope that was declared with a matching ``View/routes(id:_:)`` ID.
+        /// Unwinds to the scope that was declared with a matching ``SwiftUICore/View/routes(id:_:)`` ID.
         case id(AnyHashable)
     }
 
