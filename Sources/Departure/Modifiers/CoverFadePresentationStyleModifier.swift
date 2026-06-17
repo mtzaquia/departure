@@ -225,8 +225,8 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         ) -> AnyView {
             AnyView(
                 destination
-                .environment(router)
-                .environment(\.routing, RoutingAction(router: router))
+                    .environment(router)
+                    .environment(\.routing, RoutingAction(router: router))
             )
         }
 
@@ -271,8 +271,8 @@ private struct CrossDissolveModalPresenter: View {
     var body: some View {
         if let presentation {
             presentation.destination
-            .environment(router)
-            .environment(\.routing, RoutingAction(router: router))
+                .environment(router)
+                .environment(\.routing, RoutingAction(router: router))
         }
     }
 }
