@@ -84,7 +84,7 @@ public final class Router: Identifiable, Equatable {
         await requestRoute(route)
     }
 
-    /// Dismisses route scopes.
+    /// Dismisses route scopes.  If no parameter is provided, it dismisses the current route.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
     /// and any removed mounted route scopes have left the view hierarchy.

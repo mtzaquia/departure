@@ -54,7 +54,9 @@ struct LoginView: View {
 
             Section {
                 Button("Replace with high-priority cover") {
-                    routing(.present(LoginReplacementRoute()))
+                    Task {
+                        await router.present(LoginReplacementRoute())
+                    }
                 }
                 .bold()
 
@@ -83,7 +85,7 @@ struct LoginView: View {
 }
 
 struct LoginReplacementView: View {
-    @Environment(\.routing) private var routing
+    @Environment(Router.self) private var router
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
 
     var body: some View {
@@ -95,7 +97,9 @@ struct LoginReplacementView: View {
             Text("This high-priority cover replaced the login high-priority cover.")
 
             Button("Dismiss replacement") {
-                routing(.unwind())
+                Task {
+                    await router.unwind()
+                }
             }
             .bold()
         }
