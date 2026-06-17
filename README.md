@@ -242,14 +242,14 @@ flowchart TD
 
 ## Route Resolution
 
-Routes can redirect or cancel themselves before ownership is resolved.
+Routes can allow, redirect, or drop themselves before ownership is resolved.
 
 ```swift
 struct ProtectedSettingsRoute: Route {
   let isLoggedIn: Bool
 
-  func resolveRoute() async -> (any Route)? {
-    isLoggedIn ? self : LoginRoute()
+  func resolveRoute() async -> RouteResolution {
+    isLoggedIn ? .allow : .reroute(LoginRoute())
   }
 
   func destination() -> some View {
@@ -262,9 +262,11 @@ Return:
 
 | Value | Meaning |
 | --- | --- |
-| `self` | Continue with this route. |
-| another route | Resolve and present that route instead. |
-| `nil` | Drop the request. |
+| `.allow` | Continue with the requested route. |
+| `.reroute(route)` | Resolve and present another route instead. |
+| `.drop` | Ignore the request. |
+
+On `.reroute(route)`, Departure evaluates the new route before matching it to an owner. Keep resolution quick and avoid recursive reroutes.
 
 ## Actions
 
