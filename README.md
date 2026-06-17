@@ -209,7 +209,8 @@ Sheets and covers can be normal or high priority.
 
 Inside a high-priority route, normal and high-priority declarations behave like local navigation for that high-priority flow.
 
-High priority changes presentation context, not route lookup. Branch routes are still resolved with the same crawling rules; when a high-priority branch route is selected, the high-priority window uses the active branch presentation scope.
+> [!IMPORTANT]
+> High priority changes presentation context, not route lookup. Branch routes are still resolved with the same crawling rules; when a high-priority branch route is selected, the high-priority window uses the active branch presentation scope.
 
 ### High-Priority Window Environment
 
@@ -258,15 +259,8 @@ struct ProtectedSettingsRoute: Route {
 }
 ```
 
-Return:
-
-| Value | Meaning |
-| --- | --- |
-| `.allow` | Continue with the requested route. |
-| `.reroute(route)` | Resolve and present another route instead. |
-| `.drop` | Ignore the request. |
-
-On `.reroute(route)`, Departure evaluates the new route before matching it to an owner. Keep resolution quick and avoid recursive reroutes.
+> [!IMPORTANT]
+> On `.reroute(route)`, Departure evaluates the new route before matching it to an owner. Keep resolution quick and avoid recursive reroutes.
 
 ## Actions
 
