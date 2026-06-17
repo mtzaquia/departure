@@ -209,7 +209,8 @@ Sheets and covers can be normal or high priority.
 
 Inside a high-priority route, normal and high-priority declarations behave like local navigation for that high-priority flow.
 
-High priority changes presentation context, not route lookup. Branch routes are still resolved with the same crawling rules; when a high-priority branch route is selected, the high-priority window uses the active branch presentation scope.
+> [!IMPORTANT]
+> High priority changes presentation context, not route lookup. Branch routes are still resolved with the same crawling rules; when a high-priority branch route is selected, the high-priority window uses the active branch presentation scope.
 
 ### High-Priority Window Environment
 
@@ -242,14 +243,14 @@ flowchart TD
 
 ## Route Resolution
 
-Routes can redirect or cancel themselves before ownership is resolved.
+Routes can allow, redirect, or drop themselves before ownership is resolved.
 
 ```swift
 struct ProtectedSettingsRoute: Route {
   let isLoggedIn: Bool
 
-  func resolveRoute() async -> (any Route)? {
-    isLoggedIn ? self : LoginRoute()
+  func resolveRoute() async -> RouteResolution {
+    isLoggedIn ? .allow : .reroute(LoginRoute())
   }
 
   func destination() -> some View {
@@ -258,13 +259,8 @@ struct ProtectedSettingsRoute: Route {
 }
 ```
 
-Return:
-
-| Value | Meaning |
-| --- | --- |
-| `self` | Continue with this route. |
-| another route | Resolve and present that route instead. |
-| `nil` | Drop the request. |
+> [!IMPORTANT]
+> On `.reroute(route)`, Departure evaluates the new route before matching it to an owner. Keep resolution quick and avoid recursive reroutes.
 
 ## Actions
 
