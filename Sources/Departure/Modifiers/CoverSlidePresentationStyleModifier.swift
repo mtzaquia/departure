@@ -53,12 +53,19 @@ struct CoverSlidePresentationStyleModifier: ViewModifier {
 
 struct HighPriorityCoverSlideHost: View {
     @Environment(Router.self) private var router
+    let windowDestinationBuilder: WindowDestinationBuilder
 
     var body: some View {
         let presentation = router.highPriorityRoutePresentationBinding(matching: .cover(.slide))
 
-        HighPriorityPresentationWindowBridge(route: presentation) { route, onDismiss in
-            HighPriorityCoverSlidePresenter(route: route, onDismiss: onDismiss)
+        HighPriorityPresentationWindowBridge(
+            route: presentation,
+            windowDestinationBuilder: windowDestinationBuilder
+        ) { presentation, onDismiss in
+            HighPriorityCoverSlidePresenter(
+                onDismiss: onDismiss,
+                destination: presentation.destination
+            )
                 .environment(router)
                 .environment(\.routing, RoutingAction(router: router))
         }
@@ -69,8 +76,8 @@ struct HighPriorityCoverSlideHost: View {
 // MARK: - Private
 
 private struct HighPriorityCoverSlidePresenter: View {
-    let route: RoutePresentation
     let onDismiss: @MainActor () -> Void
+    let destination: AnyView
 
     @State private var isPresented = false
 
@@ -79,17 +86,11 @@ private struct HighPriorityCoverSlidePresenter: View {
             .ignoresSafeArea()
 #if canImport(UIKit)
             .fullScreenCover(isPresented: $isPresented, onDismiss: onDismiss) {
-                RouteView(
-                    scope: route.scope,
-                    providesNavigation: route.providesNavigation
-                )
+                destination
             }
 #else
             .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
-                RouteView(
-                    scope: route.scope,
-                    providesNavigation: route.providesNavigation
-                )
+                destination
             }
 #endif
             .onLifecycleEvent { event in

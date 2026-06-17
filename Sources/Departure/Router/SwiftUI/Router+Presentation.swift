@@ -25,6 +25,17 @@ import SwiftUI
 struct RoutePresentation: Identifiable, Hashable {
     let scope: RouteScope
     let declaration: AnyRouteDeclaration
+    let sourceEnvironment: EnvironmentValues
+
+    init(
+        scope: RouteScope,
+        declaration: AnyRouteDeclaration,
+        sourceEnvironment: EnvironmentValues = EnvironmentValues()
+    ) {
+        self.scope = scope
+        self.declaration = declaration
+        self.sourceEnvironment = sourceEnvironment
+    }
 
     var id: AnyHashable {
         ObjectIdentifier(scope)
@@ -156,7 +167,8 @@ private extension Router {
 
         return RoutePresentation(
             scope: presentedScope,
-            declaration: declaration
+            declaration: declaration,
+            sourceEnvironment: routeScope.sourceEnvironment
         )
     }
 
@@ -198,19 +210,18 @@ private extension Router {
             path.indices.contains(segmentStartIndex),
             let route = path[segmentStartIndex].route,
             let declaringScope = scope(at: declaringPathIndexForHighPrioritySegment()),
-            let declaration = declaringScope.highPriorityRouteAttachments.first(where: { declaration in
-                declaration.routeType == type(of: route)
-                && declaration.presentationKind == presentationKind
-                && declaration.priority == .high
-                && declaration.drivesPresentation
-            })
+            let attachment = declaringScope.highPriorityRouteAttachment(
+                for: type(of: route),
+                matching: presentationKind
+            )
         else {
             return nil
         }
 
         return RoutePresentation(
             scope: path[segmentStartIndex],
-            declaration: declaration
+            declaration: attachment.declaration,
+            sourceEnvironment: attachment.routeScope.sourceEnvironment
         )
     }
 
@@ -257,13 +268,30 @@ private extension Router {
 }
 
 private extension RouteScope {
-    var highPriorityRouteAttachments: [AnyRouteDeclaration] {
+    func highPriorityRouteAttachment(
+        for routeType: any Route.Type,
+        matching presentationKind: RoutePresentationKind
+    ) -> (routeScope: RouteScope, declaration: AnyRouteDeclaration)? {
         let activeLocalScope = activeLocalScope
 
-        guard activeLocalScope !== self else {
-            return routeAttachments
+        if let declaration = activeLocalScope.routeAttachments.first(where: {
+            $0.routeType == routeType
+            && $0.presentationKind == presentationKind
+            && $0.priority == .high
+            && $0.drivesPresentation
+        }) {
+            return (activeLocalScope, declaration)
         }
 
-        return activeLocalScope.routeAttachments + routeAttachments
+        guard activeLocalScope !== self else {
+            return nil
+        }
+
+        return routeAttachments.first(where: {
+            $0.routeType == routeType
+            && $0.presentationKind == presentationKind
+            && $0.priority == .high
+            && $0.drivesPresentation
+        }).map { (self, $0) }
     }
 }

@@ -27,7 +27,8 @@ import UIKit
 
 struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControllerRepresentable {
     @Binding var route: RoutePresentation?
-    let content: (RoutePresentation, @escaping @MainActor () -> Void) -> HostedContent
+    let windowDestinationBuilder: WindowDestinationBuilder
+    let content: (RouteDestinationSnapshot, @escaping @MainActor () -> Void) -> HostedContent
 
     func makeUIViewController(context: Context) -> Controller {
         Controller(content: content)
@@ -37,6 +38,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
         controller.content = content
         controller.update(
             route: route,
+            windowDestinationBuilder: windowDestinationBuilder,
             clearRoute: {
                 route = nil
             }
@@ -48,63 +50,77 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
     }
 
     final class Controller: UIViewController {
-        var content: (RoutePresentation, @escaping @MainActor () -> Void) -> HostedContent
+        var content: (RouteDestinationSnapshot, @escaping @MainActor () -> Void) -> HostedContent
 
         private weak var previousKeyWindow: UIWindow?
         private var window: PassThroughWindow?
         private var hostingController: UIHostingController<HostedContent>?
         private var presentedRouteID: RoutePresentation.ID?
-        private var pendingRoute: RoutePresentation?
+        private var pendingPresentation: RouteDestinationSnapshot?
         private var clearRoute: (@MainActor () -> Void)?
         private var isDismissingWindow = false
         private var ignoresHostDismiss = false
 
-        init(content: @escaping (RoutePresentation, @escaping @MainActor () -> Void) -> HostedContent) {
+        init(content: @escaping (RouteDestinationSnapshot, @escaping @MainActor () -> Void) -> HostedContent) {
             self.content = content
             super.init(nibName: nil, bundle: nil)
         }
 
         @available(*, unavailable)
-        required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
+        required init?(coder: NSCoder) { fatalError() }
 
         func update(
             route: RoutePresentation?,
+            windowDestinationBuilder: WindowDestinationBuilder,
             clearRoute: @escaping @MainActor () -> Void
         ) {
             self.clearRoute = clearRoute
 
             guard isDismissingWindow == false else {
-                pendingRoute = route
+                guard let route else {
+                    pendingPresentation = nil
+                    return
+                }
+
+                if pendingPresentation?.route.id != route.id {
+                    pendingPresentation = RouteDestinationSnapshot(
+                        route: route,
+                        destinationBuilder: windowDestinationBuilder
+                    )
+                }
+
                 return
             }
 
             guard let route else {
-                pendingRoute = nil
+                pendingPresentation = nil
                 dismissWindow(callClearRoute: false)
                 return
             }
 
             if route.id == presentedRouteID {
-                hostingController?.rootView = makeHost(for: route)
                 return
             }
 
+            let presentation = RouteDestinationSnapshot(
+                route: route,
+                destinationBuilder: windowDestinationBuilder
+            )
+
             if presentedRouteID != nil {
-                pendingRoute = route
+                pendingPresentation = presentation
                 dismissWindow(callClearRoute: false, presentsPendingRoute: true)
                 return
             }
 
-            present(route)
+            present(presentation)
         }
 
         func detach() {
             dismissWindow(callClearRoute: false)
         }
 
-        private func present(_ route: RoutePresentation) {
+        private func present(_ presentation: RouteDestinationSnapshot) {
             guard let scene = resolveScene() else {
                 clearRoute?()
                 return
@@ -115,21 +131,21 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
             window.windowLevel = UIWindow.Level(rawValue: resolveHighestWindowLevel(in: scene).rawValue + 1)
             window.backgroundColor = .clear
 
-            let hostingController = UIHostingController(rootView: makeHost(for: route))
+            let hostingController = UIHostingController(rootView: makeHost(for: presentation))
             hostingController.view.backgroundColor = .clear
             window.rootViewController = hostingController
 
             self.window = window
             self.hostingController = hostingController
-            self.presentedRouteID = route.id
+            self.presentedRouteID = presentation.route.id
 
             window.makeKeyAndVisible()
         }
 
-        private func makeHost(for route: RoutePresentation) -> HostedContent {
-            let routeID = route.id
+        private func makeHost(for presentation: RouteDestinationSnapshot) -> HostedContent {
+            let routeID = presentation.route.id
             return content(
-                route,
+                presentation,
                 { [weak self] in
                     guard self?.presentedRouteID == routeID else {
                         return
@@ -202,9 +218,9 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
                 clearRoute?()
             }
 
-            if presentsPendingRoute, let pendingRoute {
-                self.pendingRoute = nil
-                present(pendingRoute)
+            if presentsPendingRoute, let pendingPresentation {
+                self.pendingPresentation = nil
+                present(pendingPresentation)
             }
         }
 
@@ -233,14 +249,32 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
 #else
 struct HighPriorityPresentationWindowBridge<HostedContent: View>: View {
     @Binding var route: RoutePresentation?
-    let content: (RoutePresentation, @escaping @MainActor () -> Void) -> HostedContent
+    @ViewBuilder let content: (
+        RouteDestinationSnapshot,
+        @escaping @MainActor () -> Void
+    ) -> HostedContent
+
+    init(
+        route: Binding<RoutePresentation?>,
+        windowDestinationBuilder _: WindowDestinationBuilder,
+        @ViewBuilder content: @escaping (
+            RouteDestinationSnapshot,
+            @escaping @MainActor () -> Void
+        ) -> HostedContent
+    ) {
+        self._route = route
+        self.content = content
+    }
 
     @ViewBuilder
     var body: some View {
         if let route {
-            content(route) {
-                self.route = nil
-            }
+            content(
+                RouteDestinationSnapshot(route: route),
+                {
+                    self.route = nil
+                }
+            )
         }
     }
 }

@@ -37,6 +37,12 @@ struct LoginRoute: Route {
     }
 }
 
+struct LoginReplacementRoute: Route {
+    func destination() -> some View {
+        LoginReplacementView()
+    }
+}
+
 struct ProfileRoute: Route {
     func resolveRoute() async -> RouteResolution {
         Storage.shared.isLoggedIn ? .allow : .reroute(LoginRoute(nextRoute: ProfileRoute()))

@@ -98,6 +98,7 @@ private struct RoutesModifier: ViewModifier {
 
     @Environment(\.routeScope) private var routeScope
     @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
+    @Environment(\.self) private var sourceEnvironment
 
     func body(content: Content) -> some View {
         let activeBranch = selection?.value()
@@ -117,13 +118,15 @@ private struct RoutesModifier: ViewModifier {
             }
             .environment(\.branchRouteDeclarations, accumulatedBranchRouteDeclarations)
             .onLifecycleEvent { event in
-                guard case .installedInWindow = event else {
-                    return
-                }
+                switch event {
+                case .installedInWindow, .updated(isInstalledInWindow: true):
+                    hydrateScope()
 
-                hydrateScope()
+                case .removedFromWindow, .deinitialized, .updated(isInstalledInWindow: false):
+                    break
+                }
             }
-            .onChange(of: activeBranch) { _, _ in // TODO: Review whether this is reliable enough
+            .onChange(of: activeBranch) { _, _ in
                 hydrateScope()
             }
     }
@@ -132,7 +135,8 @@ private struct RoutesModifier: ViewModifier {
         routeScope?.hydrateRoutes(
             id: explicitScopeID,
             branchSelection: selection,
-            routeDeclarations: declarations
+            routeDeclarations: declarations,
+            sourceEnvironment: sourceEnvironment
         )
     }
 

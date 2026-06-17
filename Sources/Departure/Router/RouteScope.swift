@@ -21,6 +21,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 final class RouteScope: Identifiable {
     struct Branch: Identifiable {
@@ -41,6 +42,7 @@ final class RouteScope: Identifiable {
     private var unmountObservers: [@MainActor () -> Void] = []
 
     private(set) var isMounted = false
+    private(set) var sourceEnvironment = EnvironmentValues()
 
     var activeBranch: Branch.ID {
         branchSelection?.value() ?? defaultBranch
@@ -183,9 +185,14 @@ extension RouteScope {
     func hydrateRoutes(
         id: AnyHashable?,
         branchSelection: AnyRouteBranchSelection?,
-        routeDeclarations: [RouteScopeDeclaration]
+        routeDeclarations: [RouteScopeDeclaration],
+        sourceEnvironment: EnvironmentValues? = nil
     ) {
         let hookDeclarations = branches.flatMap(\.hookAttachments)
+
+        if let sourceEnvironment {
+            self.sourceEnvironment = sourceEnvironment
+        }
 
         if let id {
             self.id = id
