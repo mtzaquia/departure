@@ -119,10 +119,7 @@ private struct RoutesModifier: ViewModifier {
             .environment(\.branchRouteDeclarations, accumulatedBranchRouteDeclarations)
             .onLifecycleEvent { event in
                 switch event {
-                case .updated(let environment):
-                    hydrateScope(sourceEnvironment: environment)
-
-                case .installedInWindow:
+                case .updated, .installedInWindow:
                     hydrateScope()
 
                 case .removedFromWindow, .deinitialized:
@@ -134,12 +131,12 @@ private struct RoutesModifier: ViewModifier {
             }
     }
 
-    private func hydrateScope(sourceEnvironment: EnvironmentValues? = nil) {
+    private func hydrateScope() {
         routeScope?.hydrateRoutes(
             id: explicitScopeID,
             branchSelection: selection,
             routeDeclarations: declarations,
-            sourceEnvironment: sourceEnvironment ?? self.sourceEnvironment
+            sourceEnvironment: sourceEnvironment
         )
     }
 
