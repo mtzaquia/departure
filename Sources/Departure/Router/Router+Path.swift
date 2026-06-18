@@ -116,6 +116,8 @@ extension Router {
             await waitForRouteScopesToLeaveView(removedScopes)
         }
 
+        let waitsForBranchActivation = waitsForBranchActivation(for: match)
+
         guard activateBranch(for: match) else {
 #if DEBUG
             log.departureDebug("route dropped | reason=branch activation failed | branch=\(match.branchID.departureDebugDescription)")
@@ -126,8 +128,17 @@ extension Router {
         appendOrPendRoute(
             route,
             after: match,
-            startsHighPrioritySegment: false
+            startsHighPrioritySegment: false,
+            waitsForBranchActivation: waitsForBranchActivation
         )
+    }
+
+    func waitsForBranchActivation(for match: DeclarationMatch) -> Bool {
+        guard match.declaration.drivesPresentation == false else {
+            return false
+        }
+
+        return scope(at: match.pathIndex)?.activeBranch != match.branchID
     }
 
     func activateBranch(for match: DeclarationMatch) -> Bool {
@@ -178,6 +189,8 @@ extension Router {
 #endif
         keepPathThrough(match.pathIndex)
 
+        let waitsForBranchActivation = waitsForBranchActivation(for: match)
+
         guard activateBranch(for: match) else {
 #if DEBUG
             log.departureDebug("route dropped | reason=branch activation failed | branch=\(match.branchID.departureDebugDescription)")
@@ -188,15 +201,31 @@ extension Router {
         appendOrPendRoute(
             route,
             after: match,
-            startsHighPrioritySegment: true
+            startsHighPrioritySegment: true,
+            waitsForBranchActivation: waitsForBranchActivation
         )
     }
 
     func appendOrPendRoute(
         _ route: any Route,
         after match: DeclarationMatch,
-        startsHighPrioritySegment: Bool
+        startsHighPrioritySegment: Bool,
+        waitsForBranchActivation: Bool = false
     ) {
+        guard waitsForBranchActivation == false else {
+#if DEBUG
+            log.departureDebug(
+                "route pending | route=\(route.departureDebugDescription) | branch=\(match.branchID.departureDebugDescription) | reason=waiting for activated branch host"
+            )
+#endif
+            pendingRoute = PendingRoute(
+                route: route,
+                match: match,
+                startsHighPrioritySegment: startsHighPrioritySegment
+            )
+            return
+        }
+
         guard canPresentRoute(after: match) else {
 #if DEBUG
             log.departureDebug(
@@ -276,7 +305,9 @@ extension Router {
             return false
         }
 
-        let canPresent = declaringScope.activeLocalScope.id == match.branchID
+        let activeLocalScope = declaringScope.activeLocalScope
+        let canPresent = activeLocalScope.id == match.branchID
+            && activeLocalScope.canDrivePresentation(for: match.declaration)
         if canPresent {
 #if DEBUG
             log.departureDebug("route can present | branch=\(match.branchID.departureDebugDescription) | reason=active local scope")
@@ -460,6 +491,16 @@ extension Router {
         }
 
         return Array(path[preservationStartIndex..<path.endIndex])
+    }
+}
+
+private extension RouteScope {
+    func canDrivePresentation(for declaration: AnyRouteDeclaration) -> Bool {
+        routeAttachments.contains {
+            $0.routeType == declaration.routeType
+            && $0.kind == declaration.kind
+            && $0.drivesPresentation
+        }
     }
 }
 

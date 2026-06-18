@@ -99,6 +99,7 @@ private struct RoutesModifier: ViewModifier {
     @Environment(\.routeScope) private var routeScope
     @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
     @Environment(\.self) private var sourceEnvironment
+    @Environment(Router.self) private var router
 
     func body(content: Content) -> some View {
         let activeBranch = selection?.value()
@@ -138,6 +139,15 @@ private struct RoutesModifier: ViewModifier {
             routeDeclarations: declarations,
             sourceEnvironment: sourceEnvironment
         )
+
+        guard
+            let routeScope,
+            let parentScope = routeScope.parent
+        else {
+            return
+        }
+
+        router.resumePendingRoute(for: routeScope.id, in: parentScope)
     }
 
     private var accumulatedBranchRouteDeclarations: [RouteScopeDeclaration] {
