@@ -54,12 +54,11 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
 
         private weak var previousKeyWindow: UIWindow?
         private var window: PassThroughWindow?
-        private var hostingController: UIHostingController<HostedContent>?
+        private var hostingController: PresentedHostingController<HostedContent>?
         private var presentedRouteID: RoutePresentation.ID?
         private var pendingPresentation: RouteDestinationSnapshot?
         private var clearRoute: (@MainActor () -> Void)?
         private var isDismissingWindow = false
-        private var ignoresHostDismiss = false
 
         init(content: @escaping (RouteDestinationSnapshot, @escaping @MainActor () -> Void) -> HostedContent) {
             self.content = content
@@ -131,8 +130,11 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
             window.windowLevel = UIWindow.Level(rawValue: resolveHighestWindowLevel(in: scene).rawValue + 1)
             window.backgroundColor = .clear
 
-            let hostingController = UIHostingController(rootView: makeHost(for: presentation))
+            let hostingController = PresentedHostingController(rootView: makeHost(for: presentation))
             hostingController.view.backgroundColor = .clear
+            hostingController.onDismiss = { [weak self] in
+                self?.dismissFromPresentedHost()
+            }
             window.rootViewController = hostingController
 
             self.window = window
@@ -151,14 +153,18 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
                         return
                     }
 
-                    guard self?.ignoresHostDismiss == false else {
+                    guard self?.isDismissingWindow == false else {
                         return
                     }
 
-                    self?.clearRoute?()
-                    self?.dismissWindow(callClearRoute: false)
+                    self?.dismissFromPresentedHost()
                 }
             )
+        }
+
+        private func dismissFromPresentedHost() {
+            clearRoute?()
+            dismissWindow(callClearRoute: false)
         }
 
         private func dismissWindow(
@@ -175,7 +181,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
             }
 
             isDismissingWindow = true
-            ignoresHostDismiss = true
+            hostingController?.onDismiss = nil
 
             let rootViewController = window.rootViewController
 
@@ -212,7 +218,6 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
             }
 
             isDismissingWindow = false
-            ignoresHostDismiss = false
 
             if callClearRoute {
                 clearRoute?()
