@@ -33,6 +33,7 @@ struct StartView: View {
                     await router.present(LandingRoute())
                 }
             })
+            .accessibilityIdentifier(SampleAppAccessibility.startButton)
         }
         .routes {
             Cover(LandingRoute.self, providesNavigation: false)

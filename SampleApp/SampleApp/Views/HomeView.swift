@@ -29,15 +29,19 @@ struct HomeView: View {
     var body: some View {
         List {
             Text("Welcome home.")
+                .accessibilityIdentifier(SampleAppAccessibility.homeWelcome)
+
             Button("Show message") {
                 Task {
                     await router.present(MessageRoute())
                 }
             }
+            .accessibilityIdentifier(SampleAppAccessibility.homeShowMessageButton)
 
             Section {
                 LabeledContent {
                     Text(Storage.shared.emoji)
+                        .accessibilityIdentifier(SampleAppAccessibility.homeEmojiValue)
                 } label: {
                     Text("Current emoji")
                     Text("Change from settings")
@@ -54,6 +58,7 @@ struct HomeView: View {
                         await router.present(ProfileRoute())
                     }
                 }
+                .accessibilityIdentifier(SampleAppAccessibility.homeProfileButton)
             }
         }
     }

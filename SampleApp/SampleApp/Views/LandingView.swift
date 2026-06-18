@@ -40,6 +40,7 @@ struct LandingView: View {
                 }
             } label: {
                 Label("Home", systemImage: "house")
+                    .accessibilityIdentifier(SampleAppAccessibility.homeTab)
             }
 
             Tab(value: .settings) {
@@ -49,8 +50,10 @@ struct LandingView: View {
                 }
             } label: {
                 Label("Settings", systemImage: "gear")
+                    .accessibilityIdentifier(SampleAppAccessibility.settingsTab)
             }
         }
+        .accessibilityIdentifier(SampleAppAccessibility.landing)
         .routes(branch: $tab) {
             Cover(LoginRoute.self, priority: .high)
             Cover(LoginReplacementRoute.self, priority: .high)

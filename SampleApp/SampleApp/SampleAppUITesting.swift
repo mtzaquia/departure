@@ -1,0 +1,105 @@
+//
+//  Copyright (c) 2026 @mtzaquia
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
+//
+
+import SwiftUI
+
+#if canImport(UIKit)
+import UIKit
+#endif
+
+enum SampleAppUITesting {
+    static let isEnabled = ProcessInfo.processInfo.arguments.contains("UI_TESTING")
+
+    @MainActor
+    static func configure() {
+        guard isEnabled else {
+            return
+        }
+
+        Storage.shared.reset()
+
+        #if canImport(UIKit)
+        UIView.setAnimationsEnabled(false)
+        #endif
+    }
+}
+
+enum SampleAppAccessibility {
+    static let startButton = "sample.start.button"
+    static let landing = "sample.landing"
+
+    static let homeTab = "sample.tab.home"
+    static let settingsTab = "sample.tab.settings"
+
+    static let homeWelcome = "sample.home.welcome"
+    static let homeShowMessageButton = "sample.home.show-message"
+    static let homeProfileButton = "sample.home.profile"
+    static let homeEmojiValue = "sample.home.emoji-value"
+
+    static let settingsAppearanceButton = "sample.settings.appearance"
+    static let settingsAuthenticationButton = "sample.settings.authentication"
+    static let settingsProfileButton = "sample.settings.profile"
+    static let settingsSaveAppearanceButton = "sample.settings.save-appearance"
+    static let settingsNewEmojiButton = "sample.settings.new-emoji"
+    static let settingsPresentHomeMessageButton = "sample.settings.present-home-message"
+    static let settingsPresentDroppedRouteButton = "sample.settings.present-dropped-route"
+    static let settingsPresentUndeclaredRouteButton = "sample.settings.present-undeclared-route"
+    static let settingsMissingUnwindButton = "sample.settings.missing-unwind"
+    static let settingsMissingUnwindResult = "sample.settings.missing-unwind-result"
+
+    static let appearanceTitle = "sample.appearance.title"
+    static let appearanceRePresentButton = "sample.appearance.re-present"
+    static let appearancePresentAuthenticationButton = "sample.appearance.present-authentication"
+    static let appearanceUnwindToLandingPresentMessageButton = "sample.appearance.unwind-landing-present-message"
+    static let appearanceSaveButton = "sample.appearance.save"
+    static let appearanceSavedCount = "sample.appearance.saved-count"
+
+    static let authenticationTitle = "sample.authentication.title"
+    static let authenticationLoggedInToggle = "sample.authentication.logged-in"
+
+    static let messageText = "sample.message.text"
+    static let messageDismissUnwindButton = "sample.message.dismiss-unwind"
+    static let messageDismissSwiftUIButton = "sample.message.dismiss-swiftui"
+
+    static let alertText = "sample.alert.text"
+    static let alertDismissUnwindButton = "sample.alert.dismiss-unwind"
+    static let alertDismissSwiftUIButton = "sample.alert.dismiss-swiftui"
+
+    static let loginTitle = "sample.login.title"
+    static let loginWindowEnvironmentValue = "sample.login.window-environment"
+    static let loginEmailField = "sample.login.email"
+    static let loginPasswordField = "sample.login.password"
+    static let loginButton = "sample.login.button"
+    static let loginCancelButton = "sample.login.cancel"
+    static let loginReplaceHighPriorityButton = "sample.login.replace-high-priority"
+    static let loginPresentAlertButton = "sample.login.present-alert"
+
+    static let replacementTitle = "sample.replacement.title"
+    static let replacementWindowEnvironmentValue = "sample.replacement.window-environment"
+    static let replacementDismissButton = "sample.replacement.dismiss"
+
+    static let profileTitle = "sample.profile.title"
+    static let profileSignOutButton = "sample.profile.sign-out"
+
+    static let droppedRouteText = "sample.dropped-route.text"
+    static let undeclaredRouteText = "sample.undeclared-route.text"
+}

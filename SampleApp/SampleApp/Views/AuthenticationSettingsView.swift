@@ -35,7 +35,9 @@ struct AuthenticationSettingsView: View {
                     set: { Storage.shared.isLoggedIn = $0 }
                 )
             )
+            .accessibilityIdentifier(SampleAppAccessibility.authenticationLoggedInToggle)
         }
         .navigationTitle("Authentication")
+        .accessibilityIdentifier(SampleAppAccessibility.authenticationTitle)
     }
 }

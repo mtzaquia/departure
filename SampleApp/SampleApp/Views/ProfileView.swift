@@ -34,7 +34,9 @@ struct ProfileView: View {
                     await router.unwind(to: .root)
                 }
             }
+            .accessibilityIdentifier(SampleAppAccessibility.profileSignOutButton)
         }
         .navigationTitle("Profile")
+        .accessibilityIdentifier(SampleAppAccessibility.profileTitle)
     }
 }

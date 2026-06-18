@@ -34,6 +34,7 @@ struct MessageView: View {
 
             VStack(spacing: 12) {
                 Text("This is a message.")
+                    .accessibilityIdentifier(SampleAppAccessibility.messageText)
 
                 Button("Dismiss with unwind") {
                     Task {
@@ -41,11 +42,13 @@ struct MessageView: View {
                     }
                 }
                 .bold()
+                .accessibilityIdentifier(SampleAppAccessibility.messageDismissUnwindButton)
 
                 Button("Dismiss with dismiss()") {
                     dismiss()
                 }
                 .bold()
+                .accessibilityIdentifier(SampleAppAccessibility.messageDismissSwiftUIButton)
             }
             .padding(32)
             .background {
