@@ -76,3 +76,21 @@ struct MessageRoute: Route {
         MessageView()
     }
 }
+
+struct DroppedRoute: Route {
+    func resolveRoute() async -> RouteResolution {
+        .drop
+    }
+
+    func destination() -> some View {
+        Text("Dropped route should not appear.")
+            .accessibilityIdentifier(SampleAppAccessibility.droppedRouteText)
+    }
+}
+
+struct UndeclaredRoute: Route {
+    func destination() -> some View {
+        Text("Undeclared route should not appear.")
+            .accessibilityIdentifier(SampleAppAccessibility.undeclaredRouteText)
+    }
+}

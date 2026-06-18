@@ -36,10 +36,13 @@ struct LoginView: View {
         List {
             Section {
                 LabeledContent("Window environment", value: sampleWindowBadge)
+                    .accessibilityIdentifier(SampleAppAccessibility.loginWindowEnvironmentValue)
             }
 
             TextField("E-mail", text: $email)
+                .accessibilityIdentifier(SampleAppAccessibility.loginEmailField)
             SecureField("Password", text: $password)
+                .accessibilityIdentifier(SampleAppAccessibility.loginPasswordField)
 
             Button("Log in") {
                 Storage.shared.isLoggedIn = true
@@ -51,6 +54,7 @@ struct LoginView: View {
                     }
                 }
             }
+            .accessibilityIdentifier(SampleAppAccessibility.loginButton)
 
             Section {
                 Button("Replace with high-priority cover") {
@@ -59,6 +63,7 @@ struct LoginView: View {
                     }
                 }
                 .bold()
+                .accessibilityIdentifier(SampleAppAccessibility.loginReplaceHighPriorityButton)
 
                 Text("A second high-priority cover attached to the same scope should replace this login cover.")
 
@@ -68,10 +73,12 @@ struct LoginView: View {
                     }
                 }
                 .bold()
+                .accessibilityIdentifier(SampleAppAccessibility.loginPresentAlertButton)
                 Text("An alert attached to an ancestor scope with high priority should replace this screen.")
             }
         }
         .navigationTitle("Login")
+        .accessibilityIdentifier(SampleAppAccessibility.loginTitle)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
@@ -79,6 +86,7 @@ struct LoginView: View {
                         await router.unwind()
                     }
                 }
+                .accessibilityIdentifier(SampleAppAccessibility.loginCancelButton)
             }
         }
     }
@@ -92,6 +100,7 @@ struct LoginReplacementView: View {
         List {
             Section {
                 LabeledContent("Window environment", value: sampleWindowBadge)
+                    .accessibilityIdentifier(SampleAppAccessibility.replacementWindowEnvironmentValue)
             }
 
             Text("This high-priority cover replaced the login high-priority cover.")
@@ -102,7 +111,9 @@ struct LoginReplacementView: View {
                 }
             }
             .bold()
+            .accessibilityIdentifier(SampleAppAccessibility.replacementDismissButton)
         }
         .navigationTitle("Replacement")
+        .accessibilityIdentifier(SampleAppAccessibility.replacementTitle)
     }
 }

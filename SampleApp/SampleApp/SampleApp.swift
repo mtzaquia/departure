@@ -30,10 +30,23 @@ final class Storage {
     var isLoggedIn = false
     var appearanceSaveCount = 0
     var emoji: String = "🎉"
+    var missingUnwindResult: Bool?
+
+    func reset() {
+        isLoggedIn = false
+        appearanceSaveCount = 0
+        emoji = "🎉"
+        missingUnwindResult = nil
+    }
 }
 
 struct RandomizeEmojiAction: Action {
     func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
+        if SampleAppUITesting.isEnabled {
+            Storage.shared.emoji = "⚡️"
+            return
+        }
+
         Storage.shared.emoji = ["⚡️", "🎸", "✈️", "🇮🇹", "🎉", "👀"].randomElement() ?? ""
     }
 }
@@ -57,6 +70,7 @@ extension EnvironmentValues {
 struct DepartureSampleApp: App {
     init() {
         Departure.debug = true
+        SampleAppUITesting.configure()
     }
 
     var body: some Scene {
@@ -69,6 +83,13 @@ struct DepartureSampleApp: App {
             } windowDestination: { destination, environment in
                 destination
                     .environment(\.sampleWindowBadge, environment.sampleWindowBadge)
+            }
+            .transaction { transaction in
+                guard SampleAppUITesting.isEnabled else {
+                    return
+                }
+
+                transaction.animation = nil
             }
         }
     }

@@ -47,11 +47,26 @@ struct AppearanceSettingsView: View {
                         await router.present(AppearanceSettingsRoute())
                     }
                 }
+                .accessibilityIdentifier(SampleAppAccessibility.appearanceRePresentButton)
 
                 Button("Present authentication settings") {
                     Task {
                         await router.present(AuthenticationSettingsRoute())
                     }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.appearancePresentAuthenticationButton)
+
+                if SampleAppUITesting.isEnabled {
+                    Button("Unwind to landing, present home message") {
+                        Task {
+                            guard await router.unwind(to: .id(LandingRoute().id)) else {
+                                return
+                            }
+
+                            await router.present(MessageRoute())
+                        }
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.appearanceUnwindToLandingPresentMessageButton)
                 }
             }
 
@@ -61,11 +76,14 @@ struct AppearanceSettingsView: View {
                         await router.perform(SaveAppearanceSettingsAction())
                     }
                 }
+                .accessibilityIdentifier(SampleAppAccessibility.appearanceSaveButton)
 
                 Text("Saved \(storage.appearanceSaveCount) time(s)")
+                    .accessibilityIdentifier(SampleAppAccessibility.appearanceSavedCount)
             }
         }
         .navigationTitle("Appearance")
+        .accessibilityIdentifier(SampleAppAccessibility.appearanceTitle)
         .hooks {
             ActionInterceptor(SaveAppearanceSettingsAction.self) { invocation in
                 try? await invocation()

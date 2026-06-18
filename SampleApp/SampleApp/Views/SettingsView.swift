@@ -25,6 +25,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(Router.self) private var router
+    @State private var storage = Storage.shared
 
     var body: some View {
         List {
@@ -33,18 +34,21 @@ struct SettingsView: View {
                     await router.present(AppearanceSettingsRoute())
                 }
             }
+            .accessibilityIdentifier(SampleAppAccessibility.settingsAppearanceButton)
 
             Button("Authentication") {
                 Task {
                     await router.present(AuthenticationSettingsRoute())
                 }
             }
+            .accessibilityIdentifier(SampleAppAccessibility.settingsAuthenticationButton)
 
             Button("Profile") {
                 Task {
                     await router.present(ProfileRoute())
                 }
             }
+            .accessibilityIdentifier(SampleAppAccessibility.settingsProfileButton)
 
             Section("Actions") {
                 Button("Save appearance") {
@@ -52,11 +56,48 @@ struct SettingsView: View {
                         await router.perform(SaveAppearanceSettingsAction())
                     }
                 }
+                .accessibilityIdentifier(SampleAppAccessibility.settingsSaveAppearanceButton)
 
                 Button("New emoji") {
                     Task {
                         await router.perform(RandomizeEmojiAction())
                     }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.settingsNewEmojiButton)
+            }
+
+            if SampleAppUITesting.isEnabled {
+                Section("UI Tests") {
+                    Button("Present home message") {
+                        Task {
+                            await router.present(MessageRoute())
+                        }
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.settingsPresentHomeMessageButton)
+
+                    Button("Present dropped route") {
+                        Task {
+                            await router.present(DroppedRoute())
+                        }
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.settingsPresentDroppedRouteButton)
+
+                    Button("Present undeclared route") {
+                        Task {
+                            await router.present(UndeclaredRoute())
+                        }
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.settingsPresentUndeclaredRouteButton)
+
+                    Button("Attempt missing unwind") {
+                        Task {
+                            storage.missingUnwindResult = await router.unwind(to: .id("missing"))
+                        }
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.settingsMissingUnwindButton)
+
+                    Text("Missing unwind: \(storage.missingUnwindResult.map(String.init) ?? "none")")
+                        .accessibilityIdentifier(SampleAppAccessibility.settingsMissingUnwindResult)
                 }
             }
         }

@@ -34,6 +34,7 @@ struct AlertView: View {
 
             VStack(spacing: 12) {
                 Text("This is an alert!")
+                    .accessibilityIdentifier(SampleAppAccessibility.alertText)
 
                 Button("Dismiss with unwind") {
                     Task {
@@ -41,11 +42,13 @@ struct AlertView: View {
                     }
                 }
                 .bold()
+                .accessibilityIdentifier(SampleAppAccessibility.alertDismissUnwindButton)
 
                 Button("Dismiss with dismiss()") {
                     dismiss()
                 }
                 .bold()
+                .accessibilityIdentifier(SampleAppAccessibility.alertDismissSwiftUIButton)
             }
             .foregroundStyle(.white)
             .padding(32)
