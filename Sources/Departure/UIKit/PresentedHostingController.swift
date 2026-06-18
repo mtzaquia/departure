@@ -22,46 +22,36 @@
 
 import SwiftUI
 
-public struct RouteView: View {
-    let scope: RouteScope
-    let providesNavigation: Bool
+#if canImport(UIKit)
+import UIKit
 
-    @Environment(Router.self) private var router
+final class PresentedHostingController<Content: View>: UIHostingController<Content> {
+    var onDismiss: (@MainActor () -> Void)?
 
-    init(scope: RouteScope, providesNavigation: Bool = false) {
-        self.scope = scope
-        self.providesNavigation = providesNavigation
-    }
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
 
-    public var body: some View {
-        content
-            .environment(\.routeScope, scope)
-            .environment(\.routing, RoutingAction(router: router))
-            .onLifecycleEvent { event in
-                switch event {
-                case .updated:
-                    break
-
-                case .installedInWindow:
-                    router.routeScopeDidInstallInView(scope)
-
-                case .dismantled, .deinitialized:
-                    router.routeScopeDidLeaveView(scope)
-                }
-            }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        let destination = (scope.route?.destination()).map(AnyView.init)
-
-        if providesNavigation {
-            NavigationStack {
-                destination
-            }
-        } else {
-            destination
+        guard isBeingDismissedInHierarchy else {
+            return
         }
-    }
 
+        onDismiss?()
+    }
 }
+
+private extension UIViewController {
+    var isBeingDismissedInHierarchy: Bool {
+        var viewController: UIViewController? = self
+
+        while let current = viewController {
+            if current.isBeingDismissed {
+                return true
+            }
+
+            viewController = current.parent
+        }
+
+        return false
+    }
+}
+#endif

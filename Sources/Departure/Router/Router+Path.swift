@@ -24,19 +24,19 @@ extension Router {
     @discardableResult
     func unwindAndWait(to target: UnwindTarget?) async -> Bool {
 #if DEBUG
-        log.departureDebug("Unwind requested: target: \(String(describing: target)).")
+        log.departureDebug("unwind requested | target=\(String(describing: target))")
 #endif
 
         switch unwindResolution(for: target) {
         case .noRouteToUnwind:
 #if DEBUG
-            log.departureDebug("Unwind skipped: no route to unwind.")
+            log.departureDebug("unwind skipped | reason=no route")
 #endif
             return true
 
         case .targetNotFound:
 #if DEBUG
-            log.departureDebug("Unwind dropped: target not found: \(String(describing: target)).")
+            log.departureDebug("unwind dropped | reason=target not found | target=\(String(describing: target))")
 #endif
             return false
 
@@ -44,7 +44,7 @@ extension Router {
             let removedScopes = routeScopesRemovedByKeepingPathThrough(targetPathIndex)
 #if DEBUG
             log.departureDebug(
-                "Unwind accepted: keeping path through \(String(describing: targetPathIndex)), removing \(removedScopes.count) scope(s)."
+                "unwind accepted | keepThrough=\(String(describing: targetPathIndex)) | removing=\(removedScopes.count)"
             )
 #endif
 
@@ -56,7 +56,7 @@ extension Router {
             await waitForRouteScopesToLeaveView(removedScopes)
             unwindPresentationSnapshot = nil
 #if DEBUG
-            log.departureDebug("Unwind completed: removed scope(s) left view.")
+            log.departureDebug("unwind completed | removed scopes left view")
 #endif
 
             return true
@@ -104,21 +104,23 @@ extension Router {
 
     func appendRoute(_ route: any Route, after match: DeclarationMatch) async {
 #if DEBUG
-        log.departureDebug("Route append preparing: \(route.departureDebugDescription) after \(match.departureDebugDescription).")
+        log.departureDebug("route append preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)")
 #endif
         let removedScopes = routeScopesRemovedByKeepingPathThrough(match.pathIndex)
         keepPathThrough(match.pathIndex)
 
         if match.declaration.presentationKind == .push {
 #if DEBUG
-            log.departureDebug("Route append waiting for pushed scope(s) to leave view before pushing next route.")
+            log.departureDebug("route append waiting | reason=replacing pushed scope | removedScopes=\(removedScopes.count)")
 #endif
             await waitForRouteScopesToLeaveView(removedScopes)
         }
 
+        let waitsForBranchActivation = waitsForBranchActivation(for: match)
+
         guard activateBranch(for: match) else {
 #if DEBUG
-            log.departureDebug("Route dropped: failed to activate branch \(match.branchID.departureDebugDescription).")
+            log.departureDebug("route dropped | reason=branch activation failed | branch=\(match.branchID.departureDebugDescription)")
 #endif
             return
         }
@@ -126,14 +128,23 @@ extension Router {
         appendOrPendRoute(
             route,
             after: match,
-            startsHighPrioritySegment: false
+            startsHighPrioritySegment: false,
+            waitsForBranchActivation: waitsForBranchActivation
         )
+    }
+
+    func waitsForBranchActivation(for match: DeclarationMatch) -> Bool {
+        guard match.declaration.drivesPresentation == false else {
+            return false
+        }
+
+        return scope(at: match.pathIndex)?.activeBranch != match.branchID
     }
 
     func activateBranch(for match: DeclarationMatch) -> Bool {
         guard let scope = scope(at: match.pathIndex) else {
 #if DEBUG
-            log.departureDebug("Branch activation failed: no scope at \(String(describing: match.pathIndex)).")
+            log.departureDebug("branch activation failed | reason=no scope | pathIndex=\(String(describing: match.pathIndex))")
 #endif
             return false
         }
@@ -141,7 +152,7 @@ extension Router {
         guard scope.activeBranch != match.branchID else {
 #if DEBUG
             log.departureDebug(
-                "Branch activation skipped: \(match.branchID.departureDebugDescription) already active in \(scope.departureDebugDescription)."
+                "branch activation skipped | branch=\(match.branchID.departureDebugDescription) | reason=already active | scope=\(scope.departureDebugDescription)"
             )
 #endif
             return true
@@ -153,13 +164,13 @@ extension Router {
         if didActivate {
 #if DEBUG
             log.departureDebug(
-                "Branch activated: \(previousBranch.departureDebugDescription) -> \(match.branchID.departureDebugDescription) in \(scope.departureDebugDescription)."
+                "branch activated | from=\(previousBranch.departureDebugDescription) | to=\(match.branchID.departureDebugDescription) | scope=\(scope.departureDebugDescription)"
             )
 #endif
         } else {
 #if DEBUG
             log.departureDebug(
-                "Branch activation rejected: \(previousBranch.departureDebugDescription) -> \(match.branchID.departureDebugDescription) in \(scope.departureDebugDescription)."
+                "branch activation rejected | from=\(previousBranch.departureDebugDescription) | to=\(match.branchID.departureDebugDescription) | scope=\(scope.departureDebugDescription)"
             )
 #endif
         }
@@ -173,14 +184,16 @@ extension Router {
     ) {
 #if DEBUG
         log.departureDebug(
-            "High-priority segment replace preparing: \(route.departureDebugDescription) after \(match.departureDebugDescription)."
+            "high-priority replace preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
         )
 #endif
         keepPathThrough(match.pathIndex)
 
+        let waitsForBranchActivation = waitsForBranchActivation(for: match)
+
         guard activateBranch(for: match) else {
 #if DEBUG
-            log.departureDebug("Route dropped: failed to activate branch \(match.branchID.departureDebugDescription).")
+            log.departureDebug("route dropped | reason=branch activation failed | branch=\(match.branchID.departureDebugDescription)")
 #endif
             return
         }
@@ -188,19 +201,35 @@ extension Router {
         appendOrPendRoute(
             route,
             after: match,
-            startsHighPrioritySegment: true
+            startsHighPrioritySegment: true,
+            waitsForBranchActivation: waitsForBranchActivation
         )
     }
 
     func appendOrPendRoute(
         _ route: any Route,
         after match: DeclarationMatch,
-        startsHighPrioritySegment: Bool
+        startsHighPrioritySegment: Bool,
+        waitsForBranchActivation: Bool = false
     ) {
+        guard waitsForBranchActivation == false else {
+#if DEBUG
+            log.departureDebug(
+                "route pending | route=\(route.departureDebugDescription) | branch=\(match.branchID.departureDebugDescription) | reason=waiting for activated branch host"
+            )
+#endif
+            pendingRoute = PendingRoute(
+                route: route,
+                match: match,
+                startsHighPrioritySegment: startsHighPrioritySegment
+            )
+            return
+        }
+
         guard canPresentRoute(after: match) else {
 #if DEBUG
             log.departureDebug(
-                "Route pending: \(route.departureDebugDescription) waits for branch \(match.branchID.departureDebugDescription) to install a local presentation scope."
+                "route pending | route=\(route.departureDebugDescription) | branch=\(match.branchID.departureDebugDescription) | reason=waiting for local presentation scope"
             )
 #endif
             pendingRoute = PendingRoute(
@@ -216,20 +245,20 @@ extension Router {
         if startsHighPrioritySegment {
             highPrioritySegmentStartIndex = path.endIndex
 #if DEBUG
-            log.departureDebug("High-priority segment starts at path index \(path.endIndex).")
+            log.departureDebug("high-priority segment started | pathIndex=\(path.endIndex)")
 #endif
         }
 
         path.append(RouteScope(id: route.id, route: route))
 #if DEBUG
-        log.departureDebug("Route appended: \(route.departureDebugDescription). Path count: \(path.count).")
+        log.departureDebug("route appended | route=\(route.departureDebugDescription) | pathCount=\(path.count)")
 #endif
     }
 
     func resumePendingRoute(for branch: AnyHashable, in declaringScope: RouteScope) {
 #if DEBUG
         log.departureDebug(
-            "Pending route resume check: branch \(branch.departureDebugDescription), declaring scope: \(declaringScope.departureDebugDescription)."
+            "pending resume check | branch=\(branch.departureDebugDescription) | declaringScope=\(declaringScope.departureDebugDescription)"
         )
 #endif
 
@@ -239,13 +268,13 @@ extension Router {
             scope(at: pendingRoute.match.pathIndex) === declaringScope
         else {
 #if DEBUG
-            log.departureDebug("Pending route resume skipped: no matching pending route.")
+            log.departureDebug("pending resume skipped | reason=no matching pending route")
 #endif
             return
         }
 
 #if DEBUG
-        log.departureDebug("Pending route resuming: \(pendingRoute.route.departureDebugDescription).")
+        log.departureDebug("pending route resuming | route=\(pendingRoute.route.departureDebugDescription)")
 #endif
         keepPathThrough(pendingRoute.match.pathIndex)
 
@@ -259,7 +288,7 @@ extension Router {
     func canPresentRoute(after match: DeclarationMatch) -> Bool {
         guard match.declaration.drivesPresentation == false else {
 #if DEBUG
-            log.departureDebug("Route can present immediately: declaration drives presentation.")
+            log.departureDebug("route can present | reason=declaration drives presentation")
 #endif
             return true
         }
@@ -270,20 +299,22 @@ extension Router {
         else {
 #if DEBUG
             log.departureDebug(
-                "Route cannot present yet: declaration is discovery-only and branch \(match.branchID.departureDebugDescription) is not active."
+                "route cannot present | branch=\(match.branchID.departureDebugDescription) | reason=discovery branch inactive"
             )
 #endif
             return false
         }
 
-        let canPresent = declaringScope.activeLocalScope.id == match.branchID
+        let activeLocalScope = declaringScope.activeLocalScope
+        let canPresent = activeLocalScope.id == match.branchID
+            && activeLocalScope.canDrivePresentation(for: match.declaration)
         if canPresent {
 #if DEBUG
-            log.departureDebug("Route can present: branch \(match.branchID.departureDebugDescription) has an active local scope.")
+            log.departureDebug("route can present | branch=\(match.branchID.departureDebugDescription) | reason=active local scope")
 #endif
         } else {
 #if DEBUG
-            log.departureDebug("Route cannot present yet: branch \(match.branchID.departureDebugDescription) has no active local scope.")
+            log.departureDebug("route cannot present | branch=\(match.branchID.departureDebugDescription) | reason=no active local scope")
 #endif
         }
 
@@ -298,7 +329,7 @@ extension Router {
             path.removeAll()
             removeHighPrioritySegmentStartIfNeeded()
 #if DEBUG
-            log.departureDebug("Path cleared: removed \(removedCount) scope(s).")
+            log.departureDebug("path cleared | removed=\(removedCount)")
 #endif
             return
         }
@@ -307,7 +338,7 @@ extension Router {
         guard removalStartIndex < path.endIndex else {
             removeHighPrioritySegmentStartIfNeeded()
 #if DEBUG
-            log.departureDebug("Path unchanged: already kept through \(pathIndex).")
+            log.departureDebug("path unchanged | keepThrough=\(pathIndex)")
 #endif
             return
         }
@@ -318,20 +349,20 @@ extension Router {
         path.removeSubrange(removalStartIndex..<path.endIndex)
         removeHighPrioritySegmentStartIfNeeded()
 #if DEBUG
-        log.departureDebug("Path trimmed: kept through \(pathIndex), removed \(removedCount) scope(s).")
+        log.departureDebug("path trimmed | keepThrough=\(pathIndex) | removed=\(removedCount)")
 #endif
     }
 
     func removeFromPath(_ routeScope: RouteScope) {
         guard let pathIndex = path.firstIndex(where: { $0 === routeScope }) else {
 #if DEBUG
-            log.departureDebug("Path removal skipped: scope not in path: \(routeScope.departureDebugDescription).")
+            log.departureDebug("path removal skipped | reason=scope not in path | scope=\(routeScope.departureDebugDescription)")
 #endif
             return
         }
 
 #if DEBUG
-        log.departureDebug("Path removal requested for scope at \(pathIndex): \(routeScope.departureDebugDescription).")
+        log.departureDebug("path removal requested | pathIndex=\(pathIndex) | scope=\(routeScope.departureDebugDescription)")
 #endif
         if pathIndex == path.startIndex {
             keepPathThrough(nil)
@@ -347,7 +378,7 @@ extension Router {
         else {
             if self.highPrioritySegmentStartIndex != nil {
 #if DEBUG
-                log.departureDebug("High-priority segment cleared.")
+                log.departureDebug("high-priority segment cleared")
 #endif
             }
             self.highPrioritySegmentStartIndex = nil
@@ -358,16 +389,17 @@ extension Router {
     func routeScopeDidInstallInView(_ routeScope: RouteScope) {
         routeScope.mount()
 #if DEBUG
-        log.departureDebug("Route scope mounted: \(routeScope.departureDebugDescription).")
+        log.departureDebug("scope mounted | scope=\(routeScope.departureDebugDescription)")
 #endif
     }
 
     func routeScopeDidLeaveView(_ routeScope: RouteScope) {
+        guard routeScope.isMounted else { return }
+        
         routeScope.unmount()
 #if DEBUG
-        log.departureDebug("Route scope unmounted: \(routeScope.departureDebugDescription).")
+        log.departureDebug("scope unmounted | scope=\(routeScope.departureDebugDescription)")
 #endif
-        removeFromPath(routeScope)
     }
 
     func waitForRouteScopesToLeaveView(_ routeScopes: [RouteScope]) async {
@@ -375,13 +407,13 @@ extension Router {
 
         guard mountedRouteScopes.isEmpty == false else {
 #if DEBUG
-            log.departureDebug("Unmount wait skipped: no mounted route scopes.")
+            log.departureDebug("unmount wait skipped | reason=no mounted scopes")
 #endif
             return
         }
 
 #if DEBUG
-        log.departureDebug("Unmount wait started: \(mountedRouteScopes.count) mounted scope(s).")
+        log.departureDebug("unmount wait started | mounted=\(mountedRouteScopes.count)")
 #endif
         await withCheckedContinuation { continuation in
             var remainingCount = mountedRouteScopes.count
@@ -391,7 +423,7 @@ extension Router {
                     remainingCount -= 1
 #if DEBUG
                     log.departureDebug(
-                        "Unmount wait progress: \(remainingCount) mounted scope(s) remaining."
+                        "unmount wait progress | remaining=\(remainingCount)"
                     )
 #endif
 
@@ -459,6 +491,16 @@ extension Router {
         }
 
         return Array(path[preservationStartIndex..<path.endIndex])
+    }
+}
+
+private extension RouteScope {
+    func canDrivePresentation(for declaration: AnyRouteDeclaration) -> Bool {
+        routeAttachments.contains {
+            $0.routeType == declaration.routeType
+            && $0.kind == declaration.kind
+            && $0.drivesPresentation
+        }
     }
 }
 

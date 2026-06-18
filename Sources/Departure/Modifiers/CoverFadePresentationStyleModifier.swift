@@ -132,7 +132,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         private var router: Router?
         private var onDismiss: (@MainActor () -> Void)?
         private var presentedRouteID: RoutePresentation.ID?
-        private var hostingController: UIHostingController<AnyView>?
+        private var hostingController: PresentedHostingController<AnyView>?
 
         override func viewDidLoad() {
             super.viewDidLoad()
@@ -174,6 +174,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
                 return
             }
 
+            hostingController.onDismiss = nil
             hostingController.dismiss(animated: animated) { [weak self] in
                 self?.finishDismiss()
             }
@@ -201,7 +202,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
                 return
             }
 
-            let hostingController = UIHostingController(
+            let hostingController = PresentedHostingController(
                 rootView: rootView(
                     router: router,
                     destination: pendingPresentation.destination
@@ -211,6 +212,9 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
             hostingController.modalPresentationStyle = .overFullScreen
             hostingController.modalTransitionStyle = .crossDissolve
             hostingController.presentationController?.delegate = self
+            hostingController.onDismiss = { [weak self] in
+                self?.finishDismiss()
+            }
 
             self.hostingController = hostingController
             self.presentedRouteID = pendingPresentation.route.id
@@ -231,9 +235,14 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         }
 
         private func finishDismiss() {
+            guard hostingController != nil || presentedRouteID != nil else {
+                return
+            }
+
             hostingController = nil
             presentedRouteID = nil
             onDismiss?()
+
             presentPendingRouteIfNeeded()
         }
 
