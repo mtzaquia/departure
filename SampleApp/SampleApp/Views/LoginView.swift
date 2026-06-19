@@ -76,9 +76,29 @@ struct LoginView: View {
                 .accessibilityIdentifier(SampleAppAccessibility.loginPresentAlertButton)
                 Text("An alert attached to an ancestor scope with high priority should replace this screen.")
             }
+
+            Section {
+                Button("Push detail") {
+                    Task {
+                        await router.present(LoginDetailRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.loginPushDetailButton)
+
+                Button("Present high-priority sheet") {
+                    Task {
+                        await router.present(LoginNoticeRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.loginPresentHighPrioritySheetButton)
+            }
         }
         .navigationTitle("Login")
         .accessibilityIdentifier(SampleAppAccessibility.loginTitle)
+        .routes {
+            Push(LoginDetailRoute.self)
+            Sheet(LoginNoticeRoute.self, priority: .high, providesNavigation: false)
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
@@ -115,5 +135,34 @@ struct LoginReplacementView: View {
         }
         .navigationTitle("Replacement")
         .accessibilityIdentifier(SampleAppAccessibility.replacementTitle)
+    }
+}
+
+struct LoginDetailView: View {
+    var body: some View {
+        List {
+            Text("Pushed from the login screen.")
+                .accessibilityIdentifier(SampleAppAccessibility.loginDetailText)
+        }
+        .navigationTitle("Login detail")
+    }
+}
+
+struct LoginNoticeView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Login notice")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.loginNoticeText)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.loginNoticeDismissButton)
+        }
+        .padding()
     }
 }

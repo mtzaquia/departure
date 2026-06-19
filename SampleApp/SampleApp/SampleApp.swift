@@ -64,6 +64,7 @@ struct SaveAppearanceSettingsAction: Action {
 
 extension EnvironmentValues {
     @Entry var sampleWindowBadge: String = "not forwarded"
+    @Entry var samplePresentationSource: String = "unknown"
 }
 
 @main

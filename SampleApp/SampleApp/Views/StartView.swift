@@ -28,15 +28,44 @@ struct StartView: View {
 
     var body: some View {
         ZStack {
-            Button("Start", action: {
-                Task {
-                    await router.present(LandingRoute())
+            VStack(spacing: 16) {
+                Button("Start", action: {
+                    Task {
+                        await router.present(LandingRoute())
+                    }
+                })
+                .accessibilityIdentifier(SampleAppAccessibility.startButton)
+
+                Button("Show info") {
+                    Task {
+                        await router.present(StartInfoRoute())
+                    }
                 }
-            })
-            .accessibilityIdentifier(SampleAppAccessibility.startButton)
+                .accessibilityIdentifier(SampleAppAccessibility.startShowInfoButton)
+            }
         }
-        .routes {
+        .routes(id: SampleAppAccessibility.startScopeID) {
             Cover(LandingRoute.self, providesNavigation: false)
+            Sheet(StartInfoRoute.self, providesNavigation: false)
         }
+    }
+}
+
+struct StartInfoView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Start info")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.startInfoText)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.startInfoDismissButton)
+        }
+        .padding()
     }
 }
