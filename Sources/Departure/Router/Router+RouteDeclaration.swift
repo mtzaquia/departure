@@ -24,9 +24,7 @@ import Foundation
 
 extension Router {
     func requestRoute(_ route: some Route) async {
-#if DEBUG
-        log.departureDebug("route requested | route=\(route.departureDebugDescription)")
-#endif
+        log.departureDebug(.routeRequested(route: route))
 
         let resolvedRoute: (any Route)?
 
@@ -36,17 +34,11 @@ extension Router {
             resolvedRoute = route
 
         case .reroute(let newRoute):
-#if DEBUG
-            log.departureDebug(
-                "route rerouted | from=\(route.departureDebugDescription) | to=\(newRoute.departureDebugDescription)"
-            )
-#endif
+            log.departureDebug(.routeRerouted(from: route, to: newRoute))
             resolvedRoute = newRoute
 
         case .drop:
-#if DEBUG
-            log.departureDebug("route dropped | reason=resolution")
-#endif
+            log.departureDebug(.routeDroppedResolution)
             resolvedRoute = nil
         }
 
@@ -54,11 +46,7 @@ extension Router {
 
         let resolvedRouteType = type(of: resolvedRoute)
         guard let matchedDeclaration = firstDeclaration(including: resolvedRouteType) else {
-#if DEBUG
-            log.departureDebug(
-                "route dropped | reason=no declaration | type=\(String(reflecting: resolvedRouteType))"
-            )
-#endif
+            log.departureDebug(.routeDroppedNoDeclaration(routeType: resolvedRouteType))
             return // Cannot find matching route, dropped.
         }
 
@@ -71,34 +59,24 @@ extension Router {
             && pathIndex >= highPrioritySegment.startIndex
         } ?? false
 
-#if DEBUG
-        log.departureDebug(
-            "route matched | route=\(resolvedRoute.departureDebugDescription) | \(matchedDeclaration.departureDebugDescription) | highPriorityStart=\(String(describing: highPrioritySegment?.startIndex))"
-        )
-#endif
+        log.departureDebug(.routeMatched(
+            route: resolvedRoute,
+            match: matchedDeclaration,
+            highPriorityStart: highPrioritySegment?.startIndex
+        ))
 
         switch (requestedPriority, hasHighPrioritySegment, declarationIsInHighPrioritySegment) {
         case (.normal, true, false):
-#if DEBUG
-            log.departureDebug(
-                "route blocked | route=\(resolvedRoute.departureDebugDescription) | reason=normal priority before active high-priority segment"
-            )
-#endif
+            log.departureDebug(.routeBlockedByHighPrioritySegment(route: resolvedRoute))
             return // Normal priority route attached before an existing high-priority segment is dropped.
 
         case (.normal, _, _), (.high, _, true):
-#if DEBUG
-            log.departureDebug("route accepted | action=append | route=\(resolvedRoute.departureDebugDescription)")
-#endif
+            log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
             await appendRoute(resolvedRoute, after: matchedDeclaration)
             return
 
         case (.high, _, false):
-#if DEBUG
-            log.departureDebug(
-                "route accepted | action=replace high-priority segment | route=\(resolvedRoute.departureDebugDescription)"
-            )
-#endif
+            log.departureDebug(.routeAcceptedReplaceHighPriority(route: resolvedRoute))
             replaceHighPrioritySegment(with: resolvedRoute, after: matchedDeclaration)
             return
         }
@@ -113,12 +91,6 @@ extension Router {
         var declaringPathIndex: [RouteScope].Index?
         var branchID: AnyHashable
         var declaration: AnyRouteDeclaration
-
-#if DEBUG
-        var departureDebugDescription: String {
-            "match=declaration | pathIndex=\(String(describing: pathIndex)) | declaringPathIndex=\(String(describing: declaringPathIndex)) | branch=\(branchID.departureDebugDescription) | declaration=\(declaration.departureDebugDescription)"
-        }
-#endif
     }
 
     func firstDeclaration(including routeType: any Route.Type) -> DeclarationMatch? {

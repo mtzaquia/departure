@@ -166,12 +166,7 @@ extension RouteScope {
             activeBranch: activeBranch,
             hookDeclarations: hookDeclarations
         )
-#if DEBUG
-        let branchDescription = branchDebugDescription.map { ", branches: \($0)" } ?? ""
-        log.departureDebug(
-            "routes hydrated | scope=\(departureDebugDescription) | declarations=\(routeDeclarations.count)\(branchDescription)"
-        )
-#endif
+        log.departureDebug(.routesHydrated(scope: self, declarationCount: routeDeclarations.count))
     }
 
     func clearRoutes(sourceID: AnyHashable) {
@@ -185,11 +180,7 @@ extension RouteScope {
         branchSelection = nil
         sourceEnvironment = EnvironmentValues()
         branches = [Branch(id: initialID)]
-#if DEBUG
-        log.departureDebug(
-            "routes cleared | scope=\(departureDebugDescription)"
-        )
-#endif
+        log.departureDebug(.routesCleared(scope: self))
     }
 
     func updateSourceEnvironment(_ sourceEnvironment: EnvironmentValues) {
@@ -203,11 +194,7 @@ extension RouteScope {
         hookSourceID = sourceID
         let branchIndex = branches.index(for: activeBranch)
         branches[branchIndex].hookAttachments = hookDeclarations
-#if DEBUG
-        log.departureDebug(
-            "hooks hydrated | scope=\(departureDebugDescription) | hooks=\(hookDeclarations.count)"
-        )
-#endif
+        log.departureDebug(.hooksHydrated(scope: self, hookCount: hookDeclarations.count))
     }
 
     func clearHooks(sourceID: AnyHashable) {
@@ -218,11 +205,7 @@ extension RouteScope {
         hookSourceID = nil
         let branchIndex = branches.index(for: activeBranch)
         branches[branchIndex].hookAttachments = []
-#if DEBUG
-        log.departureDebug(
-            "hooks cleared | scope=\(departureDebugDescription)"
-        )
-#endif
+        log.departureDebug(.hooksCleared(scope: self))
     }
 }
 

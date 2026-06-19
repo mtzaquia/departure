@@ -126,11 +126,7 @@ extension RouteScope {
 
         routeScope.parent = self
         mountedBranchScopes[branch] = routeScope
-#if DEBUG
-        log.departureDebug(
-            "branch registered | branch=\(branch.departureDebugDescription) | parent=\(departureDebugDescription) | scope=\(routeScope.departureDebugDescription)"
-        )
-#endif
+        log.departureDebug(.branchRegistered(branch: branch, parent: self, scope: routeScope))
         return true
     }
 
@@ -140,22 +136,14 @@ extension RouteScope {
         }
 
         guard registeredScope === routeScope else {
-#if DEBUG
-            log.departureDebug(
-                "branch unregister skipped | branch=\(branch.departureDebugDescription) | reason=scope mismatch | scope=\(routeScope.departureDebugDescription)"
-            )
-#endif
+            log.departureDebug(.branchUnregisterSkipped(branch: branch, scope: routeScope))
             return
         }
 
         mountedBranchScopes[branch] = nil
         routeScope.parent = nil
         routeScope.mountedBranchID = nil
-#if DEBUG
-        log.departureDebug(
-            "branch unregistered | branch=\(branch.departureDebugDescription) | scope=\(routeScope.departureDebugDescription)"
-        )
-#endif
+        log.departureDebug(.branchUnregistered(branch: branch, scope: routeScope))
     }
 }
 
