@@ -31,7 +31,7 @@ struct ActionHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
 
-        router.path.append(parentScope)
+        router.rootPath.scopes.append(parentScope)
         parentScope.setActiveBranch(AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -56,7 +56,7 @@ struct ActionHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
 
-        router.path.append(parentScope)
+        router.rootPath.scopes.append(parentScope)
         parentScope.setActiveBranch(AnyHashable(AppTab.wallet))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -76,13 +76,36 @@ struct ActionHookTests {
         #expect(recorder.bools.isEmpty)
     }
 
+    @Test func clearingHooksRemovesInterceptorsFromScope() async {
+        let router = Router()
+        let scope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let sourceID = AnyHashable("hooks")
+        let recorder = ActionRecorder()
+
+        router.rootPath.scopes.append(scope)
+        scope.hydrateHooks(
+            sourceID: sourceID,
+            hookDeclarations: [
+                ActionInterceptor(ContextProbeAction.self) { invocation in
+                    recorder.bools.append((try? await invocation()) ?? false)
+                }.declaration,
+            ]
+        )
+
+        await router.performAction(ContextProbeAction())
+        scope.clearHooks(sourceID: sourceID)
+        await router.performAction(ContextProbeAction())
+
+        #expect(recorder.bools == [true])
+    }
+
     @Test func selectedBranchScopeChangesWhenActiveBranchChanges() {
         let router = Router()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
 
-        router.path.append(parentScope)
+        router.rootPath.scopes.append(parentScope)
         parentScope.registerBranchScope(homeScope, for: AppTab.home)
         parentScope.registerBranchScope(walletScope, for: AppTab.wallet)
 

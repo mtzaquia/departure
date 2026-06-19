@@ -174,7 +174,6 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
                 return
             }
 
-            hostingController.onDismiss = nil
             hostingController.dismiss(animated: animated) { [weak self] in
                 self?.finishDismiss()
             }

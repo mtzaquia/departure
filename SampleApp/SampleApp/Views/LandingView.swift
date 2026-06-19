@@ -58,6 +58,7 @@ struct LandingView: View {
             Cover(LoginRoute.self, priority: .high)
             Cover(LoginReplacementRoute.self, priority: .high)
             Cover(AlertRoute.self, priority: .high, transition: .fade, providesNavigation: false)
+            Sheet(TopLevelSheetRoute.self, providesNavigation: false)
 
             Branch(.home) {
                 Sheet(ProfileRoute.self)
@@ -69,5 +70,6 @@ struct LandingView: View {
                 Push(AuthenticationSettingsRoute.self)
             }
         }
+        .environment(\.samplePresentationSource, "top-level branched scope")
     }
 }

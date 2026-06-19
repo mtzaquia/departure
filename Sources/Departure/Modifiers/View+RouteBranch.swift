@@ -45,6 +45,7 @@ private struct RouteBranchModifier: ViewModifier {
     @Environment(Router.self) private var router
     @Environment(\.routeScope) private var parentScope
     @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
+    @Environment(\.self) private var sourceEnvironment
 
     init(branch: AnyHashable) {
         self.branch = branch
@@ -58,7 +59,6 @@ private struct RouteBranchModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .routes(id: branch, adoptedDeclarations)
             .environment(\.routeScope, branchScope)
             .onLifecycleEvent { event in
                 switch event {
@@ -69,8 +69,16 @@ private struct RouteBranchModifier: ViewModifier {
                     break
 
                 case .dismantled, .deinitialized:
-                    parentScope?.unregisterBranchScope(branchScope, for: branch)
+                    unregisterBranchScope()
                 }
+            }
+            // Presentation hosts live in a detached background layer so their per-declaration
+            // structural changes never tear down the registration bridge above. See
+            // `routePresentationStyleModifiers()`.
+            .background {
+                Color.black.frame(width: .zero, height: .zero)
+                    .routePresentationStyleModifiers(for: adoptedDeclarations)
+                    .environment(\.routeScope, branchScope)
             }
     }
 
@@ -79,19 +87,39 @@ private struct RouteBranchModifier: ViewModifier {
             return
         }
 
-        parentScope.registerBranchScope(branchScope, for: branch)
+        parentScope.registerBranchScope(
+            branchScope,
+            for: branch,
+            sourceEnvironment: sourceEnvironment
+        )
         router.resumePendingRoute(for: branch, in: parentScope)
     }
 
+    private func unregisterBranchScope() {
+        parentScope?.unregisterBranchScope(branchScope, for: branch)
+    }
+
     private var adoptedDeclarations: [RouteScopeDeclaration] {
-        branchRouteDeclarations
-            .filter { $0.branch == branch }
-            .map { declaration in
-                RouteScopeDeclaration(
-                    routes: declaration.routes.map {
-                        $0.drivingPresentation(true)
-                    }
-                )
+        let routes = branchRouteDeclarations
+            .flatMap { declaration in
+                if declaration.branch == branch {
+                    return declaration.routes
+                }
+
+                guard declaration.branch == nil else {
+                    return []
+                }
+
+                return declaration.routes.filter {
+                    $0.presentationKind != .push
+                }
             }
+            .map { $0.drivingPresentation(true) }
+
+        guard routes.isEmpty == false else {
+            return []
+        }
+
+        return [RouteScopeDeclaration(routes: routes)]
     }
 }

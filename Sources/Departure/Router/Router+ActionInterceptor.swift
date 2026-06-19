@@ -24,42 +24,26 @@ import Foundation
 
 extension Router {
     func performAction<A: Action>(_ action: A) async {
-#if DEBUG
-        log.departureDebug("Action requested: \(action.departureDebugDescription).")
-#endif
+        log.departureDebug(.actionRequested(action: action))
         await performAction(action, hasRerouted: false)
     }
 
     @discardableResult
     func runAction<A: Action>(_ action: A, hasRerouted: Bool) async throws -> A.Output {
         do {
-            let currentRoute = currentRouteScope.currentRoute.map { type(of:$0) }
-#if DEBUG
-            log.departureDebug(
-                "Action running: \(action.departureDebugDescription) in currentRoute: \(currentRoute.map { String(reflecting: $0) } ?? "nil")."
-            )
-#endif
+            let currentRoute: (any Route.Type)? = currentRouteScope.currentRoute.map { type(of: $0) }
+            log.departureDebug(.actionRunning(action: action, currentRoute: currentRoute))
             let output = try await action.attemptAction(in: ActionContext(currentRoute: currentRoute))
-#if DEBUG
-            log.departureDebug("Action completed: \(action.departureDebugDescription).")
-#endif
+            log.departureDebug(.actionCompleted(action: action))
             return output
         } catch let error {
             switch error {
             case .reroute where hasRerouted:
-#if DEBUG
-                log.departureDebug(
-                    "Action reroute dropped: \(action.departureDebugDescription) already rerouted once."
-                )
-#endif
+                log.departureDebug(.actionRerouteDropped(action: action))
                 throw CancellationError()
 
             case let .reroute(route):
-#if DEBUG
-                log.departureDebug(
-                    "Action reroute requested: \(action.departureDebugDescription) -> \(route.departureDebugDescription)."
-                )
-#endif
+                log.departureDebug(.actionRerouteRequested(action: action, route: route))
                 Task {
                     await requestRoute(route)
                     await performAction(action, hasRerouted: true)
@@ -68,11 +52,7 @@ extension Router {
                 throw CancellationError()
 
             case let .invocationError(error):
-#if DEBUG
-                log.departureDebug(
-                    "Action failed: \(action.departureDebugDescription) error: \(String(describing: error))."
-                )
-#endif
+                log.departureDebug(.actionFailed(action: action, error: error))
                 throw error
             }
         }
@@ -82,34 +62,20 @@ extension Router {
 private extension Router {
     func performAction<A: Action>(_ action: A, hasRerouted: Bool) async {
         if let interceptor = currentRouteScope.firstInterceptor(for: A.self) {
-#if DEBUG
-            log.departureDebug(
-                "Action intercepted: \(action.departureDebugDescription) by \(currentRouteScope.departureDebugDescription)."
-            )
-#endif
+            log.departureDebug(.actionIntercepted(action: action, scope: currentRouteScope))
             await interceptor.invoke(self, action, hasRerouted)
-#if DEBUG
-            log.departureDebug("Action interceptor finished: \(action.departureDebugDescription).")
-#endif
+            log.departureDebug(.actionInterceptorFinished(action: action))
             return
         }
 
-#if DEBUG
-        log.departureDebug(
-            "Action has no interceptor: \(action.departureDebugDescription). Running directly from \(currentRouteScope.departureDebugDescription)."
-        )
-#endif
+        log.departureDebug(.actionNoInterceptor(action: action, scope: currentRouteScope))
 
         // A top-level action dispatch is fire-and-forget. Interceptors can
         // capture invocation failures by catching errors from `invocation()`.
         do {
             _ = try await runAction(action, hasRerouted: hasRerouted)
         } catch {
-#if DEBUG
-            log.departureDebug(
-                "Action direct invocation ended without delivery: \(action.departureDebugDescription), error: \(String(describing: error))."
-            )
-#endif
+            log.departureDebug(.actionDirectInvocationEnded(action: action, error: error))
         }
     }
 }

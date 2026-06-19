@@ -29,6 +29,12 @@ struct LandingRoute: Route {
     }
 }
 
+struct StartInfoRoute: Route {
+    func destination() -> some View {
+        StartInfoView()
+    }
+}
+
 struct LoginRoute: Route {
     let nextRoute: (any Route)?
 
@@ -43,6 +49,18 @@ struct LoginReplacementRoute: Route {
     }
 }
 
+struct LoginDetailRoute: Route {
+    func destination() -> some View {
+        LoginDetailView()
+    }
+}
+
+struct LoginNoticeRoute: Route {
+    func destination() -> some View {
+        LoginNoticeView()
+    }
+}
+
 struct ProfileRoute: Route {
     func resolveRoute() async -> RouteResolution {
         Storage.shared.isLoggedIn ? .allow : .reroute(LoginRoute(nextRoute: ProfileRoute()))
@@ -53,9 +71,49 @@ struct ProfileRoute: Route {
     }
 }
 
+@Observable
+final class AuthenticationSettingsRouteState {
+    var attachesLocalRoute = false
+}
+
 struct AuthenticationSettingsRoute: Route {
+    let state: AuthenticationSettingsRouteState
+
+    init(state: AuthenticationSettingsRouteState = AuthenticationSettingsRouteState()) {
+        self.state = state
+    }
+
     func destination() -> some View {
-        AuthenticationSettingsView()
+        AuthenticationSettingsView(state: state)
+    }
+}
+
+struct TopLevelSheetRoute: Route {
+    func destination() -> some View {
+        TopLevelSheetView()
+    }
+}
+
+struct TopLevelSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.samplePresentationSource) private var samplePresentationSource
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Top-level sheet")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetText)
+
+            Text("Presented from: \(samplePresentationSource)")
+                .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetPresentationSource)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetDismissButton)
+        }
+        .padding()
     }
 }
 

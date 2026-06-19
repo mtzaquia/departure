@@ -22,6 +22,14 @@
 
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+typealias PlatformView = UIView
+#else
+import AppKit
+typealias PlatformView = NSView
+#endif
+
 extension View {
     func onLifecycleEvent(_ handler: @escaping @MainActor (ViewLifecycleBridge.Event) -> Void) -> some View {
         background {
@@ -31,10 +39,7 @@ extension View {
     }
 }
 
-#if canImport(UIKit)
-import UIKit
-
-struct ViewLifecycleBridge: UIViewRepresentable {
+struct ViewLifecycleBridge {
     enum Event {
         case updated(isInstalledInWindow: Bool)
         case installedInWindow(isInitial: Bool)
@@ -44,101 +49,32 @@ struct ViewLifecycleBridge: UIViewRepresentable {
 
     let onEvent: @MainActor (Event) -> Void
 
-    func makeUIView(context: Context) -> LifecycleView {
+    fileprivate func makeView() -> LifecycleView {
         LifecycleView(onEvent: onEvent)
     }
 
-    func updateUIView(_ uiView: LifecycleView, context: Context) {
-        uiView.onEvent = onEvent
-        uiView.onEvent(.updated(isInstalledInWindow: uiView.window != nil))
+    fileprivate func updateView(_ view: LifecycleView) {
+        view.onEvent = onEvent
+        view.onEvent(.updated(isInstalledInWindow: view.window != nil))
     }
+}
 
-    static func dismantleUIView(_ uiView: LifecycleView, coordinator: ()) {
-        uiView.notifyDismantled()
-    }
-
-    final class LifecycleView: UIView {
-        var onEvent: @MainActor (Event) -> Void
-        private var hasInstalledInWindow = false
-        private var hasDismantled = false
-        private var hasDeinitialized = false
-
-        init(onEvent: @escaping @MainActor (Event) -> Void) {
-            self.onEvent = onEvent
-            super.init(frame: .zero)
-            isUserInteractionEnabled = false
-        }
-
-        @available(*, unavailable)
-        required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-
-        override func didMoveToWindow() {
-            super.didMoveToWindow()
-
-            guard window != nil else {
-                if hasInstalledInWindow {
-                    onEvent(.updated(isInstalledInWindow: false))
-                }
-                return
-            }
-
-            let isInitial = hasInstalledInWindow == false
-            hasInstalledInWindow = true
-            onEvent(.installedInWindow(isInitial: isInitial))
-        }
-
-        func notifyDismantled() {
-            guard hasDismantled == false else {
-                return
-            }
-
-            hasDismantled = true
-            onEvent(.dismantled)
-        }
-
-        func notifyDeinitialized() {
-            guard hasDeinitialized == false else {
-                return
-            }
-
-            hasDeinitialized = true
-            onEvent(.deinitialized)
-        }
-
-        isolated deinit {
-            notifyDeinitialized()
-        }
-    }
+#if canImport(UIKit)
+extension ViewLifecycleBridge: UIViewRepresentable {
+    func makeUIView(context: Context) -> LifecycleView { makeView() }
+    func updateUIView(_ uiView: LifecycleView, context: Context) { updateView(uiView) }
+    static func dismantleUIView(_ uiView: LifecycleView, coordinator: ()) { uiView.notifyDismantled() }
 }
 #else
-import AppKit
+extension ViewLifecycleBridge: NSViewRepresentable {
+    func makeNSView(context: Context) -> LifecycleView { makeView() }
+    func updateNSView(_ nsView: LifecycleView, context: Context) { updateView(nsView) }
+    static func dismantleNSView(_ nsView: LifecycleView, coordinator: ()) { nsView.notifyDismantled() }
+}
+#endif
 
-struct ViewLifecycleBridge: NSViewRepresentable {
-    enum Event {
-        case updated(isInstalledInWindow: Bool)
-        case installedInWindow(isInitial: Bool)
-        case dismantled
-        case deinitialized
-    }
-
-    let onEvent: @MainActor (Event) -> Void
-
-    func makeNSView(context: Context) -> LifecycleView {
-        LifecycleView(onEvent: onEvent)
-    }
-
-    func updateNSView(_ nsView: LifecycleView, context: Context) {
-        nsView.onEvent = onEvent
-        nsView.onEvent(.updated(isInstalledInWindow: nsView.window != nil))
-    }
-
-    static func dismantleNSView(_ nsView: LifecycleView, coordinator: ()) {
-        nsView.notifyDismantled()
-    }
-
-    final class LifecycleView: NSView {
+extension ViewLifecycleBridge {
+    final class LifecycleView: PlatformView {
         var onEvent: @MainActor (Event) -> Void
         private var hasInstalledInWindow = false
         private var hasDismantled = false
@@ -147,6 +83,9 @@ struct ViewLifecycleBridge: NSViewRepresentable {
         init(onEvent: @escaping @MainActor (Event) -> Void) {
             self.onEvent = onEvent
             super.init(frame: .zero)
+            #if canImport(UIKit)
+            isUserInteractionEnabled = false
+            #endif
         }
 
         @available(*, unavailable)
@@ -154,9 +93,19 @@ struct ViewLifecycleBridge: NSViewRepresentable {
             fatalError("init(coder:) has not been implemented")
         }
 
+        #if canImport(UIKit)
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            handleMoveToWindow()
+        }
+        #else
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
+            handleMoveToWindow()
+        }
+        #endif
 
+        private func handleMoveToWindow() {
             guard window != nil else {
                 if hasInstalledInWindow {
                     onEvent(.updated(isInstalledInWindow: false))
@@ -192,4 +141,3 @@ struct ViewLifecycleBridge: NSViewRepresentable {
         }
     }
 }
-#endif

@@ -23,105 +23,100 @@
 extension Router {
     @discardableResult
     func unwindAndWait(to target: UnwindTarget?) async -> Bool {
-#if DEBUG
-        log.departureDebug("unwind requested | target=\(String(describing: target))")
-#endif
+        log.departureDebug(.unwindRequested(target: target))
 
-        switch unwindResolution(for: target) {
+        // The target only differs by which path it clears; resolution is the same. `.root` unwinds
+        // the entire app via the root path, regardless of the originating branch or depth.
+        // `.nearestBranch` resolves against the enclosing branch path (no-op when there isn't one).
+        // Everything else resolves against the current path.
+        let routePath: RoutePath
+        switch target {
+        case .root:
+            routePath = rootPath
+
+        case .nearestBranch:
+            guard let branchPath = nearestBranchPath else {
+                // Not inside a branch — there is nothing nearer to unwind to.
+                log.departureDebug(.unwindSkippedNotInsideBranch)
+                return true
+            }
+            routePath = branchPath
+
+        case nil, .id:
+            routePath = currentRoutePath
+        }
+
+        switch routePath.unwindResolution(to: target) {
         case .noRouteToUnwind:
-#if DEBUG
-            log.departureDebug("unwind skipped | reason=no route")
-#endif
+            log.departureDebug(.unwindSkippedNoRoute)
             return true
 
         case .targetNotFound:
-#if DEBUG
-            log.departureDebug("unwind dropped | reason=target not found | target=\(String(describing: target))")
-#endif
-            return false
+            guard let ancestorResolution = ancestorUnwindResolution(from: routePath, to: target) else {
+                log.departureDebug(.unwindDroppedTargetNotFound(target: target))
+                return false
+            }
+
+            let removedScopes = routePath.scopesRemovedByKeepingThrough(nil)
+            + ancestorResolution.path.scopesRemovedByKeepingThrough(ancestorResolution.pathIndex)
+            log.departureDebug(.unwindAcceptedAncestorTarget(
+                keepThrough: ancestorResolution.pathIndex,
+                removing: removedScopes.count
+            ))
+
+            keepPathThrough(nil, in: routePath)
+            keepPathThrough(ancestorResolution.pathIndex, in: ancestorResolution.path)
+            await waitForRouteScopesToLeaveView(removedScopes)
+            log.departureDebug(.unwindCompleted)
+
+            return true
 
         case let .keepPathThrough(targetPathIndex):
-            let removedScopes = routeScopesRemovedByKeepingPathThrough(targetPathIndex)
-#if DEBUG
-            log.departureDebug(
-                "unwind accepted | keepThrough=\(String(describing: targetPathIndex)) | removing=\(removedScopes.count)"
-            )
-#endif
+            let removedScopes = routePath.scopesRemovedByKeepingThrough(targetPathIndex)
+            log.departureDebug(.unwindAccepted(
+                keepThrough: targetPathIndex,
+                removing: removedScopes.count
+            ))
 
-            unwindPresentationSnapshot = UnwindPresentationSnapshot(
-                preservedPath: presentationPathPreservedByKeepingPathThrough(targetPathIndex),
-                highPrioritySegmentStartIndex: highPrioritySegmentStartIndex
-            )
-            keepPathThrough(targetPathIndex)
+            if target != nil {
+                unwindPresentationSnapshot = UnwindPresentationSnapshot(
+                    routePath: routePath,
+                    preservedPath: removedScopes,
+                    highPrioritySegment: highPrioritySegment
+                )
+            }
+            keepPathThrough(targetPathIndex, in: routePath)
+            if case .root = target {
+                // A high-priority segment may live on a branch path that clearing the root path
+                // doesn't touch; `.root` tears the whole app down, so drop it explicitly.
+                highPrioritySegment = nil
+            }
             await waitForRouteScopesToLeaveView(removedScopes)
             unwindPresentationSnapshot = nil
-#if DEBUG
-            log.departureDebug("unwind completed | removed scopes left view")
-#endif
+            log.departureDebug(.unwindCompleted)
 
             return true
         }
     }
 
-    func pathIndex(of routeScope: RouteScope) -> [RouteScope].Index? {
-        pathIndex(of: routeScope, in: path)
-    }
-
-    func pathIndex(
-        of routeScope: RouteScope,
-        in path: [RouteScope]
-    ) -> [RouteScope].Index? {
-        guard routeScope !== root else {
-            return nil
-        }
-
-        if let pathIndex = path.firstIndex(where: { $0 === routeScope }) {
-            return pathIndex
-        }
-
-        guard let parent = routeScope.parent else {
-            return nil
-        }
-
-        return pathIndex(of: parent, in: path)
-    }
-
-    func contains(_ routeScope: RouteScope, in path: [RouteScope]) -> Bool {
-        routeScope === root || pathIndex(of: routeScope, in: path) != nil || routeScope.parent === root
-    }
-
-    func scope(at pathIndex: [RouteScope].Index?) -> RouteScope? {
-        guard let pathIndex else {
-            return root
-        }
-
-        guard path.indices.contains(pathIndex) else {
-            return nil
-        }
-
-        return path[pathIndex]
-    }
-
     func appendRoute(_ route: any Route, after match: DeclarationMatch) async {
-#if DEBUG
-        log.departureDebug("route append preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)")
-#endif
-        let removedScopes = routeScopesRemovedByKeepingPathThrough(match.pathIndex)
-        keepPathThrough(match.pathIndex)
+        log.departureDebug(.routeAppendPreparing(route: route, match: match))
+        let preservesCurrentPath = preservesCurrentPath(for: match)
+        let removedScopes = preservesCurrentPath ? [] : match.path.scopesRemovedByKeepingThrough(match.pathIndex)
+
+        if preservesCurrentPath == false {
+            keepPathThrough(match.pathIndex, in: match.path)
+        }
 
         if match.declaration.presentationKind == .push {
-#if DEBUG
-            log.departureDebug("route append waiting | reason=replacing pushed scope | removedScopes=\(removedScopes.count)")
-#endif
+            log.departureDebug(.routeAppendWaitingReplacingPushedScope(removedScopes: removedScopes.count))
             await waitForRouteScopesToLeaveView(removedScopes)
         }
 
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
 
         guard activateBranch(for: match) else {
-#if DEBUG
-            log.departureDebug("route dropped | reason=branch activation failed | branch=\(match.branchID.departureDebugDescription)")
-#endif
+            log.departureDebug(.routeDroppedBranchActivationFailed(branch: match.branchID))
             return
         }
 
@@ -138,23 +133,17 @@ extension Router {
             return false
         }
 
-        return scope(at: match.pathIndex)?.activeBranch != match.branchID
+        return match.declaringPath.scope(at: match.declaringPathIndex)?.activeBranch != match.branchID
     }
 
     func activateBranch(for match: DeclarationMatch) -> Bool {
-        guard let scope = scope(at: match.pathIndex) else {
-#if DEBUG
-            log.departureDebug("branch activation failed | reason=no scope | pathIndex=\(String(describing: match.pathIndex))")
-#endif
+        guard let scope = match.declaringPath.scope(at: match.declaringPathIndex) else {
+            log.departureDebug(.branchActivationFailed(pathIndex: match.declaringPathIndex))
             return false
         }
 
         guard scope.activeBranch != match.branchID else {
-#if DEBUG
-            log.departureDebug(
-                "branch activation skipped | branch=\(match.branchID.departureDebugDescription) | reason=already active | scope=\(scope.departureDebugDescription)"
-            )
-#endif
+            log.departureDebug(.branchActivationSkipped(branch: match.branchID, scope: scope))
             return true
         }
 
@@ -162,17 +151,9 @@ extension Router {
         let didActivate = scope.setActiveBranch(match.branchID)
 
         if didActivate {
-#if DEBUG
-            log.departureDebug(
-                "branch activated | from=\(previousBranch.departureDebugDescription) | to=\(match.branchID.departureDebugDescription) | scope=\(scope.departureDebugDescription)"
-            )
-#endif
+            log.departureDebug(.branchActivated(from: previousBranch, to: match.branchID, scope: scope))
         } else {
-#if DEBUG
-            log.departureDebug(
-                "branch activation rejected | from=\(previousBranch.departureDebugDescription) | to=\(match.branchID.departureDebugDescription) | scope=\(scope.departureDebugDescription)"
-            )
-#endif
+            log.departureDebug(.branchActivationRejected(from: previousBranch, to: match.branchID, scope: scope))
         }
 
         return didActivate
@@ -182,19 +163,13 @@ extension Router {
         with route: any Route,
         after match: DeclarationMatch
     ) {
-#if DEBUG
-        log.departureDebug(
-            "high-priority replace preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
-        )
-#endif
-        keepPathThrough(match.pathIndex)
+        log.departureDebug(.highPriorityReplacePreparing(route: route, match: match))
+        keepPathThrough(match.pathIndex, in: match.path)
 
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
 
         guard activateBranch(for: match) else {
-#if DEBUG
-            log.departureDebug("route dropped | reason=branch activation failed | branch=\(match.branchID.departureDebugDescription)")
-#endif
+            log.departureDebug(.routeDroppedBranchActivationFailed(branch: match.branchID))
             return
         }
 
@@ -213,11 +188,7 @@ extension Router {
         waitsForBranchActivation: Bool = false
     ) {
         guard waitsForBranchActivation == false else {
-#if DEBUG
-            log.departureDebug(
-                "route pending | route=\(route.departureDebugDescription) | branch=\(match.branchID.departureDebugDescription) | reason=waiting for activated branch host"
-            )
-#endif
+            log.departureDebug(.routePendingWaitingForActivatedBranchHost(route: route, branch: match.branchID))
             pendingRoute = PendingRoute(
                 route: route,
                 match: match,
@@ -227,11 +198,7 @@ extension Router {
         }
 
         guard canPresentRoute(after: match) else {
-#if DEBUG
-            log.departureDebug(
-                "route pending | route=\(route.departureDebugDescription) | branch=\(match.branchID.departureDebugDescription) | reason=waiting for local presentation scope"
-            )
-#endif
+            log.departureDebug(.routePendingWaitingForLocalPresentationScope(route: route, branch: match.branchID))
             pendingRoute = PendingRoute(
                 route: route,
                 match: match,
@@ -243,189 +210,209 @@ extension Router {
         pendingRoute = nil
 
         if startsHighPrioritySegment {
-            highPrioritySegmentStartIndex = path.endIndex
-#if DEBUG
-            log.departureDebug("high-priority segment started | pathIndex=\(path.endIndex)")
-#endif
+            highPrioritySegment = HighPrioritySegment(path: match.path, startIndex: match.path.endIndex)
+            log.departureDebug(.highPrioritySegmentStarted(pathIndex: match.path.endIndex))
         }
 
-        path.append(RouteScope(id: route.id, route: route))
-#if DEBUG
-        log.departureDebug("route appended | route=\(route.departureDebugDescription) | pathCount=\(path.count)")
-#endif
+        let appendedScope = RouteScope(id: route.id, route: route)
+        // Resolve the host once, at write time, so the SwiftUI bindings read it directly instead of
+        // re-deriving the closest declaring scope on every read. The presenter is not always the
+        // declarer: when the route is placed into a different path than the one it was discovered
+        // in (a branch adopting a top-level/branch declaration), the branch scope that owns the
+        // target path is the presenter. Otherwise the declaring scope within the path hosts it.
+        let hostScope = match.path === match.declaringPath
+            ? match.path.scope(at: match.pathIndex)
+            : match.path.owner
+        appendedScope.hostScope = hostScope
+        // `match.declaration` may be the discovery copy (drivesPresentation == false). The host
+        // presents using its own adopted/local copy that actually drives presentation, so resolve
+        // that from the host's attachments.
+        appendedScope.hostDeclaration = hostScope?.routeAttachments.first(where: {
+            $0.routeType == match.declaration.routeType
+            && $0.presentationKind == match.declaration.presentationKind
+            && $0.drivesPresentation
+        }) ?? match.declaration
+        // Place the route in its host's structural slot. Assigning `modalChild` replaces any prior
+        // modal (the old one is trimmed from the path before we get here), so a host can never hold
+        // two modals at once.
+        if match.declaration.presentationKind == .push {
+            hostScope?.pushChild = appendedScope
+        } else {
+            hostScope?.modalChild = appendedScope
+        }
+        match.path.append(appendedScope)
+        log.departureDebug(.routeAppended(route: route, pathCount: match.path.count))
     }
 
     func resumePendingRoute(for branch: AnyHashable, in declaringScope: RouteScope) {
-#if DEBUG
-        log.departureDebug(
-            "pending resume check | branch=\(branch.departureDebugDescription) | declaringScope=\(declaringScope.departureDebugDescription)"
-        )
-#endif
+        log.departureDebug(.pendingResumeCheck(branch: branch, declaringScope: declaringScope))
 
         guard
             let pendingRoute,
             pendingRoute.match.branchID == branch,
-            scope(at: pendingRoute.match.pathIndex) === declaringScope
+            pendingRoute.match.declaringPath.scope(at: pendingRoute.match.declaringPathIndex) === declaringScope
         else {
-#if DEBUG
-            log.departureDebug("pending resume skipped | reason=no matching pending route")
-#endif
+            log.departureDebug(.pendingResumeSkipped)
             return
         }
 
-#if DEBUG
-        log.departureDebug("pending route resuming | route=\(pendingRoute.route.departureDebugDescription)")
-#endif
-        keepPathThrough(pendingRoute.match.pathIndex)
+        log.departureDebug(.pendingRouteResuming(route: pendingRoute.route))
+        let match = pendingRoute.match.updatingPresentationPath(
+            routePath(
+                forBranch: pendingRoute.match.branchID,
+                under: declaringScope,
+                declaration: pendingRoute.match.declaration
+            )
+        )
+        keepPathThrough(match.pathIndex, in: match.path)
 
         appendOrPendRoute(
             pendingRoute.route,
-            after: pendingRoute.match,
+            after: match,
             startsHighPrioritySegment: pendingRoute.startsHighPrioritySegment
         )
     }
 
     func canPresentRoute(after match: DeclarationMatch) -> Bool {
         guard match.declaration.drivesPresentation == false else {
-#if DEBUG
-            log.departureDebug("route can present | reason=declaration drives presentation")
-#endif
+            log.departureDebug(.routeCanPresentDeclarationDrivesPresentation)
             return true
         }
 
         guard
-            let declaringScope = scope(at: match.pathIndex),
+            let declaringScope = match.declaringPath.scope(at: match.declaringPathIndex),
             declaringScope.activeBranch == match.branchID
         else {
-#if DEBUG
-            log.departureDebug(
-                "route cannot present | branch=\(match.branchID.departureDebugDescription) | reason=discovery branch inactive"
-            )
-#endif
+            log.departureDebug(.routeCannotPresentDiscoveryBranchInactive(branch: match.branchID))
             return false
         }
 
-        let activeLocalScope = declaringScope.activeLocalScope
-        let canPresent = activeLocalScope.id == match.branchID
-            && activeLocalScope.canDrivePresentation(for: match.declaration)
+        let activeLocalScope = declaringScope.activeLocalScope(for: match.branchID)
+        let canPresent = activeLocalScope?.canDrivePresentation(for: match.declaration) == true
         if canPresent {
-#if DEBUG
-            log.departureDebug("route can present | branch=\(match.branchID.departureDebugDescription) | reason=active local scope")
-#endif
+            log.departureDebug(.routeCanPresentActiveLocalScope(branch: match.branchID))
         } else {
-#if DEBUG
-            log.departureDebug("route cannot present | branch=\(match.branchID.departureDebugDescription) | reason=no active local scope")
-#endif
+            log.departureDebug(.routeCannotPresentNoActiveLocalScope(branch: match.branchID))
         }
 
         return canPresent
     }
 
-    func keepPathThrough(_ pathIndex: [RouteScope].Index?) {
+    func keepPathThrough(_ pathIndex: [RouteScope].Index?, in routePath: RoutePath) {
+        // Scopes leaving the path must release their host's structural slots, otherwise a dismissed
+        // modal/push would still be reachable through `modalChild`/`pushChild`.
+        for removed in routePath.scopesRemovedByKeepingThrough(pathIndex) {
+            if removed.hostScope?.pushChild === removed {
+                removed.hostScope?.pushChild = nil
+            }
+            if removed.hostScope?.modalChild === removed {
+                removed.hostScope?.modalChild = nil
+            }
+        }
+
         guard let pathIndex else {
-#if DEBUG
-            let removedCount = path.count
-#endif
-            path.removeAll()
-            removeHighPrioritySegmentStartIfNeeded()
-#if DEBUG
-            log.departureDebug("path cleared | removed=\(removedCount)")
-#endif
+            let removedCount = routePath.count
+            routePath.keepThrough(nil)
+            removeHighPrioritySegmentStartIfNeeded(in: routePath)
+            log.departureDebug(.pathCleared(removedCount: removedCount))
             return
         }
 
-        let removalStartIndex = path.index(after: pathIndex)
-        guard removalStartIndex < path.endIndex else {
-            removeHighPrioritySegmentStartIfNeeded()
-#if DEBUG
-            log.departureDebug("path unchanged | keepThrough=\(pathIndex)")
-#endif
+        let removalStartIndex = routePath.scopes.index(after: pathIndex)
+        guard removalStartIndex < routePath.endIndex else {
+            removeHighPrioritySegmentStartIfNeeded(in: routePath)
+            log.departureDebug(.pathUnchanged(keepThrough: pathIndex))
             return
         }
 
-#if DEBUG
-        let removedCount = path.distance(from: removalStartIndex, to: path.endIndex)
-#endif
-        path.removeSubrange(removalStartIndex..<path.endIndex)
-        removeHighPrioritySegmentStartIfNeeded()
-#if DEBUG
-        log.departureDebug("path trimmed | keepThrough=\(pathIndex) | removed=\(removedCount)")
-#endif
+        let removedCount = routePath.scopes.distance(from: removalStartIndex, to: routePath.endIndex)
+        routePath.keepThrough(pathIndex)
+        removeHighPrioritySegmentStartIfNeeded(in: routePath)
+        log.departureDebug(.pathTrimmed(keepThrough: pathIndex, removedCount: removedCount))
+    }
+
+    func preservesCurrentPath(for match: DeclarationMatch) -> Bool {
+        guard match.declaration.presentationKind != .push else {
+            return false
+        }
+
+        guard
+            let declaringScope = match.declaringPath.scope(at: match.declaringPathIndex),
+            declaringScope.activeBranch == match.branchID
+        else {
+            return false
+        }
+
+        // A scope can host only one modal (sheet or cover) at a time.
+        if RoutePresentationKind.modalKinds.contains(where: {
+            routePresentation(from: declaringScope, matching: $0) != nil
+        }) {
+            return false
+        }
+
+        return true
     }
 
     func removeFromPath(_ routeScope: RouteScope) {
-        guard let pathIndex = path.firstIndex(where: { $0 === routeScope }) else {
-#if DEBUG
-            log.departureDebug("path removal skipped | reason=scope not in path | scope=\(routeScope.departureDebugDescription)")
-#endif
+        guard
+            let routePath = routePath(containing: routeScope),
+            let pathIndex = routePath.scopes.firstIndex(where: { $0 === routeScope })
+        else {
+            log.departureDebug(.pathRemovalSkipped(scope: routeScope))
             return
         }
 
-#if DEBUG
-        log.departureDebug("path removal requested | pathIndex=\(pathIndex) | scope=\(routeScope.departureDebugDescription)")
-#endif
-        if pathIndex == path.startIndex {
-            keepPathThrough(nil)
+        log.departureDebug(.pathRemovalRequested(pathIndex: pathIndex, scope: routeScope))
+        if pathIndex == routePath.scopes.startIndex {
+            keepPathThrough(nil, in: routePath)
         } else {
-            keepPathThrough(path.index(before: pathIndex))
+            keepPathThrough(routePath.scopes.index(before: pathIndex), in: routePath)
         }
     }
 
-    func removeHighPrioritySegmentStartIfNeeded() {
+    func removeHighPrioritySegmentStartIfNeeded(in routePath: RoutePath) {
         guard
-            let highPrioritySegmentStartIndex,
-            highPrioritySegmentStartIndex < path.endIndex
+            let highPrioritySegment,
+            highPrioritySegment.path === routePath
         else {
-            if self.highPrioritySegmentStartIndex != nil {
-#if DEBUG
-                log.departureDebug("high-priority segment cleared")
-#endif
-            }
-            self.highPrioritySegmentStartIndex = nil
+            return
+        }
+
+        guard highPrioritySegment.startIndex < routePath.endIndex else {
+            log.departureDebug(.highPrioritySegmentCleared)
+            self.highPrioritySegment = nil
             return
         }
     }
 
     func routeScopeDidInstallInView(_ routeScope: RouteScope) {
         routeScope.mount()
-#if DEBUG
-        log.departureDebug("scope mounted | scope=\(routeScope.departureDebugDescription)")
-#endif
+        log.departureDebug(.scopeMounted(scope: routeScope))
     }
 
     func routeScopeDidLeaveView(_ routeScope: RouteScope) {
         guard routeScope.isMounted else { return }
         
         routeScope.unmount()
-#if DEBUG
-        log.departureDebug("scope unmounted | scope=\(routeScope.departureDebugDescription)")
-#endif
+        log.departureDebug(.scopeUnmounted(scope: routeScope))
     }
 
     func waitForRouteScopesToLeaveView(_ routeScopes: [RouteScope]) async {
         let mountedRouteScopes = routeScopes.filter(\.isMounted)
 
         guard mountedRouteScopes.isEmpty == false else {
-#if DEBUG
-            log.departureDebug("unmount wait skipped | reason=no mounted scopes")
-#endif
+            log.departureDebug(.unmountWaitSkipped)
             return
         }
 
-#if DEBUG
-        log.departureDebug("unmount wait started | mounted=\(mountedRouteScopes.count)")
-#endif
+        log.departureDebug(.unmountWaitStarted(mounted: mountedRouteScopes.count))
         await withCheckedContinuation { continuation in
             var remainingCount = mountedRouteScopes.count
 
             for routeScope in mountedRouteScopes {
                 routeScope.onUnmount {
                     remainingCount -= 1
-#if DEBUG
-                    log.departureDebug(
-                        "unmount wait progress | remaining=\(remainingCount)"
-                    )
-#endif
+                    log.departureDebug(.unmountWaitProgress(remaining: remainingCount))
 
                     if remainingCount == 0 {
                         continuation.resume()
@@ -435,63 +422,72 @@ extension Router {
         }
     }
 
-    private func unwindResolution(for target: UnwindTarget?) -> UnwindResolution {
-        guard let target else {
-            guard let currentPathIndex = path.indices.last else {
-                return .noRouteToUnwind
-            }
-
-            guard currentPathIndex > path.startIndex else {
-                return .keepPathThrough(nil)
-            }
-
-            return .keepPathThrough(path.index(before: currentPathIndex))
+    func routePath(containing routeScope: RouteScope) -> RoutePath? {
+        if routeScope === root {
+            return rootPath
         }
 
-        switch target {
-        case .root:
-            return .keepPathThrough(nil)
-
-        case let .id(id):
-            if root.id == id {
-                return .keepPathThrough(nil)
-            }
-
-            guard let pathIndex = path.lastIndex(where: { $0.id == id }) else {
-                return .targetNotFound
-            }
-
-            return .keepPathThrough(pathIndex)
+        if routeScope.mountedBranchID != nil {
+            return routeScope.path
         }
+
+        if let owningPath = routeScope.owningPath {
+            return owningPath
+        }
+
+        if rootPath.contains(routeScope) {
+            return rootPath
+        }
+
+        return routePath(containing: routeScope, under: root)
     }
 
-    private func routeScopesRemovedByKeepingPathThrough(_ pathIndex: [RouteScope].Index?) -> [RouteScope] {
-        guard let pathIndex else {
-            return path
+    private func routePath(containing routeScope: RouteScope, under owner: RouteScope) -> RoutePath? {
+        for branchScope in owner.mountedBranchScopes.values {
+            if branchScope.path.contains(routeScope) {
+                return branchScope.path
+            }
+
+            if let routePath = self.routePath(containing: routeScope, under: branchScope) {
+                return routePath
+            }
         }
 
-        let removalStartIndex = path.index(after: pathIndex)
-
-        guard removalStartIndex < path.endIndex else {
-            return []
+        for scope in owner.path.scopes {
+            if let routePath = self.routePath(containing: routeScope, under: scope) {
+                return routePath
+            }
         }
 
-        return Array(path[removalStartIndex..<path.endIndex])
+        return nil
     }
 
-    private func presentationPathPreservedByKeepingPathThrough(_ pathIndex: [RouteScope].Index?) -> [RouteScope] {
-        guard let pathIndex else {
-            return path
+    private func ancestorUnwindResolution(
+        from routePath: RoutePath,
+        to target: UnwindTarget?
+    ) -> (path: RoutePath, pathIndex: [RouteScope].Index?)? {
+        guard case .id = target else {
+            return nil
         }
 
-        let preservationStartIndex = path.index(after: pathIndex)
+        var scope = routePath.owner?.parent
+        while let ancestorScope = scope {
+            if let ancestorPath = self.routePath(containing: ancestorScope) {
+                switch ancestorPath.unwindResolution(to: target) {
+                case let .keepPathThrough(pathIndex):
+                    return (ancestorPath, pathIndex)
 
-        guard preservationStartIndex < path.endIndex else {
-            return []
+                case .noRouteToUnwind, .targetNotFound:
+                    break
+                }
+            }
+
+            scope = ancestorScope.parent
         }
 
-        return Array(path[preservationStartIndex..<path.endIndex])
+        return nil
     }
+
 }
 
 private extension RouteScope {
@@ -502,10 +498,4 @@ private extension RouteScope {
             && $0.drivesPresentation
         }
     }
-}
-
-private enum UnwindResolution {
-    case noRouteToUnwind
-    case targetNotFound
-    case keepPathThrough([RouteScope].Index?)
 }

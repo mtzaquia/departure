@@ -35,6 +35,13 @@ struct ProfileView: View {
                 }
             }
             .accessibilityIdentifier(SampleAppAccessibility.profileSignOutButton)
+
+            Button("Present top-level sheet") {
+                Task {
+                    await router.present(TopLevelSheetRoute())
+                }
+            }
+            .accessibilityIdentifier(SampleAppAccessibility.profilePresentTopLevelSheetButton)
         }
         .navigationTitle("Profile")
         .accessibilityIdentifier(SampleAppAccessibility.profileTitle)

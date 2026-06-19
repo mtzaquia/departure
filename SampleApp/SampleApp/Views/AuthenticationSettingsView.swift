@@ -24,7 +24,9 @@ import Departure
 import SwiftUI
 
 struct AuthenticationSettingsView: View {
-    @State private var isHappy = false
+    @Environment(Router.self) private var router
+
+    let state: AuthenticationSettingsRouteState
 
     var body: some View {
         List {
@@ -36,8 +38,53 @@ struct AuthenticationSettingsView: View {
                 )
             )
             .accessibilityIdentifier(SampleAppAccessibility.authenticationLoggedInToggle)
+
+            Section("Sheet") {
+                Toggle(
+                    "Attach local route",
+                    isOn: .init(
+                        get: { state.attachesLocalRoute },
+                        set: { state.attachesLocalRoute = $0 }
+                    )
+                )
+                .accessibilityIdentifier(SampleAppAccessibility.authenticationAttachLocalRouteToggle)
+
+                Button("Present top-level sheet") {
+                    Task {
+                        await router.present(TopLevelSheetRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.authenticationPresentTopLevelSheetButton)
+
+                Button("Present info from Start") {
+                    Task {
+                        await router.present(StartInfoRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToRootButton)
+
+                Button("Unwind to root") {
+                    Task {
+                        await router.unwind(to: .root)
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToRootButton)
+
+                Button("Unwind to nearest branch") {
+                    Task {
+                        await router.unwind(to: .nearestBranch)
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToNearestBranchButton)
+            }
         }
         .navigationTitle("Authentication")
         .accessibilityIdentifier(SampleAppAccessibility.authenticationTitle)
+        .routes {
+            if state.attachesLocalRoute {
+                Sheet(TopLevelSheetRoute.self, providesNavigation: false)
+            }
+        }
+        .environment(\.samplePresentationSource, "authentication settings scope")
     }
 }

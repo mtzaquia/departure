@@ -45,6 +45,10 @@ enum SampleAppUITesting {
 
 enum SampleAppAccessibility {
     static let startButton = "sample.start.button"
+    static let startShowInfoButton = "sample.start.show-info"
+    static let startScopeID = "sample.start.scope"
+    static let startInfoText = "sample.start-info.text"
+    static let startInfoDismissButton = "sample.start-info.dismiss"
     static let landing = "sample.landing"
 
     static let homeTab = "sample.tab.home"
@@ -75,6 +79,14 @@ enum SampleAppAccessibility {
 
     static let authenticationTitle = "sample.authentication.title"
     static let authenticationLoggedInToggle = "sample.authentication.logged-in"
+    static let authenticationAttachLocalRouteToggle = "sample.authentication.attach-local-route"
+    static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
+    static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
+    static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
+
+    static let topLevelSheetText = "sample.top-level-sheet.text"
+    static let topLevelSheetPresentationSource = "sample.top-level-sheet.presentation-source"
+    static let topLevelSheetDismissButton = "sample.top-level-sheet.dismiss"
 
     static let messageText = "sample.message.text"
     static let messageDismissUnwindButton = "sample.message.dismiss-unwind"
@@ -92,6 +104,12 @@ enum SampleAppAccessibility {
     static let loginCancelButton = "sample.login.cancel"
     static let loginReplaceHighPriorityButton = "sample.login.replace-high-priority"
     static let loginPresentAlertButton = "sample.login.present-alert"
+    static let loginPushDetailButton = "sample.login.push-detail"
+    static let loginPresentHighPrioritySheetButton = "sample.login.present-high-priority-sheet"
+
+    static let loginDetailText = "sample.login-detail.text"
+    static let loginNoticeText = "sample.login-notice.text"
+    static let loginNoticeDismissButton = "sample.login-notice.dismiss"
 
     static let replacementTitle = "sample.replacement.title"
     static let replacementWindowEnvironmentValue = "sample.replacement.window-environment"
@@ -99,6 +117,7 @@ enum SampleAppAccessibility {
 
     static let profileTitle = "sample.profile.title"
     static let profileSignOutButton = "sample.profile.sign-out"
+    static let profilePresentTopLevelSheetButton = "sample.profile.present-top-level-sheet"
 
     static let droppedRouteText = "sample.dropped-route.text"
     static let undeclaredRouteText = "sample.undeclared-route.text"

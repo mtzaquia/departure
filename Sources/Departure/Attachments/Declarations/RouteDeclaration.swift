@@ -23,7 +23,7 @@
 import Foundation
 
 /// Type-erased route presentation metadata.
-public struct AnyRouteDeclaration: Sendable {
+public struct AnyRouteDeclaration: Sendable, Hashable {
     enum Kind: Hashable, Sendable {
         case push
         case sheet(priority: RoutePriority, providesNavigation: Bool)
@@ -43,12 +43,26 @@ public struct AnyRouteDeclaration: Sendable {
         self.kind = kind
         self.drivesPresentation = drivesPresentation
     }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.routeType == rhs.routeType
+        && lhs.kind == rhs.kind
+        && lhs.drivesPresentation == rhs.drivesPresentation
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(ObjectIdentifier(routeType))
+        hasher.combine(kind)
+        hasher.combine(drivesPresentation)
+    }
 }
 
 enum RoutePresentationKind: Hashable, Sendable {
     case push
     case sheet
     case cover(Cover.Transition)
+
+    static let modalKinds: [RoutePresentationKind] = [.sheet] + Cover.Transition.allCases.map(RoutePresentationKind.cover)
 }
 
 extension AnyRouteDeclaration {
@@ -81,7 +95,7 @@ extension AnyRouteDeclaration {
 }
 
 /// A group of route declarations attached to a route scope.
-public struct RouteScopeDeclaration: Sendable {
+public struct RouteScopeDeclaration: Sendable, Hashable {
     let branch: AnyHashable?
     let routes: [AnyRouteDeclaration]
 
