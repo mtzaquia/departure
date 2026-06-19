@@ -67,6 +67,78 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.messageText)
     }
 
+    func testTopLevelSheetCanPresentFromPushedAuthenticationSettings() {
+        openLanding()
+        tapSettingsTab()
+
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        tap(A11y.authenticationPresentTopLevelSheetButton)
+        assertExists(A11y.topLevelSheetText)
+        assertLabel(A11y.topLevelSheetPresentationSource, contains: "top-level branched scope")
+
+        tap(A11y.topLevelSheetDismissButton)
+        assertGone(A11y.topLevelSheetText)
+        assertExists(A11y.authenticationTitle)
+
+        setSwitch(A11y.authenticationAttachLocalRouteToggle, on: true)
+
+        tap(A11y.authenticationPresentTopLevelSheetButton)
+        assertExists(A11y.topLevelSheetText)
+        assertLabel(A11y.topLevelSheetPresentationSource, contains: "authentication settings scope")
+
+        tap(A11y.topLevelSheetDismissButton)
+        assertGone(A11y.topLevelSheetText)
+        assertExists(A11y.authenticationTitle)
+    }
+
+    func testTopLevelSheetPresentedFromBranchLocalProfileSheetDismissesItAndPresentsTopLevel() {
+        openLanding()
+
+        // Present the home-branch-local Profile sheet (reroutes through login first).
+        tap(A11y.homeProfileButton)
+        assertExists(A11y.loginTitle)
+
+        tap(A11y.loginButton)
+        assertExists(A11y.profileTitle)
+
+        // Presenting the top-level sheet from within the branch-local sheet must dismiss the
+        // branch-local Profile sheet and present the top-level sheet from the branched scope.
+        tap(A11y.profilePresentTopLevelSheetButton)
+        assertExists(A11y.topLevelSheetText)
+        assertLabel(A11y.topLevelSheetPresentationSource, contains: "top-level branched scope")
+        assertGone(A11y.profileTitle)
+
+        // Dismissing the top-level sheet returns to home — the branch-local Profile sheet was
+        // dismissed, not merely covered, so it must not re-appear.
+        tap(A11y.topLevelSheetDismissButton)
+        assertGone(A11y.topLevelSheetText)
+        assertGone(A11y.profileTitle)
+        assertExists(A11y.homeWelcome)
+    }
+
+    func testInactiveBranchPushIsPreservedWhenSwitchingTabs() {
+        openLanding()
+        tapSettingsTab()
+
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        tapHomeTab()
+        assertExists(A11y.homeWelcome)
+
+        tapSettingsTab()
+        assertExists(A11y.authenticationTitle)
+        assertGone(A11y.settingsAuthenticationButton)
+
+        tapHomeTab()
+        assertExists(A11y.homeWelcome)
+
+        tapSettingsTab()
+        assertExists(A11y.authenticationTitle)
+    }
+
     func testProfileRequestFromSettingsReroutesToLoginThenContinuesToProfile() {
         openLanding()
         tapSettingsTab()
@@ -153,6 +225,80 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.startButton)
     }
 
+    func testRoutesFromHighPrioritySegmentBehaveAsNormalNavigationAndModal() {
+        openLanding()
+
+        // Reaching profile while logged out reroutes to the login high-priority cover, starting a
+        // high-priority segment.
+        tap(A11y.homeProfileButton)
+        assertExists(A11y.loginTitle)
+
+        // A high-priority sheet declared inside the segment presents as a normal sheet over login
+        // — it must not escalate/replace the login cover, so login stays in the hierarchy behind it.
+        tap(A11y.loginPresentHighPrioritySheetButton)
+        assertExists(A11y.loginNoticeText)
+        assertExists(A11y.loginTitle)
+
+        tap(A11y.loginNoticeDismissButton)
+        assertGone(A11y.loginNoticeText)
+        assertExists(A11y.loginTitle)
+
+        // A normal push declared inside the segment navigates within the login stack (it is not
+        // blocked the way a normal route before the segment would be).
+        tap(A11y.loginPushDetailButton)
+        assertExists(A11y.loginDetailText)
+    }
+
+    func testUnwindToRootFromDeepWithinSettingsBranchCrossesBranchedScope() {
+        openLanding()
+        tapSettingsTab()
+
+        // Go deep: a pushed route inside the settings branch stack.
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        // Unwind to root (the app start) from deep inside the branch. This crosses the settings
+        // branch scope and the branched landing scope (resolved via the ancestor unwind path).
+        tap(A11y.authenticationUnwindToRootButton)
+        assertExists(A11y.startButton)
+        assertGone(A11y.authenticationTitle)
+        assertGone(A11y.landing)
+
+        // The root scope survived the cross-branch unwind: its sheet still presents and dismisses.
+        tap(A11y.startShowInfoButton)
+        assertExists(A11y.startInfoText)
+
+        tap(A11y.startInfoDismissButton)
+        assertGone(A11y.startInfoText)
+        assertExists(A11y.startButton)
+    }
+
+    func testUnwindToNearestBranchReturnsToBranchRootAndIsIdempotentThere() {
+        openLanding()
+        tapSettingsTab()
+
+        // Go deep: a pushed route inside the settings branch stack.
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        // Unwind to the nearest branch: pops back to the settings branch root, NOT all the way to
+        // the app start. The landing (tabbed) container stays mounted — proving we did not escape
+        // the branch (a full unwind would dismiss `landing`, see the `.root` test above).
+        tap(A11y.authenticationUnwindToNearestBranchButton)
+        assertGone(A11y.authenticationTitle)
+        assertExists(A11y.settingsAuthenticationButton)
+        assertExists(A11y.landing)
+
+        // Already at the branch root: pushing in again and unwinding lands back at the same place,
+        // and the engine never escapes the branch to the app start.
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+        tap(A11y.authenticationUnwindToNearestBranchButton)
+        assertGone(A11y.authenticationTitle)
+        assertExists(A11y.settingsAuthenticationButton)
+        assertExists(A11y.landing)
+    }
+
     func testDroppedUndeclaredMissingUnwindAndActionDispatchRemainStable() {
         openLanding()
         tapSettingsTab()
@@ -212,6 +358,24 @@ private extension SampleAppUITests {
         target.tap()
     }
 
+    func setSwitch(_ identifier: String, on: Bool) {
+        let target = app.switches[identifier]
+        XCTAssertTrue(target.waitForExistence(timeout: 5), "Expected switch \(identifier) to exist")
+
+        let expectedValue = on ? "1" : "0"
+        if target.valueDescription != expectedValue {
+            XCTAssertTrue(target.isHittable, "Expected switch \(identifier) to be hittable")
+            target.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        }
+
+        let deadline = Date().addingTimeInterval(2)
+        while target.valueDescription != expectedValue && Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+
+        XCTAssertEqual(target.valueDescription, expectedValue, "Expected switch \(identifier) to be \(expectedValue)")
+    }
+
     func assertExists(_ identifier: String) {
         XCTAssertTrue(element(identifier).waitForExistence(timeout: 5), "Expected \(identifier) to exist")
     }
@@ -253,6 +417,10 @@ private extension XCUIElement {
 
 private enum A11y {
     static let startButton = "sample.start.button"
+    static let startShowInfoButton = "sample.start.show-info"
+    static let startInfoText = "sample.start-info.text"
+    static let startInfoDismissButton = "sample.start-info.dismiss"
+    static let landing = "sample.landing"
 
     static let homeTab = "sample.tab.home"
     static let settingsTab = "sample.tab.settings"
@@ -263,6 +431,7 @@ private enum A11y {
     static let homeEmojiValue = "sample.home.emoji-value"
 
     static let settingsAppearanceButton = "sample.settings.appearance"
+    static let settingsAuthenticationButton = "sample.settings.authentication"
     static let settingsProfileButton = "sample.settings.profile"
     static let settingsSaveAppearanceButton = "sample.settings.save-appearance"
     static let settingsNewEmojiButton = "sample.settings.new-emoji"
@@ -280,6 +449,14 @@ private enum A11y {
     static let appearanceSavedCount = "sample.appearance.saved-count"
 
     static let authenticationTitle = "sample.authentication.title"
+    static let authenticationAttachLocalRouteToggle = "sample.authentication.attach-local-route"
+    static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
+    static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
+    static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
+
+    static let topLevelSheetText = "sample.top-level-sheet.text"
+    static let topLevelSheetPresentationSource = "sample.top-level-sheet.presentation-source"
+    static let topLevelSheetDismissButton = "sample.top-level-sheet.dismiss"
 
     static let messageText = "sample.message.text"
     static let messageDismissUnwindButton = "sample.message.dismiss-unwind"
@@ -294,6 +471,12 @@ private enum A11y {
     static let loginButton = "sample.login.button"
     static let loginReplaceHighPriorityButton = "sample.login.replace-high-priority"
     static let loginPresentAlertButton = "sample.login.present-alert"
+    static let loginPushDetailButton = "sample.login.push-detail"
+    static let loginPresentHighPrioritySheetButton = "sample.login.present-high-priority-sheet"
+
+    static let loginDetailText = "sample.login-detail.text"
+    static let loginNoticeText = "sample.login-notice.text"
+    static let loginNoticeDismissButton = "sample.login-notice.dismiss"
 
     static let replacementTitle = "sample.replacement.title"
     static let replacementWindowEnvironmentValue = "sample.replacement.window-environment"
@@ -301,6 +484,7 @@ private enum A11y {
 
     static let profileTitle = "sample.profile.title"
     static let profileSignOutButton = "sample.profile.sign-out"
+    static let profilePresentTopLevelSheetButton = "sample.profile.present-top-level-sheet"
 
     static let droppedRouteText = "sample.dropped-route.text"
     static let undeclaredRouteText = "sample.undeclared-route.text"
