@@ -60,6 +60,11 @@ extension Router {
         matching presentationKind: RoutePresentationKind
     ) -> Binding<RoutePresentation?> {
         let routeScope = routeScope ?? root
+        let routePath = routePath(containing: routeScope) ?? rootPath
+        _ = routePath.scopes
+        if routeScope !== root {
+            _ = routeScope.path.scopes
+        }
 
         return Binding(
             get: {
@@ -81,10 +86,48 @@ extension Router {
         )
     }
 
+    func routePresentation(
+        from routeScope: RouteScope,
+        matching presentationKind: RoutePresentationKind
+    ) -> RoutePresentation? {
+        let routePath = routePath(containing: routeScope) ?? rootPath
+        let highPrioritySegmentStartIndex = highPrioritySegment.flatMap {
+            $0.path === routePath ? $0.startIndex : nil
+        }
+
+        // Live read: return the host's structural slot directly.
+        if let presentation = hostedPresentation(
+            by: routeScope,
+            matching: presentationKind,
+            highPrioritySegmentStartIndex: highPrioritySegmentStartIndex
+        ) {
+            return presentation
+        }
+
+        guard
+            routeScope !== root,
+            let unwindPresentationSnapshot,
+            routeScope !== unwindPresentationSnapshot.routePath.owner
+        else {
+            return nil
+        }
+
+        // Snapshot read: the preserved scopes have already left the live path (and released their
+        // slots), so scan the snapshot by recorded host instead.
+        return hostedPresentation(
+            by: routeScope,
+            matching: presentationKind,
+            inPreservedPath: unwindPresentationSnapshot.preservedPath,
+            highPrioritySegmentStartIndex: unwindPresentationSnapshot.highPrioritySegment?.startIndex
+        )
+    }
+
     func highPriorityRoutePresentationBinding(
         matching presentationKind: RoutePresentationKind
     ) -> Binding<RoutePresentation?> {
-        Binding(
+        _ = highPrioritySegment?.path.scopes
+
+        return Binding(
             get: {
                 self.highPriorityRoutePresentation(
                     matching: presentationKind
@@ -104,61 +147,32 @@ extension Router {
 }
 
 private extension Router {
-    func routePresentation(
-        from routeScope: RouteScope,
-        matching presentationKind: RoutePresentationKind
+    func hostedPresentation(
+        by host: RouteScope,
+        matching presentationKind: RoutePresentationKind,
+        highPrioritySegmentStartIndex: [RouteScope].Index?
     ) -> RoutePresentation? {
-        if let presentation = routePresentation(
-            from: routeScope,
-            matching: presentationKind,
-            in: path,
-            highPrioritySegmentStartIndex: highPrioritySegmentStartIndex
-        ) {
-            return presentation
+        guard host.canDrivePresentation(matching: presentationKind) else {
+            return nil
         }
 
+        let candidate = presentationKind == .push ? host.pushChild : host.modalChild
         guard
-            routeScope !== root,
-            let unwindPresentationSnapshot
+            let presentedScope = candidate,
+            let declaration = presentedScope.hostDeclaration,
+            declaration.presentationKind == presentationKind,
+            declaration.drivesPresentation
         else {
             return nil
         }
 
-        return routePresentation(
-            from: routeScope,
-            matching: presentationKind,
-            in: unwindPresentationSnapshot.preservedPath,
-            highPrioritySegmentStartIndex: unwindPresentationSnapshot.highPrioritySegmentStartIndex
-        )
-    }
-
-    func routePresentation(
-        from routeScope: RouteScope,
-        matching presentationKind: RoutePresentationKind,
-        in path: [RouteScope],
-        highPrioritySegmentStartIndex: [RouteScope].Index?
-    ) -> RoutePresentation? {
-        guard contains(routeScope, in: path) else {
-            return nil
-        }
-
-        guard routeScope.canDrivePresentation else {
-            return nil
-        }
-
-        let routeScopePathIndex = pathIndex(of: routeScope, in: path)
-
+        // The high-priority gate keys off the *host's* position relative to the segment (the path
+        // owner maps to `nil`, i.e. before the segment).
+        let hostIndex = (routePath(containing: host) ?? rootPath).scopes.firstIndex { $0 === host }
         guard
-            let presentedScope = scope(after: routeScopePathIndex, in: path),
-            let route = presentedScope.route,
-            let declaration = routeScope.routeAttachments.first(where: { declaration in
-                declaration.routeType == type(of: route)
-                && declaration.presentationKind == presentationKind
-                && declaration.drivesPresentation
-            }),
             shouldHostLocally(
                 declaration,
-                from: routeScopePathIndex,
+                from: hostIndex,
                 highPrioritySegmentStartIndex: highPrioritySegmentStartIndex
             )
         else {
@@ -168,19 +182,67 @@ private extension Router {
         return RoutePresentation(
             scope: presentedScope,
             declaration: declaration,
-            sourceEnvironment: routeScope.sourceEnvironment
+            sourceEnvironment: host.sourceEnvironment
         )
+    }
+
+    func hostedPresentation(
+        by host: RouteScope,
+        matching presentationKind: RoutePresentationKind,
+        inPreservedPath path: [RouteScope],
+        highPrioritySegmentStartIndex: [RouteScope].Index?
+    ) -> RoutePresentation? {
+        guard host.canDrivePresentation(matching: presentationKind) else {
+            return nil
+        }
+
+        let hostIndex = path.firstIndex { $0 === host }
+
+        for presentedScope in path {
+            guard
+                presentedScope.hostScope === host,
+                let declaration = presentedScope.hostDeclaration,
+                declaration.presentationKind == presentationKind,
+                declaration.drivesPresentation,
+                shouldHostLocally(
+                    declaration,
+                    from: hostIndex,
+                    highPrioritySegmentStartIndex: highPrioritySegmentStartIndex
+                )
+            else {
+                continue
+            }
+
+            return RoutePresentation(
+                scope: presentedScope,
+                declaration: declaration,
+                sourceEnvironment: host.sourceEnvironment
+            )
+        }
+
+        return nil
     }
 
     func dismissPresentation(
         from routeScope: RouteScope,
         matching presentationKind: RoutePresentationKind
     ) {
-        guard routePresentation(from: routeScope, matching: presentationKind) != nil else {
+        guard let presentation = routePresentation(from: routeScope, matching: presentationKind) else {
             return
         }
 
-        keepPathThrough(pathIndex(of: routeScope))
+        let routePath = routePath(containing: presentation.scope) ?? rootPath
+
+        guard let presentedPathIndex = routePath.scopes.firstIndex(where: { $0 === presentation.scope }) else {
+            keepPathThrough(routePath.index(of: routeScope), in: routePath)
+            return
+        }
+
+        if presentedPathIndex == routePath.scopes.startIndex {
+            keepPathThrough(nil, in: routePath)
+        } else {
+            keepPathThrough(routePath.scopes.index(before: presentedPathIndex), in: routePath)
+        }
     }
 
     func shouldHostLocally(
@@ -206,10 +268,10 @@ private extension Router {
         matching presentationKind: RoutePresentationKind
     ) -> RoutePresentation? {
         guard
-            let segmentStartIndex = highPrioritySegmentStartIndex,
-            path.indices.contains(segmentStartIndex),
-            let route = path[segmentStartIndex].route,
-            let declaringScope = scope(at: declaringPathIndexForHighPrioritySegment()),
+            let highPrioritySegment,
+            highPrioritySegment.path.scopes.indices.contains(highPrioritySegment.startIndex),
+            let route = highPrioritySegment.path.scopes[highPrioritySegment.startIndex].route,
+            let declaringScope = highPrioritySegment.path.scope(at: declaringPathIndexForHighPrioritySegment()),
             let attachment = declaringScope.highPriorityRouteAttachment(
                 for: type(of: route),
                 matching: presentationKind
@@ -219,7 +281,7 @@ private extension Router {
         }
 
         return RoutePresentation(
-            scope: path[segmentStartIndex],
+            scope: highPrioritySegment.path.scopes[highPrioritySegment.startIndex],
             declaration: attachment.declaration,
             sourceEnvironment: attachment.routeScope.sourceEnvironment
         )
@@ -232,37 +294,22 @@ private extension Router {
             return
         }
 
-        keepPathThrough(declaringPathIndexForHighPrioritySegment())
+        guard let highPrioritySegment else {
+            return
+        }
+
+        keepPathThrough(declaringPathIndexForHighPrioritySegment(), in: highPrioritySegment.path)
     }
 
     func declaringPathIndexForHighPrioritySegment() -> [RouteScope].Index? {
         guard
-            let segmentStartIndex = highPrioritySegmentStartIndex,
-            segmentStartIndex > path.startIndex
+            let highPrioritySegment,
+            highPrioritySegment.startIndex > highPrioritySegment.path.scopes.startIndex
         else {
             return nil
         }
 
-        return path.index(before: segmentStartIndex)
-    }
-
-    func scope(
-        after pathIndex: [RouteScope].Index?,
-        in path: [RouteScope]
-    ) -> RouteScope? {
-        let nextIndex: [RouteScope].Index
-
-        if let pathIndex {
-            nextIndex = path.index(after: pathIndex)
-        } else {
-            nextIndex = path.startIndex
-        }
-
-        guard path.indices.contains(nextIndex) else {
-            return nil
-        }
-
-        return path[nextIndex]
+        return highPrioritySegment.path.scopes.index(before: highPrioritySegment.startIndex)
     }
 
 }

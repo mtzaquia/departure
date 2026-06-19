@@ -20,6 +20,7 @@
 //  SOFTWARE.
 //
 
+import Foundation
 import SwiftUI
 
 public extension View {
@@ -74,21 +75,6 @@ public extension View {
     }
 }
 
-extension View {
-    func routes<ID: Hashable>(
-        id: ID? = AnyHashable?.none,
-        _ declarations: [RouteScopeDeclaration]
-    ) -> some View {
-        modifier(
-            RoutesModifier(
-                explicitScopeID: id.map({ AnyHashable($0) }),
-                selection: nil,
-                declarations: declarations
-            )
-        )
-    }
-}
-
 // MARK: - Private
 
 private struct RoutesModifier: ViewModifier {
@@ -96,61 +82,72 @@ private struct RoutesModifier: ViewModifier {
     let selection: AnyRouteBranchSelection?
     let declarations: [RouteScopeDeclaration]
 
+    @State private var sourceID = AnyHashable(UUID())
+
+    @Environment(Router.self) private var router
     @Environment(\.routeScope) private var routeScope
     @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
     @Environment(\.self) private var sourceEnvironment
-    @Environment(Router.self) private var router
 
     func body(content: Content) -> some View {
         let activeBranch = selection?.value()
 
         content
-            .applyIf(declarations.containsPresentationKind(.push)) {
-                $0.modifier(PushPresentationStyleModifier())
-            }
-            .applyIf(declarations.containsPresentationKind(.sheet)) {
-                $0.modifier(SheetPresentationStyleModifier())
-            }
-            .applyIf(declarations.containsPresentationKind(.cover(.slide))) {
-                $0.modifier(CoverSlidePresentationStyleModifier())
-            }
-            .applyIf(declarations.containsPresentationKind(.cover(.fade))) {
-                $0.modifier(CoverFadePresentationStyleModifier())
-            }
             .environment(\.branchRouteDeclarations, accumulatedBranchRouteDeclarations)
             .onLifecycleEvent { event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
                     hydrateScope()
 
-                case .dismantled, .deinitialized, .updated(isInstalledInWindow: false):
+                case .updated(isInstalledInWindow: false):
                     break
+
+                case .dismantled, .deinitialized:
+                    clearScope()
                 }
             }
             .onChange(of: activeBranch) { _, _ in
                 hydrateScope()
             }
+            .onChange(of: declarations) { _, _ in
+                hydrateScope()
+            }
+            // Presentation hosts live in a detached background layer. They are installed only for
+            // the declared styles (so e.g. `navigationDestination` is never attached without a
+            // push declaration), which means the host set changes as declarations change. Keeping
+            // that conditional structure off the primary content prevents its `_ConditionalContent`
+            // churn from tearing down the lifecycle bridge above, which would otherwise clear the
+            // scope's freshly hydrated routes.
+            .background {
+                Color.black.frame(width: .zero, height: .zero)
+                    .routePresentationStyleModifiers(for: declarations)
+            }
     }
 
     private func hydrateScope() {
         routeScope?.hydrateRoutes(
+            sourceID: sourceID,
             id: explicitScopeID,
             branchSelection: selection,
             routeDeclarations: declarations,
             sourceEnvironment: sourceEnvironment
         )
 
-        guard
-            let routeScope,
-            let parentScope = routeScope.parent
-        else {
+        guard let routeScope, let parentScope = routeScope.parent else {
             return
         }
 
         router.resumePendingRoute(for: routeScope.id, in: parentScope)
     }
 
+    private func clearScope() {
+        routeScope?.clearRoutes(sourceID: sourceID)
+    }
+
     private var accumulatedBranchRouteDeclarations: [RouteScopeDeclaration] {
-        branchRouteDeclarations + declarations.filter { $0.branch != nil }
+        branchRouteDeclarations + declarations.filter { declaration in
+            declaration.branch != nil
+            || declaration.routes.contains { $0.presentationKind != .push }
+        }
     }
 }

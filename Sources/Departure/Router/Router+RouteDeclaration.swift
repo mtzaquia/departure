@@ -63,14 +63,17 @@ extension Router {
         }
 
         let requestedPriority = matchedDeclaration.declaration.priority
-        let hasHighPrioritySegment = highPrioritySegmentStartIndex != nil
+        let hasHighPrioritySegment = highPrioritySegment != nil
         let declarationIsInHighPrioritySegment = matchedDeclaration.pathIndex.map { pathIndex in
-            highPrioritySegmentStartIndex.map { pathIndex >= $0 } ?? false
+            guard let highPrioritySegment else { return false }
+
+            return matchedDeclaration.path === highPrioritySegment.path
+            && pathIndex >= highPrioritySegment.startIndex
         } ?? false
 
 #if DEBUG
         log.departureDebug(
-            "route matched | route=\(resolvedRoute.departureDebugDescription) | \(matchedDeclaration.departureDebugDescription) | highPriorityStart=\(String(describing: highPrioritySegmentStartIndex))"
+            "route matched | route=\(resolvedRoute.departureDebugDescription) | \(matchedDeclaration.departureDebugDescription) | highPriorityStart=\(String(describing: highPrioritySegment?.startIndex))"
         )
 #endif
 
@@ -104,35 +107,184 @@ extension Router {
 
 extension Router {
     struct DeclarationMatch {
+        var path: RoutePath
         var pathIndex: [RouteScope].Index?
+        var declaringPath: RoutePath
+        var declaringPathIndex: [RouteScope].Index?
         var branchID: AnyHashable
         var declaration: AnyRouteDeclaration
 
 #if DEBUG
         var departureDebugDescription: String {
-            "match=declaration | pathIndex=\(String(describing: pathIndex)) | branch=\(branchID.departureDebugDescription) | declaration=\(declaration.departureDebugDescription)"
+            "match=declaration | pathIndex=\(String(describing: pathIndex)) | declaringPathIndex=\(String(describing: declaringPathIndex)) | branch=\(branchID.departureDebugDescription) | declaration=\(declaration.departureDebugDescription)"
         }
 #endif
     }
 
     func firstDeclaration(including routeType: any Route.Type) -> DeclarationMatch? {
-        for index in path.indices.reversed() {
-            if let match = path[index].firstRouteAttachment(for: routeType) {
+        if let match = firstDeclaration(in: currentRoutePath, including: routeType) {
+            return match
+        }
+
+        if currentRoutePath !== rootPath,
+           let match = firstDeclaration(in: rootPath, including: routeType) {
+            return match
+        }
+
+        if let match = root.firstMountedBranchRouteAttachment(
+            for: routeType,
+            in: root.activeBranch
+        ) {
+            let branchPath = routePath(forBranch: match.branchID, under: root, declaration: match.declaration)
+            return DeclarationMatch(
+                path: branchPath.path,
+                pathIndex: branchPath.pathIndex,
+                declaringPath: rootPath,
+                declaringPathIndex: nil,
+                branchID: match.branchID,
+                declaration: match.declaration
+            )
+        }
+
+        if let match = root.firstRouteAttachment(for: routeType) {
+            guard match.declaration.drivesPresentation == false else {
                 return DeclarationMatch(
-                    pathIndex: index,
+                    path: rootPath,
+                    pathIndex: nil,
+                    declaringPath: rootPath,
+                    declaringPathIndex: nil,
                     branchID: match.branchID,
                     declaration: match.declaration
                 )
             }
-        }
 
-        if let match = root.firstRouteAttachment(for: routeType) {
+            let branchPath = routePath(forBranch: match.branchID, under: root, declaration: match.declaration)
             return DeclarationMatch(
+                path: branchPath.path,
+                pathIndex: branchPath.pathIndex,
+                declaringPath: rootPath,
+                declaringPathIndex: nil,
                 branchID: match.branchID,
                 declaration: match.declaration
             )
         }
 
         return nil
+    }
+
+    func firstDeclaration(in searchPath: RoutePath, including routeType: any Route.Type) -> DeclarationMatch? {
+        for index in searchPath.scopes.indices.reversed() {
+            if let match = searchPath.scopes[index].firstMountedBranchRouteAttachment(
+                for: routeType,
+                in: searchPath.scopes[index].activeBranch
+            ) {
+                let branchPath = routePath(
+                    forBranch: match.branchID,
+                    under: searchPath.scopes[index],
+                    declaration: match.declaration
+                )
+                return DeclarationMatch(
+                    path: branchPath.path,
+                    pathIndex: branchPath.pathIndex,
+                    declaringPath: searchPath,
+                    declaringPathIndex: index,
+                    branchID: match.branchID,
+                    declaration: match.declaration
+                )
+            }
+
+            if let match = searchPath.scopes[index].firstRouteAttachment(for: routeType) {
+                return DeclarationMatch(
+                    path: searchPath,
+                    pathIndex: index,
+                    declaringPath: searchPath,
+                    declaringPathIndex: index,
+                    branchID: match.branchID,
+                    declaration: match.declaration
+                )
+            }
+        }
+
+        guard let owner = searchPath.owner, owner !== root else {
+            return nil
+        }
+
+        if let match = owner.firstRouteAttachment(for: routeType) {
+            return DeclarationMatch(
+                path: searchPath,
+                pathIndex: nil,
+                declaringPath: searchPath,
+                declaringPathIndex: nil,
+                branchID: match.branchID,
+                declaration: match.declaration
+            )
+        }
+
+        return nil
+    }
+
+    var currentRoutePath: RoutePath {
+        if let highPrioritySegment {
+            return highPrioritySegment.path
+        }
+
+        if let activeTopLevelPath = rootPath.last?.activeLocalScope.owningPath {
+            return activeTopLevelPath
+        }
+
+        if let activeRootPath = root.activeLocalScope.owningPath {
+            return activeRootPath
+        }
+
+        return rootPath
+    }
+
+    /// The path owned by the branch nearest to the current position, or `nil` when the current
+    /// position is not inside any branch. `.nearestBranch` unwinds clear this path back to its root.
+    var nearestBranchPath: RoutePath? {
+        var scope: RouteScope? = currentRouteScope
+        while let current = scope {
+            if current.mountedBranchID != nil {
+                return current.path
+            }
+
+            scope = current.owningPath?.owner
+        }
+
+        return nil
+    }
+
+    func routePath(
+        forBranch branchID: AnyHashable,
+        under routeScope: RouteScope,
+        declaration: AnyRouteDeclaration
+    ) -> (path: RoutePath, pathIndex: [RouteScope].Index?) {
+        guard let branchScope = routeScope.mountedBranchScopes[branchID] else {
+            return (path: routePath(containing: routeScope) ?? rootPath, pathIndex: nil)
+        }
+
+        guard declaration.presentationKind != .push else {
+            return (path: branchScope.path, pathIndex: nil)
+        }
+
+        return (
+            path: branchScope.path,
+            pathIndex: branchScope.path.scopes.indices.last
+        )
+    }
+}
+
+extension Router.DeclarationMatch {
+    func updatingPresentationPath(
+        _ routePath: (path: RoutePath, pathIndex: [RouteScope].Index?)
+    ) -> Self {
+        .init(
+            path: routePath.path,
+            pathIndex: routePath.pathIndex,
+            declaringPath: declaringPath,
+            declaringPathIndex: declaringPathIndex,
+            branchID: branchID,
+            declaration: declaration
+        )
     }
 }

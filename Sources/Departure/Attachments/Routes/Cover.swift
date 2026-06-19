@@ -55,7 +55,7 @@ public struct Cover: RouteDeclaration, Sendable {
 
 extension Cover {
     /// Animation style for ``Cover``.
-    public enum Transition: Hashable, Sendable {
+    public enum Transition: Hashable, Sendable, CaseIterable {
         /// Uses SwiftUI full-screen cover movement.
         case slide
 

@@ -20,6 +20,7 @@
 //  SOFTWARE.
 //
 
+import Foundation
 import SwiftUI
 
 public extension View {
@@ -49,22 +50,34 @@ public extension View {
 private struct HooksModifier: ViewModifier {
     let declarations: [AnyHookDeclaration]
 
+    @State private var sourceID = AnyHashable(UUID())
+
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
         content
             .onLifecycleEvent { event in
-                guard case .installedInWindow = event else {
-                    return
-                }
+                switch event {
+                case .installedInWindow, .updated(isInstalledInWindow: true):
+                    hydrateScope()
 
-                hydrateScope()
+                case .updated(isInstalledInWindow: false):
+                    break
+
+                case .dismantled, .deinitialized:
+                    clearScope()
+                }
             }
     }
 
     private func hydrateScope() {
         routeScope?.hydrateHooks(
+            sourceID: sourceID,
             hookDeclarations: declarations
         )
+    }
+
+    private func clearScope() {
+        routeScope?.clearHooks(sourceID: sourceID)
     }
 }

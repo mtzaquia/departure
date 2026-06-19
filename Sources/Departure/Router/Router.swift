@@ -21,6 +21,7 @@
 //
 
 import SwiftUI
+import Observation
 
 /// The routing engine installed by ``WithRouter``.
 ///
@@ -44,36 +45,57 @@ public final class Router: Identifiable, Equatable {
     }
 
     struct UnwindPresentationSnapshot {
+        let routePath: RoutePath
         let preservedPath: [RouteScope]
-        let highPrioritySegmentStartIndex: [RouteScope].Index?
+        let highPrioritySegment: HighPrioritySegment?
+    }
+
+    struct HighPrioritySegment {
+        let path: RoutePath
+        let startIndex: [RouteScope].Index
     }
 
     /// A destination for ``Router/unwind(to:)``.
     public enum UnwindTarget {
-        /// Unwinds every presented route.
+        /// Unwinds every presented route across all branches and scopes, returning to the app's start.
         case root
+
+        /// Unwinds to the first scope of the nearest enclosing branch.
+        ///
+        /// Brings the user to the branch's root regardless of how deep the current route is. If the
+        /// user is already at the branch root — or is not inside a branch — this is a no-op.
+        case nearestBranch
 
         /// Unwinds to the scope that was declared with a matching ``SwiftUICore/View/routes(id:_:)`` ID.
         case id(AnyHashable)
     }
 
     /// Stable identity for this router instance.
-    public let id = UUID()
+    @ObservationIgnored public let id = UUID()
 
+    @ObservationIgnored
     let root: RouteScope
-    var path: [RouteScope] = []
 
-    var highPrioritySegmentStartIndex: [RouteScope].Index?
+    @ObservationIgnored
+    let rootPath: RoutePath
+
+    var highPrioritySegment: HighPrioritySegment?
+
+    @ObservationIgnored
     var pendingRoute: PendingRoute?
+
+    @ObservationIgnored
     var unwindPresentationSnapshot: UnwindPresentationSnapshot?
 
     var currentRouteScope: RouteScope {
-        (path.last ?? root).activeLocalScope
+        rootPath.last?.activeLocalScope ?? root.activeLocalScope
     }
 
     /// Creates an empty router.
     public init() {
-        self.root = RouteScope(id: UUID(), route: nil)
+        let root = RouteScope(id: UUID(), route: nil)
+        self.root = root
+        self.rootPath = RoutePath(owner: root)
     }
 
     /// Requests a route presentation.
