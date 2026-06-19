@@ -289,7 +289,7 @@ struct WindowDestinationBuilderTests {
             matching: .sheet
         ).wrappedValue)
 
-        #expect(presentation.scope === router.path.last)
+        #expect(presentation.scope === router.rootPath.last)
         #expect(recorder.values.isEmpty)
         _ = host
     }
