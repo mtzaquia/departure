@@ -2,7 +2,7 @@
 
 Departure is a lightweight, expressive routing framework for SwiftUI.
 
-It lets visible views declare the routes they own, then lets any active route ask Departure to present a route by type. Departure finds the closest visible owner and uses SwiftUI presentation APIs such as pushes, sheets, and full-screen covers.
+It lets views declare the routes they own, then lets any active route ask Departure to present a route by type. Departure finds the closest eligible owner, including inactive branch declarations when a selection container declares them, and uses SwiftUI presentation APIs such as pushes, sheets, and full-screen covers.
 
 ```swift
 await router.present(SettingsRoute())
@@ -79,7 +79,7 @@ struct HomeView: View {
 }
 ```
 
-When `SettingsRoute()` is requested, Departure starts from the active route and looks backward through visible route scopes until it finds the nearest scope that declared `SettingsRoute.self`.
+When `SettingsRoute()` is requested, Departure starts from the active route and looks backward through the current route path until it finds the nearest scope that declared `SettingsRoute.self`.
 
 ## Presentation Styles
 
@@ -110,14 +110,14 @@ Disable the automatic navigation wrapper for sheets and covers when the destinat
 
 ## Route Ownership
 
-Route requests are resolved by visible ownership.
+Route requests are resolved by route ownership.
 
 ```mermaid
 flowchart TD
     request["await router.present(ReceiptRoute())"]
     active["Start at active route scope"]
     owns{"Did this scope declare ReceiptRoute?"}
-    previous["Move to previous visible owner"]
+    previous["Move to previous route owner"]
     present["Present from matching scope"]
     drop["Drop request"]
 
@@ -131,7 +131,7 @@ That gives feature views a simple rule:
 
 > Declare the routes your feature can present. If a child asks for one of those routes, the request comes back to you.
 
-If no visible scope declared the route type, the request is ignored.
+If no active scope or declared branch map can resolve the route type, the request is ignored.
 
 ## Branches
 
@@ -181,7 +181,7 @@ Top-level declarations in the same `.routes(branch:)` builder, such as `Cover(Lo
 
 If a request matches a route declared in an inactive branch, Departure selects that branch before presenting the route from the mounted `.routeBranch(...)` host.
 
-When a branch is not lazy, declaring the same route locally is equivalent:
+When a branch is already active, declaring routes locally on the branch host works as normal local ownership:
 
 ```swift
 HomeView()
@@ -190,6 +190,8 @@ HomeView()
     Push(HomeDetailRoute.self)
   }
 ```
+
+Local branch declarations do not replace the parent `.routes(branch:)` map for inactive branch selection. Keep routes that should be discoverable from another branch in the parent `Branch(...)` declarations, even when the branch content is eagerly mounted.
 
 ## Priority
 
@@ -204,7 +206,7 @@ Sheets and covers can be normal or high priority.
 
 | Priority | Behavior |
 | --- | --- |
-| `.normal` | Presents from the nearest visible owner, unless a high-priority presentation is already covering the normal flow. |
+| `.normal` | Presents from the nearest eligible owner, unless a high-priority presentation is already covering the normal flow. |
 | `.high` | Presents above the normal flow in a separate high-priority window on UIKit. A new high-priority request from the normal flow replaces the active high-priority presentation. |
 
 Inside a high-priority route, normal and high-priority declarations behave like local navigation for that high-priority flow.
@@ -214,7 +216,7 @@ Inside a high-priority route, normal and high-priority declarations behave like 
 
 ### High-Priority Window Environment
 
-`windowDestination` customizes destinations presented through Departure's separate high-priority window. Use it to explicitly forward environment values that should cross the `UIWindow` boundary.
+On UIKit platforms, `windowDestination` customizes destinations presented through Departure's separate high-priority window. Use it to explicitly forward environment values that should cross the `UIWindow` boundary.
 
 ```swift
 WithRouter {
@@ -227,7 +229,7 @@ WithRouter {
 }
 ```
 
-Without `windowDestination`, high-priority destinations are presented unchanged. Normal in-tree presentations do not use this hook.
+Without `windowDestination`, high-priority destinations are presented unchanged. Normal in-tree presentations do not use this hook. On non-UIKit platforms, Departure does not create a separate `UIWindow`, so this customization is not applied.
 
 ```mermaid
 flowchart TD
@@ -354,12 +356,13 @@ Unwind is the counterpart to presentation: instead of asking for a new route, a 
 await router.unwind()
 ```
 
-`await router.unwind()` dismisses the current route. If the current route is the only route in the path, it unwinds to the root scope.
+`await router.unwind()` dismisses the current route. If the current route is the only route in its path, it unwinds to that path's root, which may be the app root or a branch root.
 
 Use an explicit target when you want to dismiss more than one route:
 
 ```swift
 await router.unwind(to: .root)
+await router.unwind(to: .nearestBranch)
 await router.unwind(to: .id("settings-flow"))
 ```
 
@@ -367,6 +370,7 @@ await router.unwind(to: .id("settings-flow"))
 | --- | --- |
 | `await router.unwind()` | Dismisses the current route. |
 | `await router.unwind(to: .root)` | Clears all presented routes and returns to the root scope. |
+| `await router.unwind(to: .nearestBranch)` | Clears the nearest enclosing branch path back to that branch's root without escaping to the app root. |
 | `await router.unwind(to: .id(id))` | Keeps the matching route scope and dismisses everything after it. |
 
 Scope IDs are useful when a view owns a named flow:
@@ -390,7 +394,7 @@ if await router.unwind(to: .id("settings-flow")) {
 }
 ```
 
-For example, a completion screen can dismiss itself and continue with a route owned by an earlier visible scope:
+For example, a completion screen can dismiss itself and continue with a route owned by an earlier eligible scope:
 
 ```swift
 struct CompletionView: View {
@@ -407,7 +411,7 @@ struct CompletionView: View {
 }
 ```
 
-Departure removes the route scopes from its path first, then waits for any mounted dismissed route views to leave SwiftUI before requesting the continuation route. The continuation is a normal route request: it resolves, crawls visible scopes, selects branches, observes priority, and may still be dropped if no eligible declaration exists.
+Departure removes the route scopes from its path first, then waits for any mounted dismissed route views to leave SwiftUI before `unwind` returns. Any route you present after that is a normal route request: it resolves, crawls active scopes and branch maps, selects branches, observes priority, and may still be dropped if no eligible declaration exists.
 
 > [!NOTE]
 > `unwind(to:)` returns `false` when an explicit target is not found. Check the return value before presenting a continuation route when you need the same behavior as the deprecated `thenPresent` request.

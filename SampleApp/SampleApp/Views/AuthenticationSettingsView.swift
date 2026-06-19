@@ -56,6 +56,13 @@ struct AuthenticationSettingsView: View {
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.authenticationPresentTopLevelSheetButton)
 
+                Button("Present info from Start") {
+                    Task {
+                        await router.present(StartInfoRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToRootButton)
+
                 Button("Unwind to root") {
                     Task {
                         await router.unwind(to: .root)
