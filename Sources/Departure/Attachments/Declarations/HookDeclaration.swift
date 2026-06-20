@@ -49,4 +49,14 @@ extension AnyHookDeclaration {
             return nil
         }
     }
+
+    func unwindHandler(for routeType: any Route.Type) -> AnyUnwindHandler? {
+        switch kind {
+        case let .unwindHandler(candidateRouteType, unwindHandler) where candidateRouteType == routeType:
+            return unwindHandler
+
+        default:
+            return nil
+        }
+    }
 }

@@ -22,8 +22,9 @@
 
 extension Router {
     @discardableResult
-    func unwindAndWait(to target: UnwindTarget?) async -> Bool {
+    func unwindAndWait(to target: UnwindTarget?, payload: Any? = nil) async -> Bool {
         log.departureDebug(.unwindRequested(target: target))
+        let sourceRoute = currentRouteScope.route
 
         // The target only differs by which path it clears; resolution is the same. `.root` unwinds
         // the entire app via the root path, regardless of the originating branch or depth.
@@ -64,6 +65,13 @@ extension Router {
                 removing: removedScopes.count
             ))
 
+            if removedScopes.isEmpty == false {
+                invokeUnwindHandlers(
+                    for: sourceRoute,
+                    payload: payload,
+                    in: ancestorResolution.path.scope(at: ancestorResolution.pathIndex)
+                )
+            }
             keepPathThrough(nil, in: routePath)
             keepPathThrough(ancestorResolution.pathIndex, in: ancestorResolution.path)
             await waitForRouteScopesToLeaveView(removedScopes)
@@ -77,6 +85,18 @@ extension Router {
                 keepThrough: targetPathIndex,
                 removing: removedScopes.count
             ))
+
+            if removedScopes.isEmpty == false {
+                invokeUnwindHandlers(
+                    for: sourceRoute,
+                    payload: payload,
+                    in: unwindHandlerScope(
+                        for: target,
+                        in: routePath,
+                        keepThrough: targetPathIndex
+                    )
+                )
+            }
 
             if target != nil {
                 unwindPresentationSnapshot = UnwindPresentationSnapshot(
@@ -488,6 +508,37 @@ extension Router {
         return nil
     }
 
+    func unwindHandlerScope(
+        for target: UnwindTarget?,
+        in routePath: RoutePath,
+        keepThrough pathIndex: [RouteScope].Index?
+    ) -> RouteScope? {
+        switch target {
+        case .nearestBranch:
+            // `.nearestBranch` targets the container that owns the branch. An explicit
+            // `.id(branchRootID)` is the opt-in path for hooks on the branch root itself.
+            routePath.owner?.parent
+
+        default:
+            routePath.scope(at: pathIndex)
+        }
+    }
+
+    func invokeUnwindHandlers(
+        for sourceRoute: (any Route)?,
+        payload: Any?,
+        in targetScope: RouteScope?
+    ) {
+        guard let sourceRoute, let targetScope else {
+            return
+        }
+
+        let declaringScopeID = targetScope.id
+        for handler in targetScope.unwindHandlers(for: type(of: sourceRoute)) {
+            handler.invoke(sourceRoute, payload, declaringScopeID)
+        }
+    }
+
 }
 
 private extension RouteScope {
@@ -496,6 +547,12 @@ private extension RouteScope {
             $0.routeType == declaration.routeType
             && $0.kind == declaration.kind
             && $0.drivesPresentation
+        }
+    }
+
+    func unwindHandlers(for routeType: any Route.Type) -> [AnyUnwindHandler] {
+        hookAttachments.compactMap {
+            $0.unwindHandler(for: routeType)
         }
     }
 }

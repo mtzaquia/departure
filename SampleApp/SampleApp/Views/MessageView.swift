@@ -44,6 +44,22 @@ struct MessageView: View {
                 .bold()
                 .accessibilityIdentifier(SampleAppAccessibility.messageDismissUnwindButton)
 
+                Button("Dismiss with payload") {
+                    Task {
+                        await router.unwind(payload: "message delivered")
+                    }
+                }
+                .bold()
+                .accessibilityIdentifier(SampleAppAccessibility.messageDismissPayloadButton)
+                
+                Button("Dismiss with mismatched payload") {
+                    Task {
+                        await router.unwind(payload: 42)
+                    }
+                }
+                .bold()
+                .accessibilityIdentifier(SampleAppAccessibility.messageDismissMismatchedPayloadButton)
+
                 Button("Dismiss with dismiss()") {
                     dismiss()
                 }

@@ -68,6 +68,12 @@ struct SettingsView: View {
 
             if SampleAppUITesting.isEnabled {
                 Section("UI Tests") {
+                    Text("Container unwind hooks: \(storage.landingContainerUnwindHookCount)")
+                        .accessibilityIdentifier(SampleAppAccessibility.landingContainerHookStatus)
+
+                    Text("Branch unwind hooks: \(storage.settingsBranchUnwindHookCount)")
+                        .accessibilityIdentifier(SampleAppAccessibility.settingsBranchHookStatus)
+
                     Button("Present home message") {
                         Task {
                             await router.present(MessageRoute())
@@ -102,5 +108,14 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
+        .hooks {
+            UnwindHandler(AuthenticationSettingsRoute.self) {
+                guard SampleAppUITesting.isEnabled else {
+                    return
+                }
+
+                Storage.shared.settingsBranchUnwindHookCount += 1
+            }
+        }
     }
 }

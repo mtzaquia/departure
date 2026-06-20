@@ -30,7 +30,6 @@ struct LandingView: View {
     }
 
     @State private var tab: TabItem = .home
-
     var body: some View {
         TabView(selection: $tab) {
             Tab(value: .home) {
@@ -68,6 +67,15 @@ struct LandingView: View {
             Branch(.settings) {
                 Push(AppearanceSettingsRoute.self)
                 Push(AuthenticationSettingsRoute.self)
+            }
+        }
+        .hooks {
+            UnwindHandler(AuthenticationSettingsRoute.self) {
+                guard SampleAppUITesting.isEnabled else {
+                    return
+                }
+
+                Storage.shared.landingContainerUnwindHookCount += 1
             }
         }
         .environment(\.samplePresentationSource, "top-level branched scope")

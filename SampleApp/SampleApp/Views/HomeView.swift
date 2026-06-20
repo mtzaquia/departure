@@ -25,6 +25,7 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(Router.self) private var router
+    @State private var storage = Storage.shared
 
     var body: some View {
         List {
@@ -49,6 +50,13 @@ struct HomeView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            if SampleAppUITesting.isEnabled {
+                Section("UI Tests") {
+                    Text("Payload hooks: \(storage.homeUnwindPayloads.joined(separator: ", "))")
+                        .accessibilityIdentifier(SampleAppAccessibility.homeUnwindPayloadStatus)
+                }
+            }
         }
         .navigationTitle("Home")
         .toolbar {
@@ -59,6 +67,16 @@ struct HomeView: View {
                     }
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.homeProfileButton)
+            }
+        }
+        .hooks {
+            UnwindHandler(MessageRoute.self, expecting: String.self) { payload in
+                guard SampleAppUITesting.isEnabled else {
+                    print(payload)
+                    return
+                }
+
+                Storage.shared.homeUnwindPayloads.append(payload)
             }
         }
     }

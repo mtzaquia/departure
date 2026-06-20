@@ -24,34 +24,50 @@
 ///
 /// ```swift
 /// .hooks {
-///     UnwindHandler(TransactionRoute.self) { route in
+///     UnwindHandler(TransactionRoute.self, expecting: TransactionResult.self) { result in
 ///         refresh()
 ///     }
 /// }
 /// ```
-@_spi(WIP) public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
+public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
     let declaration: AnyHookDeclaration
 
     /// Creates an unwind handler.
-    public init(
+    public init<Payload>(
         _ routeType: R.Type,
-        handle: @escaping @MainActor @Sendable (R) -> Void
+        expecting payloadType: Payload.Type,
+        handle: @escaping @MainActor @Sendable (Payload) -> Void
     ) {
         self.declaration = AnyHookDeclaration(
             kind: .unwindHandler(
                 routeType,
-                AnyUnwindHandler { route in
-                    guard let route = route as? R else {
+                AnyUnwindHandler { route, payload, declaringScopeID in
+                    guard let payload = payload as? Payload else {
                         log.departureWarning(
                             """
-                            Unwind handler type mismatch for \(String(describing: routeType)):
-                            expected \(R.self), got \(type(of: route))."
+                            Unwind handler payload mismatch for \(String(describing: routeType)):
+                            hook scope \(String(describing: declaringScopeID)) expected \(Payload.self), got \(payload.map { String(describing: type(of: $0)) } ?? "nil").
                             """
                         )
                         return
                     }
 
-                    handle(route)
+                    handle(payload)
+                }
+            )
+        )
+    }
+
+    /// Creates an unwind handler that ignores any payload sent with the unwind request.
+    public init(
+        _ routeType: R.Type,
+        handle: @escaping @MainActor @Sendable () -> Void
+    ) {
+        self.declaration = AnyHookDeclaration(
+            kind: .unwindHandler(
+                routeType,
+                AnyUnwindHandler { _, _, _ in
+                    handle()
                 }
             )
         )
@@ -65,9 +81,9 @@
 // MARK: - Supporting types
 
 struct AnyUnwindHandler {
-    let invoke: @MainActor (any Route) -> Void
+    let invoke: @MainActor (any Route, Any?, AnyHashable) -> Void
 
-    init(invoke: @escaping @MainActor (any Route) -> Void) {
+    init(invoke: @escaping @MainActor (any Route, Any?, AnyHashable) -> Void) {
         self.invoke = invoke
     }
 }

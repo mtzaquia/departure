@@ -25,10 +25,16 @@ import SwiftUI
 
 struct StartView: View {
     @Environment(Router.self) private var router
+    @State private var storage = Storage.shared
 
     var body: some View {
         ZStack {
             VStack(spacing: 16) {
+                if SampleAppUITesting.isEnabled {
+                    Text("Root unwind hooks: \(storage.rootUnwindHookCount)")
+                        .accessibilityIdentifier(SampleAppAccessibility.rootHookStatus)
+                }
+
                 Button("Start", action: {
                     Task {
                         await router.present(LandingRoute())
@@ -47,6 +53,15 @@ struct StartView: View {
         .routes(id: SampleAppAccessibility.startScopeID) {
             Cover(LandingRoute.self, providesNavigation: false)
             Sheet(StartInfoRoute.self, providesNavigation: false)
+        }
+        .hooks {
+            UnwindHandler(AuthenticationSettingsRoute.self) {
+                guard SampleAppUITesting.isEnabled else {
+                    return
+                }
+
+                Storage.shared.rootUnwindHookCount += 1
+            }
         }
     }
 }
