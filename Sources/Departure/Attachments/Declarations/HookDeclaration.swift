@@ -40,6 +40,26 @@ public protocol HookDeclaration {
 // MARK: - Internal helpers
 
 extension AnyHookDeclaration {
+    var actionInterceptorType: (any Action.Type)? {
+        switch kind {
+        case let .actionInterceptor(actionType, _):
+            actionType
+
+        default:
+            nil
+        }
+    }
+
+    var unwindHandlerRouteType: (any Route.Type)? {
+        switch kind {
+        case let .unwindHandler(routeType, _):
+            routeType
+
+        default:
+            nil
+        }
+    }
+
     func interceptor(for actionType: (some Action).Type) -> AnyActionInterceptor? {
         switch kind {
         case let .actionInterceptor(candidateActionType, actionInterceptor) where candidateActionType == actionType:

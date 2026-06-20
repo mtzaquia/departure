@@ -534,7 +534,7 @@ extension Router {
         }
 
         let declaringScopeID = targetScope.id
-        for handler in targetScope.unwindHandlers(for: type(of: sourceRoute)) {
+        if let handler = targetScope.firstUnwindHandler(for: type(of: sourceRoute)) {
             handler.invoke(sourceRoute, payload, declaringScopeID)
         }
     }
@@ -550,9 +550,13 @@ private extension RouteScope {
         }
     }
 
-    func unwindHandlers(for routeType: any Route.Type) -> [AnyUnwindHandler] {
-        hookAttachments.compactMap {
-            $0.unwindHandler(for: routeType)
+    func firstUnwindHandler(for routeType: any Route.Type) -> AnyUnwindHandler? {
+        for attachment in hookAttachments {
+            if let handler = attachment.unwindHandler(for: routeType) {
+                return handler
+            }
         }
+
+        return nil
     }
 }
