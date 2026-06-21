@@ -71,7 +71,7 @@ extension Router {
             await waitForRouteScopesToLeaveView(removedScopes)
             log.departureDebug(.unwindCompleted)
             if removedScopes.isEmpty == false {
-                invokeUnwindHandlers(
+                await invokeUnwindHandlers(
                     for: sourceRoute,
                     payload: payload,
                     in: targetScope
@@ -110,7 +110,7 @@ extension Router {
             unwindPresentationSnapshot = nil
             log.departureDebug(.unwindCompleted)
             if removedScopes.isEmpty == false {
-                invokeUnwindHandlers(
+                await invokeUnwindHandlers(
                     for: sourceRoute,
                     payload: payload,
                     in: targetScope
@@ -530,14 +530,14 @@ extension Router {
         for sourceRoute: (any Route)?,
         payload: Any?,
         in targetScope: RouteScope?
-    ) {
+    ) async {
         guard let sourceRoute, let targetScope else {
             return
         }
 
         let declaringScopeID = targetScope.id
         if let handler = targetScope.firstUnwindHandler(for: type(of: sourceRoute)) {
-            handler.invoke(sourceRoute, payload, declaringScopeID)
+            await handler.invoke(sourceRoute, payload, declaringScopeID)
         }
     }
 
@@ -552,7 +552,7 @@ extension Router {
 
         Task { @MainActor in
             await waitForRouteScopesToLeaveView(removedScopes)
-            invokeUnwindHandlers(
+            await invokeUnwindHandlers(
                 for: sourceRoute,
                 payload: nil,
                 in: targetScope

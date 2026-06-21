@@ -378,6 +378,28 @@ struct UnwindHookTests {
         #expect(recorder.events == ["handler"])
     }
 
+    @Test func routerUnwindWaitsForAsyncHandlerBody() async {
+        let router = Router()
+        let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let recorder = UnwindRecorder()
+
+        parentScope.hydrateHooks(
+            hookDeclarations: [
+                UnwindHandler(LoginRoute.self) {
+                    recorder.events.append("started")
+                    await Task.yield()
+                    recorder.events.append("finished")
+                }.declaration,
+            ]
+        )
+        router.rootPath.scopes = [parentScope, childScope]
+
+        await router.unwind()
+
+        #expect(recorder.events == ["started", "finished"])
+    }
+
     @Test func swiftUIDismissTriggersNoPayloadHandlerForHighPriorityPresentation() async throws {
         let router = Router()
         let recorder = UnwindRecorder()
