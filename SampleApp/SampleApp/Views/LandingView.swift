@@ -30,6 +30,7 @@ struct LandingView: View {
     }
 
     @State private var tab: TabItem = .home
+
     var body: some View {
         TabView(selection: $tab) {
             Tab(value: .home) {
@@ -61,6 +62,7 @@ struct LandingView: View {
 
             Branch(.home) {
                 Sheet(ProfileRoute.self)
+                Sheet(DismissProbeRoute.self, providesNavigation: false)
                 Cover(MessageRoute.self, transition: .fade, providesNavigation: false)
             }
 

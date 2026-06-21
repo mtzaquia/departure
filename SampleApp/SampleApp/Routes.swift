@@ -135,6 +135,31 @@ struct MessageRoute: Route {
     }
 }
 
+struct DismissProbeRoute: Route {
+    func destination() -> some View {
+        DismissProbeView()
+    }
+}
+
+struct DismissProbeView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Dismiss probe")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.dismissProbeText)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.dismissProbeDismissButton)
+        }
+        .padding()
+    }
+}
+
 struct DroppedRoute: Route {
     func resolveRoute() async -> RouteResolution {
         .drop

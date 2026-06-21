@@ -39,6 +39,15 @@ struct HomeView: View {
             }
             .accessibilityIdentifier(SampleAppAccessibility.homeShowMessageButton)
 
+            if SampleAppUITesting.isEnabled {
+                Button("Show dismiss probe") {
+                    Task {
+                        await router.present(DismissProbeRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.homeShowDismissProbeButton)
+            }
+
             Section {
                 LabeledContent {
                     Text(Storage.shared.emoji)
@@ -55,6 +64,9 @@ struct HomeView: View {
                 Section("UI Tests") {
                     Text("Payload hooks: \(storage.homeUnwindPayloads.joined(separator: ", "))")
                         .accessibilityIdentifier(SampleAppAccessibility.homeUnwindPayloadStatus)
+
+                    Text("Dismiss probe hooks: \(storage.dismissProbeUnwindHookCount)")
+                        .accessibilityIdentifier(SampleAppAccessibility.homeDismissProbeHookStatus)
                 }
             }
         }
@@ -70,6 +82,17 @@ struct HomeView: View {
             }
         }
         .hooks {
+            UnwindHandler(DismissProbeRoute.self) {
+                guard SampleAppUITesting.isEnabled else {
+                    return
+                }
+
+                Storage.shared.dismissProbeUnwindHookCount += 1
+                Task {
+                    await router.present(MessageRoute())
+                }
+            }
+
             UnwindHandler(MessageRoute.self, expecting: String.self) { payload in
                 guard SampleAppUITesting.isEnabled else {
                     print(payload)

@@ -57,8 +57,10 @@ enum SampleAppAccessibility {
     static let homeWelcome = "sample.home.welcome"
     static let homeShowMessageButton = "sample.home.show-message"
     static let homeProfileButton = "sample.home.profile"
+    static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
     static let homeEmojiValue = "sample.home.emoji-value"
     static let homeUnwindPayloadStatus = "sample.home.unwind-payload-status"
+    static let homeDismissProbeHookStatus = "sample.home.dismiss-probe-hook-status"
 
     static let settingsAppearanceButton = "sample.settings.appearance"
     static let settingsAuthenticationButton = "sample.settings.authentication"
@@ -96,6 +98,9 @@ enum SampleAppAccessibility {
     static let messageDismissSwiftUIButton = "sample.message.dismiss-swiftui"
     static let messageDismissPayloadButton = "sample.message.dismiss-payload"
     static let messageDismissMismatchedPayloadButton = "sample.message.dismiss-mismatched-payload"
+
+    static let dismissProbeText = "sample.dismiss-probe.text"
+    static let dismissProbeDismissButton = "sample.dismiss-probe.dismiss"
 
     static let alertText = "sample.alert.text"
     static let alertDismissUnwindButton = "sample.alert.dismiss-unwind"

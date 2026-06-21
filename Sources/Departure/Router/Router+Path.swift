@@ -65,17 +65,18 @@ extension Router {
                 removing: removedScopes.count
             ))
 
-            if removedScopes.isEmpty == false {
-                invokeUnwindHandlers(
-                    for: sourceRoute,
-                    payload: payload,
-                    in: ancestorResolution.path.scope(at: ancestorResolution.pathIndex)
-                )
-            }
+            let targetScope = ancestorResolution.path.scope(at: ancestorResolution.pathIndex)
             keepPathThrough(nil, in: routePath)
             keepPathThrough(ancestorResolution.pathIndex, in: ancestorResolution.path)
             await waitForRouteScopesToLeaveView(removedScopes)
             log.departureDebug(.unwindCompleted)
+            if removedScopes.isEmpty == false {
+                invokeUnwindHandlers(
+                    for: sourceRoute,
+                    payload: payload,
+                    in: targetScope
+                )
+            }
 
             return true
 
@@ -86,17 +87,11 @@ extension Router {
                 removing: removedScopes.count
             ))
 
-            if removedScopes.isEmpty == false {
-                invokeUnwindHandlers(
-                    for: sourceRoute,
-                    payload: payload,
-                    in: unwindHandlerScope(
-                        for: target,
-                        in: routePath,
-                        keepThrough: targetPathIndex
-                    )
-                )
-            }
+            let targetScope = unwindHandlerScope(
+                for: target,
+                in: routePath,
+                keepThrough: targetPathIndex
+            )
 
             if target != nil {
                 unwindPresentationSnapshot = UnwindPresentationSnapshot(
@@ -114,6 +109,13 @@ extension Router {
             await waitForRouteScopesToLeaveView(removedScopes)
             unwindPresentationSnapshot = nil
             log.departureDebug(.unwindCompleted)
+            if removedScopes.isEmpty == false {
+                invokeUnwindHandlers(
+                    for: sourceRoute,
+                    payload: payload,
+                    in: targetScope
+                )
+            }
 
             return true
         }
@@ -536,6 +538,25 @@ extension Router {
         let declaringScopeID = targetScope.id
         if let handler = targetScope.firstUnwindHandler(for: type(of: sourceRoute)) {
             handler.invoke(sourceRoute, payload, declaringScopeID)
+        }
+    }
+
+    func scheduleUnwindHandlersAfterDismissalCompletes(
+        for sourceRoute: (any Route)?,
+        in targetScope: RouteScope?,
+        removing removedScopes: [RouteScope]
+    ) {
+        guard removedScopes.isEmpty == false else {
+            return
+        }
+
+        Task { @MainActor in
+            await waitForRouteScopesToLeaveView(removedScopes)
+            invokeUnwindHandlers(
+                for: sourceRoute,
+                payload: nil,
+                in: targetScope
+            )
         }
     }
 

@@ -234,15 +234,29 @@ private extension Router {
         let routePath = routePath(containing: presentation.scope) ?? rootPath
 
         guard let presentedPathIndex = routePath.scopes.firstIndex(where: { $0 === presentation.scope }) else {
-            keepPathThrough(routePath.index(of: routeScope), in: routePath)
+            let targetPathIndex = routePath.index(of: routeScope)
+            let removedScopes = routePath.scopesRemovedByKeepingThrough(targetPathIndex)
+            let targetScope = routePath.scope(at: targetPathIndex)
+            keepPathThrough(targetPathIndex, in: routePath)
+            scheduleUnwindHandlersAfterDismissalCompletes(
+                for: presentation.scope.route,
+                in: targetScope,
+                removing: removedScopes
+            )
             return
         }
 
-        if presentedPathIndex == routePath.scopes.startIndex {
-            keepPathThrough(nil, in: routePath)
-        } else {
-            keepPathThrough(routePath.scopes.index(before: presentedPathIndex), in: routePath)
-        }
+        let targetPathIndex = presentedPathIndex == routePath.scopes.startIndex
+            ? nil
+            : routePath.scopes.index(before: presentedPathIndex)
+        let removedScopes = routePath.scopesRemovedByKeepingThrough(targetPathIndex)
+        let targetScope = routePath.scope(at: targetPathIndex)
+        keepPathThrough(targetPathIndex, in: routePath)
+        scheduleUnwindHandlersAfterDismissalCompletes(
+            for: presentation.scope.route,
+            in: targetScope,
+            removing: removedScopes
+        )
     }
 
     func shouldHostLocally(
@@ -290,7 +304,7 @@ private extension Router {
     func dismissHighPriorityPresentation(
         matching presentationKind: RoutePresentationKind
     ) {
-        guard highPriorityRoutePresentation(matching: presentationKind) != nil else {
+        guard let presentation = highPriorityRoutePresentation(matching: presentationKind) else {
             return
         }
 
@@ -298,7 +312,15 @@ private extension Router {
             return
         }
 
-        keepPathThrough(declaringPathIndexForHighPrioritySegment(), in: highPrioritySegment.path)
+        let targetPathIndex = declaringPathIndexForHighPrioritySegment()
+        let removedScopes = highPrioritySegment.path.scopesRemovedByKeepingThrough(targetPathIndex)
+        let targetScope = highPrioritySegment.path.scope(at: targetPathIndex)
+        keepPathThrough(targetPathIndex, in: highPrioritySegment.path)
+        scheduleUnwindHandlersAfterDismissalCompletes(
+            for: presentation.scope.route,
+            in: targetScope,
+            removing: removedScopes
+        )
     }
 
     func declaringPathIndexForHighPrioritySegment() -> [RouteScope].Index? {

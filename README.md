@@ -194,6 +194,9 @@ If an intercepted action throws `.reroute(route)` from its original implementati
 }
 ```
 
+> [!NOTE]
+> If the route and target scope match, SwiftUI's `dismiss()` also triggers unwind handlers with no payloads.
+
 ### Duplicate declarations
 
 If a scope declares multiple handlers for the same route, multiple action interceptors for the same action, or multiple unwind handlers for the same route, only the first declaration is used; all subsequent declarations are ignored. In these cases, `Departure` emits a runtime warning.
@@ -324,8 +327,6 @@ await router.unwind(to: .id("documents"), payload: SaveResult.saved)
 
 > [!NOTE]
 > `unwind(to:)` returns `false` when an explicit target is not found. Check the return value before presenting a continuation route if your flow requires it.
-
-Unwind handlers fire only on the accepted target scope, not on every removed scope along the way.
 
 ## Branches
 

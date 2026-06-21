@@ -293,6 +293,21 @@ final class SampleAppUITests: XCTestCase {
         assertLabel(A11y.homeUnwindPayloadStatus, contains: "message delivered")
     }
 
+    func testSwiftUIDismissTriggersUnwindHandlerThatCanPresentRoute() {
+        openLanding()
+
+        tap(A11y.homeShowDismissProbeButton)
+        assertExists(A11y.dismissProbeText)
+
+        tap(A11y.dismissProbeDismissButton)
+        assertGone(A11y.dismissProbeText)
+        assertExists(A11y.messageText)
+
+        tap(A11y.messageDismissUnwindButton)
+        assertGone(A11y.messageText)
+        assertLabel(A11y.homeDismissProbeHookStatus, contains: "Dismiss probe hooks: 1")
+    }
+
     func testUnwindHooksFireForRootNearestBranchAndExplicitBranchIDTargets() {
         openLanding()
         tapSettingsTab()
@@ -479,8 +494,10 @@ private enum A11y {
     static let homeWelcome = "sample.home.welcome"
     static let homeShowMessageButton = "sample.home.show-message"
     static let homeProfileButton = "sample.home.profile"
+    static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
     static let homeEmojiValue = "sample.home.emoji-value"
     static let homeUnwindPayloadStatus = "sample.home.unwind-payload-status"
+    static let homeDismissProbeHookStatus = "sample.home.dismiss-probe-hook-status"
 
     static let settingsAppearanceButton = "sample.settings.appearance"
     static let settingsAuthenticationButton = "sample.settings.authentication"
@@ -517,6 +534,9 @@ private enum A11y {
     static let messageDismissSwiftUIButton = "sample.message.dismiss-swiftui"
     static let messageDismissPayloadButton = "sample.message.dismiss-payload"
     static let messageDismissMismatchedPayloadButton = "sample.message.dismiss-mismatched-payload"
+
+    static let dismissProbeText = "sample.dismiss-probe.text"
+    static let dismissProbeDismissButton = "sample.dismiss-probe.dismiss"
 
     static let alertText = "sample.alert.text"
     static let alertDismissUnwindButton = "sample.alert.dismiss-unwind"
