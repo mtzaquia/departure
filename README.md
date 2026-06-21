@@ -10,11 +10,11 @@ await router.present(SettingsRoute())
 
 ## Install
 
-`Departure` is available via Swift Package Manager.
+`Departure` is available via Swift Package Manager, and supports iOS 17.5 or later.
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/mtzaquia/departure.git", from: "1.1.0"),
+  .package(url: "https://github.com/mtzaquia/departure.git", from: "1.2.0"),
 ],
 ```
 
