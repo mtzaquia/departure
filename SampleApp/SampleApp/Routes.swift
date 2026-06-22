@@ -94,6 +94,18 @@ struct TopLevelSheetRoute: Route {
     }
 }
 
+struct TopLevelCoverRoute: Route {
+    func destination() -> some View {
+        TopLevelCoverView()
+    }
+}
+
+struct TopLevelReplacementCoverRoute: Route {
+    func destination() -> some View {
+        TopLevelReplacementCoverView()
+    }
+}
+
 struct TopLevelSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.samplePresentationSource) private var samplePresentationSource
@@ -112,6 +124,46 @@ struct TopLevelSheetView: View {
             }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetDismissButton)
+        }
+        .padding()
+    }
+}
+
+struct TopLevelCoverView: View {
+    @Environment(Router.self) private var router
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Top-level cover")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.topLevelCoverText)
+
+            Button("Present replacement cover") {
+                Task {
+                    await router.present(TopLevelReplacementCoverRoute())
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.topLevelCoverPresentReplacementButton)
+        }
+        .padding()
+    }
+}
+
+struct TopLevelReplacementCoverView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Top-level replacement cover")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.topLevelReplacementCoverText)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.topLevelReplacementCoverDismissButton)
         }
         .padding()
     }

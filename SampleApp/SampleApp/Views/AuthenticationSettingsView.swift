@@ -56,6 +56,13 @@ struct AuthenticationSettingsView: View {
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.authenticationPresentTopLevelSheetButton)
 
+                Button("Present top-level cover") {
+                    Task {
+                        await router.present(TopLevelCoverRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.authenticationPresentTopLevelCoverButton)
+
                 Button("Present info from Start") {
                     Task {
                         await router.present(StartInfoRoute())
