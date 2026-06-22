@@ -103,7 +103,7 @@ extension Router {
             return match
         }
 
-        if let match = root.firstMountedBranchRouteAttachment(
+        if let match = root.firstBranchScopeRouteAttachment(
             for: routeType,
             in: root.activeBranch
         ) {
@@ -146,7 +146,7 @@ extension Router {
 
     func firstDeclaration(in searchPath: RoutePath, including routeType: any Route.Type) -> DeclarationMatch? {
         for index in searchPath.scopes.indices.reversed() {
-            if let match = searchPath.scopes[index].firstMountedBranchRouteAttachment(
+            if let match = searchPath.scopes[index].firstBranchScopeRouteAttachment(
                 for: routeType,
                 in: searchPath.scopes[index].activeBranch
             ) {
@@ -216,7 +216,7 @@ extension Router {
     var nearestBranchPath: RoutePath? {
         var scope: RouteScope? = currentRouteScope
         while let current = scope {
-            if current.mountedBranchID != nil {
+            if current.branchID != nil {
                 return current.path
             }
 
@@ -231,7 +231,7 @@ extension Router {
         under routeScope: RouteScope,
         declaration: AnyRouteDeclaration
     ) -> (path: RoutePath, pathIndex: [RouteScope].Index?) {
-        guard let branchScope = routeScope.mountedBranchScopes[branchID] else {
+        guard let branchScope = routeScope.branchScopes[branchID] else {
             return (path: routePath(containing: routeScope) ?? rootPath, pathIndex: nil)
         }
 

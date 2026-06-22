@@ -29,20 +29,20 @@ final class RouteScope: Identifiable {
         let declaration: AnyRouteDeclaration
     }
 
-    private(set) var id: AnyHashable
+    var id: AnyHashable {
+        declarationInstallation.id
+    }
+
     let route: (any Route)?
     weak var parent: RouteScope?
 
-    private let initialID: AnyHashable
-    var mountedBranchID: AnyHashable?
-    var defaultBranch: Branch.ID
-    private(set) var branches: [Branch]
-    private(set) var branchSelection: AnyRouteBranchSelection?
-    var mountedBranchScopes: [Branch.ID: RouteScope] = [:]
+    var branchID: AnyHashable?
+    var declarations = DeclarationStore()
+    var branchContainer: BranchContainerState?
+    var branchScopes: [AnyHashable: RouteScope] = [:]
 
-    private var routeSourceID: AnyHashable?
-    private var hookSourceID: AnyHashable?
-    private var unmountObservers: [@MainActor () -> Void] = []
+    let declarationInstallation: DeclarationInstallationState
+    private var uninstallObservers: [@MainActor () -> Void] = []
 
     lazy var path = RoutePath(owner: self)
     weak var owningPath: RoutePath?
@@ -57,16 +57,15 @@ final class RouteScope: Identifiable {
     var debugKind = DebugKind.root
     #endif
 
-    private(set) var isMounted = false
-    private(set) var sourceEnvironment = EnvironmentValues()
+    private(set) var isInstalledInView = false
+    var sourceEnvironment: EnvironmentValues {
+        declarationInstallation.sourceEnvironment
+    }
 
     init(id: AnyHashable, route: (any Route)?, parent: RouteScope? = nil) {
-        self.id = id
         self.route = route
         self.parent = parent
-        self.initialID = id
-        self.defaultBranch = id
-        self.branches = [Branch(id: id)]
+        self.declarationInstallation = DeclarationInstallationState(initialID: id)
     }
 }
 
@@ -78,189 +77,42 @@ extension RouteScope {
     }
 }
 
+// MARK: - Declaration Installation State
+
+extension RouteScope {
+    func updateSourceEnvironment(_ sourceEnvironment: EnvironmentValues) {
+        declarationInstallation.updateSourceEnvironment(sourceEnvironment)
+    }
+
+    func defaultBranchID(hasSelection: Bool) -> AnyHashable {
+        hasSelection
+            ? branchContainer?.defaultBranch ?? declarationInstallation.initialID
+            : id
+    }
+}
+
 // MARK: - Lifecycle
 
 extension RouteScope {
-    func mount() {
-        isMounted = true
+    func installInView() {
+        isInstalledInView = true
     }
 
-    func unmount() {
-        isMounted = false
+    func uninstallFromView() {
+        isInstalledInView = false
 
-        unmountObservers.forEach { $0() }
-        unmountObservers.removeAll()
+        uninstallObservers.forEach { $0() }
+        uninstallObservers.removeAll()
     }
 
-    func onUnmount(_ observer: @escaping @MainActor () -> Void) {
-        guard isMounted else {
+    func onUninstallFromView(_ observer: @escaping @MainActor () -> Void) {
+        guard isInstalledInView else {
             observer()
             return
         }
 
-        unmountObservers.append(observer)
+        uninstallObservers.append(observer)
     }
-}
-
-// MARK: - Route Attachment Lookup
-
-extension RouteScope {
-    func firstRouteAttachment(for routeType: (some Route).Type) -> RouteAttachmentMatch? {
-        if let match = firstRouteAttachment(for: routeType, in: activeBranch) {
-            return match
-        }
-
-        if let match = firstAdoptedRouteAttachment(for: routeType) {
-            return match
-        }
-
-        for branch in branches where branch.id != activeBranch {
-            if let match = firstRouteAttachment(for: routeType, in: branch.id) {
-                return match
-            }
-        }
-
-        return nil
-    }
-
-    func firstMountedBranchRouteAttachment(
-        for routeType: (some Route).Type,
-        in branch: AnyHashable
-    ) -> RouteAttachmentMatch? {
-        guard
-            let mountedScope = mountedBranchScopes[branch]?.activeLocalScope,
-            mountedScope !== self,
-            let match = mountedScope.firstRouteAttachment(for: routeType)
-        else {
-            return nil
-        }
-
-        return RouteAttachmentMatch(branchID: branch, declaration: match.declaration)
-    }
-}
-
-// MARK: - Hydration
-
-extension RouteScope {
-    func hydrateRoutes(
-        sourceID: AnyHashable = AnyHashable("default"),
-        id: AnyHashable?,
-        branchSelection: AnyRouteBranchSelection?,
-        routeDeclarations: [RouteScopeDeclaration],
-        sourceEnvironment: EnvironmentValues? = nil
-    ) {
-        let hookDeclarations = branches.flatMap(\.hookAttachments)
-        routeSourceID = sourceID
-        self.sourceEnvironment = sourceEnvironment ?? EnvironmentValues()
-
-        if let id {
-            self.id = id
-            if branchSelection == nil {
-                defaultBranch = id
-            }
-        }
-
-        self.branchSelection = branchSelection
-        self.branches = makeBranches(
-            from: routeDeclarations,
-            activeBranch: activeBranch,
-            hookDeclarations: hookDeclarations
-        )
-        log.departureDebug(.routesHydrated(scope: self, declarationCount: routeDeclarations.count))
-    }
-
-    func clearRoutes(sourceID: AnyHashable) {
-        guard routeSourceID == sourceID else {
-            return
-        }
-
-        routeSourceID = nil
-        id = initialID
-        defaultBranch = initialID
-        branchSelection = nil
-        sourceEnvironment = EnvironmentValues()
-        branches = [Branch(id: initialID)]
-        log.departureDebug(.routesCleared(scope: self))
-    }
-
-    func updateSourceEnvironment(_ sourceEnvironment: EnvironmentValues) {
-        self.sourceEnvironment = sourceEnvironment
-    }
-
-    func hydrateHooks(
-        sourceID: AnyHashable = AnyHashable("default"),
-        hookDeclarations: [AnyHookDeclaration]
-    ) {
-        hookSourceID = sourceID
-        let branchIndex = branches.index(for: activeBranch)
-        var actionTypeIDs = Set<ObjectIdentifier>()
-        var routeTypeIDs = Set<ObjectIdentifier>()
-
-        for hookDeclaration in hookDeclarations {
-            if let actionType = hookDeclaration.actionInterceptorType {
-                let inserted = actionTypeIDs
-                    .insert(ObjectIdentifier(actionType))
-                    .inserted
-
-                if inserted == false {
-                    log.departureWarning(
-                        """
-                        Duplicate action interceptor for \(String(reflecting: actionType)) in scope \(String(describing: id)), branch \(String(describing: branches[branchIndex].id)). The first interceptor will be used.
-                        """
-                    )
-                }
-            }
-
-            if let routeType = hookDeclaration.unwindHandlerRouteType {
-                let inserted = routeTypeIDs
-                    .insert(ObjectIdentifier(routeType))
-                    .inserted
-
-                if inserted == false {
-                    log.departureWarning(
-                        """
-                        Duplicate unwind handler for \(String(reflecting: routeType)) in scope \(String(describing: id)), branch \(String(describing: branches[branchIndex].id)). The first handler will be used.
-                        """
-                    )
-                }
-            }
-        }
-
-        branches[branchIndex].hookAttachments = hookDeclarations
-        log.departureDebug(.hooksHydrated(scope: self, hookCount: hookDeclarations.count))
-    }
-
-    func clearHooks(sourceID: AnyHashable) {
-        guard hookSourceID == sourceID else {
-            return
-        }
-
-        hookSourceID = nil
-        let branchIndex = branches.index(for: activeBranch)
-        branches[branchIndex].hookAttachments = []
-        log.departureDebug(.hooksCleared(scope: self))
-    }
-}
-
-// MARK: - Private Helpers
-
-private extension RouteScope {
-    func firstRouteAttachment(
-        for routeType: (some Route).Type,
-        in branchID: AnyHashable
-    ) -> RouteAttachmentMatch? {
-        guard
-            let branch = branches.first(where: { $0.id == branchID }),
-            let declaration = branch.routeAttachments.first(where: { attachment in
-                routeType == attachment.routeType
-            })
-        else {
-            return nil
-        }
-
-        return RouteAttachmentMatch(branchID: branch.id, declaration: declaration)
-    }
-
 }
 
 #if DEBUG
@@ -271,3 +123,58 @@ extension RouteScope {
     }
 }
 #endif
+
+final class DeclarationInstallationState {
+    let initialID: AnyHashable
+    private(set) var id: AnyHashable
+    private(set) var sourceEnvironment = EnvironmentValues()
+
+    private var routeSourceID: AnyHashable?
+    private var hookSourceID: AnyHashable?
+
+    fileprivate init(initialID: AnyHashable) {
+        self.initialID = initialID
+        self.id = initialID
+    }
+
+    func installRouteSource(
+        sourceID: AnyHashable,
+        id: AnyHashable?,
+        sourceEnvironment: EnvironmentValues
+    ) {
+        routeSourceID = sourceID
+        updateSourceEnvironment(sourceEnvironment)
+
+        if let id {
+            self.id = id
+        }
+    }
+
+    func uninstallRouteSource(sourceID: AnyHashable) -> Bool {
+        guard routeSourceID == sourceID else {
+            return false
+        }
+
+        routeSourceID = nil
+        id = initialID
+        updateSourceEnvironment(EnvironmentValues())
+        return true
+    }
+
+    func installHookSource(sourceID: AnyHashable) {
+        hookSourceID = sourceID
+    }
+
+    func uninstallHookSource(sourceID: AnyHashable) -> Bool {
+        guard hookSourceID == sourceID else {
+            return false
+        }
+
+        hookSourceID = nil
+        return true
+    }
+
+    func updateSourceEnvironment(_ sourceEnvironment: EnvironmentValues) {
+        self.sourceEnvironment = sourceEnvironment
+    }
+}

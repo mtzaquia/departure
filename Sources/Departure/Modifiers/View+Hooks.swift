@@ -59,25 +59,25 @@ private struct HooksModifier: ViewModifier {
             .onLifecycleEvent { event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
-                    hydrateScope()
+                    installScopeDeclarations()
 
                 case .updated(isInstalledInWindow: false):
                     break
 
                 case .dismantled, .deinitialized:
-                    clearScope()
+                    uninstallScopeDeclarations()
                 }
             }
     }
 
-    private func hydrateScope() {
-        routeScope?.hydrateHooks(
+    private func installScopeDeclarations() {
+        routeScope?.installHookDeclarations(
             sourceID: sourceID,
             hookDeclarations: declarations
         )
     }
 
-    private func clearScope() {
-        routeScope?.clearHooks(sourceID: sourceID)
+    private func uninstallScopeDeclarations() {
+        routeScope?.uninstallHookDeclarations(sourceID: sourceID)
     }
 }

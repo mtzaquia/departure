@@ -109,7 +109,7 @@ public final class Router: Identifiable, Equatable {
     /// Dismisses route scopes.  If no parameter is provided, it dismisses the current route.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed mounted route scopes have left the view hierarchy.
+    /// and any removed installed route scopes have left the view hierarchy.
     ///
     /// - Parameter target: The target to unwind to, or `nil` for the route to just dismiss itself.
     /// - Returns: `false` when an explicit target was requested but not found.
@@ -121,7 +121,7 @@ public final class Router: Identifiable, Equatable {
     /// Dismisses route scopes, delivering a payload to a matching ``UnwindHandler``.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed mounted route scopes have left the view hierarchy.
+    /// and any removed installed route scopes have left the view hierarchy.
     ///
     /// - Parameters:
     ///   - target: The target to unwind to, or `nil` for the route to just dismiss itself.

@@ -31,8 +31,8 @@ extension View {
     ///
     /// - Important: Because the conditionals produce `_ConditionalContent`, the set of hosts
     ///   changing tears down and rebuilds this subtree. Callers must install this in a layer
-    ///   detached from the scope's route-hydration lifecycle (e.g. a `background`), otherwise the
-    ///   churn clears freshly hydrated declarations.
+    ///   detached from the scope's route-declaration installation lifecycle (e.g. a `background`);
+    ///   otherwise the churn uninstalls freshly installed declarations.
     func routePresentationStyleModifiers(
         for declarations: [RouteScopeDeclaration]
     ) -> some View {

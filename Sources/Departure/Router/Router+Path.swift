@@ -408,33 +408,33 @@ extension Router {
     }
 
     func routeScopeDidInstallInView(_ routeScope: RouteScope) {
-        routeScope.mount()
-        log.departureDebug(.scopeMounted(scope: routeScope))
+        routeScope.installInView()
+        log.departureDebug(.scopeInstalledInView(scope: routeScope))
     }
 
     func routeScopeDidLeaveView(_ routeScope: RouteScope) {
-        guard routeScope.isMounted else { return }
+        guard routeScope.isInstalledInView else { return }
         
-        routeScope.unmount()
-        log.departureDebug(.scopeUnmounted(scope: routeScope))
+        routeScope.uninstallFromView()
+        log.departureDebug(.scopeUninstalledFromView(scope: routeScope))
     }
 
     func waitForRouteScopesToLeaveView(_ routeScopes: [RouteScope]) async {
-        let mountedRouteScopes = routeScopes.filter(\.isMounted)
+        let installedRouteScopes = routeScopes.filter(\.isInstalledInView)
 
-        guard mountedRouteScopes.isEmpty == false else {
-            log.departureDebug(.unmountWaitSkipped)
+        guard installedRouteScopes.isEmpty == false else {
+            log.departureDebug(.viewExitWaitSkipped)
             return
         }
 
-        log.departureDebug(.unmountWaitStarted(mounted: mountedRouteScopes.count))
+        log.departureDebug(.viewExitWaitStarted(installed: installedRouteScopes.count))
         await withCheckedContinuation { continuation in
-            var remainingCount = mountedRouteScopes.count
+            var remainingCount = installedRouteScopes.count
 
-            for routeScope in mountedRouteScopes {
-                routeScope.onUnmount {
+            for routeScope in installedRouteScopes {
+                routeScope.onUninstallFromView {
                     remainingCount -= 1
-                    log.departureDebug(.unmountWaitProgress(remaining: remainingCount))
+                    log.departureDebug(.viewExitWaitProgress(remaining: remainingCount))
 
                     if remainingCount == 0 {
                         continuation.resume()
@@ -449,7 +449,7 @@ extension Router {
             return rootPath
         }
 
-        if routeScope.mountedBranchID != nil {
+        if routeScope.branchID != nil {
             return routeScope.path
         }
 
@@ -465,7 +465,7 @@ extension Router {
     }
 
     private func routePath(containing routeScope: RouteScope, under owner: RouteScope) -> RoutePath? {
-        for branchScope in owner.mountedBranchScopes.values {
+        for branchScope in owner.branchScopes.values {
             if branchScope.path.contains(routeScope) {
                 return branchScope.path
             }

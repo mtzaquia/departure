@@ -8,11 +8,16 @@ let package = Package(
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "Departure", targets: ["Departure"]),
-//        .library(name: "DepartureSwiftUI", targets: ["DepartureSwiftUI"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-collections.git", from: "1.3.0"),
     ],
     targets: [
         .target(
             name: "Departure",
+            dependencies: [
+                .product(name: "OrderedCollections", package: "swift-collections"),
+            ],
             swiftSettings: [
                 .defaultIsolation(MainActor.self)
             ]
@@ -21,16 +26,6 @@ let package = Package(
             name: "DepartureTests",
             dependencies: ["Departure"]
         ),
-//        .target(
-//            name: "DepartureSwiftUI",
-//            swiftSettings: [
-//                .defaultIsolation(MainActor.self)
-//            ]
-//        ),
-//        .testTarget(
-//            name: "DepartureSwiftUITests",
-//            dependencies: ["DepartureSwiftUI"]
-//        ),
     ],
     swiftLanguageModes: [.v6]
 )

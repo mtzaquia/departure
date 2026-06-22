@@ -22,7 +22,7 @@
 
 /// Handles a matching route when it unwinds to this scope.
 ///
-/// The handler runs after the unwind has completed and any dismissed mounted scopes have left the
+/// The handler runs after the unwind has completed and any dismissed installed scopes have left the
 /// view hierarchy. When the route is dismissed with ``Router/unwind(to:)`` or
 /// ``Router/unwind(to:payload:)``, the unwind call stays suspended until the async handler body
 /// returns.

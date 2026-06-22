@@ -23,27 +23,16 @@
 import Foundation
 import SwiftUI
 
-// MARK: - Types
-
-extension RouteScope {
-    struct Branch: Identifiable {
-        let id: AnyHashable
-
-        var routeAttachments: [AnyRouteDeclaration] = []
-        var hookAttachments: [AnyHookDeclaration] = []
-    }
-}
-
 // MARK: - Derived State
 
 extension RouteScope {
-    var activeBranch: Branch.ID {
-        branchSelection?.value() ?? defaultBranch
+    var activeBranch: AnyHashable {
+        branchContainer?.activeBranch ?? id
     }
 
     var activeLocalScope: RouteScope {
         path.last?.activeLocalScope
-        ?? mountedBranchScopes[activeBranch]?.activeLocalScope
+        ?? branchScopes[activeBranch]?.activeLocalScope
         ?? self
     }
 
@@ -56,23 +45,7 @@ extension RouteScope {
             return true
         }
 
-        return parent.activeBranch == (mountedBranchID ?? id)
-    }
-
-    var routeAttachments: [AnyRouteDeclaration] {
-        let local = activeBranchScope?.routeAttachments ?? []
-        let adopted = adoptedRouteAttachments
-        if adopted.isEmpty {
-            return local
-        }
-        if local.isEmpty {
-            return adopted
-        }
-        return local + adopted
-    }
-
-    var hookAttachments: [AnyHookDeclaration] {
-        activeBranchScope?.hookAttachments ?? []
+        return parent.activeBranch == (branchID ?? id)
     }
 }
 
@@ -81,21 +54,26 @@ extension RouteScope {
 extension RouteScope {
     @discardableResult
     func setActiveBranch(_ branch: AnyHashable) -> Bool {
-        if let branchSelection {
-            return branchSelection.setValue(branch)
+        guard var branchContainer else {
+            branchContainer = BranchContainerState(
+                defaultBranch: branch,
+                selection: nil
+            )
+            return true
         }
 
-        defaultBranch = branch
-        return true
+        let didSet = branchContainer.setActiveBranch(branch)
+        self.branchContainer = branchContainer
+        return didSet
     }
 }
 
-// MARK: - Mounted Scopes
+// MARK: - Branch Scopes
 
 extension RouteScope {
     func activeLocalScope(for branch: AnyHashable) -> RouteScope? {
-        if let mountedScope = mountedBranchScopes[branch] {
-            return mountedScope.activeLocalScope
+        if let branchScope = branchScopes[branch] {
+            return branchScope.activeLocalScope
         }
 
         guard branch == activeBranch else {
@@ -114,24 +92,24 @@ extension RouteScope {
         #if DEBUG
         routeScope.debugKind = .branch
         #endif
-        routeScope.mountedBranchID = branch
+        routeScope.branchID = branch
         if let sourceEnvironment {
             routeScope.updateSourceEnvironment(sourceEnvironment)
         }
 
-        if mountedBranchScopes[branch] === routeScope {
+        if branchScopes[branch] === routeScope {
             routeScope.parent = self
             return false
         }
 
         routeScope.parent = self
-        mountedBranchScopes[branch] = routeScope
+        branchScopes[branch] = routeScope
         log.departureDebug(.branchRegistered(branch: branch, parent: self, scope: routeScope))
         return true
     }
 
     func unregisterBranchScope(_ routeScope: RouteScope, for branch: AnyHashable) {
-        guard let registeredScope = mountedBranchScopes[branch] else {
+        guard let registeredScope = branchScopes[branch] else {
             return
         }
 
@@ -140,114 +118,9 @@ extension RouteScope {
             return
         }
 
-        mountedBranchScopes[branch] = nil
+        branchScopes[branch] = nil
         routeScope.parent = nil
-        routeScope.mountedBranchID = nil
+        routeScope.branchID = nil
         log.departureDebug(.branchUnregistered(branch: branch, scope: routeScope))
-    }
-}
-
-// MARK: - Declaration Adoption
-
-extension RouteScope {
-    func routeDeclarations(adoptedByBranch branchID: AnyHashable) -> [RouteScopeDeclaration] {
-        guard
-            let branch = branches.first(where: { $0.id == branchID }),
-            branch.routeAttachments.isEmpty == false
-        else {
-            return []
-        }
-
-        return [
-            RouteScopeDeclaration(
-                routes: branch.routeAttachments.map {
-                    $0.drivingPresentation(true)
-                }
-            ),
-        ]
-    }
-
-    func firstAdoptedRouteAttachment(for routeType: (some Route).Type) -> RouteAttachmentMatch? {
-        guard
-            let declaration = adoptedRouteAttachments.first(where: { attachment in
-                routeType == attachment.routeType
-            })
-        else {
-            return nil
-        }
-
-        return RouteAttachmentMatch(branchID: activeBranch, declaration: declaration)
-    }
-}
-
-// MARK: - Hydration
-
-extension RouteScope {
-    func makeBranches(
-        from routeDeclarations: [RouteScopeDeclaration],
-        activeBranch: AnyHashable,
-        hookDeclarations: [AnyHookDeclaration]
-    ) -> [Branch] {
-        var branches = [Branch(id: activeBranch)]
-        var routeTypeIDsByBranch: [AnyHashable: Set<ObjectIdentifier>] = [:]
-
-        for declaration in routeDeclarations {
-            let branchID = declaration.branch ?? activeBranch
-            let branchIndex = branches.index(for: branchID)
-
-            for route in declaration.routes {
-                let routeTypeID = ObjectIdentifier(route.routeType)
-                let inserted = routeTypeIDsByBranch[branchID, default: []]
-                    .insert(routeTypeID)
-                    .inserted
-
-                if inserted == false {
-                    log.departureWarning(
-                        """
-                        Duplicate route declaration for \(String(reflecting: route.routeType)) in scope \(String(describing: id)), branch \(String(describing: branchID)). The first declaration will be used.
-                        """
-                    )
-                }
-            }
-
-            branches[branchIndex].routeAttachments.append(contentsOf: declaration.routes)
-        }
-
-        if hookDeclarations.isEmpty == false {
-            let branchIndex = branches.index(for: activeBranch)
-            branches[branchIndex].hookAttachments.append(contentsOf: hookDeclarations)
-        }
-
-        return branches
-    }
-}
-
-// MARK: - Private Helpers
-
-private extension RouteScope {
-    var activeBranchScope: Branch? {
-        branches.first { $0.id == activeBranch }
-    }
-
-    var adoptedRouteAttachments: [AnyRouteDeclaration] {
-        guard let mountedBranchID else {
-            return []
-        }
-
-        return parent?
-            .routeDeclarations(adoptedByBranch: mountedBranchID)
-            .flatMap(\.routes) ?? []
-    }
-
-}
-
-extension Array where Element == RouteScope.Branch {
-    mutating func index(for id: AnyHashable) -> Index {
-        if let index = firstIndex(where: { $0.id == id }) {
-            return index
-        }
-
-        append(RouteScope.Branch(id: id))
-        return index(before: endIndex)
     }
 }

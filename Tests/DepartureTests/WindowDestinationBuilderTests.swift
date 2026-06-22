@@ -88,7 +88,7 @@ struct WindowDestinationBuilderTests {
         let router = Router()
         let recorder = WindowDestinationRecorder()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -127,12 +127,12 @@ struct WindowDestinationBuilderTests {
         #expect(recorder.values == ["forwarded"])
     }
 
-    @Test func routeHydrationAttachesSourceEnvironmentForHighPriorityPresentation() async throws {
+    @Test func routeDeclarationInstallationAttachesSourceEnvironmentForHighPriorityPresentation() async throws {
         let router = Router()
         var environment = EnvironmentValues()
-        environment.windowDestinationTestValue = "hydrated"
+        environment.windowDestinationTestValue = "installed"
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -146,7 +146,7 @@ struct WindowDestinationBuilderTests {
             matching: .cover(.slide)
         ).wrappedValue)
 
-        #expect(presentation.sourceEnvironment.windowDestinationTestValue == "hydrated")
+        #expect(presentation.sourceEnvironment.windowDestinationTestValue == "installed")
     }
 
     @Test func existingWindowDestinationSnapshotKeepsCapturedSourceEnvironment() async throws {
@@ -162,7 +162,7 @@ struct WindowDestinationBuilderTests {
         var initialEnvironment = EnvironmentValues()
         initialEnvironment.windowDestinationTestValue = "initial"
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -183,7 +183,7 @@ struct WindowDestinationBuilderTests {
 
         var updatedEnvironment = EnvironmentValues()
         updatedEnvironment.windowDestinationTestValue = "updated"
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -220,7 +220,7 @@ struct WindowDestinationBuilderTests {
         var initialEnvironment = EnvironmentValues()
         initialEnvironment.windowDestinationTestValue = "initial"
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: routeDeclarations,
@@ -239,7 +239,7 @@ struct WindowDestinationBuilderTests {
 
         var replacementEnvironment = EnvironmentValues()
         replacementEnvironment.windowDestinationTestValue = "replacement"
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: routeDeclarations,
@@ -275,7 +275,7 @@ struct WindowDestinationBuilderTests {
             )
         }
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
