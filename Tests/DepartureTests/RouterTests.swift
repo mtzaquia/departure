@@ -1136,6 +1136,72 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }
 
+    @Test func unwindToRootClearsInactiveBranchStacksOwnedByRemovedScope() async throws {
+        let router = Router()
+        let (selection, selectedTab) = tabSelection(.home)
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+
+        router.rootPath.scopes = [landingScope]
+        landingScope.installRouteDeclarations(
+            id: RootRoute().id,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.home) {
+                        Push(HomeDetailRoute.self)
+                        Sheet(MessageRoute.self)
+                    }
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.wallet) {
+                        Push(TransactionRoute.self)
+                    }
+                )
+            )
+        )
+
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        homeScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.home),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Push(HomeDetailRoute.self)._routeDeclarations
+                    + Sheet(MessageRoute.self)._routeDeclarations
+                ),
+            ]
+        )
+        landingScope.registerBranchScope(homeScope, for: AppTab.home)
+
+        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        walletScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.wallet),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(TransactionRoute.self)._routeDeclarations),
+            ]
+        )
+        landingScope.registerBranchScope(walletScope, for: AppTab.wallet)
+
+        await router.requestRoute(HomeDetailRoute())
+        await router.requestRoute(MessageRoute())
+        landingScope.setActiveBranch(AnyHashable(AppTab.wallet))
+        await router.requestRoute(TransactionRoute())
+
+        #expect(selectedTab() == .wallet)
+        #expect(router.rootPath.count == 1)
+        #expect(homeScope.path.count == 2)
+        #expect(walletScope.path.count == 1)
+
+        await router.unwind(to: .root)
+
+        #expect(router.rootPath.isEmpty)
+        #expect(homeScope.path.isEmpty)
+        #expect(walletScope.path.isEmpty)
+        #expect(router.routePresentationBinding(from: homeScope, matching: .push).wrappedValue == nil)
+        #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
+    }
+
     @Test func unwindToRootPreservesInactiveBranchPushStackButClearsModal() async throws {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.home)

@@ -166,10 +166,12 @@ extension Router {
     func unwindRootAndWait(sourceRoute: (any Route)?, payload: Any?) async -> Bool {
         let rootRemovedScopes = rootPath.scopesRemovedByKeepingThrough(nil)
         var branchPaths = activeBranchPaths(under: root)
+        branchPaths.appendUnique(contentsOf: rootRemovedScopes.flatMap {
+            allBranchPaths(under: $0)
+        })
         if let highContextPath = highContext?.path,
-           highContextPath !== rootPath,
-           branchPaths.contains(where: { $0 === highContextPath }) == false {
-            branchPaths.append(highContextPath)
+           highContextPath !== rootPath {
+            branchPaths.appendUnique(contentsOf: [highContextPath])
         }
         let branchRemovedScopes = branchPaths.flatMap {
             $0.scopesRemovedByKeepingThrough(nil)
@@ -846,6 +848,14 @@ extension Router {
         }
     }
 
+}
+
+private extension [RoutePath] {
+    mutating func appendUnique(contentsOf routePaths: [RoutePath]) {
+        for routePath in routePaths where contains(where: { $0 === routePath }) == false {
+            append(routePath)
+        }
+    }
 }
 
 private extension RouteScope {
