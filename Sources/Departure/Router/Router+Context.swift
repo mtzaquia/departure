@@ -23,17 +23,21 @@
 extension Router {
     enum RouteContext {
         case normal(path: RoutePath)
-        case high(path: RoutePath, startIndex: [RouteScope].Index)
+        case high(
+            path: RoutePath,
+            startIndex: [RouteScope].Index,
+            presentationScope: RouteScope
+        )
 
         var path: RoutePath {
             switch self {
-            case .normal(let path), .high(let path, _):
+            case .normal(let path), .high(let path, _, _):
                 path
             }
         }
 
         var highStartIndex: [RouteScope].Index? {
-            guard case .high(_, let startIndex) = self else {
+            guard case .high(_, let startIndex, _) = self else {
                 return nil
             }
 
@@ -42,7 +46,7 @@ extension Router {
 
         var highRouteScope: RouteScope? {
             guard
-                case .high(let path, let startIndex) = self,
+                case .high(let path, let startIndex, _) = self,
                 path.scopes.indices.contains(startIndex)
             else {
                 return nil
@@ -51,9 +55,9 @@ extension Router {
             return path.scopes[startIndex]
         }
 
-        var declaringPathIndex: [RouteScope].Index? {
+        var highBasePathIndex: [RouteScope].Index? {
             guard
-                case .high(let path, let startIndex) = self,
+                case .high(let path, let startIndex, _) = self,
                 startIndex > path.scopes.startIndex
             else {
                 return nil
@@ -62,13 +66,21 @@ extension Router {
             return path.scopes.index(before: startIndex)
         }
 
+        var highPresentationScope: RouteScope? {
+            guard case .high(_, _, let presentationScope) = self else {
+                return nil
+            }
+
+            return presentationScope
+        }
+
         func contains(_ match: DeclarationMatch) -> Bool {
             contains(path: match.path, pathIndex: match.pathIndex)
         }
 
         func contains(path: RoutePath, pathIndex: [RouteScope].Index?) -> Bool {
             guard
-                case .high(let contextPath, let startIndex) = self,
+                case .high(let contextPath, let startIndex, _) = self,
                 path === contextPath,
                 let pathIndex
             else {

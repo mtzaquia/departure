@@ -999,7 +999,11 @@ struct RouterTests {
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
         router.rootPath.scopes = [firstScope, secondScope]
-        router.highContext = .high(path: router.rootPath, startIndex: 1)
+        router.highContext = .high(
+            path: router.rootPath,
+            startIndex: 1,
+            presentationScope: router.root
+        )
 
         await router.unwindAndWait(to: nil)
 
@@ -1014,7 +1018,11 @@ struct RouterTests {
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
         router.rootPath.scopes = [firstScope, secondScope]
-        router.highContext = .high(path: router.rootPath, startIndex: 1)
+        router.highContext = .high(
+            path: router.rootPath,
+            startIndex: 1,
+            presentationScope: router.root
+        )
 
         await router.unwindAndWait(to: .id(RootRoute().id))
 
@@ -1029,7 +1037,11 @@ struct RouterTests {
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
         router.rootPath.scopes = [firstScope, secondScope]
-        router.highContext = .high(path: router.rootPath, startIndex: 1)
+        router.highContext = .high(
+            path: router.rootPath,
+            startIndex: 1,
+            presentationScope: router.root
+        )
 
         await router.unwindAndWait(to: .root)
 
@@ -1279,7 +1291,11 @@ struct RouterTests {
         )
 
         router.rootPath.scopes = [loginScope]
-        router.highContext = .high(path: router.rootPath, startIndex: 0)
+        router.highContext = .high(
+            path: router.rootPath,
+            startIndex: 0,
+            presentationScope: router.root
+        )
         router.routeScopeDidInstallInView(loginScope)
 
         let unwindTask = Task {
@@ -1478,7 +1494,11 @@ struct RouterTests {
         let noticeDeclaration = Sheet(SettingsRoute.self, priority: .high)._routeDeclarations[0]
 
         router.rootPath.scopes = [rootScope, loginScope, noticeScope]
-        router.highContext = .high(path: router.rootPath, startIndex: 1)
+        router.highContext = .high(
+            path: router.rootPath,
+            startIndex: 1,
+            presentationScope: router.root
+        )
         loginScope.modalChild = noticeScope
         noticeScope.hostScope = loginScope
         noticeScope.hostDeclaration = noticeDeclaration
@@ -2026,6 +2046,91 @@ struct RouterTests {
         #expect(router.rootPath.count == 1)
         #expect(router.rootPath.last?.route is LoginRoute)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
+    }
+
+    @Test func highPriorityPresentationOverlaysNormalPresentation() async {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Cover(SettingsRoute.self)._routeDeclarations
+                    + Cover(LoginRoute.self, priority: .high)._routeDeclarations
+                ),
+            ]
+        )
+
+        await router.requestRoute(SettingsRoute())
+        let normalScope = router.rootPath.last
+
+        await router.requestRoute(LoginRoute())
+
+        let normalPresentation = router.routePresentationBinding(
+            from: router.root,
+            matching: .cover(.slide)
+        ).wrappedValue
+        let highPresentation = router.highPriorityRoutePresentationBinding(
+            matching: .cover(.slide)
+        ).wrappedValue
+
+        #expect(router.rootPath.count == 2)
+        #expect(router.rootPath.first === normalScope)
+        #expect(router.rootPath.first?.route is SettingsRoute)
+        #expect(router.rootPath.last?.route is LoginRoute)
+        #expect(router.highContext?.highStartIndex == 1)
+        #expect(normalPresentation?.scope === normalScope)
+        #expect(normalPresentation?.declaration.priority == .normal)
+        #expect(highPresentation?.scope === router.rootPath.last)
+        #expect(highPresentation?.declaration.priority == .high)
+
+        router.highPriorityRoutePresentationBinding(matching: .cover(.slide)).wrappedValue = nil
+
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last === normalScope)
+        #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue?.scope === normalScope)
+        #expect(router.highContext == nil)
+    }
+
+    @Test func highPriorityReplacementPreservesUnderlyingNormalPresentation() async {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Cover(SettingsRoute.self)._routeDeclarations
+                    + Cover(LoginRoute.self, priority: .high)._routeDeclarations
+                    + Cover(AlertRoute.self, priority: .high, transition: .fade, providesNavigation: false)._routeDeclarations
+                ),
+            ]
+        )
+
+        await router.requestRoute(SettingsRoute())
+        let normalScope = router.rootPath.last
+        await router.requestRoute(LoginRoute())
+        await router.requestRoute(AlertRoute())
+
+        let normalPresentation = router.routePresentationBinding(
+            from: router.root,
+            matching: .cover(.slide)
+        ).wrappedValue
+        let highPresentation = router.highPriorityRoutePresentationBinding(
+            matching: .cover(.fade)
+        ).wrappedValue
+
+        #expect(router.rootPath.count == 2)
+        #expect(router.rootPath.first === normalScope)
+        #expect(router.rootPath.first?.route is SettingsRoute)
+        #expect(router.rootPath.last?.route is AlertRoute)
+        #expect(router.rootPath.scopes.contains { $0.route is LoginRoute } == false)
+        #expect(router.highContext?.highStartIndex == 1)
+        #expect(normalPresentation?.scope === normalScope)
+        #expect(normalPresentation?.declaration.priority == .normal)
+        #expect(highPresentation?.scope === router.rootPath.last)
+        #expect(highPresentation?.declaration.priority == .high)
     }
 
     @Test func normalRouteMatchedInsideHighContextAppendsNormally() async {
