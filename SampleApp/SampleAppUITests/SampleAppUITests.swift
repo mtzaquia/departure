@@ -93,6 +93,26 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.authenticationTitle)
     }
 
+    func testTopLevelCoverReplacementPreservesPushedBranchStackAndShowsReplacementContent() {
+        openLanding()
+        tapSettingsTab()
+
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        tap(A11y.authenticationPresentTopLevelCoverButton)
+        assertExists(A11y.topLevelCoverText)
+
+        tap(A11y.topLevelCoverPresentReplacementButton)
+        assertExists(A11y.topLevelReplacementCoverText)
+        assertGone(A11y.topLevelCoverText)
+
+        tap(A11y.topLevelReplacementCoverDismissButton)
+        assertGone(A11y.topLevelReplacementCoverText)
+        assertExists(A11y.authenticationTitle)
+        assertGone(A11y.settingsAuthenticationButton)
+    }
+
     func testTopLevelSheetPresentedFromBranchLocalProfileSheetDismissesItAndPresentsTopLevel() {
         openLanding()
 
@@ -521,6 +541,7 @@ private enum A11y {
     static let authenticationTitle = "sample.authentication.title"
     static let authenticationAttachLocalRouteToggle = "sample.authentication.attach-local-route"
     static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
+    static let authenticationPresentTopLevelCoverButton = "sample.authentication.present-top-level-cover"
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
     static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
     static let authenticationUnwindToBranchIDButton = "sample.authentication.unwind-to-branch-id"
@@ -528,6 +549,10 @@ private enum A11y {
     static let topLevelSheetText = "sample.top-level-sheet.text"
     static let topLevelSheetPresentationSource = "sample.top-level-sheet.presentation-source"
     static let topLevelSheetDismissButton = "sample.top-level-sheet.dismiss"
+    static let topLevelCoverText = "sample.top-level-cover.text"
+    static let topLevelCoverPresentReplacementButton = "sample.top-level-cover.present-replacement"
+    static let topLevelReplacementCoverText = "sample.top-level-replacement-cover.text"
+    static let topLevelReplacementCoverDismissButton = "sample.top-level-replacement-cover.dismiss"
 
     static let messageText = "sample.message.text"
     static let messageDismissUnwindButton = "sample.message.dismiss-unwind"

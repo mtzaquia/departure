@@ -59,6 +59,8 @@ struct LandingView: View {
             Cover(LoginReplacementRoute.self, priority: .high)
             Cover(AlertRoute.self, priority: .high, transition: .fade, providesNavigation: false)
             Sheet(TopLevelSheetRoute.self, providesNavigation: false)
+            Cover(TopLevelCoverRoute.self, providesNavigation: false)
+            Cover(TopLevelReplacementCoverRoute.self, providesNavigation: false)
 
             Branch(.home) {
                 Sheet(ProfileRoute.self)

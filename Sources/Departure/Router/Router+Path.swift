@@ -151,10 +151,11 @@ extension Router {
     func appendRoute(_ route: any Route, after match: DeclarationMatch) async {
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
         let preservesCurrentPath = preservesCurrentPath(for: match)
-        let removedScopes = preservesCurrentPath ? [] : match.path.scopesRemovedByKeepingThrough(match.pathIndex)
+        let trimPathIndex = preservesCurrentPath ? nil : pathIndexToKeepBeforeAppending(after: match)
+        let removedScopes = preservesCurrentPath ? [] : match.path.scopesRemovedByKeepingThrough(trimPathIndex)
 
         if preservesCurrentPath == false {
-            keepPathThrough(match.pathIndex, in: match.path)
+            keepPathThrough(trimPathIndex, in: match.path)
         }
 
         if removedScopes.isEmpty == false {
@@ -400,6 +401,26 @@ extension Router {
         }
 
         return true
+    }
+
+    func pathIndexToKeepBeforeAppending(after match: DeclarationMatch) -> [RouteScope].Index? {
+        guard match.declaration.presentationKind != .push else {
+            return match.pathIndex
+        }
+
+        guard
+            let declaringScope = match.declaringPath.scope(at: match.declaringPathIndex),
+            let modalChild = declaringScope.modalChild,
+            let modalPathIndex = match.path.index(of: modalChild)
+        else {
+            return match.pathIndex
+        }
+
+        guard modalPathIndex > match.path.scopes.startIndex else {
+            return nil
+        }
+
+        return match.path.scopes.index(before: modalPathIndex)
     }
 
     func removeFromPath(_ routeScope: RouteScope) {

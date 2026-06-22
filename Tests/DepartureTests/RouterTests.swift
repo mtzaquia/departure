@@ -583,6 +583,78 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }
 
+    @Test func replacingTopLevelCoverPreservesActiveBranchPushStack() async throws {
+        let router = Router()
+        let (selection, _) = tabSelection(.home)
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+
+        router.rootPath.scopes = [landingScope]
+        landingScope.installRouteDeclarations(
+            id: RootRoute().id,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Cover(LoginRoute.self)
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Cover(MessageRoute.self)
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.home) {
+                        Push(SettingsRoute.self)
+                    }
+                )
+            )
+        )
+
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        homeScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.home),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Cover(LoginRoute.self)._routeDeclarations.map { $0.drivingPresentation(true) }
+                    + Cover(MessageRoute.self)._routeDeclarations.map { $0.drivingPresentation(true) }
+                    + Push(SettingsRoute.self)._routeDeclarations
+                ),
+            ]
+        )
+        landingScope.registerBranchScope(homeScope, for: AppTab.home)
+
+        await router.requestRoute(SettingsRoute())
+        #expect(homeScope.path.last?.route is SettingsRoute)
+
+        await router.requestRoute(LoginRoute())
+        let loginScope = try #require(homeScope.path.last)
+        #expect(homeScope.path.count == 2)
+        #expect(homeScope.path.first?.route is SettingsRoute)
+        #expect(loginScope.route is LoginRoute)
+        router.routeScopeDidInstallInView(loginScope)
+
+        let replacementTask = Task {
+            await router.requestRoute(MessageRoute())
+        }
+
+        for _ in 0..<10 {
+            if homeScope.path.count == 1 {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(homeScope.path.count == 1)
+        #expect(homeScope.path.last?.route is SettingsRoute)
+        #expect(router.routePresentationBinding(from: homeScope, matching: .cover(.slide)).wrappedValue == nil)
+
+        router.routeScopeDidLeaveView(loginScope)
+        await replacementTask.value
+
+        #expect(homeScope.path.count == 2)
+        #expect(homeScope.path.first?.route is SettingsRoute)
+        #expect(homeScope.path.last?.route is MessageRoute)
+        #expect(router.routePresentationBinding(from: homeScope, matching: .cover(.slide)).wrappedValue?.scope.route is MessageRoute)
+    }
+
     @Test func crawlBackBranchSwitchWaitsForAdoptedLocalDeclarationBeforePresenting() async throws {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.home)
