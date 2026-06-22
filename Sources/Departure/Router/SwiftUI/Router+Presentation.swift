@@ -281,8 +281,8 @@ private extension Router {
             let highContext,
             let highRouteScope = highContext.highRouteScope,
             let route = highRouteScope.route,
-            let declaringScope = highContext.path.scope(at: highContext.declaringPathIndex),
-            let attachment = declaringScope.highPriorityRouteAttachment(
+            let presentationScope = highContext.highPresentationScope,
+            let attachment = presentationScope.highPriorityRouteAttachment(
                 for: type(of: route),
                 matching: presentationKind
             )
@@ -308,7 +308,7 @@ private extension Router {
             return
         }
 
-        let targetPathIndex = highContext.declaringPathIndex
+        let targetPathIndex = highContext.highBasePathIndex
         let removedScopes = highContext.path.scopesRemovedByKeepingThrough(targetPathIndex)
         let targetScope = highContext.path.scope(at: targetPathIndex)
         keepPathThrough(targetPathIndex, in: highContext.path)

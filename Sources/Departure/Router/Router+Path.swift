@@ -214,13 +214,7 @@ extension Router {
         }
 
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
-        let preservesCurrentPath = preservesCurrentPath(for: match)
-        let trimPathIndex = preservesCurrentPath ? nil : pathIndexToKeepBeforeAppending(after: match)
-        let removedScopes = preservesCurrentPath ? [] : match.path.scopesRemovedByKeepingThrough(trimPathIndex)
-
-        if preservesCurrentPath == false {
-            keepPathThrough(trimPathIndex, in: match.path)
-        }
+        let removedScopes = prepareNormalAppendPath(after: match)
 
         if removedScopes.isEmpty == false {
             log.departureDebug(.routeAppendWaitingReplacingScopes(removedScopes: removedScopes.count))
@@ -284,7 +278,6 @@ extension Router {
         after match: DeclarationMatch
     ) {
         log.departureDebug(.highPriorityReplacePreparing(route: route, match: match))
-        keepPathThrough(match.pathIndex, in: match.path)
 
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
 
@@ -329,12 +322,6 @@ extension Router {
 
         pendingRoute = nil
 
-        if behavior == .startHighContext {
-            highContext = .high(path: match.path, startIndex: match.path.endIndex)
-            log.departureDebug(.highContextStarted(pathIndex: match.path.endIndex))
-        }
-
-        let appendedScope = RouteScope(id: route.id, route: route)
         // Resolve the host once, at write time, so the SwiftUI bindings read it directly instead of
         // re-deriving the closest declaring scope on every read. The presenter is not always the
         // declarer: when the route is placed into a different path than the one it was discovered
@@ -343,6 +330,22 @@ extension Router {
         let hostScope = match.path === match.declaringPath
             ? match.path.scope(at: match.pathIndex)
             : match.path.owner
+
+        if behavior == .startHighContext {
+            trimExistingHighContextForReplacement()
+            guard let hostScope else {
+                return
+            }
+
+            highContext = .high(
+                path: match.path,
+                startIndex: match.path.endIndex,
+                presentationScope: hostScope
+            )
+            log.departureDebug(.highContextStarted(pathIndex: match.path.endIndex))
+        }
+
+        let appendedScope = RouteScope(id: route.id, route: route)
         appendedScope.hostScope = hostScope
         // `match.declaration` may be the discovery copy (drivesPresentation == false). The host
         // presents using its own adopted/local copy that actually drives presentation, so resolve
@@ -354,11 +357,14 @@ extension Router {
         }) ?? match.declaration
         // Place the route in its host's structural slot. Assigning `modalChild` replaces any prior
         // modal (the old one is trimmed from the path before we get here), so a host can never hold
-        // two modals at once.
-        if match.declaration.presentationKind == .push {
-            hostScope?.pushChild = appendedScope
-        } else {
-            hostScope?.modalChild = appendedScope
+        // two modals at once. A high-priority root is presented by the separate high-priority
+        // binding, so it must not replace the normal context's host slot underneath it.
+        if behavior != .startHighContext {
+            if match.declaration.presentationKind == .push {
+                hostScope?.pushChild = appendedScope
+            } else {
+                hostScope?.modalChild = appendedScope
+            }
         }
         match.path.append(appendedScope)
         log.departureDebug(.routeAppended(route: route, pathCount: match.path.count))
@@ -384,7 +390,13 @@ extension Router {
                 declaration: pendingRoute.match.declaration
             )
         )
-        keepPathThrough(match.pathIndex, in: match.path)
+        switch pendingRoute.appendBehavior {
+        case .append:
+            prepareNormalAppendPath(after: match)
+
+        case .startHighContext:
+            break
+        }
 
         appendOrPendRoute(
             pendingRoute.route,
@@ -416,6 +428,18 @@ extension Router {
         }
 
         return canPresent
+    }
+
+    @discardableResult
+    func prepareNormalAppendPath(after match: DeclarationMatch) -> [RouteScope] {
+        guard preservesCurrentPath(for: match) == false else {
+            return []
+        }
+
+        let trimPathIndex = pathIndexToKeepBeforeAppending(after: match)
+        let removedScopes = match.path.scopesRemovedByKeepingThrough(trimPathIndex)
+        keepPathThrough(trimPathIndex, in: match.path)
+        return removedScopes
     }
 
     func keepPathThrough(_ pathIndex: [RouteScope].Index?, in routePath: RoutePath) {
@@ -518,6 +542,22 @@ extension Router {
         } else {
             keepPathThrough(routePath.scopes.index(before: pathIndex), in: routePath)
         }
+    }
+
+    func trimExistingHighContextForReplacement() {
+        guard
+            let highContext,
+            let startIndex = highContext.highStartIndex
+        else {
+            return
+        }
+
+        guard startIndex <= highContext.path.endIndex else {
+            self.highContext = nil
+            return
+        }
+
+        keepPathThrough(highContext.highBasePathIndex, in: highContext.path)
     }
 
     func removeHighContextIfNeeded(in routePath: RoutePath) {
