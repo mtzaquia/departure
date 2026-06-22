@@ -594,9 +594,19 @@ extension Router {
 
     func routeScopeDidLeaveView(_ routeScope: RouteScope) {
         guard routeScope.isInstalledInView else { return }
-        
+
         routeScope.uninstallFromView()
         log.departureDebug(.scopeUninstalledFromView(scope: routeScope))
+        clearHighContextIfNeeded(forRemovedViewScope: routeScope)
+    }
+
+    func clearHighContextIfNeeded(forRemovedViewScope routeScope: RouteScope) {
+        guard highContext?.highRouteScope === routeScope else {
+            return
+        }
+
+        log.departureDebug(.highContextCleared)
+        highContext = nil
     }
 
     func waitForRouteScopesToLeaveView(_ routeScopes: [RouteScope]) async {

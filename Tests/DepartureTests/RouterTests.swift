@@ -1846,6 +1846,65 @@ struct RouterTests {
         #expect(walletScope.path.last === transactionScope)
     }
 
+    @Test func highPriorityContextClearsWhenHighRouteLeavesViewOnInactiveBranch() async throws {
+        let router = Router()
+        let (selection, selectedTab) = tabSelection(.wallet)
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.home) {
+                        Sheet(SettingsRoute.self)
+                    }
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.wallet) {
+                        Cover(LoginRoute.self, priority: .high)
+                    }
+                )
+            )
+        )
+
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        homeScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.home),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Sheet(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+        router.root.registerBranchScope(homeScope, for: AppTab.home)
+
+        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        walletScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.wallet),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations),
+            ]
+        )
+        router.root.registerBranchScope(walletScope, for: AppTab.wallet)
+
+        await router.requestRoute(LoginRoute())
+        let highRouteScope = try #require(walletScope.path.last)
+        router.routeScopeDidInstallInView(highRouteScope)
+
+        router.root.setActiveBranch(AnyHashable(AppTab.home))
+        router.routeScopeDidLeaveView(highRouteScope)
+
+        #expect(selectedTab() == .home)
+        #expect(walletScope.path.last === highRouteScope)
+        #expect(router.highContext == nil)
+
+        await router.requestRoute(SettingsRoute())
+
+        #expect(homeScope.path.count == 1)
+        #expect(homeScope.path.last?.route is SettingsRoute)
+        #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue?.scope === homeScope.path.last)
+    }
+
     @Test func inactiveBranchPushPresentationBindingStaysStableWhenActiveBranchChanges() async throws {
         let router = Router()
         let (selection, _) = tabSelection(.home)
