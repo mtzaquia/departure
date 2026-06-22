@@ -92,6 +92,7 @@ enum SampleAppAccessibility {
 
     static let topLevelSheetText = "sample.top-level-sheet.text"
     static let topLevelSheetPresentationSource = "sample.top-level-sheet.presentation-source"
+    static let topLevelSheetPresentCoverButton = "sample.top-level-sheet.present-cover"
     static let topLevelSheetDismissButton = "sample.top-level-sheet.dismiss"
     static let topLevelCoverText = "sample.top-level-cover.text"
     static let topLevelCoverPresentReplacementButton = "sample.top-level-cover.present-replacement"

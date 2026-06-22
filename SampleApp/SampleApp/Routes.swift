@@ -109,6 +109,7 @@ struct TopLevelReplacementCoverRoute: Route {
 struct TopLevelSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.samplePresentationSource) private var samplePresentationSource
+    @Environment(Router.self) private var router
 
     var body: some View {
         VStack(spacing: 16) {
@@ -118,6 +119,14 @@ struct TopLevelSheetView: View {
 
             Text("Presented from: \(samplePresentationSource)")
                 .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetPresentationSource)
+
+            Button("Present cover") {
+                Task {
+                    await router.present(TopLevelCoverRoute())
+                }
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetPresentCoverButton)
 
             Button("Dismiss") {
                 dismiss()

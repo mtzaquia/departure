@@ -70,6 +70,9 @@ public final class Router: Identifiable, Equatable {
     @ObservationIgnored
     var unwindPresentationSnapshot: UnwindPresentationSnapshot?
 
+    @ObservationIgnored
+    var deferredRouteAppend: DeferredRouteAppend?
+
     var currentRouteScope: RouteScope {
         currentRoutePath.last?.activeLocalScope ?? activeContext.path.owner?.activeLocalScope ?? root.activeLocalScope
     }

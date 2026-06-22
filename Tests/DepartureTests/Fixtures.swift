@@ -100,6 +100,7 @@ struct ContextProbeAction: Action {
 @MainActor
 final class ActionRecorder {
     var bools: [Bool] = []
+    var labels: [String] = []
 }
 
 actor AsyncActionRecorder {

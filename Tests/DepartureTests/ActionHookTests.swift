@@ -26,6 +26,33 @@ import Testing
 @MainActor
 @Suite
 struct ActionHookTests {
+    @Test func currentScopeInterceptorWinsOverAncestorInterceptor() async {
+        let router = Router()
+        let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let recorder = ActionRecorder()
+
+        parentScope.installHookDeclarations(
+            hookDeclarations: [
+                ActionInterceptor(ContextProbeAction.self) { _ in
+                    recorder.labels.append("parent")
+                }.declaration,
+            ]
+        )
+        childScope.installHookDeclarations(
+            hookDeclarations: [
+                ActionInterceptor(ContextProbeAction.self) { _ in
+                    recorder.labels.append("child")
+                }.declaration,
+            ]
+        )
+        router.rootPath.scopes = [parentScope, childScope]
+
+        await router.performAction(ContextProbeAction())
+
+        #expect(recorder.labels == ["child"])
+    }
+
     @Test func currentRouteScopeUsesSelectedInstalledBranchScopeForHooks() async {
         let router = Router()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
@@ -99,6 +126,46 @@ struct ActionHookTests {
         #expect(recorder.bools == [true])
     }
 
+    @Test func actionReroutePresentsRouteAndRetriesOnce() async {
+        let router = Router()
+        let recorder = ActionEventRecorder()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.performAction(ReroutingProbeAction(recorder: recorder))
+        await recorder.waitForEvent("ran")
+
+        #expect(await recorder.values() == ["reroute", "ran"])
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last?.route is SettingsRoute)
+    }
+
+    @Test func actionRerouteLoopIsDroppedAfterRetry() async {
+        let router = Router()
+        let recorder = ActionEventRecorder()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.performAction(LoopingRerouteAction(recorder: recorder))
+        await recorder.waitForEventCount(2)
+
+        #expect(await recorder.values() == ["attempt", "attempt"])
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last?.route is SettingsRoute)
+    }
+
     @Test func selectedBranchScopeChangesWhenActiveBranchChanges() {
         let router = Router()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
@@ -117,5 +184,56 @@ struct ActionHookTests {
 
         parentScope.unregisterBranchScope(walletScope, for: AppTab.wallet)
         #expect(router.currentRouteScope === parentScope)
+    }
+}
+
+private actor ActionEventRecorder {
+    private var events: [String] = []
+
+    func append(_ event: String) {
+        events.append(event)
+    }
+
+    func values() -> [String] {
+        events
+    }
+
+    func waitForEvent(_ event: String) async {
+        for _ in 0..<100 {
+            if events.contains(event) {
+                return
+            }
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+    }
+
+    func waitForEventCount(_ count: Int) async {
+        for _ in 0..<100 where events.count < count {
+            try? await Task.sleep(nanoseconds: 1_000_000)
+        }
+    }
+}
+
+private struct ReroutingProbeAction: Action {
+    let recorder: ActionEventRecorder
+
+    func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
+        if context.isRunning(in: SettingsRoute.self) {
+            await recorder.append("ran")
+            return
+        }
+
+        await recorder.append("reroute")
+        throw .reroute(SettingsRoute())
+    }
+}
+
+private struct LoopingRerouteAction: Action {
+    let recorder: ActionEventRecorder
+
+    func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
+        _ = context
+        await recorder.append("attempt")
+        throw .reroute(SettingsRoute())
     }
 }

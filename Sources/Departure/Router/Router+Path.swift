@@ -42,6 +42,18 @@ extension Router {
         }
     }
 
+    final class DeferredRouteAppend {
+        let blockingScopes: [RouteScope]
+
+        init(blockingScopes: [RouteScope]) {
+            self.blockingScopes = blockingScopes
+        }
+
+        var installedBlockingScopes: [RouteScope] {
+            blockingScopes.filter(\.isInstalledInView)
+        }
+    }
+
     enum RouteAppendBehavior {
         case append
         case startHighContext
@@ -149,6 +161,10 @@ extension Router {
     }
 
     func appendRoute(_ route: any Route, after match: DeclarationMatch) async {
+        if await deferRouteAppendIfNeeded(route, after: match) {
+            return
+        }
+
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
         let preservesCurrentPath = preservesCurrentPath(for: match)
         let trimPathIndex = preservesCurrentPath ? nil : pathIndexToKeepBeforeAppending(after: match)
@@ -160,9 +176,15 @@ extension Router {
 
         if removedScopes.isEmpty == false {
             log.departureDebug(.routeAppendWaitingReplacingScopes(removedScopes: removedScopes.count))
-            await waitForRouteScopesToLeaveView(removedScopes)
+            if await deferRouteAppend(route, after: match, until: removedScopes) {
+                return
+            }
         }
 
+        appendPreparedRoute(route, after: match)
+    }
+
+    func appendPreparedRoute(_ route: any Route, after match: DeclarationMatch) {
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
 
         guard activateBranch(for: match) else {
@@ -393,14 +415,7 @@ extension Router {
             return false
         }
 
-        // A scope can host only one modal (sheet or cover) at a time.
-        if RoutePresentationKind.modalKinds.contains(where: {
-            routePresentation(from: declaringScope, matching: $0) != nil
-        }) {
-            return false
-        }
-
-        return true
+        return firstModalPathIndexAfterPresentationPoint(for: match) == nil
     }
 
     func pathIndexToKeepBeforeAppending(after match: DeclarationMatch) -> [RouteScope].Index? {
@@ -408,11 +423,7 @@ extension Router {
             return match.pathIndex
         }
 
-        guard
-            let declaringScope = match.declaringPath.scope(at: match.declaringPathIndex),
-            let modalChild = declaringScope.modalChild,
-            let modalPathIndex = match.path.index(of: modalChild)
-        else {
+        guard let modalPathIndex = firstModalPathIndexAfterPresentationPoint(for: match) else {
             return match.pathIndex
         }
 
@@ -421,6 +432,27 @@ extension Router {
         }
 
         return match.path.scopes.index(before: modalPathIndex)
+    }
+
+    func firstModalPathIndexAfterPresentationPoint(for match: DeclarationMatch) -> [RouteScope].Index? {
+        guard match.declaration.presentationKind != .push else {
+            return nil
+        }
+
+        let searchStartIndex: [RouteScope].Index
+        if let pathIndex = match.pathIndex {
+            searchStartIndex = match.path.scopes.index(after: pathIndex)
+        } else {
+            searchStartIndex = match.path.scopes.startIndex
+        }
+
+        guard searchStartIndex < match.path.endIndex else {
+            return nil
+        }
+
+        return match.path.scopes[searchStartIndex...].firstIndex {
+            $0.hostDeclaration?.presentationKind != .push
+        }
     }
 
     func removeFromPath(_ routeScope: RouteScope) {
@@ -502,6 +534,42 @@ extension Router {
                 }
             }
         }
+    }
+
+    func deferRouteAppendIfNeeded(_ route: any Route, after match: DeclarationMatch) async -> Bool {
+        guard let deferredRouteAppend else {
+            return false
+        }
+
+        if deferredRouteAppend.installedBlockingScopes.isEmpty {
+            self.deferredRouteAppend = nil
+            return false
+        }
+
+        _ = await deferRouteAppend(route, after: match, until: deferredRouteAppend.blockingScopes)
+        return true
+    }
+
+    func deferRouteAppend(_ route: any Route, after match: DeclarationMatch, until routeScopes: [RouteScope]) async -> Bool {
+        let installedRouteScopes = routeScopes.filter(\.isInstalledInView)
+        guard installedRouteScopes.isEmpty == false else {
+            await waitForRouteScopesToLeaveView(routeScopes)
+            return false
+        }
+
+        let deferredRouteAppend = DeferredRouteAppend(blockingScopes: installedRouteScopes)
+        self.deferredRouteAppend = deferredRouteAppend
+
+        await waitForRouteScopesToLeaveView(installedRouteScopes)
+
+        guard self.deferredRouteAppend === deferredRouteAppend else {
+            log.departureDebug(.routeAppendSuperseded(route: route))
+            return true
+        }
+
+        self.deferredRouteAppend = nil
+        appendPreparedRoute(route, after: match)
+        return true
     }
 
     func routePath(containing routeScope: RouteScope) -> RoutePath? {

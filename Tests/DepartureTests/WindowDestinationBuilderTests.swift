@@ -261,6 +261,80 @@ struct WindowDestinationBuilderTests {
         #expect(recorder.values == ["initial", "replacement"])
     }
 
+    @Test func normalPresentationUsesDeclaringScopeSourceEnvironment() async throws {
+        let router = Router()
+        var environment = EnvironmentValues()
+        environment.windowDestinationTestValue = "declaring"
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Sheet(LoginRoute.self)._routeDeclarations),
+            ],
+            sourceEnvironment: environment
+        )
+
+        await router.requestRoute(LoginRoute())
+        let presentation = try #require(router.routePresentationBinding(
+            from: router.root,
+            matching: .sheet
+        ).wrappedValue)
+
+        #expect(presentation.sourceEnvironment.windowDestinationTestValue == "declaring")
+    }
+
+    @Test func adoptedBranchPresentationUsesBranchSourceEnvironment() async throws {
+        let router = Router()
+        let (selection, _) = tabSelection(.home)
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        var containerEnvironment = EnvironmentValues()
+        containerEnvironment.windowDestinationTestValue = "container"
+        var branchEnvironment = EnvironmentValues()
+        branchEnvironment.windowDestinationTestValue = "branch"
+
+        router.rootPath.scopes = [landingScope]
+        landingScope.installRouteDeclarations(
+            id: RootRoute().id,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Sheet(MessageRoute.self)
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.home) {
+                        Push(SettingsRoute.self)
+                    }
+                )
+            ),
+            sourceEnvironment: containerEnvironment
+        )
+
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        homeScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.home),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Sheet(MessageRoute.self)._routeDeclarations.map { $0.drivingPresentation(true) }
+                    + Push(SettingsRoute.self)._routeDeclarations
+                ),
+            ],
+            sourceEnvironment: branchEnvironment
+        )
+        landingScope.registerBranchScope(homeScope, for: AppTab.home, sourceEnvironment: branchEnvironment)
+
+        await router.requestRoute(SettingsRoute())
+        await router.requestRoute(MessageRoute())
+
+        let presentation = try #require(router.routePresentationBinding(
+            from: homeScope,
+            matching: .sheet
+        ).wrappedValue)
+
+        #expect(presentation.sourceEnvironment.windowDestinationTestValue == "branch")
+    }
+
     @Test func normalPresentationResolutionDoesNotUseWindowDestinationBuilder() async throws {
         let router = Router()
         let recorder = WindowDestinationRecorder()
