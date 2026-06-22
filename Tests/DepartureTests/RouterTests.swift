@@ -815,13 +815,13 @@ struct RouterTests {
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
         router.rootPath.scopes = [firstScope, secondScope]
-        router.highPrioritySegment = Router.HighPrioritySegment(path: router.rootPath, startIndex: 1)
+        router.highContext = .high(path: router.rootPath, startIndex: 1)
 
         await router.unwindAndWait(to: nil)
 
         #expect(router.rootPath.count == 1)
         #expect(router.rootPath.last === firstScope)
-        #expect(router.highPrioritySegment == nil)
+        #expect(router.highContext == nil)
     }
 
     @Test func unwindToIDKeepsMatchingRouteScope() async {
@@ -830,13 +830,13 @@ struct RouterTests {
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
         router.rootPath.scopes = [firstScope, secondScope]
-        router.highPrioritySegment = Router.HighPrioritySegment(path: router.rootPath, startIndex: 1)
+        router.highContext = .high(path: router.rootPath, startIndex: 1)
 
         await router.unwindAndWait(to: .id(RootRoute().id))
 
         #expect(router.rootPath.count == 1)
         #expect(router.rootPath.last === firstScope)
-        #expect(router.highPrioritySegment == nil)
+        #expect(router.highContext == nil)
     }
 
     @Test func unwindToRootClearsPath() async {
@@ -845,12 +845,12 @@ struct RouterTests {
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
         router.rootPath.scopes = [firstScope, secondScope]
-        router.highPrioritySegment = Router.HighPrioritySegment(path: router.rootPath, startIndex: 1)
+        router.highContext = .high(path: router.rootPath, startIndex: 1)
 
         await router.unwindAndWait(to: .root)
 
         #expect(router.rootPath.isEmpty)
-        #expect(router.highPrioritySegment == nil)
+        #expect(router.highContext == nil)
     }
 
     @Test func unwindToRootClearsEntireAppFromDeepWithinBranch() async throws {
@@ -977,7 +977,7 @@ struct RouterTests {
         )
 
         router.rootPath.scopes = [loginScope]
-        router.highPrioritySegment = Router.HighPrioritySegment(path: router.rootPath, startIndex: 0)
+        router.highContext = .high(path: router.rootPath, startIndex: 0)
         router.routeScopeDidInstallInView(loginScope)
 
         let unwindTask = Task {
@@ -998,6 +998,44 @@ struct RouterTests {
 
         #expect(router.rootPath.count == 1)
         #expect(router.rootPath.last?.route is SettingsRoute)
+    }
+
+    @Test func snapshotPresentationUsesOriginalPathIndexForHighContextLocalHosting() async {
+        let router = Router()
+        let rootScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let loginScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let noticeScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
+        let noticeDeclaration = Sheet(SettingsRoute.self, priority: .high)._routeDeclarations[0]
+
+        router.rootPath.scopes = [rootScope, loginScope, noticeScope]
+        router.highContext = .high(path: router.rootPath, startIndex: 1)
+        loginScope.modalChild = noticeScope
+        noticeScope.hostScope = loginScope
+        noticeScope.hostDeclaration = noticeDeclaration
+        router.routeScopeDidInstallInView(loginScope)
+        router.routeScopeDidInstallInView(noticeScope)
+
+        let unwindTask = Task {
+            await router.unwind(to: .id(RootRoute().id))
+        }
+
+        for _ in 0..<10 {
+            if router.unwindPresentationSnapshot != nil {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(router.rootPath.count == 1)
+        #expect(router.unwindPresentationSnapshot != nil)
+        let presentation = router.routePresentation(from: loginScope, matching: .sheet)
+        #expect(presentation?.scope === noticeScope)
+        #expect(presentation?.declaration.priority == .high)
+
+        router.routeScopeDidLeaveView(loginScope)
+        router.routeScopeDidLeaveView(noticeScope)
+
+        #expect(await unwindTask.value)
     }
 
     @Test func unwindFromBranchPresentationKeepsPresentedTopLevelScope() async throws {
@@ -1084,7 +1122,7 @@ struct RouterTests {
 
         #expect(walletScope.path.count == 1)
         #expect(walletScope.path.last?.route is LoginRoute)
-        #expect(router.highPrioritySegment?.path === walletScope.path)
+        #expect(router.highContext?.path === walletScope.path)
 
         await router.unwind()
 

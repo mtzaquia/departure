@@ -225,15 +225,15 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.startButton)
     }
 
-    func testRoutesFromHighPrioritySegmentBehaveAsNormalNavigationAndModal() {
+    func testRoutesFromHighPriorityContextBehaveAsNormalNavigationAndModal() {
         openLanding()
 
         // Reaching profile while logged out reroutes to the login high-priority cover, starting a
-        // high-priority segment.
+        // high-priority context.
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
 
-        // A high-priority sheet declared inside the segment presents as a normal sheet over login
+        // A high-priority sheet declared inside the context presents as a normal sheet over login
         // — it must not escalate/replace the login cover, so login stays in the hierarchy behind it.
         tap(A11y.loginPresentHighPrioritySheetButton)
         assertExists(A11y.loginNoticeText)
@@ -243,8 +243,8 @@ final class SampleAppUITests: XCTestCase {
         assertGone(A11y.loginNoticeText)
         assertExists(A11y.loginTitle)
 
-        // A normal push declared inside the segment navigates within the login stack (it is not
-        // blocked the way a normal route before the segment would be).
+        // A normal push declared inside the context navigates within the login stack (it is not
+        // blocked the way a normal route before the context would be).
         tap(A11y.loginPushDetailButton)
         assertExists(A11y.loginDetailText)
     }

@@ -43,47 +43,43 @@ extension Router {
         }
 
         guard let resolvedRoute else { return }
-
         let resolvedRouteType = type(of: resolvedRoute)
         guard let matchedDeclaration = firstDeclaration(including: resolvedRouteType) else {
             log.departureDebug(.routeDroppedNoDeclaration(routeType: resolvedRouteType))
             return // Cannot find matching route, dropped.
         }
 
-        let requestedPriority = matchedDeclaration.declaration.priority
-        let hasHighPrioritySegment = highPrioritySegment != nil
-        let declarationIsInHighPrioritySegment = matchedDeclaration.pathIndex.map { pathIndex in
-            guard let highPrioritySegment else { return false }
-
-            return matchedDeclaration.path === highPrioritySegment.path
-            && pathIndex >= highPrioritySegment.startIndex
-        } ?? false
-
         log.departureDebug(.routeMatched(
             route: resolvedRoute,
             match: matchedDeclaration,
-            highPriorityStart: highPrioritySegment?.startIndex
+            highContextStart: highContext?.highStartIndex
         ))
 
-        switch (requestedPriority, hasHighPrioritySegment, declarationIsInHighPrioritySegment) {
-        case (.normal, true, false):
-            log.departureDebug(.routeBlockedByHighPrioritySegment(route: resolvedRoute))
-            return // Normal priority route attached before an existing high-priority segment is dropped.
+        switch routeRequestDecision(for: matchedDeclaration) {
+        case .drop:
+            log.departureDebug(.routeBlockedByHighContext(route: resolvedRoute))
+            return // Normal priority route attached before an existing high-priority context is dropped.
 
-        case (.normal, _, _), (.high, _, true):
+        case .append:
             log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
             await appendRoute(resolvedRoute, after: matchedDeclaration)
             return
 
-        case (.high, _, false):
+        case .replaceHighContext:
             log.departureDebug(.routeAcceptedReplaceHighPriority(route: resolvedRoute))
-            replaceHighPrioritySegment(with: resolvedRoute, after: matchedDeclaration)
+            replaceHighContext(with: resolvedRoute, after: matchedDeclaration)
             return
         }
     }
 }
 
 extension Router {
+    enum RouteRequestDecision {
+        case append
+        case replaceHighContext
+        case drop
+    }
+
     struct DeclarationMatch {
         var path: RoutePath
         var pathIndex: [RouteScope].Index?
@@ -91,6 +87,21 @@ extension Router {
         var declaringPathIndex: [RouteScope].Index?
         var branchID: AnyHashable
         var declaration: AnyRouteDeclaration
+    }
+
+    func routeRequestDecision(for match: DeclarationMatch) -> RouteRequestDecision {
+        let declarationIsInHighContext = highContext?.contains(match) == true
+
+        switch (match.declaration.priority, highContext != nil, declarationIsInHighContext) {
+        case (.normal, true, false):
+            return .drop
+
+        case (.normal, _, _), (.high, _, true):
+            return .append
+
+        case (.high, _, false):
+            return .replaceHighContext
+        }
     }
 
     func firstDeclaration(including routeType: any Route.Type) -> DeclarationMatch? {
@@ -193,22 +204,6 @@ extension Router {
         }
 
         return nil
-    }
-
-    var currentRoutePath: RoutePath {
-        if let highPrioritySegment {
-            return highPrioritySegment.path
-        }
-
-        if let activeTopLevelPath = rootPath.last?.activeLocalScope.owningPath {
-            return activeTopLevelPath
-        }
-
-        if let activeRootPath = root.activeLocalScope.owningPath {
-            return activeRootPath
-        }
-
-        return rootPath
     }
 
     /// The path owned by the branch nearest to the current position, or `nil` when the current

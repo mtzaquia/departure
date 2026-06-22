@@ -58,8 +58,8 @@ enum DepartureLogEvent {
     case branchUnregistered(branch: AnyHashable, scope: RouteScope)
     case branchUnregisterSkipped(branch: AnyHashable, scope: RouteScope)
     case highPriorityReplacePreparing(route: any Route, match: Router.DeclarationMatch)
-    case highPrioritySegmentCleared
-    case highPrioritySegmentStarted(pathIndex: [RouteScope].Index)
+    case highContextCleared
+    case highContextStarted(pathIndex: [RouteScope].Index)
     case hookDeclarationsUninstalled(scope: RouteScope)
     case hookDeclarationsInstalled(scope: RouteScope, hookCount: Int)
     case pathCleared(removedCount: Int)
@@ -75,7 +75,7 @@ enum DepartureLogEvent {
     case routeAppendPreparing(route: any Route, match: Router.DeclarationMatch)
     case routeAppendWaitingReplacingPushedScope(removedScopes: Int)
     case routeAppended(route: any Route, pathCount: Int)
-    case routeBlockedByHighPrioritySegment(route: any Route)
+    case routeBlockedByHighContext(route: any Route)
     case routeCanPresentActiveLocalScope(branch: AnyHashable)
     case routeCanPresentDeclarationDrivesPresentation
     case routeCannotPresentDiscoveryBranchInactive(branch: AnyHashable)
@@ -83,7 +83,7 @@ enum DepartureLogEvent {
     case routeDroppedBranchActivationFailed(branch: AnyHashable)
     case routeDroppedNoDeclaration(routeType: any Route.Type)
     case routeDroppedResolution
-    case routeMatched(route: any Route, match: Router.DeclarationMatch, highPriorityStart: [RouteScope].Index?)
+    case routeMatched(route: any Route, match: Router.DeclarationMatch, highContextStart: [RouteScope].Index?)
     case routePendingWaitingForActivatedBranchHost(route: any Route, branch: AnyHashable)
     case routePendingWaitingForLocalPresentationScope(route: any Route, branch: AnyHashable)
     case routeRequested(route: any Route)
@@ -159,10 +159,10 @@ extension DepartureLogEvent {
             "branch unregister skipped | branch=\(branch.departureDebugDescription) | reason=scope mismatch | scope=\(scope.departureDebugDescription)"
         case let .highPriorityReplacePreparing(route, match):
             "high-priority replace preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
-        case .highPrioritySegmentCleared:
-            "high-priority segment cleared"
-        case let .highPrioritySegmentStarted(pathIndex):
-            "high-priority segment started | pathIndex=\(pathIndex)"
+        case .highContextCleared:
+            "high-priority context cleared"
+        case let .highContextStarted(pathIndex):
+            "high-priority context started | pathIndex=\(pathIndex)"
         case let .hookDeclarationsUninstalled(scope):
             "hook declarations uninstalled | scope=\(scope.departureDebugDescription)"
         case let .hookDeclarationsInstalled(scope, hookCount):
@@ -186,15 +186,15 @@ extension DepartureLogEvent {
         case let .routeAcceptedAppend(route):
             "route accepted | action=append | route=\(route.departureDebugDescription)"
         case let .routeAcceptedReplaceHighPriority(route):
-            "route accepted | action=replace high-priority segment | route=\(route.departureDebugDescription)"
+            "route accepted | action=replace high-priority context | route=\(route.departureDebugDescription)"
         case let .routeAppendPreparing(route, match):
             "route append preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
         case let .routeAppendWaitingReplacingPushedScope(removedScopes):
             "route append waiting | reason=replacing pushed scope | removedScopes=\(removedScopes)"
         case let .routeAppended(route, pathCount):
             "route appended | route=\(route.departureDebugDescription) | pathCount=\(pathCount)"
-        case let .routeBlockedByHighPrioritySegment(route):
-            "route blocked | route=\(route.departureDebugDescription) | reason=normal priority before active high-priority segment"
+        case let .routeBlockedByHighContext(route):
+            "route blocked | route=\(route.departureDebugDescription) | reason=normal priority before active high-priority context"
         case let .routeCanPresentActiveLocalScope(branch):
             "route can present | branch=\(branch.departureDebugDescription) | reason=active local scope"
         case .routeCanPresentDeclarationDrivesPresentation:
@@ -209,8 +209,8 @@ extension DepartureLogEvent {
             "route dropped | reason=no declaration | type=\(String(reflecting: routeType))"
         case .routeDroppedResolution:
             "route dropped | reason=resolution"
-        case let .routeMatched(route, match, highPriorityStart):
-            "route matched | route=\(route.departureDebugDescription) | \(match.departureDebugDescription) | highPriorityStart=\(String(describing: highPriorityStart))"
+        case let .routeMatched(route, match, highContextStart):
+            "route matched | route=\(route.departureDebugDescription) | \(match.departureDebugDescription) | highContextStart=\(String(describing: highContextStart))"
         case let .routePendingWaitingForActivatedBranchHost(route, branch):
             "route pending | route=\(route.departureDebugDescription) | branch=\(branch.departureDebugDescription) | reason=waiting for activated branch host"
         case let .routePendingWaitingForLocalPresentationScope(route, branch):
