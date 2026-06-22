@@ -73,7 +73,7 @@ enum DepartureLogEvent {
     case routeAcceptedAppend(route: any Route)
     case routeAcceptedReplaceHighPriority(route: any Route)
     case routeAppendPreparing(route: any Route, match: Router.DeclarationMatch)
-    case routeAppendWaitingReplacingPushedScope(removedScopes: Int)
+    case routeAppendWaitingReplacingScopes(removedScopes: Int)
     case routeAppended(route: any Route, pathCount: Int)
     case routeBlockedByHighContext(route: any Route)
     case routeCanPresentActiveLocalScope(branch: AnyHashable)
@@ -189,8 +189,8 @@ extension DepartureLogEvent {
             "route accepted | action=replace high-priority context | route=\(route.departureDebugDescription)"
         case let .routeAppendPreparing(route, match):
             "route append preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
-        case let .routeAppendWaitingReplacingPushedScope(removedScopes):
-            "route append waiting | reason=replacing pushed scope | removedScopes=\(removedScopes)"
+        case let .routeAppendWaitingReplacingScopes(removedScopes):
+            "route append waiting | reason=replacing scopes | removedScopes=\(removedScopes)"
         case let .routeAppended(route, pathCount):
             "route appended | route=\(route.departureDebugDescription) | pathCount=\(pathCount)"
         case let .routeBlockedByHighContext(route):

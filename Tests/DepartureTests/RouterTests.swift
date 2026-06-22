@@ -1000,6 +1000,45 @@ struct RouterTests {
         #expect(router.rootPath.last?.route is SettingsRoute)
     }
 
+    @Test func modalReplacementWaitsForInstalledRouteScopeToLeaveView() async throws {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Sheet(LoginRoute.self)._routeDeclarations
+                    + Sheet(SettingsRoute.self)._routeDeclarations
+                ),
+            ]
+        )
+
+        await router.requestRoute(LoginRoute())
+        let loginScope = try #require(router.rootPath.last)
+        router.routeScopeDidInstallInView(loginScope)
+
+        let replacementTask = Task {
+            await router.requestRoute(SettingsRoute())
+        }
+
+        for _ in 0..<10 {
+            if router.rootPath.isEmpty {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(router.rootPath.isEmpty)
+        #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
+
+        router.routeScopeDidLeaveView(loginScope)
+        await replacementTask.value
+
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last?.route is SettingsRoute)
+    }
+
     @Test func snapshotPresentationUsesOriginalPathIndexForHighContextLocalHosting() async {
         let router = Router()
         let rootScope = RouteScope(id: RootRoute().id, route: RootRoute())

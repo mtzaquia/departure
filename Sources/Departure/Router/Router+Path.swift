@@ -157,8 +157,8 @@ extension Router {
             keepPathThrough(match.pathIndex, in: match.path)
         }
 
-        if match.declaration.presentationKind == .push {
-            log.departureDebug(.routeAppendWaitingReplacingPushedScope(removedScopes: removedScopes.count))
+        if removedScopes.isEmpty == false {
+            log.departureDebug(.routeAppendWaitingReplacingScopes(removedScopes: removedScopes.count))
             await waitForRouteScopesToLeaveView(removedScopes)
         }
 
