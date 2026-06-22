@@ -1136,7 +1136,7 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }
 
-    @Test func unwindToRootPreservesInactiveBranchStacks() async throws {
+    @Test func unwindToRootPreservesInactiveBranchPushStackButClearsModal() async throws {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.home)
 
@@ -1198,9 +1198,10 @@ struct RouterTests {
         await router.unwind(to: .root)
 
         #expect(router.rootPath.isEmpty)
-        #expect(homeScope.path.count == 2)
-        #expect(homeScope.path.first?.route is HomeDetailRoute)
-        #expect(homeScope.path.last?.route is MessageRoute)
+        #expect(homeScope.path.count == 1)
+        #expect(homeScope.path.last?.route is HomeDetailRoute)
+        #expect(router.routePresentationBinding(from: homeScope, matching: .push).wrappedValue?.scope === homeScope.path.last)
+        #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
         #expect(walletScope.path.isEmpty)
     }
 

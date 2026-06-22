@@ -174,7 +174,11 @@ extension Router {
         let branchRemovedScopes = branchPaths.flatMap {
             $0.scopesRemovedByKeepingThrough(nil)
         }
-        let removedScopes = rootRemovedScopes + branchRemovedScopes
+        let inactiveBranchModalTrims = inactiveBranchModalTrims(excluding: branchPaths)
+        let inactiveBranchRemovedScopes = inactiveBranchModalTrims.flatMap {
+            $0.path.scopesRemovedByKeepingThrough($0.keepThrough)
+        }
+        let removedScopes = rootRemovedScopes + branchRemovedScopes + inactiveBranchRemovedScopes
 
         log.departureDebug(.unwindAccepted(
             keepThrough: nil,
@@ -190,6 +194,9 @@ extension Router {
 
         for branchPath in branchPaths {
             keepPathThrough(nil, in: branchPath)
+        }
+        for trim in inactiveBranchModalTrims {
+            keepPathThrough(trim.keepThrough, in: trim.path)
         }
         keepPathThrough(nil, in: rootPath)
         highContext = nil
@@ -721,6 +728,43 @@ extension Router {
         let ownedScopes = owner === root ? rootPath.scopes : owner.path.scopes
         for scope in ownedScopes {
             paths.append(contentsOf: activeBranchPaths(under: scope))
+        }
+
+        return paths
+    }
+
+    func inactiveBranchModalTrims(
+        excluding clearedPaths: [RoutePath]
+    ) -> [(path: RoutePath, keepThrough: [RouteScope].Index?)] {
+        allBranchPaths(under: root).compactMap { branchPath in
+            guard clearedPaths.contains(where: { $0 === branchPath }) == false else {
+                return nil
+            }
+
+            guard let modalIndex = branchPath.scopes.firstIndex(where: {
+                $0.hostDeclaration?.presentationKind != .push
+            }) else {
+                return nil
+            }
+
+            let keepThrough = modalIndex == branchPath.scopes.startIndex
+                ? nil
+                : branchPath.scopes.index(before: modalIndex)
+            return (branchPath, keepThrough)
+        }
+    }
+
+    func allBranchPaths(under owner: RouteScope) -> [RoutePath] {
+        var paths: [RoutePath] = []
+
+        for branchScope in owner.branchScopes.values {
+            paths.append(branchScope.path)
+            paths.append(contentsOf: allBranchPaths(under: branchScope))
+        }
+
+        let ownedScopes = owner === root ? rootPath.scopes : owner.path.scopes
+        for scope in ownedScopes {
+            paths.append(contentsOf: allBranchPaths(under: scope))
         }
 
         return paths
