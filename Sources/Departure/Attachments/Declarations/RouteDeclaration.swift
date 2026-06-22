@@ -61,8 +61,6 @@ enum RoutePresentationKind: Hashable, Sendable {
     case push
     case sheet
     case cover(Cover.Transition)
-
-    static let modalKinds: [RoutePresentationKind] = [.sheet] + Cover.Transition.allCases.map(RoutePresentationKind.cover)
 }
 
 extension AnyRouteDeclaration {

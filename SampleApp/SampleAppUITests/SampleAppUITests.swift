@@ -113,6 +113,34 @@ final class SampleAppUITests: XCTestCase {
         assertGone(A11y.settingsAuthenticationButton)
     }
 
+    func testAncestorCoverReplacementFromDescendantLocalSheetDismissesSheetAndPreservesPushStack() {
+        openLanding()
+        tapSettingsTab()
+
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        setSwitch(A11y.authenticationAttachLocalRouteToggle, on: true)
+
+        tap(A11y.authenticationPresentTopLevelSheetButton)
+        assertExists(A11y.topLevelSheetText)
+        assertLabel(A11y.topLevelSheetPresentationSource, contains: "authentication settings scope")
+
+        tap(A11y.topLevelSheetPresentCoverButton)
+        assertExists(A11y.topLevelCoverText)
+        assertGone(A11y.topLevelSheetText)
+
+        tap(A11y.topLevelCoverPresentReplacementButton)
+        assertExists(A11y.topLevelReplacementCoverText)
+        assertGone(A11y.topLevelCoverText)
+
+        tap(A11y.topLevelReplacementCoverDismissButton)
+        assertGone(A11y.topLevelReplacementCoverText)
+        assertGone(A11y.topLevelSheetText)
+        assertExists(A11y.authenticationTitle)
+        assertGone(A11y.settingsAuthenticationButton)
+    }
+
     func testTopLevelSheetPresentedFromBranchLocalProfileSheetDismissesItAndPresentsTopLevel() {
         openLanding()
 
@@ -548,6 +576,7 @@ private enum A11y {
 
     static let topLevelSheetText = "sample.top-level-sheet.text"
     static let topLevelSheetPresentationSource = "sample.top-level-sheet.presentation-source"
+    static let topLevelSheetPresentCoverButton = "sample.top-level-sheet.present-cover"
     static let topLevelSheetDismissButton = "sample.top-level-sheet.dismiss"
     static let topLevelCoverText = "sample.top-level-cover.text"
     static let topLevelCoverPresentReplacementButton = "sample.top-level-cover.present-replacement"

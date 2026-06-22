@@ -393,14 +393,7 @@ extension Router {
             return false
         }
 
-        // A scope can host only one modal (sheet or cover) at a time.
-        if RoutePresentationKind.modalKinds.contains(where: {
-            routePresentation(from: declaringScope, matching: $0) != nil
-        }) {
-            return false
-        }
-
-        return true
+        return firstModalPathIndexAfterPresentationPoint(for: match) == nil
     }
 
     func pathIndexToKeepBeforeAppending(after match: DeclarationMatch) -> [RouteScope].Index? {
@@ -408,11 +401,7 @@ extension Router {
             return match.pathIndex
         }
 
-        guard
-            let declaringScope = match.declaringPath.scope(at: match.declaringPathIndex),
-            let modalChild = declaringScope.modalChild,
-            let modalPathIndex = match.path.index(of: modalChild)
-        else {
+        guard let modalPathIndex = firstModalPathIndexAfterPresentationPoint(for: match) else {
             return match.pathIndex
         }
 
@@ -421,6 +410,27 @@ extension Router {
         }
 
         return match.path.scopes.index(before: modalPathIndex)
+    }
+
+    func firstModalPathIndexAfterPresentationPoint(for match: DeclarationMatch) -> [RouteScope].Index? {
+        guard match.declaration.presentationKind != .push else {
+            return nil
+        }
+
+        let searchStartIndex: [RouteScope].Index
+        if let pathIndex = match.pathIndex {
+            searchStartIndex = match.path.scopes.index(after: pathIndex)
+        } else {
+            searchStartIndex = match.path.scopes.startIndex
+        }
+
+        guard searchStartIndex < match.path.endIndex else {
+            return nil
+        }
+
+        return match.path.scopes[searchStartIndex...].firstIndex {
+            $0.hostDeclaration?.presentationKind != .push
+        }
     }
 
     func removeFromPath(_ routeScope: RouteScope) {
