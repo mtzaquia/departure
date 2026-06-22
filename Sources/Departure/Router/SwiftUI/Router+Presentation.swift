@@ -91,15 +91,13 @@ extension Router {
         matching presentationKind: RoutePresentationKind
     ) -> RoutePresentation? {
         let routePath = routePath(containing: routeScope) ?? rootPath
-        let highPrioritySegmentStartIndex = highPrioritySegment.flatMap {
-            $0.path === routePath ? $0.startIndex : nil
-        }
 
         // Live read: return the host's structural slot directly.
         if let presentation = hostedPresentation(
             by: routeScope,
             matching: presentationKind,
-            highPrioritySegmentStartIndex: highPrioritySegmentStartIndex
+            in: routePath,
+            context: highContext
         ) {
             return presentation
         }
@@ -118,14 +116,14 @@ extension Router {
             by: routeScope,
             matching: presentationKind,
             inPreservedPath: unwindPresentationSnapshot.preservedPath,
-            highPrioritySegmentStartIndex: unwindPresentationSnapshot.highPrioritySegment?.startIndex
+            snapshot: unwindPresentationSnapshot
         )
     }
 
     func highPriorityRoutePresentationBinding(
         matching presentationKind: RoutePresentationKind
     ) -> Binding<RoutePresentation?> {
-        _ = highPrioritySegment?.path.scopes
+        _ = highContext?.path.scopes
 
         return Binding(
             get: {
@@ -150,7 +148,8 @@ private extension Router {
     func hostedPresentation(
         by host: RouteScope,
         matching presentationKind: RoutePresentationKind,
-        highPrioritySegmentStartIndex: [RouteScope].Index?
+        in routePath: RoutePath,
+        context: RouteContext?
     ) -> RoutePresentation? {
         guard host.canDrivePresentation(matching: presentationKind) else {
             return nil
@@ -166,14 +165,15 @@ private extension Router {
             return nil
         }
 
-        // The high-priority gate keys off the *host's* position relative to the segment (the path
-        // owner maps to `nil`, i.e. before the segment).
-        let hostIndex = (routePath(containing: host) ?? rootPath).scopes.firstIndex { $0 === host }
+        // The high-priority gate keys off the *host's* position relative to the high context.
+        // The path owner maps to `nil`, i.e. before the high context begins.
+        let hostIndex = routePath.scopes.firstIndex { $0 === host }
         guard
             shouldHostLocally(
                 declaration,
                 from: hostIndex,
-                highPrioritySegmentStartIndex: highPrioritySegmentStartIndex
+                in: routePath,
+                context: context
             )
         else {
             return nil
@@ -190,13 +190,14 @@ private extension Router {
         by host: RouteScope,
         matching presentationKind: RoutePresentationKind,
         inPreservedPath path: [RouteScope],
-        highPrioritySegmentStartIndex: [RouteScope].Index?
+        snapshot: UnwindPresentationSnapshot
     ) -> RoutePresentation? {
         guard host.canDrivePresentation(matching: presentationKind) else {
             return nil
         }
 
         let hostIndex = path.firstIndex { $0 === host }
+        let originalHostIndex = snapshot.originalPathIndex(forPreservedPathIndex: hostIndex)
 
         for presentedScope in path {
             guard
@@ -206,8 +207,9 @@ private extension Router {
                 declaration.drivesPresentation,
                 shouldHostLocally(
                     declaration,
-                    from: hostIndex,
-                    highPrioritySegmentStartIndex: highPrioritySegmentStartIndex
+                    from: originalHostIndex,
+                    in: snapshot.routePath,
+                    context: snapshot.highContext
                 )
             else {
                 continue
@@ -262,30 +264,24 @@ private extension Router {
     func shouldHostLocally(
         _ declaration: AnyRouteDeclaration,
         from pathIndex: [RouteScope].Index?,
-        highPrioritySegmentStartIndex: [RouteScope].Index?
+        in routePath: RoutePath,
+        context: RouteContext?
     ) -> Bool {
         guard declaration.priority == .high else {
             return true
         }
 
-        guard
-            let pathIndex,
-            let highPrioritySegmentStartIndex
-        else {
-            return false
-        }
-
-        return pathIndex >= highPrioritySegmentStartIndex
+        return context?.contains(path: routePath, pathIndex: pathIndex) == true
     }
 
     func highPriorityRoutePresentation(
         matching presentationKind: RoutePresentationKind
     ) -> RoutePresentation? {
         guard
-            let highPrioritySegment,
-            highPrioritySegment.path.scopes.indices.contains(highPrioritySegment.startIndex),
-            let route = highPrioritySegment.path.scopes[highPrioritySegment.startIndex].route,
-            let declaringScope = highPrioritySegment.path.scope(at: declaringPathIndexForHighPrioritySegment()),
+            let highContext,
+            let highRouteScope = highContext.highRouteScope,
+            let route = highRouteScope.route,
+            let declaringScope = highContext.path.scope(at: highContext.declaringPathIndex),
             let attachment = declaringScope.highPriorityRouteAttachment(
                 for: type(of: route),
                 matching: presentationKind
@@ -295,7 +291,7 @@ private extension Router {
         }
 
         return RoutePresentation(
-            scope: highPrioritySegment.path.scopes[highPrioritySegment.startIndex],
+            scope: highRouteScope,
             declaration: attachment.declaration,
             sourceEnvironment: attachment.routeScope.sourceEnvironment
         )
@@ -308,30 +304,19 @@ private extension Router {
             return
         }
 
-        guard let highPrioritySegment else {
+        guard let highContext else {
             return
         }
 
-        let targetPathIndex = declaringPathIndexForHighPrioritySegment()
-        let removedScopes = highPrioritySegment.path.scopesRemovedByKeepingThrough(targetPathIndex)
-        let targetScope = highPrioritySegment.path.scope(at: targetPathIndex)
-        keepPathThrough(targetPathIndex, in: highPrioritySegment.path)
+        let targetPathIndex = highContext.declaringPathIndex
+        let removedScopes = highContext.path.scopesRemovedByKeepingThrough(targetPathIndex)
+        let targetScope = highContext.path.scope(at: targetPathIndex)
+        keepPathThrough(targetPathIndex, in: highContext.path)
         scheduleUnwindHandlersAfterDismissalCompletes(
             for: presentation.scope.route,
             in: targetScope,
             removing: removedScopes
         )
-    }
-
-    func declaringPathIndexForHighPrioritySegment() -> [RouteScope].Index? {
-        guard
-            let highPrioritySegment,
-            highPrioritySegment.startIndex > highPrioritySegment.path.scopes.startIndex
-        else {
-            return nil
-        }
-
-        return highPrioritySegment.path.scopes.index(before: highPrioritySegment.startIndex)
     }
 
 }

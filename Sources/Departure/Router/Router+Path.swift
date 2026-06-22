@@ -21,6 +21,32 @@
 //
 
 extension Router {
+    struct PendingRoute {
+        let route: any Route
+        let match: DeclarationMatch
+        let appendBehavior: RouteAppendBehavior
+    }
+
+    struct UnwindPresentationSnapshot {
+        let routePath: RoutePath
+        let preservedPath: [RouteScope]
+        let preservedPathStartIndex: [RouteScope].Index
+        let highContext: RouteContext?
+
+        func originalPathIndex(forPreservedPathIndex pathIndex: [RouteScope].Index?) -> [RouteScope].Index? {
+            guard let pathIndex else {
+                return nil
+            }
+
+            return preservedPathStartIndex + pathIndex
+        }
+    }
+
+    enum RouteAppendBehavior {
+        case append
+        case startHighContext
+    }
+
     @discardableResult
     func unwindAndWait(to target: UnwindTarget?, payload: Any? = nil) async -> Bool {
         log.departureDebug(.unwindRequested(target: target))
@@ -97,14 +123,15 @@ extension Router {
                 unwindPresentationSnapshot = UnwindPresentationSnapshot(
                     routePath: routePath,
                     preservedPath: removedScopes,
-                    highPrioritySegment: highPrioritySegment
+                    preservedPathStartIndex: preservedPathStartIndex(keepingThrough: targetPathIndex, in: routePath),
+                    highContext: highContext
                 )
             }
             keepPathThrough(targetPathIndex, in: routePath)
             if case .root = target {
-                // A high-priority segment may live on a branch path that clearing the root path
+                // A high-priority context may live on a branch path that clearing the root path
                 // doesn't touch; `.root` tears the whole app down, so drop it explicitly.
-                highPrioritySegment = nil
+                highContext = nil
             }
             await waitForRouteScopesToLeaveView(removedScopes)
             unwindPresentationSnapshot = nil
@@ -130,8 +157,8 @@ extension Router {
             keepPathThrough(match.pathIndex, in: match.path)
         }
 
-        if match.declaration.presentationKind == .push {
-            log.departureDebug(.routeAppendWaitingReplacingPushedScope(removedScopes: removedScopes.count))
+        if removedScopes.isEmpty == false {
+            log.departureDebug(.routeAppendWaitingReplacingScopes(removedScopes: removedScopes.count))
             await waitForRouteScopesToLeaveView(removedScopes)
         }
 
@@ -145,7 +172,7 @@ extension Router {
         appendOrPendRoute(
             route,
             after: match,
-            startsHighPrioritySegment: false,
+            behavior: .append,
             waitsForBranchActivation: waitsForBranchActivation
         )
     }
@@ -181,7 +208,7 @@ extension Router {
         return didActivate
     }
 
-    func replaceHighPrioritySegment(
+    func replaceHighContext(
         with route: any Route,
         after match: DeclarationMatch
     ) {
@@ -198,7 +225,7 @@ extension Router {
         appendOrPendRoute(
             route,
             after: match,
-            startsHighPrioritySegment: true,
+            behavior: .startHighContext,
             waitsForBranchActivation: waitsForBranchActivation
         )
     }
@@ -206,7 +233,7 @@ extension Router {
     func appendOrPendRoute(
         _ route: any Route,
         after match: DeclarationMatch,
-        startsHighPrioritySegment: Bool,
+        behavior: RouteAppendBehavior,
         waitsForBranchActivation: Bool = false
     ) {
         guard waitsForBranchActivation == false else {
@@ -214,7 +241,7 @@ extension Router {
             pendingRoute = PendingRoute(
                 route: route,
                 match: match,
-                startsHighPrioritySegment: startsHighPrioritySegment
+                appendBehavior: behavior
             )
             return
         }
@@ -224,16 +251,16 @@ extension Router {
             pendingRoute = PendingRoute(
                 route: route,
                 match: match,
-                startsHighPrioritySegment: startsHighPrioritySegment
+                appendBehavior: behavior
             )
             return
         }
 
         pendingRoute = nil
 
-        if startsHighPrioritySegment {
-            highPrioritySegment = HighPrioritySegment(path: match.path, startIndex: match.path.endIndex)
-            log.departureDebug(.highPrioritySegmentStarted(pathIndex: match.path.endIndex))
+        if behavior == .startHighContext {
+            highContext = .high(path: match.path, startIndex: match.path.endIndex)
+            log.departureDebug(.highContextStarted(pathIndex: match.path.endIndex))
         }
 
         let appendedScope = RouteScope(id: route.id, route: route)
@@ -291,7 +318,7 @@ extension Router {
         appendOrPendRoute(
             pendingRoute.route,
             after: match,
-            startsHighPrioritySegment: pendingRoute.startsHighPrioritySegment
+            behavior: pendingRoute.appendBehavior
         )
     }
 
@@ -335,21 +362,21 @@ extension Router {
         guard let pathIndex else {
             let removedCount = routePath.count
             routePath.keepThrough(nil)
-            removeHighPrioritySegmentStartIfNeeded(in: routePath)
+            removeHighContextIfNeeded(in: routePath)
             log.departureDebug(.pathCleared(removedCount: removedCount))
             return
         }
 
         let removalStartIndex = routePath.scopes.index(after: pathIndex)
         guard removalStartIndex < routePath.endIndex else {
-            removeHighPrioritySegmentStartIfNeeded(in: routePath)
+            removeHighContextIfNeeded(in: routePath)
             log.departureDebug(.pathUnchanged(keepThrough: pathIndex))
             return
         }
 
         let removedCount = routePath.scopes.distance(from: removalStartIndex, to: routePath.endIndex)
         routePath.keepThrough(pathIndex)
-        removeHighPrioritySegmentStartIfNeeded(in: routePath)
+        removeHighContextIfNeeded(in: routePath)
         log.departureDebug(.pathTrimmed(keepThrough: pathIndex, removedCount: removedCount))
     }
 
@@ -392,49 +419,61 @@ extension Router {
         }
     }
 
-    func removeHighPrioritySegmentStartIfNeeded(in routePath: RoutePath) {
+    func removeHighContextIfNeeded(in routePath: RoutePath) {
         guard
-            let highPrioritySegment,
-            highPrioritySegment.path === routePath
+            let highContext,
+            highContext.path === routePath,
+            let startIndex = highContext.highStartIndex
         else {
             return
         }
 
-        guard highPrioritySegment.startIndex < routePath.endIndex else {
-            log.departureDebug(.highPrioritySegmentCleared)
-            self.highPrioritySegment = nil
+        guard startIndex < routePath.endIndex else {
+            log.departureDebug(.highContextCleared)
+            self.highContext = nil
             return
         }
+    }
+
+    func preservedPathStartIndex(
+        keepingThrough pathIndex: [RouteScope].Index?,
+        in routePath: RoutePath
+    ) -> [RouteScope].Index {
+        guard let pathIndex else {
+            return routePath.scopes.startIndex
+        }
+
+        return routePath.scopes.index(after: pathIndex)
     }
 
     func routeScopeDidInstallInView(_ routeScope: RouteScope) {
-        routeScope.mount()
-        log.departureDebug(.scopeMounted(scope: routeScope))
+        routeScope.installInView()
+        log.departureDebug(.scopeInstalledInView(scope: routeScope))
     }
 
     func routeScopeDidLeaveView(_ routeScope: RouteScope) {
-        guard routeScope.isMounted else { return }
+        guard routeScope.isInstalledInView else { return }
         
-        routeScope.unmount()
-        log.departureDebug(.scopeUnmounted(scope: routeScope))
+        routeScope.uninstallFromView()
+        log.departureDebug(.scopeUninstalledFromView(scope: routeScope))
     }
 
     func waitForRouteScopesToLeaveView(_ routeScopes: [RouteScope]) async {
-        let mountedRouteScopes = routeScopes.filter(\.isMounted)
+        let installedRouteScopes = routeScopes.filter(\.isInstalledInView)
 
-        guard mountedRouteScopes.isEmpty == false else {
-            log.departureDebug(.unmountWaitSkipped)
+        guard installedRouteScopes.isEmpty == false else {
+            log.departureDebug(.viewExitWaitSkipped)
             return
         }
 
-        log.departureDebug(.unmountWaitStarted(mounted: mountedRouteScopes.count))
+        log.departureDebug(.viewExitWaitStarted(installed: installedRouteScopes.count))
         await withCheckedContinuation { continuation in
-            var remainingCount = mountedRouteScopes.count
+            var remainingCount = installedRouteScopes.count
 
-            for routeScope in mountedRouteScopes {
-                routeScope.onUnmount {
+            for routeScope in installedRouteScopes {
+                routeScope.onUninstallFromView {
                     remainingCount -= 1
-                    log.departureDebug(.unmountWaitProgress(remaining: remainingCount))
+                    log.departureDebug(.viewExitWaitProgress(remaining: remainingCount))
 
                     if remainingCount == 0 {
                         continuation.resume()
@@ -449,7 +488,7 @@ extension Router {
             return rootPath
         }
 
-        if routeScope.mountedBranchID != nil {
+        if routeScope.branchID != nil {
             return routeScope.path
         }
 
@@ -465,7 +504,7 @@ extension Router {
     }
 
     private func routePath(containing routeScope: RouteScope, under owner: RouteScope) -> RoutePath? {
-        for branchScope in owner.mountedBranchScopes.values {
+        for branchScope in owner.branchScopes.values {
             if branchScope.path.contains(routeScope) {
                 return branchScope.path
             }

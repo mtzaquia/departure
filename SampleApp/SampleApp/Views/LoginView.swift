@@ -26,9 +26,6 @@ import SwiftUI
 struct LoginView: View {
     let nextRoute: (any Route)?
 
-    @State private var email = ""
-    @State private var password = ""
-
     @Environment(Router.self) private var router
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
 
@@ -38,11 +35,6 @@ struct LoginView: View {
                 LabeledContent("Window environment", value: sampleWindowBadge)
                     .accessibilityIdentifier(SampleAppAccessibility.loginWindowEnvironmentValue)
             }
-
-            TextField("E-mail", text: $email)
-                .accessibilityIdentifier(SampleAppAccessibility.loginEmailField)
-            SecureField("Password", text: $password)
-                .accessibilityIdentifier(SampleAppAccessibility.loginPasswordField)
 
             Button("Log in") {
                 Storage.shared.isLoggedIn = true

@@ -38,23 +38,6 @@ import Observation
 /// ```
 @Observable
 public final class Router: Identifiable, Equatable {
-    struct PendingRoute {
-        let route: any Route
-        let match: DeclarationMatch
-        let startsHighPrioritySegment: Bool
-    }
-
-    struct UnwindPresentationSnapshot {
-        let routePath: RoutePath
-        let preservedPath: [RouteScope]
-        let highPrioritySegment: HighPrioritySegment?
-    }
-
-    struct HighPrioritySegment {
-        let path: RoutePath
-        let startIndex: [RouteScope].Index
-    }
-
     /// A destination for ``Router/unwind(to:)``.
     public enum UnwindTarget {
         /// Unwinds every presented route across all branches and scopes, returning to the app's start.
@@ -79,7 +62,7 @@ public final class Router: Identifiable, Equatable {
     @ObservationIgnored
     let rootPath: RoutePath
 
-    var highPrioritySegment: HighPrioritySegment?
+    var highContext: RouteContext?
 
     @ObservationIgnored
     var pendingRoute: PendingRoute?
@@ -88,7 +71,7 @@ public final class Router: Identifiable, Equatable {
     var unwindPresentationSnapshot: UnwindPresentationSnapshot?
 
     var currentRouteScope: RouteScope {
-        rootPath.last?.activeLocalScope ?? root.activeLocalScope
+        currentRoutePath.last?.activeLocalScope ?? activeContext.path.owner?.activeLocalScope ?? root.activeLocalScope
     }
 
     /// Creates an empty router.
@@ -109,7 +92,7 @@ public final class Router: Identifiable, Equatable {
     /// Dismisses route scopes.  If no parameter is provided, it dismisses the current route.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed mounted route scopes have left the view hierarchy.
+    /// and any removed installed route scopes have left the view hierarchy.
     ///
     /// - Parameter target: The target to unwind to, or `nil` for the route to just dismiss itself.
     /// - Returns: `false` when an explicit target was requested but not found.
@@ -121,7 +104,7 @@ public final class Router: Identifiable, Equatable {
     /// Dismisses route scopes, delivering a payload to a matching ``UnwindHandler``.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed mounted route scopes have left the view hierarchy.
+    /// and any removed installed route scopes have left the view hierarchy.
     ///
     /// - Parameters:
     ///   - target: The target to unwind to, or `nil` for the route to just dismiss itself.

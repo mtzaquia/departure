@@ -22,41 +22,20 @@
 
 import Foundation
 
-/// Type-erased hook metadata.
-public struct AnyHookDeclaration: Sendable {
-    enum Kind: Sendable {
-        case actionInterceptor(any Action.Type, AnyActionInterceptor)
-        case unwindHandler(any Route.Type, AnyUnwindHandler)
+struct BranchContainerState {
+    var defaultBranch: AnyHashable
+    var selection: AnyRouteBranchSelection?
+
+    var activeBranch: AnyHashable {
+        selection?.value() ?? defaultBranch
     }
 
-    let kind: Kind
-}
-
-/// A value accepted by ``SwiftUICore/View/hooks(_:)``.
-public protocol HookDeclaration {
-    var _hookDeclarations: [AnyHookDeclaration] { get }
-}
-
-// MARK: - Internal helpers
-
-extension AnyHookDeclaration {
-    func interceptor(for actionType: (some Action).Type) -> AnyActionInterceptor? {
-        switch kind {
-        case let .actionInterceptor(candidateActionType, actionInterceptor) where candidateActionType == actionType:
-            return actionInterceptor
-
-        default:
-            return nil
+    mutating func setActiveBranch(_ branch: AnyHashable) -> Bool {
+        if let selection {
+            return selection.setValue(branch)
         }
-    }
 
-    func unwindHandler(for routeType: any Route.Type) -> AnyUnwindHandler? {
-        switch kind {
-        case let .unwindHandler(candidateRouteType, unwindHandler) where candidateRouteType == routeType:
-            return unwindHandler
-
-        default:
-            return nil
-        }
+        defaultBranch = branch
+        return true
     }
 }

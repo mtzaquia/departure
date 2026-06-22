@@ -97,35 +97,35 @@ private struct RoutesModifier: ViewModifier {
             .onLifecycleEvent { event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
-                    hydrateScope()
+                    installScopeDeclarations()
 
                 case .updated(isInstalledInWindow: false):
                     break
 
                 case .dismantled, .deinitialized:
-                    clearScope()
+                    uninstallScopeDeclarations()
                 }
             }
             .onChange(of: activeBranch) { _, _ in
-                hydrateScope()
+                installScopeDeclarations()
             }
             .onChange(of: declarations) { _, _ in
-                hydrateScope()
+                installScopeDeclarations()
             }
             // Presentation hosts live in a detached background layer. They are installed only for
             // the declared styles (so e.g. `navigationDestination` is never attached without a
             // push declaration), which means the host set changes as declarations change. Keeping
             // that conditional structure off the primary content prevents its `_ConditionalContent`
-            // churn from tearing down the lifecycle bridge above, which would otherwise clear the
-            // scope's freshly hydrated routes.
+            // churn from tearing down the lifecycle bridge above, which would otherwise uninstall
+            // the scope's freshly installed route declarations.
             .background {
                 Color.black.frame(width: .zero, height: .zero)
                     .routePresentationStyleModifiers(for: declarations)
             }
     }
 
-    private func hydrateScope() {
-        routeScope?.hydrateRoutes(
+    private func installScopeDeclarations() {
+        routeScope?.installRouteDeclarations(
             sourceID: sourceID,
             id: explicitScopeID,
             branchSelection: selection,
@@ -140,8 +140,8 @@ private struct RoutesModifier: ViewModifier {
         router.resumePendingRoute(for: routeScope.id, in: parentScope)
     }
 
-    private func clearScope() {
-        routeScope?.clearRoutes(sourceID: sourceID)
+    private func uninstallScopeDeclarations() {
+        routeScope?.uninstallRouteDeclarations(sourceID: sourceID)
     }
 
     private var accumulatedBranchRouteDeclarations: [RouteScopeDeclaration] {

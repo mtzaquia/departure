@@ -2,7 +2,7 @@
 
 `Departure` is a lightweight, expressive routing framework for SwiftUI.
 
-It lets views declare the routes they can handle and the presentation style for each route. The router then presents the closest matching route. Triggered actions run against the active route context, can be intercepted by route-scoped hooks, and can request a reroute before execution is retried.
+It lets views declare the routes they can handle and the presentation style for each route. The router then presents the closest matching route. Triggered actions run against the active route scope, can be intercepted by route-scoped hooks, and can request a reroute before execution is retried.
 
 ```swift
 await router.present(SettingsRoute())
@@ -102,7 +102,7 @@ struct ProtectedSettingsRoute: Route {
 
 ### Actions
 
-Actions are work values that run against the active route context.
+Actions are work values that run against the active route scope.
 
 ```swift
 struct SaveDraftAction: Action {
@@ -279,7 +279,7 @@ struct ToolbarView: View {
 }
 ```
 
-Actions do not crawl for work execution; they run in the active route context, or unconditionally when there are no interceptors.
+Actions do not crawl for work execution; they run in the active route scope, or unconditionally when there are no interceptors.
 
 ### `.unwind(...)`
 
@@ -372,7 +372,7 @@ struct RootView: View {
 
 `.routes(branch:)` declares the full route map for a selection container. This lets `Departure` find routes in lazy branches that have not been built yet.
 
-Declarations inside `Branch(...)` are used for crawling and branch selection at the container. They area also adopted by the matching `.routeBranch(...)` view as local presentation declarations. Adopted declarations have lower priority than explicit declarations on the scope. If a request matches a route declared in an inactive branch, `Departure` selects that branch before presenting the route from the mounted `.routeBranch(...)` host.
+Declarations inside `Branch(...)` are used for crawling and branch selection at the container. They are also adopted by the matching `.routeBranch(...)` view as local presentation declarations. Adopted declarations have lower priority than explicit declarations on the scope. If a request matches a route declared in an inactive branch, `Departure` selects that branch before presenting the route from the installed `.routeBranch(...)` host.
 
 Top-level declarations in the same `.routes(branch:)` builder, such as `Cover(LoginRoute.self)`, belong to the container itself. 
 
@@ -382,7 +382,7 @@ To unwind within the current branch without escaping to the app root, target `.n
 await router.unwind(to: .nearestBranch)
 ```
 
-This clears the nearest enclosing branch path back to that branch's root. The accepted target scope is the branch container that declared the branch. To target the mounted branch root itself, unwind to that branch root's explicit ID.
+This clears the nearest enclosing branch path back to that branch's root. The accepted target scope is the branch container that declared the branch. To target the installed branch root itself, unwind to that branch root's explicit ID.
 
 ```mermaid
 flowchart TD
@@ -419,11 +419,11 @@ Sheets and covers can have normal or high priority.
 
 | Priority | Behavior |
 | --- | --- |
-| `.normal` | Presents from the nearest eligible scope, **unless a high-priority presentation is already covering the normal flow.** |
-| `.high` | Presents above the normal flow in a separate high-priority `UIWindow`. |
+| `.normal` | Presents from the nearest eligible scope, **unless an active high-priority context is blocking declarations outside it.** |
+| `.high` | Presents in a separate high-priority context backed by its own `UIWindow`. |
 
-- A new high-priority request **matched in the normal flow** replaces the active high-priority presentation entirely.
-- Routing requests **matched within the high-priority flow** always act like normal-priority requests.
+- A new high-priority request **matched outside the active high-priority context** replaces the active high-priority presentation entirely.
+- Routing requests whose declarations are **matched within the active high-priority context** act like normal-priority requests.
 
 > [!IMPORTANT]
 > High priority changes presentation context, not route lookup. Branch routes are still resolved with the same crawling rules; when a high-priority branch route is selected, the high-priority window uses the active branch presentation scope.
@@ -444,14 +444,14 @@ WithRouter {
 
 ```mermaid
 flowchart TD
-    normal["Normal app flow"]
+    normal["Normal app context"]
     login["High-priority LoginRoute"]
     twofactor["TwoFactorRoute inside login"]
     settings["Normal SettingsRoute request"]
 
     normal -->|"Cover(LoginRoute.self, priority: .high)"| login
     login -->|"local route request"| twofactor
-    settings -.->|"blocked while high-priority flow is active"| login
+    settings -.->|"blocked while high-priority context is active"| login
 ```
 
 ## License

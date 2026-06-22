@@ -133,13 +133,13 @@ public protocol RouteDeclaration {
 public enum RoutePriority: Hashable, Sendable {
     /// Presents from the declaring scope.
     ///
-    /// - Important: Normal-priority requests are ignored while a high-priority segment is
-    ///   active, unless they are declared inside that segment.
+    /// - Important: Normal-priority requests are ignored while a high-priority context is
+    ///   active, unless they are declared inside that context.
     case normal
 
     /// Presents above normal-priority routes.
     ///
     /// - Important: High-priority requests from normal content replace the active
-    ///   high-priority segment. From inside that segment, they behave as local navigation.
+    ///   high-priority context. From inside that context, they behave as local navigation.
     case high
 }

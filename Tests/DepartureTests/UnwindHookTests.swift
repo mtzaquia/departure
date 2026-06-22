@@ -32,7 +32,7 @@ struct UnwindHookTests {
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
 
-        parentScope.hydrateHooks(
+        parentScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self, expecting: String.self) { payload in
                     recorder.payloads.append(payload)
@@ -53,7 +53,7 @@ struct UnwindHookTests {
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
 
-        parentScope.hydrateHooks(
+        parentScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self, expecting: Int.self) { payload in
                     recorder.ints.append(payload)
@@ -74,7 +74,7 @@ struct UnwindHookTests {
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
 
-        parentScope.hydrateHooks(
+        parentScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("parent")
@@ -95,7 +95,7 @@ struct UnwindHookTests {
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
 
-        router.root.hydrateHooks(
+        router.root.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("root")
@@ -119,14 +119,14 @@ struct UnwindHookTests {
 
         router.rootPath.scopes = [landingScope]
         landingScope.setActiveBranch(AnyHashable(AppTab.wallet))
-        landingScope.hydrateHooks(
+        landingScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(SettingsRoute.self) {
                     recorder.events.append("container")
                 }.declaration,
             ]
         )
-        walletScope.hydrateHooks(
+        walletScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(SettingsRoute.self) {
                     recorder.events.append("branch-root")
@@ -151,14 +151,14 @@ struct UnwindHookTests {
 
         router.rootPath.scopes = [landingScope]
         landingScope.setActiveBranch(AnyHashable(AppTab.wallet))
-        landingScope.hydrateHooks(
+        landingScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(SettingsRoute.self) {
                     recorder.events.append("container")
                 }.declaration,
             ]
         )
-        walletScope.hydrateHooks(
+        walletScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(SettingsRoute.self) {
                     recorder.events.append("branch-root")
@@ -180,14 +180,14 @@ struct UnwindHookTests {
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
 
-        parentScope.hydrateRoutes(
+        parentScope.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
                 RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
             ]
         )
-        parentScope.hydrateHooks(
+        parentScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("handler")
@@ -224,7 +224,7 @@ struct UnwindHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = UnwindRecorder()
 
-        parentScope.hydrateRoutes(
+        parentScope.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -234,7 +234,7 @@ struct UnwindHookTests {
                 ),
             ]
         )
-        parentScope.hydrateHooks(
+        parentScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("handler")
@@ -272,14 +272,14 @@ struct UnwindHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = UnwindRecorder()
 
-        parentScope.hydrateRoutes(
+        parentScope.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
                 RouteScopeDeclaration(routes: Sheet(LoginRoute.self)._routeDeclarations),
             ]
         )
-        parentScope.hydrateHooks(
+        parentScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("handler")
@@ -307,14 +307,14 @@ struct UnwindHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = UnwindRecorder()
 
-        parentScope.hydrateRoutes(
+        parentScope.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
                 RouteScopeDeclaration(routes: Sheet(LoginRoute.self)._routeDeclarations),
             ]
         )
-        parentScope.hydrateHooks(
+        parentScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("handler")
@@ -345,14 +345,14 @@ struct UnwindHookTests {
         let router = Router()
         let recorder = UnwindRecorder()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
                 RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations),
             ]
         )
-        router.root.hydrateHooks(
+        router.root.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("handler")
@@ -384,7 +384,7 @@ struct UnwindHookTests {
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
 
-        parentScope.hydrateHooks(
+        parentScope.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("started")
@@ -404,14 +404,14 @@ struct UnwindHookTests {
         let router = Router()
         let recorder = UnwindRecorder()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
                 RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations),
             ]
         )
-        router.root.hydrateHooks(
+        router.root.installHookDeclarations(
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("handler")

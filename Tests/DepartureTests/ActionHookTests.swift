@@ -26,7 +26,7 @@ import Testing
 @MainActor
 @Suite
 struct ActionHookTests {
-    @Test func currentRouteScopeUsesSelectedMountedBranchScopeForHooks() async {
+    @Test func currentRouteScopeUsesSelectedInstalledBranchScopeForHooks() async {
         let router = Router()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
@@ -35,7 +35,7 @@ struct ActionHookTests {
         parentScope.setActiveBranch(AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateHooks(
+        homeScope.installHookDeclarations(
             hookDeclarations: [
                 ActionInterceptor(ContextProbeAction.self) { invocation in
                     recorder.bools.append((try? await invocation()) ?? false)
@@ -60,7 +60,7 @@ struct ActionHookTests {
         parentScope.setActiveBranch(AnyHashable(AppTab.wallet))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateHooks(
+        homeScope.installHookDeclarations(
             hookDeclarations: [
                 ActionInterceptor(ContextProbeAction.self) { invocation in
                     recorder.bools.append((try? await invocation()) ?? false)
@@ -83,7 +83,7 @@ struct ActionHookTests {
         let recorder = ActionRecorder()
 
         router.rootPath.scopes.append(scope)
-        scope.hydrateHooks(
+        scope.installHookDeclarations(
             sourceID: sourceID,
             hookDeclarations: [
                 ActionInterceptor(ContextProbeAction.self) { invocation in
@@ -93,7 +93,7 @@ struct ActionHookTests {
         )
 
         await router.performAction(ContextProbeAction())
-        scope.clearHooks(sourceID: sourceID)
+        scope.uninstallHookDeclarations(sourceID: sourceID)
         await router.performAction(ContextProbeAction())
 
         #expect(recorder.bools == [true])

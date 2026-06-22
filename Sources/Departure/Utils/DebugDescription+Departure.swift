@@ -100,11 +100,12 @@ extension RouteScope {
             return nil
         }
 
-        return "[\(branches.map { $0.id.departureDebugDescription }.joined(separator: ", "))]"
+        return "[\(declarations.branchIDs.map(\.departureDebugDescription).joined(separator: ", "))]"
     }
 
     private var isFlatScope: Bool {
-        branches.count == 1 && branches.first?.id == activeBranch
+        branchContainer == nil
+        || declarations.branchIDs == [activeBranch]
     }
 }
 #endif

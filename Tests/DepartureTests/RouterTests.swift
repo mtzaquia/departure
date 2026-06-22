@@ -42,7 +42,7 @@ struct RouterTests {
         let router = Router()
         let actionRecorder = AsyncActionRecorder()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -67,7 +67,7 @@ struct RouterTests {
 
     @Test func publicUnwindReportsMissingTargetBeforeContinuation() async {
         let router = Router()
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -84,11 +84,11 @@ struct RouterTests {
         #expect(router.rootPath.isEmpty)
     }
 
-    @Test func routeRequestSelectsInactiveBranchAndWaitsForMountedBranchScope() async {
+    @Test func routeRequestSelectsInactiveBranchAndWaitsForInstalledBranchScope() async {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.wallet)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -112,7 +112,7 @@ struct RouterTests {
         #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -132,7 +132,7 @@ struct RouterTests {
         let scope = RouteScope(id: AnyHashable("initial"), route: nil)
         let sourceID = AnyHashable("routes")
 
-        scope.hydrateRoutes(
+        scope.installRouteDeclarations(
             sourceID: sourceID,
             id: AnyHashable("explicit"),
             branchSelection: nil,
@@ -143,7 +143,7 @@ struct RouterTests {
 
         #expect(scope.id == AnyHashable("explicit"))
 
-        scope.clearRoutes(sourceID: sourceID)
+        scope.uninstallRouteDeclarations(sourceID: sourceID)
 
         #expect(scope.id == AnyHashable("initial"))
         #expect(scope.activeBranch == AnyHashable("initial"))
@@ -154,7 +154,7 @@ struct RouterTests {
         let router = Router()
         let (selection, _) = tabSelection(.home)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -168,7 +168,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable("home-root"), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -196,11 +196,11 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue != nil)
     }
 
-    @Test func routeRequestFromMountedInactiveBranchWaitsForTargetBranchScope() async {
+    @Test func routeRequestFromInstalledInactiveBranchWaitsForTargetBranchScope() async {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.wallet)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -218,7 +218,7 @@ struct RouterTests {
         )
 
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -234,7 +234,7 @@ struct RouterTests {
         #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -257,7 +257,7 @@ struct RouterTests {
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         router.rootPath.scopes = [landingScope]
 
-        landingScope.hydrateRoutes(
+        landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -275,7 +275,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -285,7 +285,7 @@ struct RouterTests {
         landingScope.registerBranchScope(homeScope, for: AppTab.home)
 
         let settingsScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        settingsScope.hydrateRoutes(
+        settingsScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -318,7 +318,7 @@ struct RouterTests {
         let router = Router()
         let (selection, _) = tabSelection(.wallet)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -334,7 +334,7 @@ struct RouterTests {
         )
 
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -372,7 +372,7 @@ struct RouterTests {
         let router = Router()
         let (selection, _) = tabSelection(.home)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -388,7 +388,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -400,7 +400,7 @@ struct RouterTests {
         await router.requestRoute(SettingsRoute())
 
         let settingsScope = try #require(homeScope.path.last)
-        settingsScope.hydrateRoutes(
+        settingsScope.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -424,7 +424,7 @@ struct RouterTests {
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         router.rootPath.scopes = [landingScope]
-        landingScope.hydrateRoutes(
+        landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -441,7 +441,7 @@ struct RouterTests {
 
         // The branch scope adopts the top-level sheet (non-push) declaration, mirroring `.routeBranch`.
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -466,7 +466,7 @@ struct RouterTests {
         #expect(walletScope.path.last === settingsScope)
 
         // Toggle ON: the pushed scope now declares the same route locally and must win.
-        settingsScope.hydrateRoutes(
+        settingsScope.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -485,7 +485,7 @@ struct RouterTests {
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         router.rootPath.scopes = [landingScope]
-        landingScope.hydrateRoutes(
+        landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -502,7 +502,7 @@ struct RouterTests {
 
         // The branch scope adopts both the top-level and the branch-local sheet (mirrors `.routeBranch`).
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -538,7 +538,7 @@ struct RouterTests {
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         router.rootPath.scopes = [landingScope]
-        landingScope.hydrateRoutes(
+        landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -554,7 +554,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -587,7 +587,7 @@ struct RouterTests {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.home)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -605,7 +605,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -637,7 +637,7 @@ struct RouterTests {
         #expect(router.rootPath.isEmpty)
         #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.wallet))
 
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -666,7 +666,7 @@ struct RouterTests {
     @Test func routeResolutionReroutePresentsResolvedRoute() async {
         let router = Router()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -683,7 +683,7 @@ struct RouterTests {
     @Test func normalPresentationResolvesAndDismissesFromDeclaringScope() async throws {
         let router = Router()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -709,7 +709,7 @@ struct RouterTests {
     @Test func repeatedPushOfSameRouteTypeGetsNewPresentationIdentity() async throws {
         let router = Router()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -733,10 +733,10 @@ struct RouterTests {
         #expect(firstPresentation.scope !== secondPresentation.scope)
     }
 
-    @Test func replacingMountedPushWaitsForOldScopeToLeaveViewBeforeAppendingNextRoute() async throws {
+    @Test func replacingInstalledPushWaitsForOldScopeToLeaveViewBeforeAppendingNextRoute() async throws {
         let router = Router()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -769,7 +769,7 @@ struct RouterTests {
     @Test func removingPresentedRouteScopeSynchronizesRouterPath() async throws {
         let router = Router()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -786,10 +786,10 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue == nil)
     }
 
-    @Test func routeScopeLeavingViewUnmountsWithoutRemovingRouterPath() async throws {
+    @Test func routeScopeLeavingViewUninstallsWithoutRemovingRouterPath() async throws {
         let router = Router()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -803,7 +803,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(pushedScope)
         router.routeScopeDidLeaveView(pushedScope)
 
-        #expect(pushedScope.isMounted == false)
+        #expect(pushedScope.isInstalledInView == false)
         #expect(router.rootPath.count == 1)
         #expect(router.rootPath.last === pushedScope)
         #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue != nil)
@@ -815,13 +815,13 @@ struct RouterTests {
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
         router.rootPath.scopes = [firstScope, secondScope]
-        router.highPrioritySegment = Router.HighPrioritySegment(path: router.rootPath, startIndex: 1)
+        router.highContext = .high(path: router.rootPath, startIndex: 1)
 
         await router.unwindAndWait(to: nil)
 
         #expect(router.rootPath.count == 1)
         #expect(router.rootPath.last === firstScope)
-        #expect(router.highPrioritySegment == nil)
+        #expect(router.highContext == nil)
     }
 
     @Test func unwindToIDKeepsMatchingRouteScope() async {
@@ -830,13 +830,13 @@ struct RouterTests {
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
         router.rootPath.scopes = [firstScope, secondScope]
-        router.highPrioritySegment = Router.HighPrioritySegment(path: router.rootPath, startIndex: 1)
+        router.highContext = .high(path: router.rootPath, startIndex: 1)
 
         await router.unwindAndWait(to: .id(RootRoute().id))
 
         #expect(router.rootPath.count == 1)
         #expect(router.rootPath.last === firstScope)
-        #expect(router.highPrioritySegment == nil)
+        #expect(router.highContext == nil)
     }
 
     @Test func unwindToRootClearsPath() async {
@@ -845,12 +845,12 @@ struct RouterTests {
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
         router.rootPath.scopes = [firstScope, secondScope]
-        router.highPrioritySegment = Router.HighPrioritySegment(path: router.rootPath, startIndex: 1)
+        router.highContext = .high(path: router.rootPath, startIndex: 1)
 
         await router.unwindAndWait(to: .root)
 
         #expect(router.rootPath.isEmpty)
-        #expect(router.highPrioritySegment == nil)
+        #expect(router.highContext == nil)
     }
 
     @Test func unwindToRootClearsEntireAppFromDeepWithinBranch() async throws {
@@ -859,7 +859,7 @@ struct RouterTests {
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         router.rootPath.scopes = [landingScope]
-        landingScope.hydrateRoutes(
+        landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -872,7 +872,7 @@ struct RouterTests {
         )
 
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -896,7 +896,7 @@ struct RouterTests {
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         router.rootPath.scopes = [landingScope]
-        landingScope.hydrateRoutes(
+        landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -909,7 +909,7 @@ struct RouterTests {
         )
 
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -934,7 +934,7 @@ struct RouterTests {
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         router.rootPath.scopes = [landingScope]
-        landingScope.hydrateRoutes(
+        landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -947,7 +947,7 @@ struct RouterTests {
         )
 
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -964,11 +964,11 @@ struct RouterTests {
         #expect(router.rootPath.count == 1)
     }
 
-    @Test func sequentialUnwindThenPresentWaitsForMountedRouteScopeToLeaveView() async {
+    @Test func sequentialUnwindThenPresentWaitsForInstalledRouteScopeToLeaveView() async {
         let router = Router()
         let loginScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -977,7 +977,7 @@ struct RouterTests {
         )
 
         router.rootPath.scopes = [loginScope]
-        router.highPrioritySegment = Router.HighPrioritySegment(path: router.rootPath, startIndex: 0)
+        router.highContext = .high(path: router.rootPath, startIndex: 0)
         router.routeScopeDidInstallInView(loginScope)
 
         let unwindTask = Task {
@@ -1000,13 +1000,90 @@ struct RouterTests {
         #expect(router.rootPath.last?.route is SettingsRoute)
     }
 
+    @Test func modalReplacementWaitsForInstalledRouteScopeToLeaveView() async throws {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Sheet(LoginRoute.self)._routeDeclarations
+                    + Sheet(SettingsRoute.self)._routeDeclarations
+                ),
+            ]
+        )
+
+        await router.requestRoute(LoginRoute())
+        let loginScope = try #require(router.rootPath.last)
+        router.routeScopeDidInstallInView(loginScope)
+
+        let replacementTask = Task {
+            await router.requestRoute(SettingsRoute())
+        }
+
+        for _ in 0..<10 {
+            if router.rootPath.isEmpty {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(router.rootPath.isEmpty)
+        #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
+
+        router.routeScopeDidLeaveView(loginScope)
+        await replacementTask.value
+
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last?.route is SettingsRoute)
+    }
+
+    @Test func snapshotPresentationUsesOriginalPathIndexForHighContextLocalHosting() async {
+        let router = Router()
+        let rootScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let loginScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let noticeScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
+        let noticeDeclaration = Sheet(SettingsRoute.self, priority: .high)._routeDeclarations[0]
+
+        router.rootPath.scopes = [rootScope, loginScope, noticeScope]
+        router.highContext = .high(path: router.rootPath, startIndex: 1)
+        loginScope.modalChild = noticeScope
+        noticeScope.hostScope = loginScope
+        noticeScope.hostDeclaration = noticeDeclaration
+        router.routeScopeDidInstallInView(loginScope)
+        router.routeScopeDidInstallInView(noticeScope)
+
+        let unwindTask = Task {
+            await router.unwind(to: .id(RootRoute().id))
+        }
+
+        for _ in 0..<10 {
+            if router.unwindPresentationSnapshot != nil {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(router.rootPath.count == 1)
+        #expect(router.unwindPresentationSnapshot != nil)
+        let presentation = router.routePresentation(from: loginScope, matching: .sheet)
+        #expect(presentation?.scope === noticeScope)
+        #expect(presentation?.declaration.priority == .high)
+
+        router.routeScopeDidLeaveView(loginScope)
+        router.routeScopeDidLeaveView(noticeScope)
+
+        #expect(await unwindTask.value)
+    }
+
     @Test func unwindFromBranchPresentationKeepsPresentedTopLevelScope() async throws {
         let router = Router()
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         router.rootPath.scopes = [landingScope]
-        landingScope.hydrateRoutes(
+        landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: Branch(AppTab.home) {
@@ -1015,7 +1092,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -1040,7 +1117,7 @@ struct RouterTests {
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         router.rootPath.scopes = [landingScope]
-        landingScope.hydrateRoutes(
+        landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -1061,7 +1138,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -1071,7 +1148,7 @@ struct RouterTests {
         landingScope.registerBranchScope(homeScope, for: AppTab.home)
 
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -1084,7 +1161,7 @@ struct RouterTests {
 
         #expect(walletScope.path.count == 1)
         #expect(walletScope.path.last?.route is LoginRoute)
-        #expect(router.highPrioritySegment?.path === walletScope.path)
+        #expect(router.highContext?.path === walletScope.path)
 
         await router.unwind()
 
@@ -1106,7 +1183,7 @@ struct RouterTests {
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         router.rootPath.scopes = [landingScope]
-        landingScope.hydrateRoutes(
+        landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -1124,7 +1201,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -1134,7 +1211,7 @@ struct RouterTests {
         landingScope.registerBranchScope(homeScope, for: AppTab.home)
 
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -1169,7 +1246,7 @@ struct RouterTests {
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let thirdScope = RouteScope(id: AlertRoute().id, route: AlertRoute())
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -1207,13 +1284,13 @@ struct RouterTests {
         #expect(router.rootPath.last?.route is SettingsRoute)
     }
 
-    @Test func unwindPreservesDescendantPresentationBindingsUntilAncestorUnmounts() async {
+    @Test func unwindPreservesDescendantPresentationBindingsUntilAncestorLeavesView() async {
         let router = Router()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let profileScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
@@ -1221,7 +1298,7 @@ struct RouterTests {
             ]
         )
         landingScope.setActiveBranch(AnyHashable(AppTab.home))
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -1256,7 +1333,7 @@ struct RouterTests {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.home)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -1274,7 +1351,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -1284,7 +1361,7 @@ struct RouterTests {
         router.root.registerBranchScope(homeScope, for: AppTab.home)
 
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -1322,7 +1399,7 @@ struct RouterTests {
         let router = Router()
         let (selection, _) = tabSelection(.home)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -1340,7 +1417,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -1350,7 +1427,7 @@ struct RouterTests {
         router.root.registerBranchScope(homeScope, for: AppTab.home)
 
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.hydrateRoutes(
+        walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
             branchSelection: nil,
             routeDeclarations: [
@@ -1383,7 +1460,7 @@ struct RouterTests {
         let router = Router()
         let (selection, _) = tabSelection(.home)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: Branch(AppTab.home) {
@@ -1392,7 +1469,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -1431,7 +1508,7 @@ struct RouterTests {
         let router = Router()
         let (selection, _) = tabSelection(.home)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: Branch(AppTab.home) {
@@ -1440,7 +1517,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -1463,7 +1540,7 @@ struct RouterTests {
         let router = Router()
         let (selection, _) = tabSelection(.home)
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: AnyRouteBranchSelection(selection),
             routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
@@ -1479,7 +1556,7 @@ struct RouterTests {
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.hydrateRoutes(
+        homeScope.installRouteDeclarations(
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
@@ -1501,7 +1578,7 @@ struct RouterTests {
     @Test func ancestorHighPriorityDeclarationReplacesActiveHighPriorityRoute() async {
         let router = Router()
 
-        router.root.hydrateRoutes(
+        router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
