@@ -72,6 +72,7 @@ enum DepartureLogEvent {
     case pendingRouteResuming(route: any Route)
     case routeAcceptedAppend(route: any Route)
     case routeAcceptedReplaceHighPriority(route: any Route)
+    case routeAppendSuperseded(route: any Route)
     case routeAppendPreparing(route: any Route, match: Router.DeclarationMatch)
     case routeAppendWaitingReplacingScopes(removedScopes: Int)
     case routeAppended(route: any Route, pathCount: Int)
@@ -187,6 +188,8 @@ extension DepartureLogEvent {
             "route accepted | action=append | route=\(route.departureDebugDescription)"
         case let .routeAcceptedReplaceHighPriority(route):
             "route accepted | action=replace high-priority context | route=\(route.departureDebugDescription)"
+        case let .routeAppendSuperseded(route):
+            "route append dropped | reason=superseded while waiting for replaced scopes | route=\(route.departureDebugDescription)"
         case let .routeAppendPreparing(route, match):
             "route append preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
         case let .routeAppendWaitingReplacingScopes(removedScopes):
