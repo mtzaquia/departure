@@ -110,6 +110,49 @@ struct UnwindHookTests {
         #expect(router.rootPath.isEmpty)
     }
 
+    @Test func rootTargetTriggersRootScopeHookForBranchLocalSourceRoute() async {
+        let router = Router()
+        let (selection, _) = tabSelection(.wallet)
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        let recorder = UnwindRecorder()
+
+        router.rootPath.scopes = [landingScope]
+        router.root.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(SettingsRoute.self) {
+                    recorder.events.append("root")
+                }.declaration,
+            ]
+        )
+        landingScope.installRouteDeclarations(
+            id: RootRoute().id,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.wallet) {
+                        Push(SettingsRoute.self)
+                    }
+                )
+            )
+        )
+        walletScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.wallet),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+        landingScope.registerBranchScope(walletScope, for: AppTab.wallet)
+
+        await router.requestRoute(SettingsRoute())
+        await router.unwind(to: .root)
+
+        #expect(recorder.events == ["root"])
+        #expect(router.rootPath.isEmpty)
+        #expect(walletScope.path.isEmpty)
+    }
+
     @Test func nearestBranchTriggersContainerHookInsteadOfBranchRootHook() async {
         let router = Router()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())

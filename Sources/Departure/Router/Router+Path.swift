@@ -64,10 +64,13 @@ extension Router {
         log.departureDebug(.unwindRequested(target: target))
         let sourceRoute = currentRouteScope.route
 
-        // The target only differs by which path it clears; resolution is the same. `.root` unwinds
-        // the entire app via the root path, regardless of the originating branch or depth.
-        // `.nearestBranch` resolves against the enclosing branch path (no-op when there isn't one).
-        // Everything else resolves against the current path.
+        if case .root = target {
+            return await unwindRootAndWait(sourceRoute: sourceRoute, payload: payload)
+        }
+
+        // Non-root targets differ only by which path they clear. `.nearestBranch` resolves against
+        // the enclosing branch path (no-op when there isn't one). Everything else resolves against
+        // the current path.
         let routePath: RoutePath
         switch target {
         case .root:
@@ -158,6 +161,51 @@ extension Router {
 
             return true
         }
+    }
+
+    func unwindRootAndWait(sourceRoute: (any Route)?, payload: Any?) async -> Bool {
+        let rootRemovedScopes = rootPath.scopesRemovedByKeepingThrough(nil)
+        var branchPaths = activeBranchPaths(under: root)
+        if let highContextPath = highContext?.path,
+           highContextPath !== rootPath,
+           branchPaths.contains(where: { $0 === highContextPath }) == false {
+            branchPaths.append(highContextPath)
+        }
+        let branchRemovedScopes = branchPaths.flatMap {
+            $0.scopesRemovedByKeepingThrough(nil)
+        }
+        let removedScopes = rootRemovedScopes + branchRemovedScopes
+
+        log.departureDebug(.unwindAccepted(
+            keepThrough: nil,
+            removing: removedScopes.count
+        ))
+
+        unwindPresentationSnapshot = UnwindPresentationSnapshot(
+            routePath: rootPath,
+            preservedPath: rootRemovedScopes,
+            preservedPathStartIndex: rootPath.scopes.startIndex,
+            highContext: highContext
+        )
+
+        for branchPath in branchPaths {
+            keepPathThrough(nil, in: branchPath)
+        }
+        keepPathThrough(nil, in: rootPath)
+        highContext = nil
+
+        await waitForRouteScopesToLeaveView(removedScopes)
+        unwindPresentationSnapshot = nil
+        log.departureDebug(.unwindCompleted)
+        if removedScopes.isEmpty == false {
+            await invokeUnwindHandlers(
+                for: sourceRoute,
+                payload: payload,
+                in: root
+            )
+        }
+
+        return true
     }
 
     func appendRoute(_ route: any Route, after match: DeclarationMatch) async {
@@ -610,6 +658,22 @@ extension Router {
         }
 
         return nil
+    }
+
+    func activeBranchPaths(under owner: RouteScope) -> [RoutePath] {
+        var paths: [RoutePath] = []
+
+        if let branchScope = owner.branchScopes[owner.activeBranch] {
+            paths.append(branchScope.path)
+            paths.append(contentsOf: activeBranchPaths(under: branchScope))
+        }
+
+        let ownedScopes = owner === root ? rootPath.scopes : owner.path.scopes
+        for scope in ownedScopes {
+            paths.append(contentsOf: activeBranchPaths(under: scope))
+        }
+
+        return paths
     }
 
     private func ancestorUnwindResolution(
