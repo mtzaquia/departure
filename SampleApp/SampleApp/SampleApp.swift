@@ -31,12 +31,22 @@ final class Storage {
     var appearanceSaveCount = 0
     var emoji: String = "🎉"
     var missingUnwindResult: Bool?
+    var homeUnwindPayloads: [String] = []
+    var dismissProbeUnwindHookCount = 0
+    var rootUnwindHookCount = 0
+    var landingContainerUnwindHookCount = 0
+    var settingsBranchUnwindHookCount = 0
 
     func reset() {
         isLoggedIn = false
         appearanceSaveCount = 0
         emoji = "🎉"
         missingUnwindResult = nil
+        homeUnwindPayloads = []
+        dismissProbeUnwindHookCount = 0
+        rootUnwindHookCount = 0
+        landingContainerUnwindHookCount = 0
+        settingsBranchUnwindHookCount = 0
     }
 }
 

@@ -33,25 +33,25 @@ struct LandingView: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            Tab(value: .home) {
-                NavigationStack {
-                    HomeView()
-                        .routeBranch(TabItem.home)
-                }
-            } label: {
+            NavigationStack {
+                HomeView()
+                    .routeBranch(TabItem.home)
+            }
+            .tabItem {
                 Label("Home", systemImage: "house")
                     .accessibilityIdentifier(SampleAppAccessibility.homeTab)
             }
+            .tag(TabItem.home)
 
-            Tab(value: .settings) {
-                NavigationStack {
-                    SettingsView()
-                        .routeBranch(TabItem.settings)
-                }
-            } label: {
+            NavigationStack {
+                SettingsView()
+                    .routeBranch(TabItem.settings)
+            }
+            .tabItem {
                 Label("Settings", systemImage: "gear")
                     .accessibilityIdentifier(SampleAppAccessibility.settingsTab)
             }
+            .tag(TabItem.settings)
         }
         .accessibilityIdentifier(SampleAppAccessibility.landing)
         .routes(branch: $tab) {
@@ -62,12 +62,22 @@ struct LandingView: View {
 
             Branch(.home) {
                 Sheet(ProfileRoute.self)
+                Sheet(DismissProbeRoute.self, providesNavigation: false)
                 Cover(MessageRoute.self, transition: .fade, providesNavigation: false)
             }
 
             Branch(.settings) {
                 Push(AppearanceSettingsRoute.self)
                 Push(AuthenticationSettingsRoute.self)
+            }
+        }
+        .hooks {
+            UnwindHandler(AuthenticationSettingsRoute.self) {
+                guard SampleAppUITesting.isEnabled else {
+                    return
+                }
+
+                Storage.shared.landingContainerUnwindHookCount += 1
             }
         }
         .environment(\.samplePresentationSource, "top-level branched scope")

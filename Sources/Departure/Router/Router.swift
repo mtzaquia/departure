@@ -118,6 +118,20 @@ public final class Router: Identifiable, Equatable {
         await unwindAndWait(to: target)
     }
 
+    /// Dismisses route scopes, delivering a payload to a matching ``UnwindHandler``.
+    ///
+    /// This method returns after the unwind request has resolved, the router path has been updated,
+    /// and any removed mounted route scopes have left the view hierarchy.
+    ///
+    /// - Parameters:
+    ///   - target: The target to unwind to, or `nil` for the route to just dismiss itself.
+    ///   - payload: A value delivered to a matching ``UnwindHandler``.
+    /// - Returns: `false` when an explicit target was requested but not found.
+    @discardableResult
+    public func unwind<Payload>(to target: UnwindTarget? = nil, payload: Payload) async -> Bool {
+        await unwindAndWait(to: target, payload: payload)
+    }
+
     /// Performs an action from the current route scope.
     public func perform(_ action: any Action) async {
         await performAction(action)

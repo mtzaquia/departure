@@ -273,6 +273,72 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.startButton)
     }
 
+    func testUnwindHookPayloadDeliveryAndMismatch() {
+        openLanding()
+
+        assertLabel(A11y.homeUnwindPayloadStatus, contains: "Payload hooks:")
+
+        tap(A11y.homeShowMessageButton)
+        assertExists(A11y.messageText)
+
+        tap(A11y.messageDismissPayloadButton)
+        assertGone(A11y.messageText)
+        assertLabel(A11y.homeUnwindPayloadStatus, contains: "message delivered")
+
+        tap(A11y.homeShowMessageButton)
+        assertExists(A11y.messageText)
+
+        tap(A11y.messageDismissMismatchedPayloadButton)
+        assertGone(A11y.messageText)
+        assertLabel(A11y.homeUnwindPayloadStatus, contains: "message delivered")
+    }
+
+    func testSwiftUIDismissTriggersUnwindHandlerThatCanPresentRoute() {
+        openLanding()
+
+        tap(A11y.homeShowDismissProbeButton)
+        assertExists(A11y.dismissProbeText)
+
+        tap(A11y.dismissProbeDismissButton)
+        assertGone(A11y.dismissProbeText)
+        assertExists(A11y.messageText)
+
+        tap(A11y.messageDismissUnwindButton)
+        assertGone(A11y.messageText)
+        assertLabel(A11y.homeDismissProbeHookStatus, contains: "Dismiss probe hooks: 1")
+    }
+
+    func testUnwindHooksFireForRootNearestBranchAndExplicitBranchIDTargets() {
+        openLanding()
+        tapSettingsTab()
+
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        tap(A11y.authenticationUnwindToNearestBranchButton)
+        assertGone(A11y.authenticationTitle)
+        assertExists(A11y.settingsAuthenticationButton)
+        assertLabel(A11y.landingContainerHookStatus, contains: "Container unwind hooks: 1")
+        assertLabel(A11y.settingsBranchHookStatus, contains: "Branch unwind hooks: 0")
+
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        tap(A11y.authenticationUnwindToBranchIDButton)
+        assertGone(A11y.authenticationTitle)
+        assertExists(A11y.settingsAuthenticationButton)
+        assertLabel(A11y.landingContainerHookStatus, contains: "Container unwind hooks: 1")
+        assertLabel(A11y.settingsBranchHookStatus, contains: "Branch unwind hooks: 1")
+
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        tap(A11y.authenticationUnwindToRootButton)
+        assertExists(A11y.startButton)
+        assertGone(A11y.landing)
+        assertLabel(A11y.rootHookStatus, contains: "Root unwind hooks: 1")
+    }
+
     func testUnwindToNearestBranchReturnsToBranchRootAndIsIdempotentThere() {
         openLanding()
         tapSettingsTab()
@@ -428,7 +494,10 @@ private enum A11y {
     static let homeWelcome = "sample.home.welcome"
     static let homeShowMessageButton = "sample.home.show-message"
     static let homeProfileButton = "sample.home.profile"
+    static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
     static let homeEmojiValue = "sample.home.emoji-value"
+    static let homeUnwindPayloadStatus = "sample.home.unwind-payload-status"
+    static let homeDismissProbeHookStatus = "sample.home.dismiss-probe-hook-status"
 
     static let settingsAppearanceButton = "sample.settings.appearance"
     static let settingsAuthenticationButton = "sample.settings.authentication"
@@ -440,6 +509,7 @@ private enum A11y {
     static let settingsPresentUndeclaredRouteButton = "sample.settings.present-undeclared-route"
     static let settingsMissingUnwindButton = "sample.settings.missing-unwind"
     static let settingsMissingUnwindResult = "sample.settings.missing-unwind-result"
+    static let settingsBranchHookStatus = "sample.settings.branch-hook-status"
 
     static let appearanceTitle = "sample.appearance.title"
     static let appearanceRePresentButton = "sample.appearance.re-present"
@@ -453,6 +523,7 @@ private enum A11y {
     static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
     static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
+    static let authenticationUnwindToBranchIDButton = "sample.authentication.unwind-to-branch-id"
 
     static let topLevelSheetText = "sample.top-level-sheet.text"
     static let topLevelSheetPresentationSource = "sample.top-level-sheet.presentation-source"
@@ -461,6 +532,11 @@ private enum A11y {
     static let messageText = "sample.message.text"
     static let messageDismissUnwindButton = "sample.message.dismiss-unwind"
     static let messageDismissSwiftUIButton = "sample.message.dismiss-swiftui"
+    static let messageDismissPayloadButton = "sample.message.dismiss-payload"
+    static let messageDismissMismatchedPayloadButton = "sample.message.dismiss-mismatched-payload"
+
+    static let dismissProbeText = "sample.dismiss-probe.text"
+    static let dismissProbeDismissButton = "sample.dismiss-probe.dismiss"
 
     static let alertText = "sample.alert.text"
     static let alertDismissUnwindButton = "sample.alert.dismiss-unwind"
@@ -488,4 +564,6 @@ private enum A11y {
 
     static let droppedRouteText = "sample.dropped-route.text"
     static let undeclaredRouteText = "sample.undeclared-route.text"
+    static let rootHookStatus = "sample.root-hook-status"
+    static let landingContainerHookStatus = "sample.landing.container-hook-status"
 }

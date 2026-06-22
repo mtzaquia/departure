@@ -193,6 +193,39 @@ extension RouteScope {
     ) {
         hookSourceID = sourceID
         let branchIndex = branches.index(for: activeBranch)
+        var actionTypeIDs = Set<ObjectIdentifier>()
+        var routeTypeIDs = Set<ObjectIdentifier>()
+
+        for hookDeclaration in hookDeclarations {
+            if let actionType = hookDeclaration.actionInterceptorType {
+                let inserted = actionTypeIDs
+                    .insert(ObjectIdentifier(actionType))
+                    .inserted
+
+                if inserted == false {
+                    log.departureWarning(
+                        """
+                        Duplicate action interceptor for \(String(reflecting: actionType)) in scope \(String(describing: id)), branch \(String(describing: branches[branchIndex].id)). The first interceptor will be used.
+                        """
+                    )
+                }
+            }
+
+            if let routeType = hookDeclaration.unwindHandlerRouteType {
+                let inserted = routeTypeIDs
+                    .insert(ObjectIdentifier(routeType))
+                    .inserted
+
+                if inserted == false {
+                    log.departureWarning(
+                        """
+                        Duplicate unwind handler for \(String(reflecting: routeType)) in scope \(String(describing: id)), branch \(String(describing: branches[branchIndex].id)). The first handler will be used.
+                        """
+                    )
+                }
+            }
+        }
+
         branches[branchIndex].hookAttachments = hookDeclarations
         log.departureDebug(.hooksHydrated(scope: self, hookCount: hookDeclarations.count))
     }

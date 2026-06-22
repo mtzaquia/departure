@@ -57,7 +57,10 @@ enum SampleAppAccessibility {
     static let homeWelcome = "sample.home.welcome"
     static let homeShowMessageButton = "sample.home.show-message"
     static let homeProfileButton = "sample.home.profile"
+    static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
     static let homeEmojiValue = "sample.home.emoji-value"
+    static let homeUnwindPayloadStatus = "sample.home.unwind-payload-status"
+    static let homeDismissProbeHookStatus = "sample.home.dismiss-probe-hook-status"
 
     static let settingsAppearanceButton = "sample.settings.appearance"
     static let settingsAuthenticationButton = "sample.settings.authentication"
@@ -69,6 +72,7 @@ enum SampleAppAccessibility {
     static let settingsPresentUndeclaredRouteButton = "sample.settings.present-undeclared-route"
     static let settingsMissingUnwindButton = "sample.settings.missing-unwind"
     static let settingsMissingUnwindResult = "sample.settings.missing-unwind-result"
+    static let settingsBranchHookStatus = "sample.settings.branch-hook-status"
 
     static let appearanceTitle = "sample.appearance.title"
     static let appearanceRePresentButton = "sample.appearance.re-present"
@@ -83,6 +87,7 @@ enum SampleAppAccessibility {
     static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
     static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
+    static let authenticationUnwindToBranchIDButton = "sample.authentication.unwind-to-branch-id"
 
     static let topLevelSheetText = "sample.top-level-sheet.text"
     static let topLevelSheetPresentationSource = "sample.top-level-sheet.presentation-source"
@@ -91,6 +96,11 @@ enum SampleAppAccessibility {
     static let messageText = "sample.message.text"
     static let messageDismissUnwindButton = "sample.message.dismiss-unwind"
     static let messageDismissSwiftUIButton = "sample.message.dismiss-swiftui"
+    static let messageDismissPayloadButton = "sample.message.dismiss-payload"
+    static let messageDismissMismatchedPayloadButton = "sample.message.dismiss-mismatched-payload"
+
+    static let dismissProbeText = "sample.dismiss-probe.text"
+    static let dismissProbeDismissButton = "sample.dismiss-probe.dismiss"
 
     static let alertText = "sample.alert.text"
     static let alertDismissUnwindButton = "sample.alert.dismiss-unwind"
@@ -121,4 +131,6 @@ enum SampleAppAccessibility {
 
     static let droppedRouteText = "sample.dropped-route.text"
     static let undeclaredRouteText = "sample.undeclared-route.text"
+    static let rootHookStatus = "sample.root-hook-status"
+    static let landingContainerHookStatus = "sample.landing.container-hook-status"
 }

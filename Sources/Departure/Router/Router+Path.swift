@@ -22,8 +22,9 @@
 
 extension Router {
     @discardableResult
-    func unwindAndWait(to target: UnwindTarget?) async -> Bool {
+    func unwindAndWait(to target: UnwindTarget?, payload: Any? = nil) async -> Bool {
         log.departureDebug(.unwindRequested(target: target))
+        let sourceRoute = currentRouteScope.route
 
         // The target only differs by which path it clears; resolution is the same. `.root` unwinds
         // the entire app via the root path, regardless of the originating branch or depth.
@@ -64,10 +65,18 @@ extension Router {
                 removing: removedScopes.count
             ))
 
+            let targetScope = ancestorResolution.path.scope(at: ancestorResolution.pathIndex)
             keepPathThrough(nil, in: routePath)
             keepPathThrough(ancestorResolution.pathIndex, in: ancestorResolution.path)
             await waitForRouteScopesToLeaveView(removedScopes)
             log.departureDebug(.unwindCompleted)
+            if removedScopes.isEmpty == false {
+                await invokeUnwindHandlers(
+                    for: sourceRoute,
+                    payload: payload,
+                    in: targetScope
+                )
+            }
 
             return true
 
@@ -77,6 +86,12 @@ extension Router {
                 keepThrough: targetPathIndex,
                 removing: removedScopes.count
             ))
+
+            let targetScope = unwindHandlerScope(
+                for: target,
+                in: routePath,
+                keepThrough: targetPathIndex
+            )
 
             if target != nil {
                 unwindPresentationSnapshot = UnwindPresentationSnapshot(
@@ -94,6 +109,13 @@ extension Router {
             await waitForRouteScopesToLeaveView(removedScopes)
             unwindPresentationSnapshot = nil
             log.departureDebug(.unwindCompleted)
+            if removedScopes.isEmpty == false {
+                await invokeUnwindHandlers(
+                    for: sourceRoute,
+                    payload: payload,
+                    in: targetScope
+                )
+            }
 
             return true
         }
@@ -488,6 +510,56 @@ extension Router {
         return nil
     }
 
+    func unwindHandlerScope(
+        for target: UnwindTarget?,
+        in routePath: RoutePath,
+        keepThrough pathIndex: [RouteScope].Index?
+    ) -> RouteScope? {
+        switch target {
+        case .nearestBranch:
+            // `.nearestBranch` targets the container that owns the branch. An explicit
+            // `.id(branchRootID)` is the opt-in path for hooks on the branch root itself.
+            routePath.owner?.parent
+
+        default:
+            routePath.scope(at: pathIndex)
+        }
+    }
+
+    func invokeUnwindHandlers(
+        for sourceRoute: (any Route)?,
+        payload: Any?,
+        in targetScope: RouteScope?
+    ) async {
+        guard let sourceRoute, let targetScope else {
+            return
+        }
+
+        let declaringScopeID = targetScope.id
+        if let handler = targetScope.firstUnwindHandler(for: type(of: sourceRoute)) {
+            await handler.invoke(sourceRoute, payload, declaringScopeID)
+        }
+    }
+
+    func scheduleUnwindHandlersAfterDismissalCompletes(
+        for sourceRoute: (any Route)?,
+        in targetScope: RouteScope?,
+        removing removedScopes: [RouteScope]
+    ) {
+        guard removedScopes.isEmpty == false else {
+            return
+        }
+
+        Task { @MainActor in
+            await waitForRouteScopesToLeaveView(removedScopes)
+            await invokeUnwindHandlers(
+                for: sourceRoute,
+                payload: nil,
+                in: targetScope
+            )
+        }
+    }
+
 }
 
 private extension RouteScope {
@@ -497,5 +569,15 @@ private extension RouteScope {
             && $0.kind == declaration.kind
             && $0.drivesPresentation
         }
+    }
+
+    func firstUnwindHandler(for routeType: any Route.Type) -> AnyUnwindHandler? {
+        for attachment in hookAttachments {
+            if let handler = attachment.unwindHandler(for: routeType) {
+                return handler
+            }
+        }
+
+        return nil
     }
 }

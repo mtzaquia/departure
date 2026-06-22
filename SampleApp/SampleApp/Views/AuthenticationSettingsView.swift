@@ -61,7 +61,6 @@ struct AuthenticationSettingsView: View {
                         await router.present(StartInfoRoute())
                     }
                 }
-                .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToRootButton)
 
                 Button("Unwind to root") {
                     Task {
@@ -76,6 +75,15 @@ struct AuthenticationSettingsView: View {
                     }
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToNearestBranchButton)
+
+                if SampleAppUITesting.isEnabled {
+                    Button("Unwind to branch ID") {
+                        Task {
+                            await router.unwind(to: .id(LandingView.TabItem.settings))
+                        }
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToBranchIDButton)
+                }
             }
         }
         .navigationTitle("Authentication")

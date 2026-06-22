@@ -22,36 +22,63 @@
 
 /// Handles a matching route when it unwinds to this scope.
 ///
+/// The handler runs after the unwind has completed and any dismissed mounted scopes have left the
+/// view hierarchy. When the route is dismissed with ``Router/unwind(to:)`` or
+/// ``Router/unwind(to:payload:)``, the unwind call stays suspended until the async handler body
+/// returns.
+///
 /// ```swift
 /// .hooks {
-///     UnwindHandler(TransactionRoute.self) { route in
-///         refresh()
+///     UnwindHandler(TransactionRoute.self, expecting: TransactionResult.self) { result in
+///         await refresh()
 ///     }
 /// }
 /// ```
-@_spi(WIP) public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
+public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
     let declaration: AnyHookDeclaration
 
     /// Creates an unwind handler.
-    public init(
+    ///
+    /// If this handler matches a ``Router/unwind(to:payload:)`` request, the unwind call stays
+    /// suspended until `handle` returns.
+    public init<Payload>(
         _ routeType: R.Type,
-        handle: @escaping @MainActor @Sendable (R) -> Void
+        expecting payloadType: Payload.Type,
+        handle: @escaping @MainActor @Sendable (Payload) async -> Void
     ) {
         self.declaration = AnyHookDeclaration(
             kind: .unwindHandler(
                 routeType,
-                AnyUnwindHandler { route in
-                    guard let route = route as? R else {
+                AnyUnwindHandler { route, payload, declaringScopeID in
+                    guard let payload = payload as? Payload else {
                         log.departureWarning(
                             """
-                            Unwind handler type mismatch for \(String(describing: routeType)):
-                            expected \(R.self), got \(type(of: route))."
+                            Unwind handler payload mismatch for \(String(describing: routeType)):
+                            hook scope \(String(describing: declaringScopeID)) expected \(Payload.self), got \(payload.map { String(describing: type(of: $0)) } ?? "nil").
                             """
                         )
                         return
                     }
 
-                    handle(route)
+                    await handle(payload)
+                }
+            )
+        )
+    }
+
+    /// Creates an unwind handler that ignores any payload sent with the unwind request.
+    ///
+    /// If this handler matches a ``Router/unwind(to:)`` request, the unwind call stays suspended
+    /// until `handle` returns.
+    public init(
+        _ routeType: R.Type,
+        handle: @escaping @MainActor @Sendable () async -> Void
+    ) {
+        self.declaration = AnyHookDeclaration(
+            kind: .unwindHandler(
+                routeType,
+                AnyUnwindHandler { _, _, _ in
+                    await handle()
                 }
             )
         )
@@ -65,9 +92,9 @@
 // MARK: - Supporting types
 
 struct AnyUnwindHandler {
-    let invoke: @MainActor (any Route) -> Void
+    let invoke: @MainActor (any Route, Any?, AnyHashable) async -> Void
 
-    init(invoke: @escaping @MainActor (any Route) -> Void) {
+    init(invoke: @escaping @MainActor (any Route, Any?, AnyHashable) async -> Void) {
         self.invoke = invoke
     }
 }

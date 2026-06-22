@@ -189,10 +189,27 @@ extension RouteScope {
         hookDeclarations: [AnyHookDeclaration]
     ) -> [Branch] {
         var branches = [Branch(id: activeBranch)]
+        var routeTypeIDsByBranch: [AnyHashable: Set<ObjectIdentifier>] = [:]
 
         for declaration in routeDeclarations {
             let branchID = declaration.branch ?? activeBranch
             let branchIndex = branches.index(for: branchID)
+
+            for route in declaration.routes {
+                let routeTypeID = ObjectIdentifier(route.routeType)
+                let inserted = routeTypeIDsByBranch[branchID, default: []]
+                    .insert(routeTypeID)
+                    .inserted
+
+                if inserted == false {
+                    log.departureWarning(
+                        """
+                        Duplicate route declaration for \(String(reflecting: route.routeType)) in scope \(String(describing: id)), branch \(String(describing: branchID)). The first declaration will be used.
+                        """
+                    )
+                }
+            }
+
             branches[branchIndex].routeAttachments.append(contentsOf: declaration.routes)
         }
 

@@ -2,7 +2,7 @@
 
 `Departure` is a lightweight, expressive routing framework for SwiftUI.
 
-It lets views declare the routes they can handle and the presentation style for each route. The router then presents the closest matching route. In branched scopes, such as parallel tabs, it switches to the branch with a matching route when none is found in the active branch. Triggered actions can be intercepted by the topmost scope, and they can request a reroute before execution is retried.
+It lets views declare the routes they can handle and the presentation style for each route. The router then presents the closest matching route. Triggered actions run against the active route context, can be intercepted by route-scoped hooks, and can request a reroute before execution is retried.
 
 ```swift
 await router.present(SettingsRoute())
@@ -10,19 +10,17 @@ await router.present(SettingsRoute())
 
 ## Install
 
-`Departure` is available via Swift Package Manager.
+`Departure` is available via Swift Package Manager, and supports iOS 17.5 or later.
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/mtzaquia/departure.git", from: "1.1.0"),
+  .package(url: "https://github.com/mtzaquia/departure.git", from: "1.2.0"),
 ],
 ```
 
 ## Quick start
 
-### Wrap your app
-
-Use `WithRouter` near the root of your SwiftUI tree:
+This is the smallest end-to-end shape: install a router, define a route, declare where that route can be presented, then ask the router to present it.
 
 ```swift
 @main
@@ -37,27 +35,19 @@ struct ExampleApp: App {
     }
   }
 }
-```
 
-### Define a route
-
-A route is a value that builds its destination.
-
-```swift
 struct SettingsRoute: Route {
   func destination() -> some View {
     SettingsView()
   }
 }
-```
 
-Routes are matched by type. Two `SettingsRoute()` values target the same declaration.
+struct SettingsView: View {
+  var body: some View {
+    Text("Settings")
+  }
+}
 
-### Declare it in the scope that can handle it
-
-You can declare the same route type in multiple places. The nearest matching scope, including the current scope, presents it with the declared style.
-
-```swift
 struct HomeView: View {
   @Environment(Router.self) private var router
 
@@ -77,9 +67,62 @@ struct HomeView: View {
 > [!NOTE]
 > When using `Push(...)` inside `.routes { ... }`, ensure the route is declared within a `NavigationStack`.
 
-## Presentation styles
+## Routes and Actions
 
-Use `Push`, `Sheet`, or `Cover` inside `.routes { ... }`.
+### Routes
+
+A route is a value that builds its destination.
+
+```swift
+struct SettingsRoute: Route {
+  func destination() -> some View {
+    SettingsView()
+  }
+}
+```
+
+Routes can also allow, redirect, or drop themselves before ownership is resolved.
+
+```swift
+struct ProtectedSettingsRoute: Route {
+  let isLoggedIn: Bool
+
+  func resolveRoute() async -> RouteResolution {
+    isLoggedIn ? .allow : .reroute(LoginRoute())
+  }
+
+  func destination() -> some View {
+    SettingsView()
+  }
+}
+```
+
+> [!IMPORTANT]
+> On `.reroute(route)`, `Departure` evaluates the new route before matching it to an owner. Keep resolution quick and avoid recursive reroutes.
+
+### Actions
+
+Actions are work values that run against the active route context.
+
+```swift
+struct SaveDraftAction: Action {
+  func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
+    guard context.isRunning(in: EditorRoute.self) else {
+      throw .reroute(EditorRoute())
+    }
+
+    // Save the draft.
+  }
+}
+```
+
+If an action throws `.reroute(route)`, `Departure` requests that route, then retries the action **once**.
+
+## Declarations
+
+### `.routes(...)`
+
+Declare routes in the scope that can present them.
 
 ```swift
 .routes {
@@ -89,30 +132,124 @@ Use `Push`, `Sheet`, or `Cover` inside `.routes { ... }`.
 }
 ```
 
-Each style has different configuration options.
+The nearest matching scope, including the current scope, presents the route with the declared style. You can declare the same route type in multiple places; the nearest matching owner wins.
+
+| Style | Behavior |
+| --- | --- |
+| `Push` | Pushes onto the nearest `NavigationStack`. |
+| `Sheet` | Presents a sheet. |
+| `Cover` | Presents a full-screen cover. |
 
 > [!NOTE]
 > `Sheet` and `Cover` wrap their destinations in a `NavigationStack` by default. Opt out using
 > `providesNavigation: false`.
 
-## Route ownership
+### `.hooks(...)`
 
-Route requests are resolved by route ownership.
+Hooks are route-scoped behavior declarations. Attach them with `.hooks { ... }` on the view that owns the behavior.
+
+```swift
+struct EditorView: View {
+  var body: some View {
+    EditorContent()
+      .hooks {
+        ActionInterceptor(SaveDraftAction.self) { invocation in
+          do {
+            try await invocation()
+          } catch {
+            // React to the failed save attempt.
+          }
+        }
+      }
+  }
+}
+```
+
+Hooks attach to the current route scope and share its lifecycle.
+
+| Hook | Behavior |
+| --- | --- |
+| `ActionInterceptor` | Wraps or replaces execution for a matching action type. |
+| `UnwindHandler` | Reacts when a descendant route unwinds back to that scope. |
+
+For actions, `Departure` checks only the active scope for a matching `ActionInterceptor`. If no interceptor matches, the action is attempted directly. If an interceptor matches, **that interceptor owns the action flow** and must call `invocation()` when the original action should run.
+
+```swift
+.hooks {
+  ActionInterceptor(DeleteDraftAction.self) { _ in
+    // Consume the action without running DeleteDraftAction.attemptAction(in:).
+  }
+}
+```
+
+If an intercepted action throws `.reroute(route)` from its original implementation, `invocation()` will perform the reroute, retry the action in the new scope, and throw a `CancellationError` in the current interceptor.
+
+`UnwindHandler` can also expect a typed payload. **The handler only runs when the unwind payload matches the declared payload type.** A warning is emitted if the expected payload type doesn't match the one provided.
+
+```swift
+.hooks {
+  UnwindHandler(EditorRoute.self, expecting: SaveResult.self) { result in
+    showToast(for: result)
+  }
+}
+```
+
+> [!NOTE]
+> If the route and target scope match, SwiftUI's `dismiss()` also triggers unwind handlers with no payloads.
+
+### Duplicate declarations
+
+If a scope declares multiple handlers for the same route, multiple action interceptors for the same action, or multiple unwind handlers for the same route, only the first declaration is used; all subsequent declarations are ignored. In these cases, `Departure` emits a runtime warning.
+
+```swift
+.routes {
+  Sheet(MessageRoute.self) // Used for MessageRoute.
+  Cover(MessageRoute.self) // Ignored; the first declaration wins.
+}
+
+.hooks {
+  ActionInterceptor(SaveDraftAction.self) { invocation in
+    try? await invocation()
+  }
+
+  ActionInterceptor(SaveDraftAction.self) { _ in
+    // Ignored; the first interceptor wins.
+  }
+}
+```
+
+## Router calls
+
+### `.present(...)`
+
+Use `present` to request a route.
+
+```swift
+struct ToolbarView: View {
+  @Environment(Router.self) private var router
+
+  var body: some View {
+    Button("Settings") {
+      Task {
+        await router.present(SettingsRoute())
+      }
+    }
+  }
+}
+```
+
+Route requests crawl backward to find an owner.
 
 ```mermaid
 flowchart TD
     request["await router.present(ReceiptRoute())"]
-    owns{"Does this scope or a sibling branch declare ReceiptRoute?"}
+    owns{"Does this scope declare ReceiptRoute?"}
     previous["Move to previous route owner"]
-    branch{"Is this declaration on a different branch?"}
-    change["Activate branch with matching declaration"]
     present["Present from matching scope"]
     drop["Drop request"]
 
     request -- Starting at the active scope --> owns
-    owns -- yes --> branch
-    branch -- yes --> change --> present
-    branch -- no --> present
+    owns -- yes --> present
     owns -- no --> previous --> owns
     previous -- no owner left --> drop
 ```
@@ -121,12 +258,79 @@ That gives feature views a simple rule:
 
 _Declare the routes you can present. If a child scope asks for one of those routes and cannot handle it, the request comes back to you._
 
-> [!IMPORTANT]
-> If no active scope or declared branch map can resolve the route type, the request is ignored.
+> [!NOTE]
+> If no active scope can resolve the route type, the request is ignored.
+
+### `.perform(...)`
+
+Use `perform` to run an action from SwiftUI through the router.
+
+```swift
+struct ToolbarView: View {
+  @Environment(Router.self) private var router
+
+  var body: some View {
+    Button("Save") {
+      Task {
+        await router.perform(SaveDraftAction())
+      }
+    }
+  }
+}
+```
+
+Actions do not crawl for work execution; they run in the active route context, or unconditionally when there are no interceptors.
+
+### `.unwind(...)`
+
+Unwind is the counterpart to presentation: it allows scopes to dismiss themselves or return to a known route scope.
+
+```swift
+await router.unwind()
+```
+
+Use an explicit target when you want to dismiss more than one route:
+
+```swift
+await router.unwind(to: .root)
+await router.unwind(to: .id("settings-flow"))
+```
+
+| API | Behavior |
+| --- | --- |
+| `await router.unwind()` | Dismisses the current route. |
+| `await router.unwind(to: .root)` | Clears all presented routes and returns to the root scope. |
+| `await router.unwind(to: .id(id))` | Keeps the matching route scope and dismisses everything after it. |
+
+To unwind to a specific scope, tag it with an explicit ID:
+
+```swift
+SettingsFlowView()
+  .routes(id: "settings-flow") {
+    Push(AdvancedSettingsRoute.self)
+    Sheet(AccountRoute.self)
+  }
+```
+
+Unwinding is a suspending operation. Once it finishes, it is safe to present a new route.
+
+```swift
+await router.unwind()
+await router.present(ProfileRoute())
+
+if await router.unwind(to: .id("settings-flow")) {
+  await router.present(LoginRoute(nextRoute: ProfileRoute()))
+}
+
+await router.unwind(to: .id("documents"), payload: SaveResult.saved)
+```
+
+> [!NOTE]
+> `unwind(to:)` returns `false` when an explicit target is not found. Check the return value before presenting a continuation route if your flow requires it.
 
 ## Branches
 
-Use branches for selection-based containers such as tabs.
+Use branched scopes for selection-based containers with lazy content, such as `TabView`.
 
 ```swift
 enum AppTab: Hashable, Sendable {
@@ -152,7 +356,7 @@ struct RootView: View {
       .tag(AppTab.wallet)
     }
     .routes(branch: $tab) {
-      Cover(LoginRoute.self, priority: .high)
+      Cover(LoginRoute.self)
 
       Branch(.home) {
         Push(HomeDetailRoute.self)
@@ -166,16 +370,43 @@ struct RootView: View {
 }
 ```
 
-`.routes(branch:)` declares the full route map for a selection container. This lets `Departure` find routes in lazy branches that have not been built yet. Declarations inside `Branch(...)` are used for crawling and branch selection at the container, then adopted by the matching `.routeBranch(...)` view as local presentation declarations. Adopted declarations have lower priority than explicit declarations on the scope.
+`.routes(branch:)` declares the full route map for a selection container. This lets `Departure` find routes in lazy branches that have not been built yet.
 
-Top-level declarations in the same `.routes(branch:)` builder, such as `Cover(LoginRoute.self, priority: .high)`, belong to the container itself. If a request matches a route declared in an inactive branch, `Departure` selects that branch before presenting the route from the mounted `.routeBranch(...)` host.
+Declarations inside `Branch(...)` are used for crawling and branch selection at the container. They area also adopted by the matching `.routeBranch(...)` view as local presentation declarations. Adopted declarations have lower priority than explicit declarations on the scope. If a request matches a route declared in an inactive branch, `Departure` selects that branch before presenting the route from the mounted `.routeBranch(...)` host.
+
+Top-level declarations in the same `.routes(branch:)` builder, such as `Cover(LoginRoute.self)`, belong to the container itself. 
+
+To unwind within the current branch without escaping to the app root, target `.nearestBranch`.
+
+```swift
+await router.unwind(to: .nearestBranch)
+```
+
+This clears the nearest enclosing branch path back to that branch's root. The accepted target scope is the branch container that declared the branch. To target the mounted branch root itself, unwind to that branch root's explicit ID.
+
+```mermaid
+flowchart TD
+    request["await router.present(ReceiptRoute())"]
+    owns{"Does this scope or a sibling branch declare ReceiptRoute?"}
+    previous["Move to previous route owner"]
+    branch{"Is this declaration on a different branch?"}
+    change["Activate branch with matching declaration"]
+    present["Present from matching scope"]
+    drop["Drop request"]
+
+    request -- Starting at the active scope --> owns
+    owns -- yes --> branch
+    branch -- yes --> change --> present
+    branch -- no --> present
+    owns -- no --> previous --> owns
+    previous -- no owner left --> drop
+```
 
 > [!NOTE]
 > Each branch on a branched scope has its own path for pushed presentations. Modal presentations are
-> mutually exclusive in the normal flow; the high-priority flow can still present modally over
-> the current flow.
+> mutually exclusive within the branched scope.
 
-## Priority
+## High-priority presentations
 
 Sheets and covers can have normal or high priority.
 
@@ -196,8 +427,6 @@ Sheets and covers can have normal or high priority.
 
 > [!IMPORTANT]
 > High priority changes presentation context, not route lookup. Branch routes are still resolved with the same crawling rules; when a high-priority branch route is selected, the high-priority window uses the active branch presentation scope.
-
-### High-priority environment
 
 Because high-priority presentations use a separate `UIWindow`, SwiftUI cannot automatically propagate custom environment values. Use the `windowDestination` parameter from `WithRouter` to customize these destinations.
 
@@ -224,158 +453,6 @@ flowchart TD
     login -->|"local route request"| twofactor
     settings -.->|"blocked while high-priority flow is active"| login
 ```
-
-## Route resolution
-
-Routes can allow, redirect, or drop themselves before ownership is resolved.
-
-```swift
-struct ProtectedSettingsRoute: Route {
-  let isLoggedIn: Bool
-
-  func resolveRoute() async -> RouteResolution {
-    isLoggedIn ? .allow : .reroute(LoginRoute())
-  }
-
-  func destination() -> some View {
-    SettingsView()
-  }
-}
-```
-
-> [!IMPORTANT]
-> On `.reroute(route)`, `Departure` evaluates the new route before matching it to an owner. Keep resolution quick and avoid recursive reroutes.
-
-## Actions
-
-Actions are work values that run against the active route context.
-
-```swift
-struct SaveDraftAction: Action {
-  func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
-    guard context.isRunning(in: EditorRoute.self) else {
-      throw .reroute(EditorRoute())
-    }
-
-    // Save the draft.
-  }
-}
-```
-
-Run an action from SwiftUI through the router:
-
-```swift
-struct ToolbarView: View {
-  @Environment(Router.self) private var router
-
-  var body: some View {
-    Button("Save") {
-      Task {
-        await router.perform(SaveDraftAction())
-      }
-    }
-  }
-}
-```
-
-If an action throws `.reroute(route)`, `Departure` requests that route using the same ownership rules, then retries the action once.
-
-> [!NOTE]
-> Route requests crawl backward to find an owner. Actions do not crawl for work execution; they run in the active route context, or unconditionally when there are no interceptors.
-
-## Hooks
-
-Hooks are route-scoped behavior declarations. Attach them with `.hooks { ... }` on the view that owns the behavior.
-
-```swift
-struct EditorView: View {
-  var body: some View {
-    EditorContent()
-        .hooks {
-          ActionInterceptor(SaveDraftAction.self) { invocation in
-            do {
-              try await invocation()
-            } catch {
-              // React to the failed save attempt.
-            }
-          }
-        }
-  }
-}
-```
-
-Hooks attach to the current route scope and share its lifecycle. Inside a selected `.routeBranch(...)`, hooks attach to that branch-local scope, so selected tab content can intercept actions without changing route ownership. For actions, `Departure` checks only the active scope for a matching `ActionInterceptor`. If no interceptor matches, the action runs normally. If an interceptor matches, **that interceptor owns the action flow** and must call `invocation()` when the original action should run.
-
-### Action interceptors
-
-`ActionInterceptor` lets a scope wrap or replace execution for a matching action type.
-
-```swift
-.hooks {
-  ActionInterceptor(SaveDraftAction.self) { invocation in
-    try? await invocation()
-  }
-}
-```
-
-The interceptor receives an `invocation` closure for the original action. Call it to continue action execution, or do not call it to consume the action.
-
-```swift
-.hooks {
-  ActionInterceptor(DeleteDraftAction.self) { _ in
-    // Consume the action without running DeleteDraftAction.attemptAction(in:).
-  }
-}
-```
-
-If an intercepted action throws `.reroute(route)` from its original implementation, `invocation()` will perform the reroute, retry the action in the new scope, and throw a `CancellationError` in the current interceptor.
-
-## Unwind
-
-Unwind is the counterpart to presentation: it allows scopes to dismiss themselves or return to a known route scope.
-
-```swift
-await router.unwind()
-```
-
-Use an explicit target when you want to dismiss more than one route:
-
-```swift
-await router.unwind(to: .root)
-await router.unwind(to: .nearestBranch)
-await router.unwind(to: .id("settings-flow"))
-```
-
-| API | Behavior |
-| --- | --- |
-| `await router.unwind()` | Dismisses the current route. |
-| `await router.unwind(to: .root)` | Clears all presented routes and returns to the root scope. |
-| `await router.unwind(to: .nearestBranch)` | Clears the nearest enclosing branch path back to that branch's root without escaping to the app root. |
-| `await router.unwind(to: .id(id))` | Keeps the matching route scope and dismisses everything after it. |
-
-To unwind to a specific scope, tag it with an explicit ID:
-
-```swift
-SettingsFlowView()
-  .routes(id: "settings-flow") {
-    Push(AdvancedSettingsRoute.self)
-    Sheet(AccountRoute.self)
-  }
-```
-
-Unwinding is a suspending operation. Once it finishes, it is safe to present a new route.
-
-```swift
-await router.unwind()
-await router.present(ProfileRoute())
-
-if await router.unwind(to: .id("settings-flow")) {
-  await router.present(LoginRoute(nextRoute: ProfileRoute()))
-}
-```
-
-> [!NOTE]
-> `unwind(to:)` returns `false` when an explicit target is not found. Check the return value before presenting a continuation route if your flow requires it.
 
 ## License
 
