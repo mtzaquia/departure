@@ -84,6 +84,11 @@ struct AppearanceSettingsView: View {
         }
         .navigationTitle("Appearance")
         .accessibilityIdentifier(SampleAppAccessibility.appearanceTitle)
+        .routes {
+            if SampleAppUITesting.isEnabled {
+                Push(AuthenticationSettingsRoute.self)
+            }
+        }
         .hooks {
             ActionInterceptor(SaveAppearanceSettingsAction.self) { invocation in
                 try? await invocation()
