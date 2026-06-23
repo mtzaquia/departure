@@ -104,8 +104,7 @@ extension Router {
 
         guard
             routeScope !== root,
-            let unwindPresentationSnapshot,
-            routeScope !== unwindPresentationSnapshot.routePath.owner
+            let unwindPresentationSnapshot
         else {
             return nil
         }
@@ -115,7 +114,7 @@ extension Router {
         return hostedPresentation(
             by: routeScope,
             matching: presentationKind,
-            inPreservedPath: unwindPresentationSnapshot.preservedPath,
+            inPreservedPaths: unwindPresentationSnapshot.preservedPaths,
             snapshot: unwindPresentationSnapshot
         )
     }
@@ -189,17 +188,37 @@ private extension Router {
     func hostedPresentation(
         by host: RouteScope,
         matching presentationKind: RoutePresentationKind,
-        inPreservedPath path: [RouteScope],
+        inPreservedPaths paths: [UnwindPresentationSnapshot.PreservedRoutePath],
+        snapshot: UnwindPresentationSnapshot
+    ) -> RoutePresentation? {
+        for path in paths {
+            if let presentation = hostedPresentation(
+                by: host,
+                matching: presentationKind,
+                inPreservedPath: path,
+                snapshot: snapshot
+            ) {
+                return presentation
+            }
+        }
+
+        return nil
+    }
+
+    func hostedPresentation(
+        by host: RouteScope,
+        matching presentationKind: RoutePresentationKind,
+        inPreservedPath path: UnwindPresentationSnapshot.PreservedRoutePath,
         snapshot: UnwindPresentationSnapshot
     ) -> RoutePresentation? {
         guard host.canDrivePresentation(matching: presentationKind) else {
             return nil
         }
 
-        let hostIndex = path.firstIndex { $0 === host }
-        let originalHostIndex = snapshot.originalPathIndex(forPreservedPathIndex: hostIndex)
+        let hostIndex = path.scopes.firstIndex { $0 === host }
+        let originalHostIndex = path.originalPathIndex(forPreservedPathIndex: hostIndex)
 
-        for presentedScope in path {
+        for presentedScope in path.scopes {
             guard
                 presentedScope.hostScope === host,
                 let declaration = presentedScope.hostDeclaration,
@@ -208,7 +227,7 @@ private extension Router {
                 shouldHostLocally(
                     declaration,
                     from: originalHostIndex,
-                    in: snapshot.routePath,
+                    in: path.routePath,
                     context: snapshot.highContext
                 )
             else {

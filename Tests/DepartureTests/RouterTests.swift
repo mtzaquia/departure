@@ -1847,6 +1847,65 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }
 
+    @Test func rootUnwindPreservesBranchDescendantPresentationBindingUntilAncestorLeavesView() async {
+        let router = Router()
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        let profileScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(RootRoute.self, providesNavigation: false)._routeDeclarations),
+            ]
+        )
+        landingScope.hostScope = router.root
+        landingScope.hostDeclaration = router.root.routeAttachments.first { $0.presentationKind == .cover(.slide) }
+        router.root.modalChild = landingScope
+
+        landingScope.setActiveBranch(AnyHashable(AppTab.home))
+        homeScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.home),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Sheet(LoginRoute.self)._routeDeclarations),
+            ]
+        )
+        landingScope.registerBranchScope(homeScope, for: AppTab.home)
+
+        profileScope.hostScope = homeScope
+        profileScope.hostDeclaration = homeScope.routeAttachments.first { $0.presentationKind == .sheet }
+        homeScope.modalChild = profileScope
+        homeScope.path.scopes = [profileScope]
+        router.rootPath.scopes = [landingScope]
+
+        router.routeScopeDidInstallInView(landingScope)
+        router.routeScopeDidInstallInView(profileScope)
+
+        let unwindTask = Task {
+            await router.unwindAndWait(to: .root)
+        }
+
+        for _ in 0..<10 {
+            if router.unwindPresentationSnapshot != nil {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(router.rootPath.isEmpty)
+        #expect(homeScope.path.isEmpty)
+        #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue == nil)
+        #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue?.scope === profileScope)
+
+        router.routeScopeDidLeaveView(landingScope)
+        router.routeScopeDidLeaveView(profileScope)
+        _ = await unwindTask.value
+
+        #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
+    }
+
     @Test func inactiveBranchPathIsPreservedWhenActiveBranchChanges() async throws {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.home)

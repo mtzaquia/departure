@@ -28,17 +28,44 @@ extension Router {
     }
 
     struct UnwindPresentationSnapshot {
-        let routePath: RoutePath
-        let preservedPath: [RouteScope]
-        let preservedPathStartIndex: [RouteScope].Index
+        struct PreservedRoutePath {
+            let routePath: RoutePath
+            let scopes: [RouteScope]
+            let startIndex: [RouteScope].Index
+
+            func originalPathIndex(forPreservedPathIndex pathIndex: [RouteScope].Index?) -> [RouteScope].Index? {
+                guard let pathIndex else {
+                    return nil
+                }
+
+                return startIndex + pathIndex
+            }
+        }
+
+        let preservedPaths: [PreservedRoutePath]
         let highContext: RouteContext?
 
-        func originalPathIndex(forPreservedPathIndex pathIndex: [RouteScope].Index?) -> [RouteScope].Index? {
-            guard let pathIndex else {
-                return nil
-            }
+        init(
+            routePath: RoutePath,
+            preservedPath: [RouteScope],
+            preservedPathStartIndex: [RouteScope].Index,
+            highContext: RouteContext?
+        ) {
+            self.init(
+                preservedPaths: [
+                    PreservedRoutePath(
+                        routePath: routePath,
+                        scopes: preservedPath,
+                        startIndex: preservedPathStartIndex
+                    ),
+                ],
+                highContext: highContext
+            )
+        }
 
-            return preservedPathStartIndex + pathIndex
+        init(preservedPaths: [PreservedRoutePath], highContext: RouteContext?) {
+            self.preservedPaths = preservedPaths
+            self.highContext = highContext
         }
     }
 
@@ -187,10 +214,32 @@ extension Router {
             removing: removedScopes.count
         ))
 
+        let preservedPaths = (
+            [
+                UnwindPresentationSnapshot.PreservedRoutePath(
+                    routePath: rootPath,
+                    scopes: rootRemovedScopes,
+                    startIndex: rootPath.scopes.startIndex
+                ),
+            ]
+            + branchPaths.map {
+                UnwindPresentationSnapshot.PreservedRoutePath(
+                    routePath: $0,
+                    scopes: $0.scopesRemovedByKeepingThrough(nil),
+                    startIndex: $0.scopes.startIndex
+                )
+            }
+            + inactiveBranchModalTrims.map {
+                UnwindPresentationSnapshot.PreservedRoutePath(
+                    routePath: $0.path,
+                    scopes: $0.path.scopesRemovedByKeepingThrough($0.keepThrough),
+                    startIndex: preservedPathStartIndex(keepingThrough: $0.keepThrough, in: $0.path)
+                )
+            }
+        ).filter { $0.scopes.isEmpty == false }
+
         unwindPresentationSnapshot = UnwindPresentationSnapshot(
-            routePath: rootPath,
-            preservedPath: rootRemovedScopes,
-            preservedPathStartIndex: rootPath.scopes.startIndex,
+            preservedPaths: preservedPaths,
             highContext: highContext
         )
 
