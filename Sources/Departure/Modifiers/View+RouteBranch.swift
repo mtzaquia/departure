@@ -100,21 +100,11 @@ private struct RouteBranchModifier: ViewModifier {
     }
 
     private var adoptedDeclarations: [RouteScopeDeclaration] {
-        let routes = branchRouteDeclarations
-            .flatMap { declaration in
-                if declaration.branch == branch {
-                    return declaration.routes
-                }
-
-                guard declaration.branch == nil else {
-                    return []
-                }
-
-                return declaration.routes.filter {
-                    $0.presentationKind != .push
-                }
-            }
-            .map { $0.drivingPresentation(true) }
+        let routes = branchRouteDeclarations.flatMap { declaration in
+            declaration.branch == branch
+                ? declaration.routes.drivingPresentation(true)
+                : []
+        }
 
         guard routes.isEmpty == false else {
             return []

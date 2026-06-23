@@ -284,7 +284,7 @@ struct WindowDestinationBuilderTests {
         #expect(presentation.sourceEnvironment.windowDestinationTestValue == "declaring")
     }
 
-    @Test func adoptedBranchPresentationUsesBranchSourceEnvironment() async throws {
+    @Test func branchContainerPresentationUsesContainerSourceEnvironment() async throws {
         let router = Router()
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
@@ -315,10 +315,7 @@ struct WindowDestinationBuilderTests {
             id: AnyHashable(AppTab.home),
             branchSelection: nil,
             routeDeclarations: [
-                RouteScopeDeclaration(
-                    routes: Sheet(MessageRoute.self)._routeDeclarations.map { $0.drivingPresentation(true) }
-                    + Push(SettingsRoute.self)._routeDeclarations
-                ),
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
             ],
             sourceEnvironment: branchEnvironment
         )
@@ -328,11 +325,11 @@ struct WindowDestinationBuilderTests {
         await router.requestRoute(MessageRoute())
 
         let presentation = try #require(router.routePresentationBinding(
-            from: homeScope,
+            from: landingScope,
             matching: .sheet
         ).wrappedValue)
 
-        #expect(presentation.sourceEnvironment.windowDestinationTestValue == "branch")
+        #expect(presentation.sourceEnvironment.windowDestinationTestValue == "container")
     }
 
     @Test func normalPresentationResolutionDoesNotUseWindowDestinationBuilder() async throws {

@@ -25,7 +25,7 @@ import SwiftUI
 
 final class RouteScope: Identifiable {
     struct RouteAttachmentMatch {
-        let branchID: AnyHashable
+        let branchID: AnyHashable?
         let declaration: AnyRouteDeclaration
     }
 

@@ -85,7 +85,7 @@ extension Router {
         var pathIndex: [RouteScope].Index?
         var declaringPath: RoutePath
         var declaringPathIndex: [RouteScope].Index?
-        var branchID: AnyHashable
+        var branchID: AnyHashable?
         var declaration: AnyRouteDeclaration
     }
 
@@ -118,37 +118,22 @@ extension Router {
             for: routeType,
             in: root.activeBranch
         ) {
-            let branchPath = routePath(forBranch: match.branchID, under: root, declaration: match.declaration)
+            let routePath = routePath(for: match, under: root, fallbackPath: rootPath, fallbackPathIndex: nil)
             return DeclarationMatch(
-                path: branchPath.path,
-                pathIndex: branchPath.pathIndex,
+                routePath: routePath,
                 declaringPath: rootPath,
                 declaringPathIndex: nil,
-                branchID: match.branchID,
-                declaration: match.declaration
+                attachment: match
             )
         }
 
         if let match = root.firstRouteAttachment(for: routeType) {
-            guard match.declaration.drivesPresentation == false else {
-                return DeclarationMatch(
-                    path: rootPath,
-                    pathIndex: nil,
-                    declaringPath: rootPath,
-                    declaringPathIndex: nil,
-                    branchID: match.branchID,
-                    declaration: match.declaration
-                )
-            }
-
-            let branchPath = routePath(forBranch: match.branchID, under: root, declaration: match.declaration)
+            let routePath = routePath(for: match, under: root, fallbackPath: rootPath, fallbackPathIndex: nil)
             return DeclarationMatch(
-                path: branchPath.path,
-                pathIndex: branchPath.pathIndex,
+                routePath: routePath,
                 declaringPath: rootPath,
                 declaringPathIndex: nil,
-                branchID: match.branchID,
-                declaration: match.declaration
+                attachment: match
             )
         }
 
@@ -161,29 +146,26 @@ extension Router {
                 for: routeType,
                 in: searchPath.scopes[index].activeBranch
             ) {
-                let branchPath = routePath(
-                    forBranch: match.branchID,
+                let routePath = routePath(
+                    for: match,
                     under: searchPath.scopes[index],
-                    declaration: match.declaration
+                    fallbackPath: searchPath,
+                    fallbackPathIndex: index
                 )
                 return DeclarationMatch(
-                    path: branchPath.path,
-                    pathIndex: branchPath.pathIndex,
+                    routePath: routePath,
                     declaringPath: searchPath,
                     declaringPathIndex: index,
-                    branchID: match.branchID,
-                    declaration: match.declaration
+                    attachment: match
                 )
             }
 
             if let match = searchPath.scopes[index].firstRouteAttachment(for: routeType) {
                 return DeclarationMatch(
-                    path: searchPath,
-                    pathIndex: index,
+                    routePath: (path: searchPath, pathIndex: index),
                     declaringPath: searchPath,
                     declaringPathIndex: index,
-                    branchID: match.branchID,
-                    declaration: match.declaration
+                    attachment: match
                 )
             }
         }
@@ -194,12 +176,10 @@ extension Router {
 
         if let match = owner.firstRouteAttachment(for: routeType) {
             return DeclarationMatch(
-                path: searchPath,
-                pathIndex: nil,
+                routePath: (path: searchPath, pathIndex: nil),
                 declaringPath: searchPath,
                 declaringPathIndex: nil,
-                branchID: match.branchID,
-                declaration: match.declaration
+                attachment: match
             )
         }
 
@@ -219,6 +199,19 @@ extension Router {
         }
 
         return nil
+    }
+
+    func routePath(
+        for match: RouteScope.RouteAttachmentMatch,
+        under routeScope: RouteScope,
+        fallbackPath: RoutePath,
+        fallbackPathIndex: [RouteScope].Index?
+    ) -> (path: RoutePath, pathIndex: [RouteScope].Index?) {
+        guard let branchID = match.branchID else {
+            return (path: fallbackPath, pathIndex: fallbackPathIndex)
+        }
+
+        return routePath(forBranch: branchID, under: routeScope, declaration: match.declaration)
     }
 
     func routePath(
@@ -242,6 +235,22 @@ extension Router {
 }
 
 extension Router.DeclarationMatch {
+    init(
+        routePath: (path: RoutePath, pathIndex: [RouteScope].Index?),
+        declaringPath: RoutePath,
+        declaringPathIndex: [RouteScope].Index?,
+        attachment: RouteScope.RouteAttachmentMatch
+    ) {
+        self.init(
+            path: routePath.path,
+            pathIndex: routePath.pathIndex,
+            declaringPath: declaringPath,
+            declaringPathIndex: declaringPathIndex,
+            branchID: attachment.branchID,
+            declaration: attachment.declaration
+        )
+    }
+
     func updatingPresentationPath(
         _ routePath: (path: RoutePath, pathIndex: [RouteScope].Index?)
     ) -> Self {

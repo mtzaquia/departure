@@ -55,26 +55,11 @@ public struct Branch<Selection: Hashable>: Sendable where Selection: Sendable {
     }
 
     var routeScopeDeclarations: [RouteScopeDeclaration] {
-        declarations.flatMap { declaration in
-            if declaration.branch == nil {
-                return [
-                    RouteScopeDeclaration(
-                        branch: selection,
-                        routes: declaration.routes.map {
-                            $0.drivingPresentation(false)
-                        }
-                    ),
-                ]
-            }
-
-            return [
-                RouteScopeDeclaration(
-                    branch: declaration.branch,
-                    routes: declaration.routes.map {
-                        $0.drivingPresentation(false)
-                    }
-                )
-            ]
+        declarations.map { declaration in
+            RouteScopeDeclaration(
+                branch: selection,
+                routes: declaration.routes.drivingPresentation(false)
+            )
         }
     }
 }

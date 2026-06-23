@@ -145,9 +145,6 @@ private struct RoutesModifier: ViewModifier {
     }
 
     private var accumulatedBranchRouteDeclarations: [RouteScopeDeclaration] {
-        branchRouteDeclarations + declarations.filter { declaration in
-            declaration.branch != nil
-            || declaration.routes.contains { $0.presentationKind != .push }
-        }
+        branchRouteDeclarations + declarations.filter { $0.branch != nil }
     }
 }
