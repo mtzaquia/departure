@@ -293,14 +293,19 @@ Use an explicit target when you want to dismiss more than one route:
 
 ```swift
 await router.unwind(to: .root)
+await router.unwind(to: .nearestBranch)
 await router.unwind(to: .id("settings-flow"))
 ```
 
 | API | Behavior |
 | --- | --- |
 | `await router.unwind()` | Dismisses the current route. |
-| `await router.unwind(to: .root)` | Clears the active route path and modal presentations, returning to the root scope while preserving inactive push stacks only for branch containers that remain installed at the router root. |
+| `await router.unwind(to: .root)` | Returns to the app root, clearing presented routes and any branch containers owned by those routes. |
+| `await router.unwind(to: .nearestBranch)` | Clears the nearest enclosing branch path back to that branch's root without unwinding to the app root. |
 | `await router.unwind(to: .id(id))` | Keeps the matching route scope and dismisses everything after it. |
+
+> [!NOTE]
+> Branch paths live under the scope that declares their `.routes(branch:)` container. If an unwind goes past that container scope, all of its branches are destroyed. If the container scope remains installed after an unwind, inactive branch push stacks aren't impacted.
 
 To unwind to a specific scope, tag it with an explicit ID:
 
