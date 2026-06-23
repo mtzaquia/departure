@@ -102,6 +102,10 @@ extension Router {
             return presentation
         }
 
+        guard presentationKind != .push else {
+            return nil
+        }
+
         guard
             routeScope !== root,
             let unwindPresentationSnapshot

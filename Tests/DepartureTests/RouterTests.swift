@@ -1906,6 +1906,48 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }
 
+    @Test func unwindSnapshotDoesNotPreservePushPresentationBinding() async {
+        let router = Router()
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let settingsScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        let authenticationScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+
+        landingScope.setActiveBranch(AnyHashable(AppTab.wallet))
+        settingsScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.wallet),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(LoginRoute.self)._routeDeclarations),
+            ]
+        )
+        landingScope.registerBranchScope(settingsScope, for: AppTab.wallet)
+
+        authenticationScope.hostScope = settingsScope
+        authenticationScope.hostDeclaration = settingsScope.routeAttachments.first { $0.presentationKind == .push }
+        settingsScope.pushChild = authenticationScope
+        settingsScope.path.scopes = [authenticationScope]
+        router.rootPath.scopes = [landingScope]
+
+        router.routeScopeDidInstallInView(authenticationScope)
+
+        let unwindTask = Task {
+            await router.unwindAndWait(to: .nearestBranch)
+        }
+
+        for _ in 0..<10 {
+            if router.unwindPresentationSnapshot != nil {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(settingsScope.path.isEmpty)
+        #expect(router.routePresentationBinding(from: settingsScope, matching: .push).wrappedValue == nil)
+
+        router.routeScopeDidLeaveView(authenticationScope)
+        _ = await unwindTask.value
+    }
+
     @Test func inactiveBranchPathIsPreservedWhenActiveBranchChanges() async throws {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.home)
