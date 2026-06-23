@@ -27,25 +27,16 @@ import SwiftUI
 
 extension RouteScope {
     var routeAttachments: [AnyRouteDeclaration] {
-        let local = branchContainer == nil
+        let visible = branchContainer == nil
             ? declarations.local.routeAttachments
-            : declarations
-                .declarations(forBranch: activeBranch)
-                .routeAttachments
+            : declarations.declarations(forBranch: activeBranch).routeAttachments + declarations.local.routeAttachments
         let adopted = branchID
             .flatMap { branchID in
                 parent?
-                    .routeDeclarations(adoptedByBranch: branchID)
-                    .flatMap(\.routes)
+                    .adoptedRouteAttachments(forBranch: branchID)
             } ?? []
 
-        if adopted.isEmpty {
-            return local
-        }
-        if local.isEmpty {
-            return adopted
-        }
-        return local + adopted
+        return visible + adopted
     }
 
     var hookAttachments: [AnyHookDeclaration] {
@@ -58,42 +49,40 @@ extension RouteScope {
             .hookAttachments
     }
 
-    func routeDeclarations(adoptedByBranch branchID: AnyHashable) -> [RouteScopeDeclaration] {
-        let routeAttachments = declarations
+    func adoptedRouteAttachments(forBranch branchID: AnyHashable) -> [AnyRouteDeclaration] {
+        declarations
             .declarations(forBranch: branchID)
             .routeAttachments
-
-        guard routeAttachments.isEmpty == false else {
-            return []
-        }
-
-        return [
-            RouteScopeDeclaration(
-                routes: routeAttachments.map {
-                    $0.drivingPresentation(true)
-                }
-            ),
-        ]
+            .filter { $0.drivesPresentation == false }
+            .drivingPresentation(true)
     }
 
     func firstRouteAttachment(for routeType: (some Route).Type) -> RouteAttachmentMatch? {
-        if let match = firstRouteAttachment(for: routeType, in: activeBranch) {
-            return match
+        if branchContainer != nil,
+           let declaration = declarations.declarations(forBranch: activeBranch).routeAttachment(for: routeType) {
+            return RouteAttachmentMatch(branchID: activeBranch, declaration: declaration)
+        }
+
+        if let declaration = declarations.local.routeAttachment(for: routeType) {
+            return RouteAttachmentMatch(branchID: nil, declaration: declaration)
         }
 
         if let branchID,
            let declaration = parent?
-            .routeDeclarations(adoptedByBranch: branchID)
-            .flatMap(\.routes)
+            .adoptedRouteAttachments(forBranch: branchID)
             .first(where: { attachment in
                 routeType == attachment.routeType
             }) {
-            return RouteAttachmentMatch(branchID: activeBranch, declaration: declaration)
+            return RouteAttachmentMatch(branchID: nil, declaration: declaration)
         }
 
-        for branchID in declarations.branchIDs where branchID != activeBranch {
-            if let match = firstRouteAttachment(for: routeType, in: branchID) {
-                return match
+        if branchContainer != nil {
+            for branchID in declarations.branchIDs where branchID != activeBranch {
+                guard let declaration = declarations.declarations(forBranch: branchID).routeAttachment(for: routeType) else {
+                    continue
+                }
+
+                return RouteAttachmentMatch(branchID: branchID, declaration: declaration)
             }
         }
 
@@ -230,22 +219,19 @@ private extension RouteScope {
             : DeclarationStore(branchIDs: branchIDs)
 
         for declaration in routeDeclarations {
-            if branchContainer != nil {
-                let branchID = declaration.branch ?? activeBranch
-
-                for route in declaration.routes {
-                    let inserted = declarationStore.appendRoute(route, toBranch: branchID)
-                    if inserted == false {
-                        logDuplicateRouteDeclaration(route.routeType, branchID: branchID)
-                    }
-                }
-                continue
-            }
+            let declarationBranch = branchContainer == nil ? nil : declaration.branch
+            let duplicateBranch = declarationBranch ?? activeBranch
 
             for route in declaration.routes {
-                let inserted = declarationStore.local.appendRoute(route)
+                let inserted: Bool
+                if let declarationBranch {
+                    inserted = declarationStore.appendRoute(route, toBranch: declarationBranch)
+                } else {
+                    inserted = declarationStore.local.appendRoute(route)
+                }
+
                 if inserted == false {
-                    logDuplicateRouteDeclaration(route.routeType, branchID: activeBranch)
+                    logDuplicateRouteDeclaration(route.routeType, branchID: duplicateBranch)
                 }
             }
         }
@@ -293,18 +279,4 @@ private extension RouteScope {
         }
     }
 
-    func firstRouteAttachment(
-        for routeType: (some Route).Type,
-        in branchID: AnyHashable
-    ) -> RouteAttachmentMatch? {
-        let scopeDeclarations = branchContainer == nil
-            ? declarations.local
-            : declarations.declarations(forBranch: branchID)
-
-        guard let declaration = scopeDeclarations.routeAttachment(for: routeType) else {
-            return nil
-        }
-
-        return RouteAttachmentMatch(branchID: branchID, declaration: declaration)
-    }
 }

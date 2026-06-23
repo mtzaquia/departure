@@ -256,7 +256,11 @@ extension DepartureLogEvent {
 
 extension Router.DeclarationMatch {
     var departureDebugDescription: String {
-        "match=declaration | pathIndex=\(String(describing: pathIndex)) | declaringPathIndex=\(String(describing: declaringPathIndex)) | branch=\(branchID.departureDebugDescription) | declaration=\(declaration.departureDebugDescription)"
+        let placementDescription = branchID.map {
+            "branch=\($0.departureDebugDescription)"
+        } ?? "scope"
+
+        return "match=declaration | pathIndex=\(String(describing: pathIndex)) | declaringPathIndex=\(String(describing: declaringPathIndex)) | \(placementDescription) | declaration=\(declaration.departureDebugDescription)"
     }
 }
 #endif

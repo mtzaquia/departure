@@ -92,6 +92,12 @@ extension AnyRouteDeclaration {
     }
 }
 
+extension [AnyRouteDeclaration] {
+    func drivingPresentation(_ value: Bool) -> Self {
+        map { $0.drivingPresentation(value) }
+    }
+}
+
 /// A group of route declarations attached to a route scope.
 public struct RouteScopeDeclaration: Sendable, Hashable {
     let branch: AnyHashable?

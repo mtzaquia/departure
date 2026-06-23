@@ -288,7 +288,9 @@ extension Router {
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
 
         guard activateBranch(for: match) else {
-            log.departureDebug(.routeDroppedBranchActivationFailed(branch: match.branchID))
+            if let branchID = match.branchID {
+                log.departureDebug(.routeDroppedBranchActivationFailed(branch: branchID))
+            }
             return
         }
 
@@ -301,31 +303,35 @@ extension Router {
     }
 
     func waitsForBranchActivation(for match: DeclarationMatch) -> Bool {
-        guard match.declaration.drivesPresentation == false else {
+        guard let branchID = match.branchID else {
             return false
         }
 
-        return match.declaringPath.scope(at: match.declaringPathIndex)?.activeBranch != match.branchID
+        return match.declaringPath.scope(at: match.declaringPathIndex)?.activeBranch != branchID
     }
 
     func activateBranch(for match: DeclarationMatch) -> Bool {
+        guard let branchID = match.branchID else {
+            return true
+        }
+
         guard let scope = match.declaringPath.scope(at: match.declaringPathIndex) else {
             log.departureDebug(.branchActivationFailed(pathIndex: match.declaringPathIndex))
             return false
         }
 
-        guard scope.activeBranch != match.branchID else {
-            log.departureDebug(.branchActivationSkipped(branch: match.branchID, scope: scope))
+        guard scope.activeBranch != branchID else {
+            log.departureDebug(.branchActivationSkipped(branch: branchID, scope: scope))
             return true
         }
 
         let previousBranch = scope.activeBranch
-        let didActivate = scope.setActiveBranch(match.branchID)
+        let didActivate = scope.setActiveBranch(branchID)
 
         if didActivate {
-            log.departureDebug(.branchActivated(from: previousBranch, to: match.branchID, scope: scope))
+            log.departureDebug(.branchActivated(from: previousBranch, to: branchID, scope: scope))
         } else {
-            log.departureDebug(.branchActivationRejected(from: previousBranch, to: match.branchID, scope: scope))
+            log.departureDebug(.branchActivationRejected(from: previousBranch, to: branchID, scope: scope))
         }
 
         return didActivate
@@ -340,7 +346,9 @@ extension Router {
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
 
         guard activateBranch(for: match) else {
-            log.departureDebug(.routeDroppedBranchActivationFailed(branch: match.branchID))
+            if let branchID = match.branchID {
+                log.departureDebug(.routeDroppedBranchActivationFailed(branch: branchID))
+            }
             return
         }
 
@@ -359,7 +367,9 @@ extension Router {
         waitsForBranchActivation: Bool = false
     ) {
         guard waitsForBranchActivation == false else {
-            log.departureDebug(.routePendingWaitingForActivatedBranchHost(route: route, branch: match.branchID))
+            if let branchID = match.branchID {
+                log.departureDebug(.routePendingWaitingForActivatedBranchHost(route: route, branch: branchID))
+            }
             pendingRoute = PendingRoute(
                 route: route,
                 match: match,
@@ -369,7 +379,9 @@ extension Router {
         }
 
         guard canPresentRoute(after: match) else {
-            log.departureDebug(.routePendingWaitingForLocalPresentationScope(route: route, branch: match.branchID))
+            if let branchID = match.branchID {
+                log.departureDebug(.routePendingWaitingForLocalPresentationScope(route: route, branch: branchID))
+            }
             pendingRoute = PendingRoute(
                 route: route,
                 match: match,
@@ -441,9 +453,13 @@ extension Router {
         }
 
         log.departureDebug(.pendingRouteResuming(route: pendingRoute.route))
+        guard let branchID = pendingRoute.match.branchID else {
+            return
+        }
+
         let match = pendingRoute.match.updatingPresentationPath(
             routePath(
-                forBranch: pendingRoute.match.branchID,
+                forBranch: branchID,
                 under: declaringScope,
                 declaration: pendingRoute.match.declaration
             )
@@ -464,25 +480,25 @@ extension Router {
     }
 
     func canPresentRoute(after match: DeclarationMatch) -> Bool {
-        guard match.declaration.drivesPresentation == false else {
+        guard let branchID = match.branchID else {
             log.departureDebug(.routeCanPresentDeclarationDrivesPresentation)
             return true
         }
 
         guard
             let declaringScope = match.declaringPath.scope(at: match.declaringPathIndex),
-            declaringScope.activeBranch == match.branchID
+            declaringScope.activeBranch == branchID
         else {
-            log.departureDebug(.routeCannotPresentDiscoveryBranchInactive(branch: match.branchID))
+            log.departureDebug(.routeCannotPresentDiscoveryBranchInactive(branch: branchID))
             return false
         }
 
-        let activeLocalScope = declaringScope.activeLocalScope(for: match.branchID)
+        let activeLocalScope = declaringScope.activeLocalScope(for: branchID)
         let canPresent = activeLocalScope?.canDrivePresentation(for: match.declaration) == true
         if canPresent {
-            log.departureDebug(.routeCanPresentActiveLocalScope(branch: match.branchID))
+            log.departureDebug(.routeCanPresentActiveLocalScope(branch: branchID))
         } else {
-            log.departureDebug(.routeCannotPresentNoActiveLocalScope(branch: match.branchID))
+            log.departureDebug(.routeCannotPresentNoActiveLocalScope(branch: branchID))
         }
 
         return canPresent
@@ -538,10 +554,11 @@ extension Router {
             return false
         }
 
-        guard
-            let declaringScope = match.declaringPath.scope(at: match.declaringPathIndex),
-            declaringScope.activeBranch == match.branchID
-        else {
+        guard let declaringScope = match.declaringPath.scope(at: match.declaringPathIndex) else {
+            return false
+        }
+
+        if let branchID = match.branchID, declaringScope.activeBranch != branchID {
             return false
         }
 
