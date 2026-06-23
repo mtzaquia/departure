@@ -299,7 +299,7 @@ await router.unwind(to: .id("settings-flow"))
 | API | Behavior |
 | --- | --- |
 | `await router.unwind()` | Dismisses the current route. |
-| `await router.unwind(to: .root)` | Clears all presented routes and returns to the root scope. |
+| `await router.unwind(to: .root)` | Clears the active route path and modal presentations, returning to the root scope while preserving inactive push stacks only for branch containers that remain installed at the router root. |
 | `await router.unwind(to: .id(id))` | Keeps the matching route scope and dismisses everything after it. |
 
 To unwind to a specific scope, tag it with an explicit ID:

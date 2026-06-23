@@ -56,6 +56,18 @@ final class SampleAppUITests: XCTestCase {
         assertGone(A11y.authenticationTitle)
         assertExists(A11y.settingsAuthenticationButton)
 
+        tap(A11y.settingsAppearanceButton)
+        assertExists(A11y.appearanceTitle)
+
+        tap(A11y.appearancePresentAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        tap(A11y.authenticationUnwindToNearestBranchButton)
+        assertGone(A11y.authenticationTitle)
+        assertGone(A11y.appearanceTitle)
+        assertExists(A11y.settingsAuthenticationButton)
+        assertExists(A11y.settingsAppearanceButton)
+
         tap(A11y.settingsPresentHomeMessageButton)
         assertExists(A11y.homeWelcome)
         assertExists(A11y.messageText)

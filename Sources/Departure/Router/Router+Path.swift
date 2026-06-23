@@ -28,17 +28,44 @@ extension Router {
     }
 
     struct UnwindPresentationSnapshot {
-        let routePath: RoutePath
-        let preservedPath: [RouteScope]
-        let preservedPathStartIndex: [RouteScope].Index
+        struct PreservedRoutePath {
+            let routePath: RoutePath
+            let scopes: [RouteScope]
+            let startIndex: [RouteScope].Index
+
+            func originalPathIndex(forPreservedPathIndex pathIndex: [RouteScope].Index?) -> [RouteScope].Index? {
+                guard let pathIndex else {
+                    return nil
+                }
+
+                return startIndex + pathIndex
+            }
+        }
+
+        let preservedPaths: [PreservedRoutePath]
         let highContext: RouteContext?
 
-        func originalPathIndex(forPreservedPathIndex pathIndex: [RouteScope].Index?) -> [RouteScope].Index? {
-            guard let pathIndex else {
-                return nil
-            }
+        init(
+            routePath: RoutePath,
+            preservedPath: [RouteScope],
+            preservedPathStartIndex: [RouteScope].Index,
+            highContext: RouteContext?
+        ) {
+            self.init(
+                preservedPaths: [
+                    PreservedRoutePath(
+                        routePath: routePath,
+                        scopes: preservedPath,
+                        startIndex: preservedPathStartIndex
+                    ),
+                ],
+                highContext: highContext
+            )
+        }
 
-            return preservedPathStartIndex + pathIndex
+        init(preservedPaths: [PreservedRoutePath], highContext: RouteContext?) {
+            self.preservedPaths = preservedPaths
+            self.highContext = highContext
         }
     }
 
@@ -166,30 +193,61 @@ extension Router {
     func unwindRootAndWait(sourceRoute: (any Route)?, payload: Any?) async -> Bool {
         let rootRemovedScopes = rootPath.scopesRemovedByKeepingThrough(nil)
         var branchPaths = activeBranchPaths(under: root)
+        branchPaths.appendUnique(contentsOf: rootRemovedScopes.flatMap {
+            allBranchPaths(under: $0)
+        })
         if let highContextPath = highContext?.path,
-           highContextPath !== rootPath,
-           branchPaths.contains(where: { $0 === highContextPath }) == false {
-            branchPaths.append(highContextPath)
+           highContextPath !== rootPath {
+            branchPaths.appendUnique(contentsOf: [highContextPath])
         }
         let branchRemovedScopes = branchPaths.flatMap {
             $0.scopesRemovedByKeepingThrough(nil)
         }
-        let removedScopes = rootRemovedScopes + branchRemovedScopes
+        let inactiveBranchModalTrims = inactiveBranchModalTrims(excluding: branchPaths)
+        let inactiveBranchRemovedScopes = inactiveBranchModalTrims.flatMap {
+            $0.path.scopesRemovedByKeepingThrough($0.keepThrough)
+        }
+        let removedScopes = rootRemovedScopes + branchRemovedScopes + inactiveBranchRemovedScopes
 
         log.departureDebug(.unwindAccepted(
             keepThrough: nil,
             removing: removedScopes.count
         ))
 
+        let preservedPaths = (
+            [
+                UnwindPresentationSnapshot.PreservedRoutePath(
+                    routePath: rootPath,
+                    scopes: rootRemovedScopes,
+                    startIndex: rootPath.scopes.startIndex
+                ),
+            ]
+            + branchPaths.map {
+                UnwindPresentationSnapshot.PreservedRoutePath(
+                    routePath: $0,
+                    scopes: $0.scopesRemovedByKeepingThrough(nil),
+                    startIndex: $0.scopes.startIndex
+                )
+            }
+            + inactiveBranchModalTrims.map {
+                UnwindPresentationSnapshot.PreservedRoutePath(
+                    routePath: $0.path,
+                    scopes: $0.path.scopesRemovedByKeepingThrough($0.keepThrough),
+                    startIndex: preservedPathStartIndex(keepingThrough: $0.keepThrough, in: $0.path)
+                )
+            }
+        ).filter { $0.scopes.isEmpty == false }
+
         unwindPresentationSnapshot = UnwindPresentationSnapshot(
-            routePath: rootPath,
-            preservedPath: rootRemovedScopes,
-            preservedPathStartIndex: rootPath.scopes.startIndex,
+            preservedPaths: preservedPaths,
             highContext: highContext
         )
 
         for branchPath in branchPaths {
             keepPathThrough(nil, in: branchPath)
+        }
+        for trim in inactiveBranchModalTrims {
+            keepPathThrough(trim.keepThrough, in: trim.path)
         }
         keepPathThrough(nil, in: rootPath)
         highContext = nil
@@ -726,6 +784,43 @@ extension Router {
         return paths
     }
 
+    func inactiveBranchModalTrims(
+        excluding clearedPaths: [RoutePath]
+    ) -> [(path: RoutePath, keepThrough: [RouteScope].Index?)] {
+        allBranchPaths(under: root).compactMap { branchPath in
+            guard clearedPaths.contains(where: { $0 === branchPath }) == false else {
+                return nil
+            }
+
+            guard let modalIndex = branchPath.scopes.firstIndex(where: {
+                $0.hostDeclaration?.presentationKind != .push
+            }) else {
+                return nil
+            }
+
+            let keepThrough = modalIndex == branchPath.scopes.startIndex
+                ? nil
+                : branchPath.scopes.index(before: modalIndex)
+            return (branchPath, keepThrough)
+        }
+    }
+
+    func allBranchPaths(under owner: RouteScope) -> [RoutePath] {
+        var paths: [RoutePath] = []
+
+        for branchScope in owner.branchScopes.values {
+            paths.append(branchScope.path)
+            paths.append(contentsOf: allBranchPaths(under: branchScope))
+        }
+
+        let ownedScopes = owner === root ? rootPath.scopes : owner.path.scopes
+        for scope in ownedScopes {
+            paths.append(contentsOf: allBranchPaths(under: scope))
+        }
+
+        return paths
+    }
+
     private func ancestorUnwindResolution(
         from routePath: RoutePath,
         to target: UnwindTarget?
@@ -802,6 +897,14 @@ extension Router {
         }
     }
 
+}
+
+private extension [RoutePath] {
+    mutating func appendUnique(contentsOf routePaths: [RoutePath]) {
+        for routePath in routePaths where contains(where: { $0 === routePath }) == false {
+            append(routePath)
+        }
+    }
 }
 
 private extension RouteScope {
