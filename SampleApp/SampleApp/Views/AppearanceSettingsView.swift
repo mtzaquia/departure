@@ -24,23 +24,11 @@ import Departure
 import SwiftUI
 
 struct AppearanceSettingsView: View {
-    @State private var colorScheme: ColorScheme = .light
     @State private var storage = Storage.shared
-
-    @Environment(\.colorScheme) private var effectiveColorScheme
     @Environment(Router.self) private var router
 
     var body: some View {
         List {
-            Section {
-                Picker("Color scheme", selection: $colorScheme) {
-                    Text("Light")
-                        .tag(ColorScheme.light)
-                    Text("Dark")
-                        .tag(ColorScheme.dark)
-                }
-            }
-
             Section {
                 Button("Re-present this") {
                     Task {
@@ -85,17 +73,12 @@ struct AppearanceSettingsView: View {
         .navigationTitle("Appearance")
         .accessibilityIdentifier(SampleAppAccessibility.appearanceTitle)
         .routes {
-            if SampleAppUITesting.isEnabled {
-                Push(AuthenticationSettingsRoute.self)
-            }
+            Push(AuthenticationSettingsRoute.self)
         }
         .hooks {
             ActionInterceptor(SaveAppearanceSettingsAction.self) { invocation in
                 try? await invocation()
             }
-        }
-        .task {
-            colorScheme = effectiveColorScheme
         }
     }
 }
