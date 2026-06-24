@@ -1,6 +1,7 @@
 # AGENTS.md
 
 - If using XcodeBuildMCP, use the installed XcodeBuildMCP skill before calling XcodeBuildMCP tools.
+- Do not mention agents or agent tooling in commit messages, pull request titles, or pull request descriptions.
 - Merge pull requests with squash merge; merge commits are not allowed for this repository.
 - When drafting release notes, compare the target release against the previous tag and write in a user-facing style:
   - Group entries under `Added`, `Changed`, and `Fixed` based on user-visible behavior, not implementation mechanics.
