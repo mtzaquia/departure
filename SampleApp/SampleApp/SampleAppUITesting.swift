@@ -75,7 +75,9 @@ enum SampleAppAccessibility {
     static let settingsBranchHookStatus = "sample.settings.branch-hook-status"
 
     static let appearanceTitle = "sample.appearance.title"
+    static let appearanceValue = "sample.appearance.value"
     static let appearanceRePresentButton = "sample.appearance.re-present"
+    static let appearanceRePresentDifferentButton = "sample.appearance.re-present-different"
     static let appearancePresentAuthenticationButton = "sample.appearance.present-authentication"
     static let appearanceUnwindToLandingPresentMessageButton = "sample.appearance.unwind-landing-present-message"
     static let appearanceSaveButton = "sample.appearance.save"

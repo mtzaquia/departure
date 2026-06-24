@@ -31,7 +31,7 @@ struct SettingsView: View {
         List {
             Button("Appearance") {
                 Task {
-                    await router.present(AppearanceSettingsRoute())
+                    await router.present(AppearanceSettingsRoute(value: nil))
                 }
             }
             .accessibilityIdentifier(SampleAppAccessibility.settingsAppearanceButton)

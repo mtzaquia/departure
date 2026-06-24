@@ -24,18 +24,30 @@ import Departure
 import SwiftUI
 
 struct AppearanceSettingsView: View {
+    let value: UUID?
+
     @State private var storage = Storage.shared
     @Environment(Router.self) private var router
 
     var body: some View {
         List {
             Section {
-                Button("Re-present this") {
+                Text("Route value: \(value.map(\.uuidString) ?? "nil")")
+                    .accessibilityIdentifier(SampleAppAccessibility.appearanceValue)
+
+                Button("Re-present this (equal, no-op)") {
                     Task {
-                        await router.present(AppearanceSettingsRoute())
+                        await router.present(AppearanceSettingsRoute(value: value))
                     }
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.appearanceRePresentButton)
+
+                Button("Re-present this (not equal, pop+push)") {
+                    Task {
+                        await router.present(AppearanceSettingsRoute(value: UUID()))
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.appearanceRePresentDifferentButton)
 
                 Button("Present authentication settings") {
                     Task {
