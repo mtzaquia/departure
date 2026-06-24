@@ -437,6 +437,76 @@ struct RouterTests {
         #expect(walletScope.path.isEmpty)
     }
 
+    @Test func branchPushRequestDismissesTopLevelModalBeforeAppending() async throws {
+        let router = Router()
+        let (selection, selectedTab) = tabSelection(.home)
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+
+        router.rootPath.scopes = [landingScope]
+        landingScope.installRouteDeclarations(
+            id: RootRoute().id,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Sheet(MessageRoute.self)
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.home) {
+                        Push(HomeDetailRoute.self)
+                    }
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.wallet) {
+                        Push(TransactionRoute.self)
+                    }
+                )
+            )
+        )
+
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        homeScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.home),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+            ]
+        )
+        landingScope.registerBranchScope(homeScope, for: AppTab.home)
+
+        await router.requestRoute(MessageRoute())
+        let modalScope = try #require(router.rootPath.last)
+        router.routeScopeDidInstallInView(modalScope)
+
+        let requestTask = Task {
+            await router.requestRoute(HomeDetailRoute())
+        }
+
+        for _ in 0..<10 {
+            if router.rootPath.count == 1,
+               router.rootPath.last === landingScope,
+               homeScope.path.isEmpty {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(selectedTab() == .home)
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last === landingScope)
+        #expect(homeScope.path.isEmpty)
+        #expect(router.routePresentationBinding(from: landingScope, matching: .sheet).wrappedValue == nil)
+
+        router.routeScopeDidLeaveView(modalScope)
+        await requestTask.value
+
+        #expect(selectedTab() == .home)
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last === landingScope)
+        #expect(homeScope.path.count == 1)
+        #expect(homeScope.path.last?.route is HomeDetailRoute)
+        #expect(router.routePresentationBinding(from: homeScope, matching: .push).wrappedValue?.scope === homeScope.path.last)
+    }
+
     @Test func localSheetDeclarationWinsOverTopLevelDeclarationForSameRoute() async throws {
         let router = Router()
         let (selection, _) = tabSelection(.home)
