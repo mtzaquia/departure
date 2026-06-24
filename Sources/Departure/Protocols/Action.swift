@@ -100,7 +100,7 @@ public struct ActionInvocation<Output> {
 }
 
 /// Control flow from ``Action/attemptAction(in:)``.
-public enum ActionInvocationError: Error {
+public enum ActionInvocationError: Error, @unchecked Sendable {
     /// Requests a route, then retries the action once from the new current scope.
     case reroute(_ route: any Route)
 
