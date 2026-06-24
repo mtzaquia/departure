@@ -71,6 +71,10 @@ extension Router {
             return
 
         case .replaceElevatedContext(let priority):
+            if await unwindToExistingEquivalentRouteIfNeeded(resolvedRoute, after: matchedDeclaration) {
+                return
+            }
+
             log.departureDebug(.routeAcceptedReplaceHighPriority(route: resolvedRoute))
             replaceElevatedContext(priority, with: resolvedRoute, after: matchedDeclaration)
             return

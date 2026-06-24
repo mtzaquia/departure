@@ -121,6 +121,8 @@ enum SampleAppAccessibility {
 
     static let loginTitle = "sample.login.title"
     static let loginWindowEnvironmentValue = "sample.login.window-environment"
+    static let loginPresentationProbeCount = "sample.login.presentation-probe-count"
+    static let loginIncrementPresentationProbeButton = "sample.login.increment-presentation-probe"
     static let loginEmailField = "sample.login.email"
     static let loginPasswordField = "sample.login.password"
     static let loginButton = "sample.login.button"
@@ -132,6 +134,7 @@ enum SampleAppAccessibility {
     static let loginPresentHighPrioritySheetButton = "sample.login.present-high-priority-sheet"
 
     static let loginDetailText = "sample.login-detail.text"
+    static let loginDetailPresentLoginButton = "sample.login-detail.present-login"
     static let loginNoticeText = "sample.login-notice.text"
     static let loginNoticeDismissButton = "sample.login-notice.dismiss"
 

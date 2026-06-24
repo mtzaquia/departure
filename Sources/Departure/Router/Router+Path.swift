@@ -100,6 +100,10 @@ extension Router {
         }
     }
 
+    struct EquivalentRouteMatch {
+        let pathIndex: [RouteScope].Index?
+    }
+
     enum RouteAppendBehavior {
         case append
         case startElevatedContext(RoutePriority)
@@ -304,6 +308,10 @@ extension Router {
             return
         }
 
+        if await unwindToExistingEquivalentRouteIfNeeded(route, after: match) {
+            return
+        }
+
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
         let removedScopes = prepareNormalAppendPath(after: match)
 
@@ -333,6 +341,60 @@ extension Router {
             behavior: .append,
             waitsForBranchActivation: waitsForBranchActivation
         )
+    }
+
+    func unwindToExistingEquivalentRouteIfNeeded(_ route: any Route, after match: DeclarationMatch) async -> Bool {
+        guard let equivalentRouteMatch = equivalentRouteMatch(to: route, after: match) else {
+            return false
+        }
+
+        guard activateBranch(for: match) else {
+            if let branchID = match.branchID {
+                log.departureDebug(.routeDroppedBranchActivationFailed(branch: branchID))
+            }
+            return true
+        }
+
+        let targetPathIndex = equivalentRouteMatch.pathIndex
+        let removedScopes = match.path.scopesRemovedByKeepingThrough(targetPathIndex)
+        let sourceRoute = removedScopes.last?.route
+        let targetScope = match.path.scope(at: targetPathIndex)
+        guard removedScopes.isEmpty == false else {
+            if let existingRoute = match.path.scope(at: targetPathIndex)?.route {
+                log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: existingRoute))
+            }
+            return true
+        }
+
+        keepPathThrough(targetPathIndex, in: match.path)
+        await waitForRouteScopesToLeaveView(removedScopes)
+        await invokeUnwindHandlers(
+            for: sourceRoute,
+            payload: nil,
+            in: targetScope
+        )
+        return true
+    }
+
+    func equivalentRouteMatch(
+        to route: any Route,
+        after match: DeclarationMatch
+    ) -> EquivalentRouteMatch? {
+        for index in match.path.scopes.indices.reversed() {
+            if let pathIndex = match.pathIndex, index < pathIndex {
+                continue
+            }
+
+            if match.path.scopes[index].route?.isEqual(to: route) == true {
+                return EquivalentRouteMatch(pathIndex: index)
+            }
+        }
+
+        guard match.pathIndex == nil, match.path.owner?.route?.isEqual(to: route) == true else {
+            return nil
+        }
+
+        return EquivalentRouteMatch(pathIndex: nil)
     }
 
     func waitsForBranchActivation(for match: DeclarationMatch) -> Bool {

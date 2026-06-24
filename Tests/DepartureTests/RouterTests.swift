@@ -1084,6 +1084,140 @@ struct RouterTests {
         #expect(secondPresentation.scope.route as? NumberedRoute == NumberedRoute(number: 2))
     }
 
+    @Test func presentingEquivalentAncestorUnwindsToExistingScopeInsteadOfRePresenting() async throws {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Push(NumberedRoute.self)._routeDeclarations
+                    + Push(SettingsRoute.self)._routeDeclarations
+                ),
+            ]
+        )
+
+        await router.requestRoute(NumberedRoute(number: 1))
+        let numberedPresentation = try #require(router.routePresentationBinding(
+            from: router.root,
+            matching: .push
+        ).wrappedValue)
+        let numberedScope = numberedPresentation.scope
+        numberedScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(SettingsRoute())
+        let settingsScope = try #require(router.rootPath.last)
+        #expect(router.rootPath.count == 2)
+        #expect(settingsScope.route is SettingsRoute)
+        router.routeScopeDidInstallInView(settingsScope)
+
+        let requestTask = Task {
+            await router.requestRoute(NumberedRoute(number: 1))
+        }
+
+        for _ in 0..<10 {
+            if router.rootPath.last === numberedScope {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last === numberedScope)
+        #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue?.scope === numberedScope)
+        #expect(router.routePresentationBinding(from: numberedScope, matching: .push).wrappedValue == nil)
+
+        router.routeScopeDidLeaveView(settingsScope)
+        await requestTask.value
+
+        let finalPresentation = try #require(router.routePresentationBinding(
+            from: router.root,
+            matching: .push
+        ).wrappedValue)
+        #expect(finalPresentation.id == numberedPresentation.id)
+        #expect(finalPresentation.scope === numberedScope)
+        #expect(router.rootPath.count == 1)
+    }
+
+    @Test func presentingEquivalentRouteInInactiveBranchSelectsBranchAndUnwindsThere() async throws {
+        let router = Router()
+        let (selection, selectedTab) = tabSelection(.wallet)
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.home) {
+                        Push(HomeDetailRoute.self)
+                    }
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.wallet) {
+                        Push(NumberedRoute.self)
+                        Push(SettingsRoute.self)
+                    }
+                )
+            )
+        )
+
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        homeScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.home),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+            ]
+        )
+        router.root.registerBranchScope(homeScope, for: AppTab.home)
+
+        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        walletScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.wallet),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Push(NumberedRoute.self)._routeDeclarations
+                    + Push(SettingsRoute.self)._routeDeclarations
+                ),
+            ]
+        )
+        router.root.registerBranchScope(walletScope, for: AppTab.wallet)
+
+        await router.requestRoute(NumberedRoute(number: 7))
+        let numberedScope = try #require(walletScope.path.last)
+        numberedScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(SettingsRoute())
+        #expect(walletScope.path.count == 2)
+        #expect(walletScope.path.last?.route is SettingsRoute)
+
+        await router.requestRoute(HomeDetailRoute())
+        router.resumePendingRoute(for: AppTab.home, in: router.root)
+        #expect(selectedTab() == .home)
+        #expect(homeScope.path.last?.route is HomeDetailRoute)
+
+        await router.requestRoute(NumberedRoute(number: 7))
+
+        #expect(selectedTab() == .wallet)
+        #expect(walletScope.path.count == 1)
+        #expect(walletScope.path.last === numberedScope)
+        #expect(walletScope.path.last?.route as? NumberedRoute == NumberedRoute(number: 7))
+    }
+
     @Test func replacingInstalledPushWaitsForOldScopeToLeaveViewBeforeAppendingNextRoute() async throws {
         let router = Router()
 
@@ -2585,6 +2719,57 @@ struct RouterTests {
         #expect(router.rootPath.last?.route is AlertRoute)
         #expect(router.highContext?.highRouteScope === loginScope)
         #expect(router.routePresentationBinding(from: loginScope, matching: .cover(.fade)).wrappedValue?.scope === router.rootPath.last)
+    }
+
+    @Test func presentingEquivalentHighPriorityRouteUnwindsInsideHighContextInsteadOfReplacing() async throws {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(LoginRoute())
+        let loginScope = try #require(router.rootPath.last)
+        loginScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(SettingsRoute())
+        let settingsScope = try #require(router.rootPath.last)
+        #expect(router.rootPath.count == 2)
+        #expect(settingsScope.route is SettingsRoute)
+        router.routeScopeDidInstallInView(settingsScope)
+
+        let requestTask = Task {
+            await router.requestRoute(LoginRoute())
+        }
+
+        for _ in 0..<10 {
+            if router.rootPath.last === loginScope {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last === loginScope)
+        #expect(router.highContext?.highRouteScope === loginScope)
+        #expect(router.highPriorityRoutePresentationBinding(matching: .cover(.slide)).wrappedValue?.scope === loginScope)
+
+        router.routeScopeDidLeaveView(settingsScope)
+        await requestTask.value
+
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last === loginScope)
+        #expect(router.highContext?.highRouteScope === loginScope)
     }
 
     @Test func ancestorHighPriorityDeclarationReplacesActiveHighPriorityRoute() async {
