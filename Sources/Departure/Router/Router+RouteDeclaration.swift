@@ -43,6 +43,11 @@ extension Router {
         }
 
         guard let resolvedRoute else { return }
+        if let currentRoute = currentRouteScope.route, currentRoute.isEqual(to: resolvedRoute) {
+            log.departureDebug(.routeNoOpEquivalent(route: resolvedRoute, currentRoute: currentRoute))
+            return
+        }
+
         let resolvedRouteType = type(of: resolvedRoute)
         guard let matchedDeclaration = firstDeclaration(including: resolvedRouteType) else {
             log.departureDebug(.routeDroppedNoDeclaration(routeType: resolvedRouteType))

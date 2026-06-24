@@ -84,6 +84,7 @@ enum DepartureLogEvent {
     case routeDroppedBranchActivationFailed(branch: AnyHashable)
     case routeDroppedNoDeclaration(routeType: any Route.Type)
     case routeDroppedResolution
+    case routeNoOpEquivalent(route: any Route, currentRoute: any Route)
     case routeMatched(route: any Route, match: Router.DeclarationMatch, highContextStart: [RouteScope].Index?)
     case routePendingWaitingForActivatedBranchHost(route: any Route, branch: AnyHashable)
     case routePendingWaitingForLocalPresentationScope(route: any Route, branch: AnyHashable)
@@ -212,6 +213,8 @@ extension DepartureLogEvent {
             "route dropped | reason=no declaration | type=\(String(reflecting: routeType))"
         case .routeDroppedResolution:
             "route dropped | reason=resolution"
+        case let .routeNoOpEquivalent(route, currentRoute):
+            "route no-op | reason=equivalent to current route | route=\(route.departureDebugDescription) | currentRoute=\(currentRoute.departureDebugDescription)"
         case let .routeMatched(route, match, highContextStart):
             "route matched | route=\(route.departureDebugDescription) | \(match.departureDebugDescription) | highContextStart=\(String(describing: highContextStart))"
         case let .routePendingWaitingForActivatedBranchHost(route, branch):

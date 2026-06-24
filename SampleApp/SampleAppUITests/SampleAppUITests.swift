@@ -270,8 +270,19 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.appearanceSaveButton)
         assertLabel(A11y.appearanceSavedCount, contains: "Saved 2 time(s)")
 
+        assertLabel(A11y.appearanceValue, contains: "Route value: nil")
         tap(A11y.appearanceRePresentButton)
         assertExists(A11y.appearanceTitle)
+        assertLabel(A11y.appearanceValue, contains: "Route value: nil")
+
+        tap(A11y.appearanceRePresentDifferentButton)
+        assertExists(A11y.appearanceTitle)
+        let changedRouteValue = label(A11y.appearanceValue)
+        XCTAssertNotEqual(changedRouteValue, "Route value: nil")
+
+        tap(A11y.appearanceRePresentButton)
+        assertExists(A11y.appearanceTitle)
+        XCTAssertEqual(label(A11y.appearanceValue), changedRouteValue)
 
         tap(A11y.appearancePresentAuthenticationButton)
         assertExists(A11y.authenticationTitle)
@@ -358,6 +369,12 @@ private extension SampleAppUITests {
         )
     }
 
+    func label(_ identifier: String) -> String {
+        let target = element(identifier)
+        XCTAssertTrue(target.waitForExistence(timeout: 5), "Expected \(identifier) to exist")
+        return target.label
+    }
+
     func element(_ identifier: String) -> XCUIElement {
         app.descendants(matching: .any)[identifier]
     }
@@ -404,7 +421,9 @@ private enum A11y {
     static let settingsBranchHookStatus = "sample.settings.branch-hook-status"
 
     static let appearanceTitle = "sample.appearance.title"
+    static let appearanceValue = "sample.appearance.value"
     static let appearanceRePresentButton = "sample.appearance.re-present"
+    static let appearanceRePresentDifferentButton = "sample.appearance.re-present-different"
     static let appearancePresentAuthenticationButton = "sample.appearance.present-authentication"
     static let appearanceUnwindToLandingPresentMessageButton = "sample.appearance.unwind-landing-present-message"
     static let appearanceSaveButton = "sample.appearance.save"

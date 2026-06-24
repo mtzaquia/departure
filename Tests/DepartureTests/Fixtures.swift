@@ -41,6 +41,14 @@ struct HomeDetailRoute: Route, Equatable {
     }
 }
 
+struct NumberedRoute: Route, Equatable {
+    let number: Int
+
+    func destination() -> some View {
+        Text("Number \(number)")
+    }
+}
+
 struct TransactionRoute: Route, Equatable {
     func destination() -> some View {
         Text("Transaction")

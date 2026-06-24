@@ -1026,7 +1026,7 @@ struct RouterTests {
         #expect(router.rootPath.isEmpty)
     }
 
-    @Test func repeatedPushOfSameRouteTypeGetsNewPresentationIdentity() async throws {
+    @Test func repeatedPresentationOfEquivalentRouteKeepsPresentationIdentity() async throws {
         let router = Router()
 
         router.root.installRouteDeclarations(
@@ -1049,8 +1049,39 @@ struct RouterTests {
             matching: .push
         ).wrappedValue)
 
+        #expect(router.rootPath.count == 1)
+        #expect(firstPresentation.id == secondPresentation.id)
+        #expect(firstPresentation == secondPresentation)
+        #expect(firstPresentation.scope === secondPresentation.scope)
+    }
+
+    @Test func repeatedPresentationOfUnequalRouteValueGetsNewPresentationIdentity() async throws {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(NumberedRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(NumberedRoute(number: 1))
+        let firstPresentation = try #require(router.routePresentationBinding(
+            from: router.root,
+            matching: .push
+        ).wrappedValue)
+
+        await router.requestRoute(NumberedRoute(number: 2))
+        let secondPresentation = try #require(router.routePresentationBinding(
+            from: router.root,
+            matching: .push
+        ).wrappedValue)
+
+        #expect(router.rootPath.count == 1)
         #expect(firstPresentation.id != secondPresentation.id)
         #expect(firstPresentation.scope !== secondPresentation.scope)
+        #expect(secondPresentation.scope.route as? NumberedRoute == NumberedRoute(number: 2))
     }
 
     @Test func replacingInstalledPushWaitsForOldScopeToLeaveViewBeforeAppendingNextRoute() async throws {

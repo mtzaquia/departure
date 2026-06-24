@@ -41,6 +41,10 @@ struct LoginRoute: Route {
     func destination() -> some View {
         LoginView(nextRoute: nextRoute)
     }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        true
+    }
 }
 
 struct LoginReplacementRoute: Route {
@@ -72,8 +76,12 @@ struct ProfileRoute: Route {
 }
 
 @Observable
-final class AuthenticationSettingsRouteState {
+final class AuthenticationSettingsRouteState: Equatable {
     var attachesLocalRoute = false
+
+    static func == (lhs: AuthenticationSettingsRouteState, rhs: AuthenticationSettingsRouteState) -> Bool {
+        lhs.attachesLocalRoute == rhs.attachesLocalRoute
+    }
 }
 
 struct AuthenticationSettingsRoute: Route {
@@ -179,8 +187,10 @@ struct TopLevelReplacementCoverView: View {
 }
 
 struct AppearanceSettingsRoute: Route {
+    let value: UUID?
+
     func destination() -> some View {
-        AppearanceSettingsView()
+        AppearanceSettingsView(value: value)
     }
 }
 

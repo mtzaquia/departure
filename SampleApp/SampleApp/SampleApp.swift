@@ -65,7 +65,7 @@ struct RandomizeEmojiAction: Action {
 struct SaveAppearanceSettingsAction: Action {
     func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
         guard context.isRunning(in: AppearanceSettingsRoute.self) else {
-            throw .reroute(AppearanceSettingsRoute())
+            throw .reroute(AppearanceSettingsRoute(value: nil))
         }
 
         Storage.shared.appearanceSaveCount += 1
