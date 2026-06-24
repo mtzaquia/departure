@@ -506,13 +506,26 @@ extension Router {
 
     @discardableResult
     func prepareNormalAppendPath(after match: DeclarationMatch) -> [RouteScope] {
+        var removedScopes: [RouteScope] = []
+
         guard preservesCurrentPath(for: match) == false else {
-            return []
+            return prepareDeclaringPathForAppend(after: match)
         }
 
         let trimPathIndex = pathIndexToKeepBeforeAppending(after: match)
-        let removedScopes = match.path.scopesRemovedByKeepingThrough(trimPathIndex)
+        removedScopes.append(contentsOf: match.path.scopesRemovedByKeepingThrough(trimPathIndex))
         keepPathThrough(trimPathIndex, in: match.path)
+        removedScopes.append(contentsOf: prepareDeclaringPathForAppend(after: match))
+        return removedScopes
+    }
+
+    func prepareDeclaringPathForAppend(after match: DeclarationMatch) -> [RouteScope] {
+        guard match.path !== match.declaringPath else {
+            return []
+        }
+
+        let removedScopes = match.declaringPath.scopesRemovedByKeepingThrough(match.declaringPathIndex)
+        keepPathThrough(match.declaringPathIndex, in: match.declaringPath)
         return removedScopes
     }
 
