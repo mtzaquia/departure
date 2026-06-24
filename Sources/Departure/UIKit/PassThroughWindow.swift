@@ -27,7 +27,17 @@ final class PassThroughWindow: UIWindow {
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let view = super.hitTest(point, with: event)
 
-        if view === rootViewController?.view {
+        guard let rootView = rootViewController?.view else {
+            return view
+        }
+
+        if let presentedView = rootViewController?.presentedViewController?.view,
+           let view,
+           view.isDescendant(of: presentedView) {
+            return view
+        }
+
+        if let view, view === rootView || view.isDescendant(of: rootView) {
             return nil
         }
 

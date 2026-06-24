@@ -44,12 +44,14 @@ extension Router {
 
         let preservedPaths: [PreservedRoutePath]
         let highContext: RouteContext?
+        let criticalContext: RouteContext?
 
         init(
             routePath: RoutePath,
             preservedPath: [RouteScope],
             preservedPathStartIndex: [RouteScope].Index,
-            highContext: RouteContext?
+            highContext: RouteContext?,
+            criticalContext: RouteContext?
         ) {
             self.init(
                 preservedPaths: [
@@ -59,13 +61,30 @@ extension Router {
                         startIndex: preservedPathStartIndex
                     ),
                 ],
-                highContext: highContext
+                highContext: highContext,
+                criticalContext: criticalContext
             )
         }
 
-        init(preservedPaths: [PreservedRoutePath], highContext: RouteContext?) {
+        init(
+            preservedPaths: [PreservedRoutePath],
+            highContext: RouteContext?,
+            criticalContext: RouteContext?
+        ) {
             self.preservedPaths = preservedPaths
             self.highContext = highContext
+            self.criticalContext = criticalContext
+        }
+
+        func elevatedContext(
+            containingPath path: RoutePath,
+            pathIndex: [RouteScope].Index?,
+            minimumPriority: RoutePriority
+        ) -> RouteContext? {
+            [criticalContext, highContext].compactMap { $0 }.first {
+                $0.priority >= minimumPriority
+                && $0.contains(path: path, pathIndex: pathIndex)
+            }
         }
     }
 
@@ -83,7 +102,15 @@ extension Router {
 
     enum RouteAppendBehavior {
         case append
-        case startHighContext
+        case startElevatedContext(RoutePriority)
+
+        var startsElevatedContext: Bool {
+            if case .startElevatedContext = self {
+                return true
+            }
+
+            return false
+        }
     }
 
     @discardableResult
@@ -166,14 +193,15 @@ extension Router {
                     routePath: routePath,
                     preservedPath: removedScopes,
                     preservedPathStartIndex: preservedPathStartIndex(keepingThrough: targetPathIndex, in: routePath),
-                    highContext: highContext
+                    highContext: highContext,
+                    criticalContext: criticalContext
                 )
             }
             keepPathThrough(targetPathIndex, in: routePath)
             if case .root = target {
                 // A high-priority context may live on a branch path that clearing the root path
                 // doesn't touch; `.root` tears the whole app down, so drop it explicitly.
-                highContext = nil
+                clearElevatedContexts()
             }
             await waitForRouteScopesToLeaveView(removedScopes)
             unwindPresentationSnapshot = nil
@@ -199,6 +227,10 @@ extension Router {
         if let highContextPath = highContext?.path,
            highContextPath !== rootPath {
             branchPaths.appendUnique(contentsOf: [highContextPath])
+        }
+        if let criticalContextPath = criticalContext?.path,
+           criticalContextPath !== rootPath {
+            branchPaths.appendUnique(contentsOf: [criticalContextPath])
         }
         let branchRemovedScopes = branchPaths.flatMap {
             $0.scopesRemovedByKeepingThrough(nil)
@@ -240,7 +272,8 @@ extension Router {
 
         unwindPresentationSnapshot = UnwindPresentationSnapshot(
             preservedPaths: preservedPaths,
-            highContext: highContext
+            highContext: highContext,
+            criticalContext: criticalContext
         )
 
         for branchPath in branchPaths {
@@ -250,7 +283,7 @@ extension Router {
             keepPathThrough(trim.keepThrough, in: trim.path)
         }
         keepPathThrough(nil, in: rootPath)
-        highContext = nil
+        clearElevatedContexts()
 
         await waitForRouteScopesToLeaveView(removedScopes)
         unwindPresentationSnapshot = nil
@@ -337,7 +370,8 @@ extension Router {
         return didActivate
     }
 
-    func replaceHighContext(
+    func replaceElevatedContext(
+        _ priority: RoutePriority,
         with route: any Route,
         after match: DeclarationMatch
     ) {
@@ -355,7 +389,7 @@ extension Router {
         appendOrPendRoute(
             route,
             after: match,
-            behavior: .startHighContext,
+            behavior: .startElevatedContext(priority),
             waitsForBranchActivation: waitsForBranchActivation
         )
     }
@@ -401,17 +435,31 @@ extension Router {
             ? match.path.scope(at: match.pathIndex)
             : match.path.owner
 
-        if behavior == .startHighContext {
-            trimExistingHighContextForReplacement()
+        if case .startElevatedContext(let priority) = behavior {
+            trimExistingElevatedContextForReplacement(priority)
             guard let hostScope else {
                 return
             }
 
-            highContext = .high(
-                path: match.path,
-                startIndex: match.path.endIndex,
-                presentationScope: hostScope
-            )
+            let context: RouteContext = switch priority {
+            case .normal:
+                .normal(path: match.path)
+
+            case .high:
+                .high(
+                    path: match.path,
+                    startIndex: match.path.endIndex,
+                    presentationScope: hostScope
+                )
+
+            case .critical:
+                .critical(
+                    path: match.path,
+                    startIndex: match.path.endIndex,
+                    presentationScope: hostScope
+                )
+            }
+            setElevatedContext(context, for: priority)
             log.departureDebug(.highContextStarted(pathIndex: match.path.endIndex))
         }
 
@@ -427,9 +475,9 @@ extension Router {
         }) ?? match.declaration
         // Place the route in its host's structural slot. Assigning `modalChild` replaces any prior
         // modal (the old one is trimmed from the path before we get here), so a host can never hold
-        // two modals at once. A high-priority root is presented by the separate high-priority
+        // two modals at once. An elevated root is presented by a separate elevated-priority
         // binding, so it must not replace the normal context's host slot underneath it.
-        if behavior != .startHighContext {
+        if behavior.startsElevatedContext == false {
             if match.declaration.presentationKind == .push {
                 hostScope?.pushChild = appendedScope
             } else {
@@ -468,7 +516,7 @@ extension Router {
         case .append:
             prepareNormalAppendPath(after: match)
 
-        case .startHighContext:
+        case .startElevatedContext:
             break
         }
 
@@ -544,21 +592,21 @@ extension Router {
         guard let pathIndex else {
             let removedCount = routePath.count
             routePath.keepThrough(nil)
-            removeHighContextIfNeeded(in: routePath)
+            removeElevatedContextsIfNeeded(in: routePath)
             log.departureDebug(.pathCleared(removedCount: removedCount))
             return
         }
 
         let removalStartIndex = routePath.scopes.index(after: pathIndex)
         guard removalStartIndex < routePath.endIndex else {
-            removeHighContextIfNeeded(in: routePath)
+            removeElevatedContextsIfNeeded(in: routePath)
             log.departureDebug(.pathUnchanged(keepThrough: pathIndex))
             return
         }
 
         let removedCount = routePath.scopes.distance(from: removalStartIndex, to: routePath.endIndex)
         routePath.keepThrough(pathIndex)
-        removeHighContextIfNeeded(in: routePath)
+        removeElevatedContextsIfNeeded(in: routePath)
         log.departureDebug(.pathTrimmed(keepThrough: pathIndex, removedCount: removedCount))
     }
 
@@ -632,35 +680,37 @@ extension Router {
         }
     }
 
-    func trimExistingHighContextForReplacement() {
+    func trimExistingElevatedContextForReplacement(_ priority: RoutePriority) {
         guard
-            let highContext,
-            let startIndex = highContext.highStartIndex
+            let context = elevatedContext(for: priority),
+            let startIndex = context.elevatedStartIndex
         else {
             return
         }
 
-        guard startIndex <= highContext.path.endIndex else {
-            self.highContext = nil
+        guard startIndex <= context.path.endIndex else {
+            setElevatedContext(nil, for: priority)
             return
         }
 
-        keepPathThrough(highContext.highBasePathIndex, in: highContext.path)
+        keepPathThrough(context.elevatedBasePathIndex, in: context.path)
     }
 
-    func removeHighContextIfNeeded(in routePath: RoutePath) {
-        guard
-            let highContext,
-            highContext.path === routePath,
-            let startIndex = highContext.highStartIndex
-        else {
-            return
-        }
+    func removeElevatedContextsIfNeeded(in routePath: RoutePath) {
+        for priority in [RoutePriority.critical, .high] {
+            guard
+                let context = elevatedContext(for: priority),
+                context.path === routePath,
+                let startIndex = context.elevatedStartIndex
+            else {
+                continue
+            }
 
-        guard startIndex < routePath.endIndex else {
-            log.departureDebug(.highContextCleared)
-            self.highContext = nil
-            return
+            guard startIndex < routePath.endIndex else {
+                log.departureDebug(.highContextCleared)
+                setElevatedContext(nil, for: priority)
+                continue
+            }
         }
     }
 
@@ -685,16 +735,15 @@ extension Router {
 
         routeScope.uninstallFromView()
         log.departureDebug(.scopeUninstalledFromView(scope: routeScope))
-        clearHighContextIfNeeded(forRemovedViewScope: routeScope)
+        clearElevatedContextIfNeeded(forRemovedViewScope: routeScope)
     }
 
-    func clearHighContextIfNeeded(forRemovedViewScope routeScope: RouteScope) {
-        guard highContext?.highRouteScope === routeScope else {
-            return
+    func clearElevatedContextIfNeeded(forRemovedViewScope routeScope: RouteScope) {
+        for priority in [RoutePriority.critical, .high]
+        where elevatedContext(for: priority)?.elevatedRouteScope === routeScope {
+            log.departureDebug(.highContextCleared)
+            setElevatedContext(nil, for: priority)
         }
-
-        log.departureDebug(.highContextCleared)
-        highContext = nil
     }
 
     func waitForRouteScopesToLeaveView(_ routeScopes: [RouteScope]) async {

@@ -59,6 +59,30 @@ struct HighPriorityCoverSlideHost: View {
         let presentation = router.highPriorityRoutePresentationBinding(matching: .cover(.slide))
 
         HighPriorityPresentationWindowBridge(
+            priority: .high,
+            route: presentation,
+            windowDestinationBuilder: windowDestinationBuilder
+        ) { presentation, onDismiss in
+            HighPriorityCoverSlidePresenter(
+                onDismiss: onDismiss,
+                destination: presentation.destination
+            )
+                .environment(router)
+                .environment(\.routing, RoutingAction(router: router))
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct CriticalPriorityCoverSlideHost: View {
+    @Environment(Router.self) private var router
+    let windowDestinationBuilder: WindowDestinationBuilder
+
+    var body: some View {
+        let presentation = router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.slide))
+
+        HighPriorityPresentationWindowBridge(
+            priority: .critical,
             route: presentation,
             windowDestinationBuilder: windowDestinationBuilder
         ) { presentation, onDismiss in

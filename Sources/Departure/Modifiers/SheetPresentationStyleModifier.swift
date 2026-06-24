@@ -47,6 +47,30 @@ struct HighPrioritySheetHost: View {
         let presentation = router.highPriorityRoutePresentationBinding(matching: .sheet)
 
         HighPriorityPresentationWindowBridge(
+            priority: .high,
+            route: presentation,
+            windowDestinationBuilder: windowDestinationBuilder
+        ) { presentation, onDismiss in
+            HighPrioritySheetPresenter(
+                onDismiss: onDismiss,
+                destination: presentation.destination
+            )
+                .environment(router)
+                .environment(\.routing, RoutingAction(router: router))
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct CriticalPrioritySheetHost: View {
+    @Environment(Router.self) private var router
+    let windowDestinationBuilder: WindowDestinationBuilder
+
+    var body: some View {
+        let presentation = router.elevatedRoutePresentationBinding(priority: .critical, matching: .sheet)
+
+        HighPriorityPresentationWindowBridge(
+            priority: .critical,
             route: presentation,
             windowDestinationBuilder: windowDestinationBuilder
         ) { presentation, onDismiss in

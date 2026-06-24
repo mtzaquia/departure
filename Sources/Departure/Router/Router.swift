@@ -64,6 +64,8 @@ public final class Router: Identifiable, Equatable {
 
     var highContext: RouteContext?
 
+    var criticalContext: RouteContext?
+
     @ObservationIgnored
     var pendingRoute: PendingRoute?
 

@@ -2613,4 +2613,140 @@ struct RouterTests {
         #expect(presentation?.scope === router.rootPath.last)
         #expect(presentation?.declaration.routeTypeID == ObjectIdentifier(AlertRoute.self))
     }
+
+    @Test func criticalPriorityPresentationOverlaysHighPriorityPresentation() async {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations
+                    + Cover(AlertRoute.self, priority: .critical, transition: .fade, providesNavigation: false)._routeDeclarations
+                ),
+            ]
+        )
+
+        await router.requestRoute(LoginRoute())
+        let highScope = router.rootPath.last
+
+        await router.requestRoute(AlertRoute())
+
+        let highPresentation = router.highPriorityRoutePresentationBinding(
+            matching: .cover(.slide)
+        ).wrappedValue
+        let criticalPresentation = router.elevatedRoutePresentationBinding(
+            priority: .critical,
+            matching: .cover(.fade)
+        ).wrappedValue
+
+        #expect(router.rootPath.count == 2)
+        #expect(router.rootPath.first === highScope)
+        #expect(router.rootPath.first?.route is LoginRoute)
+        #expect(router.rootPath.last?.route is AlertRoute)
+        #expect(router.highContext?.highRouteScope === highScope)
+        #expect(router.criticalContext?.elevatedRouteScope === router.rootPath.last)
+        #expect(highPresentation?.scope === highScope)
+        #expect(highPresentation?.declaration.priority == .high)
+        #expect(criticalPresentation?.scope === router.rootPath.last)
+        #expect(criticalPresentation?.declaration.priority == .critical)
+    }
+
+    @Test func criticalPriorityReplacementPreservesUnderlyingHighPriorityPresentation() async {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations
+                    + Cover(AlertRoute.self, priority: .critical, transition: .fade, providesNavigation: false)._routeDeclarations
+                    + Cover(SettingsRoute.self, priority: .critical)._routeDeclarations
+                ),
+            ]
+        )
+
+        await router.requestRoute(LoginRoute())
+        let highScope = router.rootPath.last
+        await router.requestRoute(AlertRoute())
+        await router.requestRoute(SettingsRoute())
+
+        let highPresentation = router.highPriorityRoutePresentationBinding(
+            matching: .cover(.slide)
+        ).wrappedValue
+        let criticalPresentation = router.elevatedRoutePresentationBinding(
+            priority: .critical,
+            matching: .cover(.slide)
+        ).wrappedValue
+
+        #expect(router.rootPath.count == 2)
+        #expect(router.rootPath.first === highScope)
+        #expect(router.rootPath.first?.route is LoginRoute)
+        #expect(router.rootPath.last?.route is SettingsRoute)
+        #expect(router.rootPath.scopes.contains { $0.route is AlertRoute } == false)
+        #expect(router.highContext?.highRouteScope === highScope)
+        #expect(router.criticalContext?.elevatedRouteScope === router.rootPath.last)
+        #expect(highPresentation?.scope === highScope)
+        #expect(criticalPresentation?.scope === router.rootPath.last)
+        #expect(criticalPresentation?.declaration.priority == .critical)
+    }
+
+    @Test func lowerPriorityRouteBeforeActiveCriticalContextIsDropped() async {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Cover(LoginRoute.self, priority: .critical)._routeDeclarations
+                    + Cover(SettingsRoute.self, priority: .high)._routeDeclarations
+                    + Sheet(MessageRoute.self)._routeDeclarations
+                ),
+            ]
+        )
+
+        await router.requestRoute(LoginRoute())
+        await router.requestRoute(SettingsRoute())
+        await router.requestRoute(MessageRoute())
+
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last?.route is LoginRoute)
+        #expect(router.criticalContext?.elevatedRouteScope === router.rootPath.last)
+        #expect(router.highContext == nil)
+    }
+
+    @Test func criticalPriorityDeclarationInsideHighContextStartsCriticalContext() async {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(LoginRoute())
+        let loginScope = router.rootPath.last
+        loginScope?.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(AlertRoute.self, priority: .critical, transition: .fade, providesNavigation: false)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(AlertRoute())
+
+        #expect(router.rootPath.count == 2)
+        #expect(router.rootPath.first?.route is LoginRoute)
+        #expect(router.rootPath.last?.route is AlertRoute)
+        #expect(router.highContext?.highRouteScope === loginScope)
+        #expect(router.criticalContext?.elevatedRouteScope === router.rootPath.last)
+        #expect(router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.fade)).wrappedValue?.scope === router.rootPath.last)
+        #expect(router.routePresentationBinding(from: loginScope, matching: .cover(.fade)).wrappedValue == nil)
+    }
 }

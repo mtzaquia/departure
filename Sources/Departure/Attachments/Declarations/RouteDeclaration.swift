@@ -134,16 +134,26 @@ public protocol RouteDeclaration {
 /// ```swift
 /// Cover(LoginRoute.self, priority: .high)
 /// ```
-public enum RoutePriority: Hashable, Sendable {
+public enum RoutePriority: Int, Comparable, Hashable, Sendable {
     /// Presents from the declaring scope.
     ///
-    /// - Important: Normal-priority requests are ignored while a high-priority context is
+    /// - Important: Normal-priority requests are ignored while an elevated-priority context is
     ///   active, unless they are declared inside that context.
     case normal
 
     /// Presents above normal-priority routes.
     ///
-    /// - Important: High-priority requests from normal content replace the active
-    ///   high-priority context. From inside that context, they behave as local navigation.
+    /// - Important: High-priority requests from normal content replace the active high-priority
+    ///   context. From inside an equal-or-higher context, they behave as local navigation.
     case high
+
+    /// Presents above high-priority routes.
+    ///
+    /// - Important: Critical-priority requests replace an active critical context when matched
+    ///   outside it. From inside that context, they behave as local navigation.
+    case critical
+
+    public static func < (lhs: Self, rhs: Self) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
 }

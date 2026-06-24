@@ -96,8 +96,7 @@ extension Router {
         if let presentation = hostedPresentation(
             by: routeScope,
             matching: presentationKind,
-            in: routePath,
-            context: highContext
+            in: routePath
         ) {
             return presentation
         }
@@ -126,11 +125,19 @@ extension Router {
     func highPriorityRoutePresentationBinding(
         matching presentationKind: RoutePresentationKind
     ) -> Binding<RoutePresentation?> {
-        _ = highContext?.path.scopes
+        elevatedRoutePresentationBinding(priority: .high, matching: presentationKind)
+    }
+
+    func elevatedRoutePresentationBinding(
+        priority: RoutePriority,
+        matching presentationKind: RoutePresentationKind
+    ) -> Binding<RoutePresentation?> {
+        _ = elevatedContext(for: priority)?.path.scopes
 
         return Binding(
             get: {
-                self.highPriorityRoutePresentation(
+                self.elevatedRoutePresentation(
+                    priority: priority,
                     matching: presentationKind
                 )
             },
@@ -139,7 +146,8 @@ extension Router {
                     return
                 }
 
-                self.dismissHighPriorityPresentation(
+                self.dismissElevatedPresentation(
+                    priority: priority,
                     matching: presentationKind
                 )
             }
@@ -151,8 +159,7 @@ private extension Router {
     func hostedPresentation(
         by host: RouteScope,
         matching presentationKind: RoutePresentationKind,
-        in routePath: RoutePath,
-        context: RouteContext?
+        in routePath: RoutePath
     ) -> RoutePresentation? {
         guard host.canDrivePresentation(matching: presentationKind) else {
             return nil
@@ -168,15 +175,14 @@ private extension Router {
             return nil
         }
 
-        // The high-priority gate keys off the *host's* position relative to the high context.
-        // The path owner maps to `nil`, i.e. before the high context begins.
+        // The elevated-priority gate keys off the host's position relative to an equal-or-higher
+        // context. The path owner maps to `nil`, i.e. before the elevated context begins.
         let hostIndex = routePath.scopes.firstIndex { $0 === host }
         guard
             shouldHostLocally(
                 declaration,
                 from: hostIndex,
-                in: routePath,
-                context: context
+                in: routePath
             )
         else {
             return nil
@@ -232,7 +238,7 @@ private extension Router {
                     declaration,
                     from: originalHostIndex,
                     in: path.routePath,
-                    context: snapshot.highContext
+                    snapshot: snapshot
                 )
             else {
                 continue
@@ -287,25 +293,47 @@ private extension Router {
     func shouldHostLocally(
         _ declaration: AnyRouteDeclaration,
         from pathIndex: [RouteScope].Index?,
-        in routePath: RoutePath,
-        context: RouteContext?
+        in routePath: RoutePath
     ) -> Bool {
-        guard declaration.priority == .high else {
+        guard declaration.priority != .normal else {
             return true
         }
 
-        return context?.contains(path: routePath, pathIndex: pathIndex) == true
+        return elevatedContext(
+            containingPath: routePath,
+            pathIndex: pathIndex,
+            minimumPriority: declaration.priority
+        ) != nil
     }
 
-    func highPriorityRoutePresentation(
+    func shouldHostLocally(
+        _ declaration: AnyRouteDeclaration,
+        from pathIndex: [RouteScope].Index?,
+        in routePath: RoutePath,
+        snapshot: UnwindPresentationSnapshot
+    ) -> Bool {
+        guard declaration.priority != .normal else {
+            return true
+        }
+
+        return snapshot.elevatedContext(
+            containingPath: routePath,
+            pathIndex: pathIndex,
+            minimumPriority: declaration.priority
+        ) != nil
+    }
+
+    func elevatedRoutePresentation(
+        priority: RoutePriority,
         matching presentationKind: RoutePresentationKind
     ) -> RoutePresentation? {
         guard
-            let highContext,
-            let highRouteScope = highContext.highRouteScope,
-            let route = highRouteScope.route,
-            let presentationScope = highContext.highPresentationScope,
-            let attachment = presentationScope.highPriorityRouteAttachment(
+            let context = elevatedContext(for: priority),
+            let routeScope = context.elevatedRouteScope,
+            let route = routeScope.route,
+            let presentationScope = context.elevatedPresentationScope,
+            let attachment = presentationScope.elevatedRouteAttachment(
+                priority: priority,
                 for: type(of: route),
                 matching: presentationKind
             )
@@ -314,27 +342,28 @@ private extension Router {
         }
 
         return RoutePresentation(
-            scope: highRouteScope,
+            scope: routeScope,
             declaration: attachment.declaration,
             sourceEnvironment: attachment.routeScope.sourceEnvironment
         )
     }
 
-    func dismissHighPriorityPresentation(
+    func dismissElevatedPresentation(
+        priority: RoutePriority,
         matching presentationKind: RoutePresentationKind
     ) {
-        guard let presentation = highPriorityRoutePresentation(matching: presentationKind) else {
+        guard let presentation = elevatedRoutePresentation(priority: priority, matching: presentationKind) else {
             return
         }
 
-        guard let highContext else {
+        guard let context = elevatedContext(for: priority) else {
             return
         }
 
-        let targetPathIndex = highContext.highBasePathIndex
-        let removedScopes = highContext.path.scopesRemovedByKeepingThrough(targetPathIndex)
-        let targetScope = highContext.path.scope(at: targetPathIndex)
-        keepPathThrough(targetPathIndex, in: highContext.path)
+        let targetPathIndex = context.elevatedBasePathIndex
+        let removedScopes = context.path.scopesRemovedByKeepingThrough(targetPathIndex)
+        let targetScope = context.path.scope(at: targetPathIndex)
+        keepPathThrough(targetPathIndex, in: context.path)
         scheduleUnwindHandlersAfterDismissalCompletes(
             for: presentation.scope.route,
             in: targetScope,
@@ -345,7 +374,8 @@ private extension Router {
 }
 
 private extension RouteScope {
-    func highPriorityRouteAttachment(
+    func elevatedRouteAttachment(
+        priority: RoutePriority,
         for routeType: any Route.Type,
         matching presentationKind: RoutePresentationKind
     ) -> (routeScope: RouteScope, declaration: AnyRouteDeclaration)? {
@@ -354,7 +384,7 @@ private extension RouteScope {
         if let declaration = activeLocalScope.routeAttachments.first(where: {
             $0.routeType == routeType
             && $0.presentationKind == presentationKind
-            && $0.priority == .high
+            && $0.priority == priority
             && $0.drivesPresentation
         }) {
             return (activeLocalScope, declaration)
@@ -367,7 +397,7 @@ private extension RouteScope {
         return routeAttachments.first(where: {
             $0.routeType == routeType
             && $0.presentationKind == presentationKind
-            && $0.priority == .high
+            && $0.priority == priority
             && $0.drivesPresentation
         }).map { (self, $0) }
     }

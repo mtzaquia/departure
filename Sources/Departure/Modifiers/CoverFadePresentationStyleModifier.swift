@@ -59,6 +59,29 @@ struct HighPriorityCoverFadeHost: View {
         let presentation = router.highPriorityRoutePresentationBinding(matching: .cover(.fade))
 
         HighPriorityPresentationWindowBridge(
+            priority: .high,
+            route: presentation,
+            windowDestinationBuilder: windowDestinationBuilder
+        ) { presentation, onDismiss in
+            HighPriorityCoverFadePresenter(
+                presentation: presentation,
+                router: router,
+                onDismiss: onDismiss
+            )
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+struct CriticalPriorityCoverFadeHost: View {
+    @Environment(Router.self) private var router
+    let windowDestinationBuilder: WindowDestinationBuilder
+
+    var body: some View {
+        let presentation = router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.fade))
+
+        HighPriorityPresentationWindowBridge(
+            priority: .critical,
             route: presentation,
             windowDestinationBuilder: windowDestinationBuilder
         ) { presentation, onDismiss in

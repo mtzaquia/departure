@@ -43,6 +43,9 @@ public struct WithRouter<Content: View>: View {
                 HighPrioritySheetHost(windowDestinationBuilder: windowDestinationBuilder)
                 HighPriorityCoverSlideHost(windowDestinationBuilder: windowDestinationBuilder)
                 HighPriorityCoverFadeHost(windowDestinationBuilder: windowDestinationBuilder)
+                CriticalPrioritySheetHost(windowDestinationBuilder: windowDestinationBuilder)
+                CriticalPriorityCoverSlideHost(windowDestinationBuilder: windowDestinationBuilder)
+                CriticalPriorityCoverFadeHost(windowDestinationBuilder: windowDestinationBuilder)
             }
             .environment(router)
     }
@@ -58,12 +61,12 @@ public struct WithRouter<Content: View>: View {
         }
     }
 
-    /// Creates a router host with a high-priority window destination customizer.
+    /// Creates a router host with an elevated-priority window destination customizer.
     ///
     /// Pass a ``Router`` when app code needs to keep an explicit reference.
     ///
     /// `windowDestination` customizes destinations presented through Departure's
-    /// separate high-priority window. Use it to explicitly forward environment
+    /// separate elevated-priority windows. Use it to explicitly forward environment
     /// values that should cross the `UIWindow` boundary.
     public init<WindowContent: View>(
         router: Router? = nil,

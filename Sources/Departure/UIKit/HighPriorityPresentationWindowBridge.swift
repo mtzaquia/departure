@@ -26,6 +26,7 @@ import SwiftUI
 import UIKit
 
 struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControllerRepresentable {
+    let priority: RoutePriority
     @Binding var route: RoutePresentation?
     let windowDestinationBuilder: WindowDestinationBuilder
     let content: (RouteDestinationSnapshot, @escaping @MainActor () -> Void) -> HostedContent
@@ -37,6 +38,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
     func updateUIViewController(_ controller: Controller, context: Context) {
         controller.content = content
         controller.update(
+            priority: priority,
             route: route,
             windowDestinationBuilder: windowDestinationBuilder,
             clearRoute: {
@@ -69,6 +71,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
         required init?(coder: NSCoder) { fatalError() }
 
         func update(
+            priority: RoutePriority,
             route: RoutePresentation?,
             windowDestinationBuilder: WindowDestinationBuilder,
             clearRoute: @escaping @MainActor () -> Void
@@ -112,14 +115,14 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
                 return
             }
 
-            present(presentation)
+            present(presentation, priority: priority)
         }
 
         func detach() {
             dismissWindow(callClearRoute: false)
         }
 
-        private func present(_ presentation: RouteDestinationSnapshot) {
+        private func present(_ presentation: RouteDestinationSnapshot, priority: RoutePriority) {
             guard let scene = resolveScene() else {
                 clearRoute?()
                 return
@@ -127,7 +130,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
 
             let window = PassThroughWindow(windowScene: scene)
             previousKeyWindow = scene.windows.first(where: \.isKeyWindow)
-            window.windowLevel = UIWindow.Level(rawValue: resolveHighestWindowLevel(in: scene).rawValue + 1)
+            window.windowLevel = windowLevel(for: priority, in: scene)
             window.backgroundColor = .clear
 
             let hostingController = PresentedHostingController(rootView: makeHost(for: presentation))
@@ -225,7 +228,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
 
             if presentsPendingRoute, let pendingPresentation {
                 self.pendingPresentation = nil
-                present(pendingPresentation)
+                present(pendingPresentation, priority: pendingPresentation.route.declaration.priority)
             }
         }
 
@@ -249,10 +252,24 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
                 .max(by: { $0.rawValue < $1.rawValue })
                 ?? .normal
         }
+
+        private func windowLevel(for priority: RoutePriority, in scene: UIWindowScene) -> UIWindow.Level {
+            switch priority {
+            case .critical:
+                return .alert
+
+            case .high:
+                return UIWindow.Level(rawValue: UIWindow.Level.alert.rawValue - 1)
+
+            case .normal:
+                return UIWindow.Level(rawValue: resolveHighestWindowLevel(in: scene).rawValue + 1)
+            }
+        }
     }
 }
 #else
 struct HighPriorityPresentationWindowBridge<HostedContent: View>: View {
+    let priority: RoutePriority
     @Binding var route: RoutePresentation?
     @ViewBuilder let content: (
         RouteDestinationSnapshot,
@@ -260,6 +277,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: View {
     ) -> HostedContent
 
     init(
+        priority: RoutePriority,
         route: Binding<RoutePresentation?>,
         windowDestinationBuilder _: WindowDestinationBuilder,
         @ViewBuilder content: @escaping (
@@ -267,6 +285,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: View {
             @escaping @MainActor () -> Void
         ) -> HostedContent
     ) {
+        self.priority = priority
         self._route = route
         self.content = content
     }

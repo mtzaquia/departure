@@ -200,6 +200,18 @@ struct AlertRoute: Route {
     }
 }
 
+struct CriticalRoute: Route {
+    func destination() -> some View {
+        CriticalView()
+    }
+}
+
+struct CriticalReplacementRoute: Route {
+    func destination() -> some View {
+        CriticalReplacementView()
+    }
+}
+
 struct MessageRoute: Route {
     func destination() -> some View {
         MessageView()

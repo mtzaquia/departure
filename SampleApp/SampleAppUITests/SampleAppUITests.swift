@@ -177,6 +177,27 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.loginDetailText)
     }
 
+    func testCriticalPriorityPresentationOverlaysAndReplacesAboveHighPriorityContext() {
+        openLanding()
+
+        tap(A11y.homeProfileButton)
+        assertExists(A11y.loginTitle)
+
+        tap(A11y.loginPresentCriticalButton)
+        assertExists(A11y.criticalText)
+        assertLabel(A11y.criticalWindowEnvironmentValue, contains: "forwarded from app window")
+        assertExists(A11y.loginTitle)
+
+        tap(A11y.criticalReplaceButton)
+        assertExists(A11y.criticalReplacementText)
+        assertGone(A11y.criticalText)
+        assertExists(A11y.loginTitle)
+
+        tap(A11y.criticalReplacementDismissButton)
+        assertGone(A11y.criticalReplacementText)
+        assertExists(A11y.loginTitle)
+    }
+
     func testSwiftUIDismissSynchronizationAndHandlerTiming() {
         openLanding()
 
@@ -464,6 +485,7 @@ private enum A11y {
     static let loginButton = "sample.login.button"
     static let loginReplaceHighPriorityButton = "sample.login.replace-high-priority"
     static let loginPresentAlertButton = "sample.login.present-alert"
+    static let loginPresentCriticalButton = "sample.login.present-critical"
     static let loginPushDetailButton = "sample.login.push-detail"
     static let loginPresentHighPrioritySheetButton = "sample.login.present-high-priority-sheet"
 
@@ -474,6 +496,12 @@ private enum A11y {
     static let replacementTitle = "sample.replacement.title"
     static let replacementWindowEnvironmentValue = "sample.replacement.window-environment"
     static let replacementDismissButton = "sample.replacement.dismiss"
+    static let criticalText = "sample.critical.text"
+    static let criticalWindowEnvironmentValue = "sample.critical.window-environment"
+    static let criticalReplaceButton = "sample.critical.replace"
+    static let criticalDismissButton = "sample.critical.dismiss"
+    static let criticalReplacementText = "sample.critical-replacement.text"
+    static let criticalReplacementDismissButton = "sample.critical-replacement.dismiss"
 
     static let profileTitle = "sample.profile.title"
     static let profileSignOutButton = "sample.profile.sign-out"

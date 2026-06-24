@@ -160,11 +160,11 @@ extension DepartureLogEvent {
         case let .branchUnregisterSkipped(branch, scope):
             "branch unregister skipped | branch=\(branch.departureDebugDescription) | reason=scope mismatch | scope=\(scope.departureDebugDescription)"
         case let .highPriorityReplacePreparing(route, match):
-            "high-priority replace preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
+            "elevated-priority replace preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
         case .highContextCleared:
-            "high-priority context cleared"
+            "elevated-priority context cleared"
         case let .highContextStarted(pathIndex):
-            "high-priority context started | pathIndex=\(pathIndex)"
+            "elevated-priority context started | pathIndex=\(pathIndex)"
         case let .hookDeclarationsUninstalled(scope):
             "hook declarations uninstalled | scope=\(scope.departureDebugDescription)"
         case let .hookDeclarationsInstalled(scope, hookCount):
@@ -188,7 +188,7 @@ extension DepartureLogEvent {
         case let .routeAcceptedAppend(route):
             "route accepted | action=append | route=\(route.departureDebugDescription)"
         case let .routeAcceptedReplaceHighPriority(route):
-            "route accepted | action=replace high-priority context | route=\(route.departureDebugDescription)"
+            "route accepted | action=replace elevated-priority context | route=\(route.departureDebugDescription)"
         case let .routeAppendSuperseded(route):
             "route append dropped | reason=superseded while waiting for replaced scopes | route=\(route.departureDebugDescription)"
         case let .routeAppendPreparing(route, match):
@@ -198,7 +198,7 @@ extension DepartureLogEvent {
         case let .routeAppended(route, pathCount):
             "route appended | route=\(route.departureDebugDescription) | pathCount=\(pathCount)"
         case let .routeBlockedByHighContext(route):
-            "route blocked | route=\(route.departureDebugDescription) | reason=normal priority before active high-priority context"
+            "route blocked | route=\(route.departureDebugDescription) | reason=lower priority before active elevated-priority context"
         case let .routeCanPresentActiveLocalScope(branch):
             "route can present | branch=\(branch.departureDebugDescription) | reason=active local scope"
         case .routeCanPresentDeclarationDrivesPresentation:

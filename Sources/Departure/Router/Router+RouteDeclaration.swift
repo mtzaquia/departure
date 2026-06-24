@@ -63,16 +63,16 @@ extension Router {
         switch routeRequestDecision(for: matchedDeclaration) {
         case .drop:
             log.departureDebug(.routeBlockedByHighContext(route: resolvedRoute))
-            return // Normal priority route attached before an existing high-priority context is dropped.
+            return // Lower-priority route attached before an existing elevated context is dropped.
 
         case .append:
             log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
             await appendRoute(resolvedRoute, after: matchedDeclaration)
             return
 
-        case .replaceHighContext:
+        case .replaceElevatedContext(let priority):
             log.departureDebug(.routeAcceptedReplaceHighPriority(route: resolvedRoute))
-            replaceHighContext(with: resolvedRoute, after: matchedDeclaration)
+            replaceElevatedContext(priority, with: resolvedRoute, after: matchedDeclaration)
             return
         }
     }
@@ -81,7 +81,7 @@ extension Router {
 extension Router {
     enum RouteRequestDecision {
         case append
-        case replaceHighContext
+        case replaceElevatedContext(RoutePriority)
         case drop
     }
 
@@ -95,18 +95,21 @@ extension Router {
     }
 
     func routeRequestDecision(for match: DeclarationMatch) -> RouteRequestDecision {
-        let declarationIsInHighContext = highContext?.contains(match) == true
-
-        switch (match.declaration.priority, highContext != nil, declarationIsInHighContext) {
-        case (.normal, true, false):
-            return .drop
-
-        case (.normal, _, _), (.high, _, true):
+        if let containingContext = elevatedContext(containing: match),
+           containingContext.priority >= match.declaration.priority {
             return .append
-
-        case (.high, _, false):
-            return .replaceHighContext
         }
+
+        guard match.declaration.priority != .normal else {
+            return highestElevatedContext == nil ? .append : .drop
+        }
+
+        if let highestElevatedContext,
+           highestElevatedContext.priority > match.declaration.priority {
+            return .drop
+        }
+
+        return .replaceElevatedContext(match.declaration.priority)
     }
 
     func firstDeclaration(including routeType: any Route.Type) -> DeclarationMatch? {
