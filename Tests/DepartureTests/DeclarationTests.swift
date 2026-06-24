@@ -30,16 +30,18 @@ struct DeclarationTests {
         let declarations = RouteDeclarationBuilder.buildBlock(
             RouteDeclarationBuilder.buildExpression(Push(HomeDetailRoute.self)),
             RouteDeclarationBuilder.buildExpression(Sheet(SettingsRoute.self, providesNavigation: false)),
-            RouteDeclarationBuilder.buildExpression(Cover(LoginRoute.self, priority: .high))
+            RouteDeclarationBuilder.buildExpression(Cover(LoginRoute.self, priority: .high)),
+            RouteDeclarationBuilder.buildExpression(Cover(AlertRoute.self, priority: .critical))
         )
 
-        #expect(declarations.count == 3)
+        #expect(declarations.count == 4)
         #expect(declarations.allSatisfy { $0.branch == nil })
         #expect(declarations.flatMap(\.routes).allSatisfy { $0.drivesPresentation })
         #expect(declarations[0].routes[0].presentationKind == .push)
         #expect(declarations[1].routes[0].presentationKind == .sheet)
         #expect(declarations[1].routes[0].providesNavigation == false)
         #expect(declarations[2].routes[0].priority == .high)
+        #expect(declarations[3].routes[0].priority == .critical)
     }
 
     @Test func branchDeclarationsAreDiscoveryOnlyOnTheParentScope() {

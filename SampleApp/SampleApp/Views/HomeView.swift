@@ -26,6 +26,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(Router.self) private var router
     @State private var storage = Storage.shared
+    @State private var passthroughTapCount = 0
 
     var body: some View {
         List {
@@ -47,6 +48,21 @@ struct HomeView: View {
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.homeShowDismissProbeButton)
             }
+
+            Button("Show high-priority passthrough sheet") {
+                Task {
+                    await router.present(HighPriorityPassthroughSheetRoute())
+                }
+            }
+            .accessibilityIdentifier(SampleAppAccessibility.homePresentHighPriorityPassthroughSheetButton)
+
+            Button("Tap behind presentation") {
+                passthroughTapCount += 1
+            }
+            .accessibilityIdentifier(SampleAppAccessibility.homePassthroughBehindButton)
+
+            Text("Behind sheet taps: \(passthroughTapCount)")
+                .accessibilityIdentifier(SampleAppAccessibility.homePassthroughTapCount)
 
             Section {
                 LabeledContent {

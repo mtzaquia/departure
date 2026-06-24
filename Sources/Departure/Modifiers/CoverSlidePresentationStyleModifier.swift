@@ -51,18 +51,20 @@ struct CoverSlidePresentationStyleModifier: ViewModifier {
     }
 }
 
-struct HighPriorityCoverSlideHost: View {
+struct ElevatedPriorityCoverSlideHost: View {
     @Environment(Router.self) private var router
+    let priority: RoutePriority
     let windowDestinationBuilder: WindowDestinationBuilder
 
     var body: some View {
-        let presentation = router.highPriorityRoutePresentationBinding(matching: .cover(.slide))
+        let presentation = router.elevatedRoutePresentationBinding(priority: priority, matching: .cover(.slide))
 
-        HighPriorityPresentationWindowBridge(
+        ElevatedPriorityPresentationWindowBridge(
+            priority: priority,
             route: presentation,
             windowDestinationBuilder: windowDestinationBuilder
         ) { presentation, onDismiss in
-            HighPriorityCoverSlidePresenter(
+            ElevatedPriorityCoverSlidePresenter(
                 onDismiss: onDismiss,
                 destination: presentation.destination
             )
@@ -75,7 +77,7 @@ struct HighPriorityCoverSlideHost: View {
 
 // MARK: - Private
 
-private struct HighPriorityCoverSlidePresenter: View {
+private struct ElevatedPriorityCoverSlidePresenter: View {
     let onDismiss: @MainActor () -> Void
     let destination: AnyView
 

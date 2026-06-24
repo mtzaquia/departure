@@ -411,29 +411,32 @@ flowchart TD
 > Each branch on a branched scope has its own path for pushed presentations. Modal presentations are
 > mutually exclusive within the branched scope.
 
-## High-priority presentations
+## Elevated-priority presentations
 
-Sheets and covers can have normal or high priority.
+Sheets and covers can have normal, high, or critical priority.
 
 ```swift
 .routes {
   Sheet(ProfileRoute.self)
   Cover(LoginRoute.self, priority: .high)
+  Cover(SystemOutageRoute.self, priority: .critical)
 }
 ```
 
 | Priority | Behavior |
 | --- | --- |
-| `.normal` | Presents from the nearest eligible scope, **unless an active high-priority context is blocking declarations outside it.** |
-| `.high` | Presents in a separate high-priority context backed by its own `UIWindow`. |
+| `.normal` | Presents from the nearest eligible scope, **unless an active elevated-priority context is blocking declarations outside it.** |
+| `.high` | Presents above normal-priority routes in a separate `UIWindow`. |
+| `.critical` | Presents above high-priority routes in a separate `UIWindow` with `windowLevel == .alert`. |
 
-- A new high-priority request **matched outside the active high-priority context** replaces the active high-priority presentation entirely.
-- Routing requests whose declarations are **matched within the active high-priority context** act like normal-priority requests.
+- Requests matched inside an active context with priority **greater than or equal to** the declaration's priority act locally.
+- Higher-priority requests start or replace their own context above lower-priority contexts; dismissing them reveals the lower context underneath.
+- Lower-priority requests matched outside the active elevated context are blocked.
 
 > [!IMPORTANT]
-> High priority changes presentation context, not route lookup. Branch routes are still resolved with the same crawling rules; when a high-priority branch route is selected, the high-priority window uses the active branch presentation scope.
+> Elevated priority changes presentation context, not route lookup. Branch routes are still resolved with the same crawling rules; when an elevated-priority branch route is selected, the elevated window uses the active branch presentation scope.
 
-Because high-priority presentations use a separate `UIWindow`, SwiftUI cannot automatically propagate custom environment values. Use the `windowDestination` parameter from `WithRouter` to customize these destinations.
+Because elevated-priority presentations use separate `UIWindow`s, SwiftUI cannot automatically propagate custom environment values. Use the `windowDestination` parameter from `WithRouter` to customize these destinations.
 
 ```swift
 WithRouter {
@@ -451,12 +454,15 @@ WithRouter {
 flowchart TD
     normal["Normal app context"]
     login["High-priority LoginRoute"]
+    outage["Critical SystemOutageRoute"]
     twofactor["TwoFactorRoute inside login"]
     settings["Normal SettingsRoute request"]
 
     normal -->|"Cover(LoginRoute.self, priority: .high)"| login
+    login -->|"Cover(SystemOutageRoute.self, priority: .critical)"| outage
+    outage -->|"dismiss critical"| login
     login -->|"local route request"| twofactor
-    settings -.->|"blocked while high-priority context is active"| login
+    settings -.->|"blocked while elevated context is active"| login
 ```
 
 ## License

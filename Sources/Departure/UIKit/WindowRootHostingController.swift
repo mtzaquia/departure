@@ -25,33 +25,13 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 
-final class PresentedHostingController<Content: View>: UIHostingController<Content> {
+final class WindowRootHostingController<Content: View>: UIHostingController<Content> {
     var onDismiss: (@MainActor () -> Void)?
 
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
 
-        guard isBeingDismissedInHierarchy else {
-            return
-        }
-
-        onDismiss?()
-    }
-}
-
-private extension UIViewController {
-    var isBeingDismissedInHierarchy: Bool {
-        var viewController: UIViewController? = self
-
-        while let current = viewController {
-            if current.isBeingDismissed {
-                return true
-            }
-
-            viewController = current.parent
-        }
-
-        return false
+        notifyPresentationDismissIfNeeded(onDismiss)
     }
 }
 #endif

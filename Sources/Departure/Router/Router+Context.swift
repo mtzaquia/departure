@@ -28,50 +28,89 @@ extension Router {
             startIndex: [RouteScope].Index,
             presentationScope: RouteScope
         )
+        case critical(
+            path: RoutePath,
+            startIndex: [RouteScope].Index,
+            presentationScope: RouteScope
+        )
 
         var path: RoutePath {
             switch self {
-            case .normal(let path), .high(let path, _, _):
+            case .normal(let path), .high(let path, _, _), .critical(let path, _, _):
                 path
             }
         }
 
-        var highStartIndex: [RouteScope].Index? {
-            guard case .high(_, let startIndex, _) = self else {
-                return nil
+        var priority: RoutePriority {
+            switch self {
+            case .normal: .normal
+            case .high: .high
+            case .critical: .critical
             }
+        }
 
-            return startIndex
+        var highStartIndex: [RouteScope].Index? {
+            elevatedStartIndex
+        }
+
+        var elevatedStartIndex: [RouteScope].Index? {
+            switch self {
+            case .normal:
+                return nil
+
+            case .high(_, let startIndex, _), .critical(_, let startIndex, _):
+                return startIndex
+            }
         }
 
         var highRouteScope: RouteScope? {
-            guard
-                case .high(let path, let startIndex, _) = self,
-                path.scopes.indices.contains(startIndex)
-            else {
-                return nil
-            }
+            elevatedRouteScope
+        }
 
-            return path.scopes[startIndex]
+        var elevatedRouteScope: RouteScope? {
+            switch self {
+            case .normal:
+                return nil
+
+            case .high(let path, let startIndex, _), .critical(let path, let startIndex, _):
+                guard path.scopes.indices.contains(startIndex) else {
+                    return nil
+                }
+
+                return path.scopes[startIndex]
+            }
         }
 
         var highBasePathIndex: [RouteScope].Index? {
-            guard
-                case .high(let path, let startIndex, _) = self,
-                startIndex > path.scopes.startIndex
-            else {
-                return nil
-            }
+            elevatedBasePathIndex
+        }
 
-            return path.scopes.index(before: startIndex)
+        var elevatedBasePathIndex: [RouteScope].Index? {
+            switch self {
+            case .normal:
+                return nil
+
+            case .high(let path, let startIndex, _), .critical(let path, let startIndex, _):
+                guard startIndex > path.scopes.startIndex else {
+                    return nil
+                }
+
+                return path.scopes.index(before: startIndex)
+            }
         }
 
         var highPresentationScope: RouteScope? {
-            guard case .high(_, _, let presentationScope) = self else {
-                return nil
-            }
+            elevatedPresentationScope
+        }
 
-            return presentationScope
+        var elevatedPresentationScope: RouteScope? {
+            switch self {
+            case .normal:
+                return nil
+
+            case .high(_, _, let presentationScope), .critical(_, _, let presentationScope):
+                return presentationScope
+            }
         }
 
         func contains(_ match: DeclarationMatch) -> Bool {
@@ -79,15 +118,17 @@ extension Router {
         }
 
         func contains(path: RoutePath, pathIndex: [RouteScope].Index?) -> Bool {
-            guard
-                case .high(let contextPath, let startIndex, _) = self,
-                path === contextPath,
-                let pathIndex
-            else {
+            switch self {
+            case .normal:
                 return false
-            }
 
-            return pathIndex >= startIndex
+            case .high(let contextPath, let startIndex, _), .critical(let contextPath, let startIndex, _):
+                guard path === contextPath, let pathIndex else {
+                    return false
+                }
+
+                return pathIndex >= startIndex
+            }
         }
     }
 
@@ -96,7 +137,66 @@ extension Router {
     }
 
     var activeContext: RouteContext {
-        highContext ?? normalContext
+        criticalContext ?? highContext ?? normalContext
+    }
+
+    var highestElevatedContext: RouteContext? {
+        criticalContext ?? highContext
+    }
+
+    func elevatedContext(for priority: RoutePriority) -> RouteContext? {
+        switch priority {
+        case .normal:
+            return nil
+
+        case .high:
+            return highContext
+
+        case .critical:
+            return criticalContext
+        }
+    }
+
+    func setElevatedContext(_ context: RouteContext?, for priority: RoutePriority) {
+        switch priority {
+        case .normal:
+            return
+
+        case .high:
+            highContext = context
+
+        case .critical:
+            criticalContext = context
+        }
+    }
+
+    func elevatedContext(containing match: DeclarationMatch) -> RouteContext? {
+        elevatedContexts(containingPath: match.path, pathIndex: match.pathIndex).first
+    }
+
+    func elevatedContext(
+        containingPath path: RoutePath,
+        pathIndex: [RouteScope].Index?,
+        minimumPriority: RoutePriority
+    ) -> RouteContext? {
+        elevatedContexts(containingPath: path, pathIndex: pathIndex).first {
+            $0.priority >= minimumPriority
+        }
+    }
+
+    func elevatedContexts(containingPath path: RoutePath, pathIndex: [RouteScope].Index?) -> [RouteContext] {
+        elevatedContexts.filter {
+            $0.contains(path: path, pathIndex: pathIndex)
+        }
+    }
+
+    var elevatedContexts: [RouteContext] {
+        [criticalContext, highContext].compactMap { $0 }
+    }
+
+    func clearElevatedContexts() {
+        highContext = nil
+        criticalContext = nil
     }
 
     var normalContext: RouteContext {

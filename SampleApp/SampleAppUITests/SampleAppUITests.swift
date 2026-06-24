@@ -177,6 +177,56 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.loginDetailText)
     }
 
+    func testCriticalPriorityPresentationOverlaysAndReplacesAboveHighPriorityContext() {
+        openLanding()
+
+        tap(A11y.homeProfileButton)
+        assertExists(A11y.loginTitle)
+        let loginCancelCoordinate = app.buttons[A11y.loginCancelButton]
+            .firstMatch
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+
+        tap(A11y.loginPresentCriticalButton)
+        assertExists(A11y.criticalText)
+        assertLabel(A11y.criticalWindowEnvironmentValue, contains: "forwarded from app window")
+        assertExists(A11y.loginTitle)
+
+        loginCancelCoordinate.tap()
+        assertGone(A11y.criticalText)
+        assertExists(A11y.loginTitle)
+
+        tap(A11y.loginPresentCriticalButton)
+        assertExists(A11y.criticalText)
+
+        tap(A11y.criticalReplaceButton)
+        assertExists(A11y.criticalReplacementText)
+        assertGone(A11y.criticalText)
+        assertExists(A11y.loginTitle)
+
+        tap(A11y.criticalReplacementDismissButton)
+        assertGone(A11y.criticalReplacementText)
+        assertExists(A11y.loginTitle)
+    }
+
+    func testHighPrioritySheetHonorsSwiftUIPresentationPassthrough() {
+        openLanding()
+
+        assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 0")
+        let behindCoordinate = app.buttons[A11y.homePassthroughBehindButton]
+            .firstMatch
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+
+        tap(A11y.homePresentHighPriorityPassthroughSheetButton)
+        assertExists(A11y.highPriorityPassthroughSheetText)
+
+        behindCoordinate.tap()
+        assertExists(A11y.highPriorityPassthroughSheetText)
+        assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 1")
+
+        tap(A11y.highPriorityPassthroughSheetDismissButton)
+        assertGone(A11y.highPriorityPassthroughSheetText)
+    }
+
     func testSwiftUIDismissSynchronizationAndHandlerTiming() {
         openLanding()
 
@@ -404,6 +454,9 @@ private enum A11y {
     static let homeShowMessageButton = "sample.home.show-message"
     static let homeProfileButton = "sample.home.profile"
     static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
+    static let homePresentHighPriorityPassthroughSheetButton = "sample.home.present-high-priority-passthrough-sheet"
+    static let homePassthroughBehindButton = "sample.home.passthrough-behind"
+    static let homePassthroughTapCount = "sample.home.passthrough-tap-count"
     static let homeEmojiValue = "sample.home.emoji-value"
     static let homeUnwindPayloadStatus = "sample.home.unwind-payload-status"
     static let homeDismissProbeHookStatus = "sample.home.dismiss-probe-hook-status"
@@ -445,6 +498,8 @@ private enum A11y {
     static let topLevelCoverPresentReplacementButton = "sample.top-level-cover.present-replacement"
     static let topLevelReplacementCoverText = "sample.top-level-replacement-cover.text"
     static let topLevelReplacementCoverDismissButton = "sample.top-level-replacement-cover.dismiss"
+    static let highPriorityPassthroughSheetText = "sample.high-priority-passthrough-sheet.text"
+    static let highPriorityPassthroughSheetDismissButton = "sample.high-priority-passthrough-sheet.dismiss"
 
     static let messageText = "sample.message.text"
     static let messageDismissUnwindButton = "sample.message.dismiss-unwind"
@@ -462,8 +517,10 @@ private enum A11y {
     static let loginTitle = "sample.login.title"
     static let loginWindowEnvironmentValue = "sample.login.window-environment"
     static let loginButton = "sample.login.button"
+    static let loginCancelButton = "sample.login.cancel"
     static let loginReplaceHighPriorityButton = "sample.login.replace-high-priority"
     static let loginPresentAlertButton = "sample.login.present-alert"
+    static let loginPresentCriticalButton = "sample.login.present-critical"
     static let loginPushDetailButton = "sample.login.push-detail"
     static let loginPresentHighPrioritySheetButton = "sample.login.present-high-priority-sheet"
 
@@ -474,6 +531,12 @@ private enum A11y {
     static let replacementTitle = "sample.replacement.title"
     static let replacementWindowEnvironmentValue = "sample.replacement.window-environment"
     static let replacementDismissButton = "sample.replacement.dismiss"
+    static let criticalText = "sample.critical.text"
+    static let criticalWindowEnvironmentValue = "sample.critical.window-environment"
+    static let criticalReplaceButton = "sample.critical.replace"
+    static let criticalDismissButton = "sample.critical.dismiss"
+    static let criticalReplacementText = "sample.critical-replacement.text"
+    static let criticalReplacementDismissButton = "sample.critical-replacement.dismiss"
 
     static let profileTitle = "sample.profile.title"
     static let profileSignOutButton = "sample.profile.sign-out"

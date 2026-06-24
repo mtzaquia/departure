@@ -67,6 +67,15 @@ struct LoginView: View {
                 .bold()
                 .accessibilityIdentifier(SampleAppAccessibility.loginPresentAlertButton)
                 Text("An alert attached to an ancestor scope with high priority should replace this screen.")
+
+                Button("Present critical cover") {
+                    Task {
+                        await router.present(CriticalRoute())
+                    }
+                }
+                .bold()
+                .accessibilityIdentifier(SampleAppAccessibility.loginPresentCriticalButton)
+                Text("A critical cover should appear above this high-priority cover without replacing it.")
             }
 
             Section {
@@ -127,6 +136,67 @@ struct LoginReplacementView: View {
         }
         .navigationTitle("Replacement")
         .accessibilityIdentifier(SampleAppAccessibility.replacementTitle)
+    }
+}
+
+struct CriticalView: View {
+    @Environment(Router.self) private var router
+    @Environment(\.sampleWindowBadge) private var sampleWindowBadge
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Critical route")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.criticalText)
+
+            LabeledContent("Window environment", value: sampleWindowBadge)
+                .accessibilityIdentifier(SampleAppAccessibility.criticalWindowEnvironmentValue)
+
+            Button("Replace critical") {
+                Task {
+                    await router.present(CriticalReplacementRoute())
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.criticalReplaceButton)
+
+            Button("Dismiss critical") {
+                Task {
+                    await router.unwind()
+                }
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier(SampleAppAccessibility.criticalDismissButton)
+        }
+        .padding()
+        .background {
+            Color.white
+        }
+    }
+}
+
+struct CriticalReplacementView: View {
+    @Environment(Router.self) private var router
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Critical replacement")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.criticalReplacementText)
+
+            Button("Dismiss critical replacement") {
+                Task {
+                    await router.unwind()
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.criticalReplacementDismissButton)
+        }
+        .padding()
+        .background {
+            Color.red
+        }
+        .padding()
     }
 }
 

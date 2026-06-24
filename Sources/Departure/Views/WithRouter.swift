@@ -40,9 +40,12 @@ public struct WithRouter<Content: View>: View {
             .environment(\.routeScope, router.root)
             .environment(\.routing, RoutingAction(router: router))
             .background {
-                HighPrioritySheetHost(windowDestinationBuilder: windowDestinationBuilder)
-                HighPriorityCoverSlideHost(windowDestinationBuilder: windowDestinationBuilder)
-                HighPriorityCoverFadeHost(windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPrioritySheetHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPriorityCoverSlideHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPriorityCoverFadeHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPrioritySheetHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPriorityCoverSlideHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPriorityCoverFadeHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
             }
             .environment(router)
     }
@@ -58,12 +61,12 @@ public struct WithRouter<Content: View>: View {
         }
     }
 
-    /// Creates a router host with a high-priority window destination customizer.
+    /// Creates a router host with an elevated-priority window destination customizer.
     ///
     /// Pass a ``Router`` when app code needs to keep an explicit reference.
     ///
     /// `windowDestination` customizes destinations presented through Departure's
-    /// separate high-priority window. Use it to explicitly forward environment
+    /// separate elevated-priority windows. Use it to explicitly forward environment
     /// values that should cross the `UIWindow` boundary.
     public init<WindowContent: View>(
         router: Router? = nil,
