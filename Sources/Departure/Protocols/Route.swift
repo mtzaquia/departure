@@ -36,7 +36,7 @@ import SwiftUI
 ///
 /// await router.present(SettingsRoute())
 /// ```
-public protocol Route: Identifiable, Equatable, Sendable where ID == ObjectIdentifier {
+public protocol Route: Identifiable, Equatable where ID == ObjectIdentifier {
     /// Returns the resolution result whenever attempting to present this route.
     ///
     /// Despite asynchronous, routing is suspended until this function returns. On a re-route, the target route is also evaluated.
@@ -84,7 +84,7 @@ public extension Route {
         let result: (any Route)? = await resolveRoute()
         
         return switch result {
-        case .some(let route) where route.id == self.id: .allow
+        case .some(let route) where self.isEqual(to: route): .allow
         case .some(let route): .reroute(route)
         case .none: .drop
         }
