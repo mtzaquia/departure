@@ -25,7 +25,7 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 
-struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControllerRepresentable {
+struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewControllerRepresentable {
     let priority: RoutePriority
     @Binding var route: RoutePresentation?
     let windowDestinationBuilder: WindowDestinationBuilder
@@ -56,7 +56,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
 
         private weak var previousKeyWindow: UIWindow?
         private var window: PassThroughWindow?
-        private var hostingController: PresentedHostingController<HostedContent>?
+        private var hostingController: WindowRootHostingController<HostedContent>?
         private var presentedRouteID: RoutePresentation.ID?
         private var pendingPresentation: RouteDestinationSnapshot?
         private var clearRoute: (@MainActor () -> Void)?
@@ -133,7 +133,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
             window.windowLevel = windowLevel(for: priority, in: scene)
             window.backgroundColor = .clear
 
-            let hostingController = PresentedHostingController(rootView: makeHost(for: presentation))
+            let hostingController = WindowRootHostingController(rootView: makeHost(for: presentation))
             hostingController.view.backgroundColor = .clear
             hostingController.onDismiss = { [weak self] in
                 self?.dismissFromPresentedHost()
@@ -268,7 +268,7 @@ struct HighPriorityPresentationWindowBridge<HostedContent: View>: UIViewControll
     }
 }
 #else
-struct HighPriorityPresentationWindowBridge<HostedContent: View>: View {
+struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
     let priority: RoutePriority
     @Binding var route: RoutePresentation?
     @ViewBuilder let content: (

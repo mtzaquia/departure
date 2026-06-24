@@ -58,6 +58,9 @@ enum SampleAppAccessibility {
     static let homeShowMessageButton = "sample.home.show-message"
     static let homeProfileButton = "sample.home.profile"
     static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
+    static let homePresentHighPriorityPassthroughSheetButton = "sample.home.present-high-priority-passthrough-sheet"
+    static let homePassthroughBehindButton = "sample.home.passthrough-behind"
+    static let homePassthroughTapCount = "sample.home.passthrough-tap-count"
     static let homeEmojiValue = "sample.home.emoji-value"
     static let homeUnwindPayloadStatus = "sample.home.unwind-payload-status"
     static let homeDismissProbeHookStatus = "sample.home.dismiss-probe-hook-status"
@@ -100,6 +103,8 @@ enum SampleAppAccessibility {
     static let topLevelCoverPresentReplacementButton = "sample.top-level-cover.present-replacement"
     static let topLevelReplacementCoverText = "sample.top-level-replacement-cover.text"
     static let topLevelReplacementCoverDismissButton = "sample.top-level-replacement-cover.dismiss"
+    static let highPriorityPassthroughSheetText = "sample.high-priority-passthrough-sheet.text"
+    static let highPriorityPassthroughSheetDismissButton = "sample.high-priority-passthrough-sheet.dismiss"
 
     static let messageText = "sample.message.text"
     static let messageDismissUnwindButton = "sample.message.dismiss-unwind"

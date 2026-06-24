@@ -23,28 +23,27 @@
 #if canImport(UIKit)
 import UIKit
 
-final class PassThroughWindow: UIWindow {
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        let view = super.hitTest(point, with: event)
-
-        guard let rootView = rootViewController?.view else {
-            return view
+extension UIViewController {
+    func notifyPresentationDismissIfNeeded(_ onDismiss: (@MainActor () -> Void)?) {
+        guard isBeingDismissedInHierarchy else {
+            return
         }
 
-        if let presentedView = rootViewController?.presentedViewController?.view,
-           let view {
-            if view.isDescendant(of: presentedView) {
-                return view
+        onDismiss?()
+    }
+
+    private var isBeingDismissedInHierarchy: Bool {
+        var viewController: UIViewController? = self
+
+        while let current = viewController {
+            if current.isBeingDismissed {
+                return true
             }
 
-            return nil
+            viewController = current.parent
         }
 
-        if let view, view === rootView || view.isDescendant(of: rootView) {
-            return nil
-        }
-
-        return view
+        return false
     }
 }
 #endif

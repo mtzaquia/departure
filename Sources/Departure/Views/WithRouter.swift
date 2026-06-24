@@ -40,12 +40,12 @@ public struct WithRouter<Content: View>: View {
             .environment(\.routeScope, router.root)
             .environment(\.routing, RoutingAction(router: router))
             .background {
-                HighPrioritySheetHost(windowDestinationBuilder: windowDestinationBuilder)
-                HighPriorityCoverSlideHost(windowDestinationBuilder: windowDestinationBuilder)
-                HighPriorityCoverFadeHost(windowDestinationBuilder: windowDestinationBuilder)
-                CriticalPrioritySheetHost(windowDestinationBuilder: windowDestinationBuilder)
-                CriticalPriorityCoverSlideHost(windowDestinationBuilder: windowDestinationBuilder)
-                CriticalPriorityCoverFadeHost(windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPrioritySheetHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPriorityCoverSlideHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPriorityCoverFadeHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPrioritySheetHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPriorityCoverSlideHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPriorityCoverFadeHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
             }
             .environment(router)
     }

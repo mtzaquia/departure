@@ -51,42 +51,20 @@ struct CoverSlidePresentationStyleModifier: ViewModifier {
     }
 }
 
-struct HighPriorityCoverSlideHost: View {
+struct ElevatedPriorityCoverSlideHost: View {
     @Environment(Router.self) private var router
+    let priority: RoutePriority
     let windowDestinationBuilder: WindowDestinationBuilder
 
     var body: some View {
-        let presentation = router.highPriorityRoutePresentationBinding(matching: .cover(.slide))
+        let presentation = router.elevatedRoutePresentationBinding(priority: priority, matching: .cover(.slide))
 
-        HighPriorityPresentationWindowBridge(
-            priority: .high,
+        ElevatedPriorityPresentationWindowBridge(
+            priority: priority,
             route: presentation,
             windowDestinationBuilder: windowDestinationBuilder
         ) { presentation, onDismiss in
-            HighPriorityCoverSlidePresenter(
-                onDismiss: onDismiss,
-                destination: presentation.destination
-            )
-                .environment(router)
-                .environment(\.routing, RoutingAction(router: router))
-        }
-        .allowsHitTesting(false)
-    }
-}
-
-struct CriticalPriorityCoverSlideHost: View {
-    @Environment(Router.self) private var router
-    let windowDestinationBuilder: WindowDestinationBuilder
-
-    var body: some View {
-        let presentation = router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.slide))
-
-        HighPriorityPresentationWindowBridge(
-            priority: .critical,
-            route: presentation,
-            windowDestinationBuilder: windowDestinationBuilder
-        ) { presentation, onDismiss in
-            HighPriorityCoverSlidePresenter(
+            ElevatedPriorityCoverSlidePresenter(
                 onDismiss: onDismiss,
                 destination: presentation.destination
             )
@@ -99,7 +77,7 @@ struct CriticalPriorityCoverSlideHost: View {
 
 // MARK: - Private
 
-private struct HighPriorityCoverSlidePresenter: View {
+private struct ElevatedPriorityCoverSlidePresenter: View {
     let onDismiss: @MainActor () -> Void
     let destination: AnyView
 

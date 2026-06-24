@@ -39,42 +39,20 @@ struct SheetPresentationStyleModifier: ViewModifier {
     }
 }
 
-struct HighPrioritySheetHost: View {
+struct ElevatedPrioritySheetHost: View {
     @Environment(Router.self) private var router
+    let priority: RoutePriority
     let windowDestinationBuilder: WindowDestinationBuilder
 
     var body: some View {
-        let presentation = router.highPriorityRoutePresentationBinding(matching: .sheet)
+        let presentation = router.elevatedRoutePresentationBinding(priority: priority, matching: .sheet)
 
-        HighPriorityPresentationWindowBridge(
-            priority: .high,
+        ElevatedPriorityPresentationWindowBridge(
+            priority: priority,
             route: presentation,
             windowDestinationBuilder: windowDestinationBuilder
         ) { presentation, onDismiss in
-            HighPrioritySheetPresenter(
-                onDismiss: onDismiss,
-                destination: presentation.destination
-            )
-                .environment(router)
-                .environment(\.routing, RoutingAction(router: router))
-        }
-        .allowsHitTesting(false)
-    }
-}
-
-struct CriticalPrioritySheetHost: View {
-    @Environment(Router.self) private var router
-    let windowDestinationBuilder: WindowDestinationBuilder
-
-    var body: some View {
-        let presentation = router.elevatedRoutePresentationBinding(priority: .critical, matching: .sheet)
-
-        HighPriorityPresentationWindowBridge(
-            priority: .critical,
-            route: presentation,
-            windowDestinationBuilder: windowDestinationBuilder
-        ) { presentation, onDismiss in
-            HighPrioritySheetPresenter(
+            ElevatedPrioritySheetPresenter(
                 onDismiss: onDismiss,
                 destination: presentation.destination
             )
@@ -87,7 +65,7 @@ struct CriticalPrioritySheetHost: View {
 
 // MARK: - Private
 
-private struct HighPrioritySheetPresenter: View {
+private struct ElevatedPrioritySheetPresenter: View {
     let onDismiss: @MainActor () -> Void
     let destination: AnyView
 

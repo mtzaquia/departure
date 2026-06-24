@@ -114,6 +114,12 @@ struct TopLevelReplacementCoverRoute: Route {
     }
 }
 
+struct HighPriorityPassthroughSheetRoute: Route {
+    func destination() -> some View {
+        HighPriorityPassthroughSheetView()
+    }
+}
+
 struct TopLevelSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.samplePresentationSource) private var samplePresentationSource
@@ -183,6 +189,40 @@ struct TopLevelReplacementCoverView: View {
             .accessibilityIdentifier(SampleAppAccessibility.topLevelReplacementCoverDismissButton)
         }
         .padding()
+    }
+}
+
+struct HighPriorityPassthroughSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("High-priority passthrough sheet")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetText)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetDismissButton)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .presentationDetents([.height(220)])
+        .presentationBackgroundInteraction(.enabled(upThrough: .height(220)))
+        .samplePresentationSizing()
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func samplePresentationSizing() -> some View {
+        if #available(iOS 18.0, *) {
+            presentationSizing(.fitted)
+        } else {
+            self
+        }
     }
 }
 

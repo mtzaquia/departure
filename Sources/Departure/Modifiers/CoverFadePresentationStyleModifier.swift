@@ -51,41 +51,20 @@ struct CoverFadePresentationStyleModifier: ViewModifier {
     }
 }
 
-struct HighPriorityCoverFadeHost: View {
+struct ElevatedPriorityCoverFadeHost: View {
     @Environment(Router.self) private var router
+    let priority: RoutePriority
     let windowDestinationBuilder: WindowDestinationBuilder
 
     var body: some View {
-        let presentation = router.highPriorityRoutePresentationBinding(matching: .cover(.fade))
+        let presentation = router.elevatedRoutePresentationBinding(priority: priority, matching: .cover(.fade))
 
-        HighPriorityPresentationWindowBridge(
-            priority: .high,
+        ElevatedPriorityPresentationWindowBridge(
+            priority: priority,
             route: presentation,
             windowDestinationBuilder: windowDestinationBuilder
         ) { presentation, onDismiss in
-            HighPriorityCoverFadePresenter(
-                presentation: presentation,
-                router: router,
-                onDismiss: onDismiss
-            )
-        }
-        .allowsHitTesting(false)
-    }
-}
-
-struct CriticalPriorityCoverFadeHost: View {
-    @Environment(Router.self) private var router
-    let windowDestinationBuilder: WindowDestinationBuilder
-
-    var body: some View {
-        let presentation = router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.fade))
-
-        HighPriorityPresentationWindowBridge(
-            priority: .critical,
-            route: presentation,
-            windowDestinationBuilder: windowDestinationBuilder
-        ) { presentation, onDismiss in
-            HighPriorityCoverFadePresenter(
+            ElevatedPriorityCoverFadePresenter(
                 presentation: presentation,
                 router: router,
                 onDismiss: onDismiss
@@ -115,7 +94,7 @@ private struct CoverFadeModalPresenter: View {
     }
 }
 
-private struct HighPriorityCoverFadePresenter: View {
+private struct ElevatedPriorityCoverFadePresenter: View {
     let presentation: RouteDestinationSnapshot
     let router: Router
     let onDismiss: @MainActor () -> Void
@@ -155,7 +134,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         private var router: Router?
         private var onDismiss: (@MainActor () -> Void)?
         private var presentedRouteID: RoutePresentation.ID?
-        private var hostingController: PresentedHostingController<AnyView>?
+        private var hostingController: PassThroughModalHostingController<AnyView>?
 
         override func viewDidLoad() {
             super.viewDidLoad()
@@ -224,7 +203,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
                 return
             }
 
-            let hostingController = PresentedHostingController(
+            let hostingController = PassThroughModalHostingController(
                 rootView: rootView(
                     router: router,
                     destination: pendingPresentation.destination
@@ -274,7 +253,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
     }
 }
 #else
-private struct HighPriorityCoverFadePresenter: View {
+private struct ElevatedPriorityCoverFadePresenter: View {
     let presentation: RouteDestinationSnapshot
     let router: Router
 
