@@ -34,7 +34,6 @@ public struct WithRouter<Content: View>: View {
     @ViewBuilder let content: Content
     let windowDestinationBuilder: WindowDestinationBuilder
 
-    /// The hosted content.
     public var body: some View {
         content
             .environment(\.routeScope, router.root)

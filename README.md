@@ -238,25 +238,29 @@ struct ToolbarView: View {
 }
 ```
 
-Route requests crawl backward to find an owner.
+Route requests crawl backward to find an owner. If an equal route is found along the way, the router unwinds back to it rather than attempting to re-present it.
 
 ```mermaid
 flowchart TD
     request["await router.present(ReceiptRoute())"]
+    current{"Is the active route already ReceiptRoute?"}
     owns{"Does this scope declare ReceiptRoute?"}
     previous["Move to previous route owner"]
+    sameRoute{"Is this route also ReceiptRoute?"}
     present["Present from matching scope"]
+    unwind["Unwind to this existing route"]
+    noop["No-op"]
     drop["Drop request"]
 
-    request -- Starting at the active scope --> owns
+    request -- Starting at the active scope --> current
+    current -- yes --> noop
+    current -- no --> owns
     owns -- yes --> present
-    owns -- no --> previous --> owns
+    owns -- no --> previous --> sameRoute
+    sameRoute -- yes --> unwind
+    sameRoute -- no --> owns
     previous -- no owner left --> drop
 ```
-
-That gives feature views a simple rule:
-
-_Declare the routes you can present. If a child scope asks for one of those routes and cannot handle it, the request comes back to you._
 
 > [!NOTE]
 > If no active scope can resolve the route type, the request is ignored.

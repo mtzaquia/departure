@@ -38,6 +38,16 @@ struct RouterTests {
         #expect(router.id != otherRouter.id)
     }
 
+    @Test func routeEqualityUsesEquatableConformanceWhenAvailable() {
+        #expect(EquatableOnlyRoute(value: 1)._isEqual(to: EquatableOnlyRoute(value: 1)))
+        #expect(EquatableOnlyRoute(value: 1)._isEqual(to: EquatableOnlyRoute(value: 2)) == false)
+    }
+
+    @Test func routeEqualityFallsBackToProtocolEqualityForNonEquatableRoutes() {
+        #expect(ProtocolEqualOnlyRoute(value: 1)._isEqual(to: ProtocolEqualOnlyRoute(value: 1)))
+        #expect(ProtocolEqualOnlyRoute(value: 1)._isEqual(to: ProtocolEqualOnlyRoute(value: 2)) == false)
+    }
+
     @Test func publicRoutingActionsDispatchThroughRouter() async {
         let router = Router()
         let actionRecorder = AsyncActionRecorder()

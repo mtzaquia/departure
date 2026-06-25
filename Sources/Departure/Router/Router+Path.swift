@@ -385,12 +385,12 @@ extension Router {
                 continue
             }
 
-            if match.path.scopes[index].route?.isEqual(to: route) == true {
+            if match.path.scopes[index].route?._isEqual(to: route) == true {
                 return EquivalentRouteMatch(pathIndex: index)
             }
         }
 
-        guard match.pathIndex == nil, match.path.owner?.route?.isEqual(to: route) == true else {
+        guard match.pathIndex == nil, match.path.owner?.route?._isEqual(to: route) == true else {
             return nil
         }
 
