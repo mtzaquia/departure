@@ -269,7 +269,6 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
 }
 #else
 struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
-    let priority: RoutePriority
     @Binding var route: RoutePresentation?
     @ViewBuilder let content: (
         RouteDestinationSnapshot,
@@ -277,7 +276,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
     ) -> HostedContent
 
     init(
-        priority: RoutePriority,
+        priority _: RoutePriority,
         route: Binding<RoutePresentation?>,
         windowDestinationBuilder _: WindowDestinationBuilder,
         @ViewBuilder content: @escaping (
@@ -285,7 +284,6 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
             @escaping @MainActor () -> Void
         ) -> HostedContent
     ) {
-        self.priority = priority
         self._route = route
         self.content = content
     }

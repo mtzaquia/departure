@@ -119,7 +119,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.rootPath.isEmpty)
-        #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         homeScope.installRouteDeclarations(
@@ -241,7 +241,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.rootPath.isEmpty)
-        #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         homeScope.installRouteDeclarations(
@@ -308,7 +308,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.rootPath.count == 1)
-        #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
 
         router.resumePendingRoute(for: AppTab.home, in: landingScope)
 
@@ -965,7 +965,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .wallet)
         #expect(router.rootPath.isEmpty)
-        #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.wallet))
+        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.wallet))
 
         walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),
@@ -2618,7 +2618,7 @@ struct RouterTests {
         #expect(router.rootPath.first === normalScope)
         #expect(router.rootPath.first?.route is SettingsRoute)
         #expect(router.rootPath.last?.route is LoginRoute)
-        #expect(router.highContext?.highStartIndex == 1)
+        #expect(router.highContext?.elevatedStartIndex == 1)
         #expect(normalPresentation?.scope === normalScope)
         #expect(normalPresentation?.declaration.priority == .normal)
         #expect(highPresentation?.scope === router.rootPath.last)
@@ -2665,7 +2665,7 @@ struct RouterTests {
         #expect(router.rootPath.first?.route is SettingsRoute)
         #expect(router.rootPath.last?.route is AlertRoute)
         #expect(router.rootPath.scopes.contains { $0.route is LoginRoute } == false)
-        #expect(router.highContext?.highStartIndex == 1)
+        #expect(router.highContext?.elevatedStartIndex == 1)
         #expect(normalPresentation?.scope === normalScope)
         #expect(normalPresentation?.declaration.priority == .normal)
         #expect(highPresentation?.scope === router.rootPath.last)
@@ -2698,7 +2698,7 @@ struct RouterTests {
         #expect(router.rootPath.count == 2)
         #expect(router.rootPath.first?.route is LoginRoute)
         #expect(router.rootPath.last?.route is SettingsRoute)
-        #expect(router.highContext?.highRouteScope === loginScope)
+        #expect(router.highContext?.elevatedRouteScope === loginScope)
     }
 
     @Test func highPriorityDeclarationInsideHighContextAppendsNormally() async {
@@ -2727,7 +2727,7 @@ struct RouterTests {
         #expect(router.rootPath.count == 2)
         #expect(router.rootPath.first?.route is LoginRoute)
         #expect(router.rootPath.last?.route is AlertRoute)
-        #expect(router.highContext?.highRouteScope === loginScope)
+        #expect(router.highContext?.elevatedRouteScope === loginScope)
         #expect(router.routePresentationBinding(from: loginScope, matching: .cover(.fade)).wrappedValue?.scope === router.rootPath.last)
     }
 
@@ -2771,7 +2771,7 @@ struct RouterTests {
 
         #expect(router.rootPath.count == 1)
         #expect(router.rootPath.last === loginScope)
-        #expect(router.highContext?.highRouteScope === loginScope)
+        #expect(router.highContext?.elevatedRouteScope === loginScope)
         #expect(router.highPriorityRoutePresentationBinding(matching: .cover(.slide)).wrappedValue?.scope === loginScope)
 
         router.routeScopeDidLeaveView(settingsScope)
@@ -2779,7 +2779,7 @@ struct RouterTests {
 
         #expect(router.rootPath.count == 1)
         #expect(router.rootPath.last === loginScope)
-        #expect(router.highContext?.highRouteScope === loginScope)
+        #expect(router.highContext?.elevatedRouteScope === loginScope)
     }
 
     @Test func ancestorHighPriorityDeclarationReplacesActiveHighPriorityRoute() async {
@@ -2840,7 +2840,7 @@ struct RouterTests {
         #expect(router.rootPath.first === highScope)
         #expect(router.rootPath.first?.route is LoginRoute)
         #expect(router.rootPath.last?.route is AlertRoute)
-        #expect(router.highContext?.highRouteScope === highScope)
+        #expect(router.highContext?.elevatedRouteScope === highScope)
         #expect(router.criticalContext?.elevatedRouteScope === router.rootPath.last)
         #expect(highPresentation?.scope === highScope)
         #expect(highPresentation?.declaration.priority == .high)
@@ -2881,7 +2881,7 @@ struct RouterTests {
         #expect(router.rootPath.first?.route is LoginRoute)
         #expect(router.rootPath.last?.route is SettingsRoute)
         #expect(router.rootPath.scopes.contains { $0.route is AlertRoute } == false)
-        #expect(router.highContext?.highRouteScope === highScope)
+        #expect(router.highContext?.elevatedRouteScope === highScope)
         #expect(router.criticalContext?.elevatedRouteScope === router.rootPath.last)
         #expect(highPresentation?.scope === highScope)
         #expect(criticalPresentation?.scope === router.rootPath.last)
@@ -2939,7 +2939,7 @@ struct RouterTests {
         #expect(router.rootPath.count == 2)
         #expect(router.rootPath.first?.route is LoginRoute)
         #expect(router.rootPath.last?.route is AlertRoute)
-        #expect(router.highContext?.highRouteScope === loginScope)
+        #expect(router.highContext?.elevatedRouteScope === loginScope)
         #expect(router.criticalContext?.elevatedRouteScope === router.rootPath.last)
         #expect(router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.fade)).wrappedValue?.scope === router.rootPath.last)
         #expect(router.routePresentationBinding(from: loginScope, matching: .cover(.fade)).wrappedValue == nil)

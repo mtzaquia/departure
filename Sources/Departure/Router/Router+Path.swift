@@ -21,10 +21,51 @@
 //
 
 extension Router {
-    struct PendingRoute {
+    final class PendingRoute {
+        struct Append {
+            let match: DeclarationMatch
+            let behavior: RouteAppendBehavior
+            let blockingScopes: [RouteScope]
+
+            init(
+                match: DeclarationMatch,
+                behavior: RouteAppendBehavior,
+                blockingScopes: [RouteScope] = []
+            ) {
+                self.match = match
+                self.behavior = behavior
+                self.blockingScopes = blockingScopes
+            }
+        }
+
         let route: any Route
-        let match: DeclarationMatch
-        let appendBehavior: RouteAppendBehavior
+        let state: State
+
+        enum State {
+            case request(CheckedContinuation<Void, Never>)
+            case append(Append)
+        }
+
+        init(route: any Route, state: State) {
+            self.route = route
+            self.state = state
+        }
+
+        var append: Append? {
+            guard case let .append(append) = state else {
+                return nil
+            }
+
+            return append
+        }
+
+        func resumeRequestIfNeeded() {
+            guard case let .request(continuation) = state else {
+                return
+            }
+
+            continuation.resume()
+        }
     }
 
     struct UnwindPresentationSnapshot {
@@ -88,20 +129,23 @@ extension Router {
         }
     }
 
-    final class DeferredRouteAppend {
-        let blockingScopes: [RouteScope]
-
-        init(blockingScopes: [RouteScope]) {
-            self.blockingScopes = blockingScopes
-        }
-
-        var installedBlockingScopes: [RouteScope] {
-            blockingScopes.filter(\.isInstalledInView)
-        }
-    }
-
     struct EquivalentRouteMatch {
         let pathIndex: [RouteScope].Index?
+    }
+
+    struct UnwindHandlerDeliveryKey: Equatable, Hashable {
+        let sourceScopeID: ObjectIdentifier
+        let targetScopeID: AnyHashable
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.sourceScopeID == rhs.sourceScopeID
+            && lhs.targetScopeID == rhs.targetScopeID
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(sourceScopeID)
+            hasher.combine(targetScopeID)
+        }
     }
 
     enum RouteAppendBehavior {
@@ -120,10 +164,10 @@ extension Router {
     @discardableResult
     func unwindAndWait(to target: UnwindTarget?, payload: Any? = nil) async -> Bool {
         log.departureDebug(.unwindRequested(target: target))
-        let sourceRoute = currentRouteScope.route
+        let sourceScope = currentRouteScope
 
         if case .root = target {
-            return await unwindRootAndWait(sourceRoute: sourceRoute, payload: payload)
+            return await unwindRootAndWait(sourceScope: sourceScope, payload: payload)
         }
 
         // Non-root targets differ only by which path they clear. `.nearestBranch` resolves against
@@ -165,16 +209,14 @@ extension Router {
             ))
 
             let targetScope = ancestorResolution.path.scope(at: ancestorResolution.pathIndex)
-            keepPathThrough(nil, in: routePath)
-            keepPathThrough(ancestorResolution.pathIndex, in: ancestorResolution.path)
-            await waitForRouteScopesToLeaveView(removedScopes)
-            log.departureDebug(.unwindCompleted)
-            if removedScopes.isEmpty == false {
-                await invokeUnwindHandlers(
-                    for: sourceRoute,
-                    payload: payload,
-                    in: targetScope
-                )
+            await performAcceptedUnwind(
+                for: sourceScope,
+                payload: payload,
+                in: targetScope,
+                removing: removedScopes
+            ) {
+                keepPathThrough(nil, in: routePath)
+                keepPathThrough(ancestorResolution.pathIndex, in: ancestorResolution.path)
             }
 
             return true
@@ -192,37 +234,37 @@ extension Router {
                 keepThrough: targetPathIndex
             )
 
-            if target != nil {
-                unwindPresentationSnapshot = UnwindPresentationSnapshot(
-                    routePath: routePath,
-                    preservedPath: removedScopes,
-                    preservedPathStartIndex: preservedPathStartIndex(keepingThrough: targetPathIndex, in: routePath),
-                    highContext: highContext,
-                    criticalContext: criticalContext
-                )
-            }
-            keepPathThrough(targetPathIndex, in: routePath)
-            if case .root = target {
-                // A high-priority context may live on a branch path that clearing the root path
-                // doesn't touch; `.root` tears the whole app down, so drop it explicitly.
-                clearElevatedContexts()
-            }
-            await waitForRouteScopesToLeaveView(removedScopes)
-            unwindPresentationSnapshot = nil
-            log.departureDebug(.unwindCompleted)
-            if removedScopes.isEmpty == false {
-                await invokeUnwindHandlers(
-                    for: sourceRoute,
-                    payload: payload,
-                    in: targetScope
-                )
+            await performAcceptedUnwind(
+                for: sourceScope,
+                payload: payload,
+                in: targetScope,
+                removing: removedScopes,
+                afterScopesLeave: {
+                    unwindPresentationSnapshot = nil
+                }
+            ) {
+                if target != nil {
+                    unwindPresentationSnapshot = UnwindPresentationSnapshot(
+                        routePath: routePath,
+                        preservedPath: removedScopes,
+                        preservedPathStartIndex: preservedPathStartIndex(keepingThrough: targetPathIndex, in: routePath),
+                        highContext: highContext,
+                        criticalContext: criticalContext
+                    )
+                }
+                keepPathThrough(targetPathIndex, in: routePath)
+                if case .root = target {
+                    // A high-priority context may live on a branch path that clearing the root path
+                    // doesn't touch; `.root` tears the whole app down, so drop it explicitly.
+                    clearElevatedContexts()
+                }
             }
 
             return true
         }
     }
 
-    func unwindRootAndWait(sourceRoute: (any Route)?, payload: Any?) async -> Bool {
+    func unwindRootAndWait(sourceScope: RouteScope?, payload: Any?) async -> Bool {
         let rootRemovedScopes = rootPath.scopesRemovedByKeepingThrough(nil)
         var branchPaths = activeBranchPaths(under: root)
         branchPaths.appendUnique(contentsOf: rootRemovedScopes.flatMap {
@@ -274,30 +316,29 @@ extension Router {
             }
         ).filter { $0.scopes.isEmpty == false }
 
-        unwindPresentationSnapshot = UnwindPresentationSnapshot(
-            preservedPaths: preservedPaths,
-            highContext: highContext,
-            criticalContext: criticalContext
-        )
-
-        for branchPath in branchPaths {
-            keepPathThrough(nil, in: branchPath)
-        }
-        for trim in inactiveBranchModalTrims {
-            keepPathThrough(trim.keepThrough, in: trim.path)
-        }
-        keepPathThrough(nil, in: rootPath)
-        clearElevatedContexts()
-
-        await waitForRouteScopesToLeaveView(removedScopes)
-        unwindPresentationSnapshot = nil
-        log.departureDebug(.unwindCompleted)
-        if removedScopes.isEmpty == false {
-            await invokeUnwindHandlers(
-                for: sourceRoute,
-                payload: payload,
-                in: root
+        await performAcceptedUnwind(
+            for: sourceScope,
+            payload: payload,
+            in: root,
+            removing: removedScopes,
+            afterScopesLeave: {
+                unwindPresentationSnapshot = nil
+            }
+        ) {
+            unwindPresentationSnapshot = UnwindPresentationSnapshot(
+                preservedPaths: preservedPaths,
+                highContext: highContext,
+                criticalContext: criticalContext
             )
+
+            for branchPath in branchPaths {
+                keepPathThrough(nil, in: branchPath)
+            }
+            for trim in inactiveBranchModalTrims {
+                keepPathThrough(trim.keepThrough, in: trim.path)
+            }
+            keepPathThrough(nil, in: rootPath)
+            clearElevatedContexts()
         }
 
         return true
@@ -357,7 +398,7 @@ extension Router {
 
         let targetPathIndex = equivalentRouteMatch.pathIndex
         let removedScopes = match.path.scopesRemovedByKeepingThrough(targetPathIndex)
-        let sourceRoute = removedScopes.last?.route
+        let sourceScope = removedScopes.last
         let targetScope = match.path.scope(at: targetPathIndex)
         guard removedScopes.isEmpty == false else {
             if let existingRoute = match.path.scope(at: targetPathIndex)?.route {
@@ -366,13 +407,15 @@ extension Router {
             return true
         }
 
-        keepPathThrough(targetPathIndex, in: match.path)
-        await waitForRouteScopesToLeaveView(removedScopes)
-        await invokeUnwindHandlers(
-            for: sourceRoute,
+        await performAcceptedUnwind(
+            for: sourceScope,
             payload: nil,
-            in: targetScope
-        )
+            in: targetScope,
+            removing: removedScopes,
+            logsCompletion: false
+        ) {
+            keepPathThrough(targetPathIndex, in: match.path)
+        }
         return true
     }
 
@@ -466,11 +509,10 @@ extension Router {
             if let branchID = match.branchID {
                 log.departureDebug(.routePendingWaitingForActivatedBranchHost(route: route, branch: branchID))
             }
-            pendingRoute = PendingRoute(
+            replacePendingRoute(PendingRoute(
                 route: route,
-                match: match,
-                appendBehavior: behavior
-            )
+                state: .append(.init(match: match, behavior: behavior))
+            ))
             return
         }
 
@@ -478,15 +520,14 @@ extension Router {
             if let branchID = match.branchID {
                 log.departureDebug(.routePendingWaitingForLocalPresentationScope(route: route, branch: branchID))
             }
-            pendingRoute = PendingRoute(
+            replacePendingRoute(PendingRoute(
                 route: route,
-                match: match,
-                appendBehavior: behavior
-            )
+                state: .append(.init(match: match, behavior: behavior))
+            ))
             return
         }
 
-        pendingRoute = nil
+        replacePendingRoute(nil)
 
         // Resolve the host once, at write time, so the SwiftUI bindings read it directly instead of
         // re-deriving the closest declaring scope on every read. The presenter is not always the
@@ -522,7 +563,7 @@ extension Router {
                 )
             }
             setElevatedContext(context, for: priority)
-            log.departureDebug(.highContextStarted(pathIndex: match.path.endIndex))
+            log.departureDebug(.elevatedContextStarted(pathIndex: match.path.endIndex))
         }
 
         let appendedScope = RouteScope(id: route.id, route: route)
@@ -555,26 +596,30 @@ extension Router {
 
         guard
             let pendingRoute,
-            pendingRoute.match.branchID == branch,
-            pendingRoute.match.declaringPath.scope(at: pendingRoute.match.declaringPathIndex) === declaringScope
+            let append = pendingRoute.append,
+            append.match.branchID == branch,
+            append.match.declaringPath.scope(at: append.match.declaringPathIndex) === declaringScope
         else {
             log.departureDebug(.pendingResumeSkipped)
             return
         }
 
+        replacePendingRoute(nil)
         log.departureDebug(.pendingRouteResuming(route: pendingRoute.route))
-        guard let branchID = pendingRoute.match.branchID else {
+        let pendingMatch = append.match
+        let appendBehavior = append.behavior
+        guard let branchID = pendingMatch.branchID else {
             return
         }
 
-        let match = pendingRoute.match.updatingPresentationPath(
+        let match = pendingMatch.updatingPresentationPath(
             routePath(
                 forBranch: branchID,
                 under: declaringScope,
-                declaration: pendingRoute.match.declaration
+                declaration: pendingMatch.declaration
             )
         )
-        switch pendingRoute.appendBehavior {
+        switch appendBehavior {
         case .append:
             prepareNormalAppendPath(after: match)
 
@@ -585,7 +630,7 @@ extension Router {
         appendOrPendRoute(
             pendingRoute.route,
             after: match,
-            behavior: pendingRoute.appendBehavior
+            behavior: appendBehavior
         )
     }
 
@@ -769,7 +814,7 @@ extension Router {
             }
 
             guard startIndex < routePath.endIndex else {
-                log.departureDebug(.highContextCleared)
+                log.departureDebug(.elevatedContextCleared)
                 setElevatedContext(nil, for: priority)
                 continue
             }
@@ -803,7 +848,7 @@ extension Router {
     func clearElevatedContextIfNeeded(forRemovedViewScope routeScope: RouteScope) {
         for priority in [RoutePriority.critical, .high]
         where elevatedContext(for: priority)?.elevatedRouteScope === routeScope {
-            log.departureDebug(.highContextCleared)
+            log.departureDebug(.elevatedContextCleared)
             setElevatedContext(nil, for: priority)
         }
     }
@@ -834,16 +879,18 @@ extension Router {
     }
 
     func deferRouteAppendIfNeeded(_ route: any Route, after match: DeclarationMatch) async -> Bool {
-        guard let deferredRouteAppend else {
+        guard let pendingAppend = pendingRoute?.append,
+              pendingAppend.blockingScopes.isEmpty == false
+        else {
             return false
         }
 
-        if deferredRouteAppend.installedBlockingScopes.isEmpty {
-            self.deferredRouteAppend = nil
+        if pendingAppend.blockingScopes.contains(where: \.isInstalledInView) == false {
+            pendingRoute = nil
             return false
         }
 
-        _ = await deferRouteAppend(route, after: match, until: deferredRouteAppend.blockingScopes)
+        _ = await deferRouteAppend(route, after: match, until: pendingAppend.blockingScopes)
         return true
     }
 
@@ -854,17 +901,24 @@ extension Router {
             return false
         }
 
-        let deferredRouteAppend = DeferredRouteAppend(blockingScopes: installedRouteScopes)
-        self.deferredRouteAppend = deferredRouteAppend
+        let pendingAppend = PendingRoute(
+            route: route,
+            state: .append(.init(
+                match: match,
+                behavior: .append,
+                blockingScopes: installedRouteScopes
+            ))
+        )
+        replacePendingRoute(pendingAppend)
 
         await waitForRouteScopesToLeaveView(installedRouteScopes)
 
-        guard self.deferredRouteAppend === deferredRouteAppend else {
+        guard pendingRoute === pendingAppend else {
             log.departureDebug(.routeAppendSuperseded(route: route))
             return true
         }
 
-        self.deferredRouteAppend = nil
+        pendingRoute = nil
         appendPreparedRoute(route, after: match)
         return true
     }
@@ -1004,40 +1058,122 @@ extension Router {
         }
     }
 
-    func invokeUnwindHandlers(
-        for sourceRoute: (any Route)?,
+    func performAcceptedUnwind(
+        for sourceScope: RouteScope?,
         payload: Any?,
-        in targetScope: RouteScope?
+        in targetScope: RouteScope?,
+        removing removedScopes: [RouteScope],
+        logsCompletion: Bool = true,
+        afterScopesLeave: () -> Void = {},
+        updatePath: () -> Void
     ) async {
-        guard let sourceRoute, let targetScope else {
-            return
+        isNavigationInProgress = true
+        await deliverUnwindHandlers(
+            for: sourceScope,
+            payload: payload,
+            in: targetScope,
+            removing: removedScopes
+        )
+        updatePath()
+        await waitForRouteScopesToLeaveView(removedScopes)
+        afterScopesLeave()
+        if logsCompletion {
+            log.departureDebug(.unwindCompleted)
         }
-
-        let declaringScopeID = targetScope.id
-        if let handler = targetScope.firstUnwindHandler(for: type(of: sourceRoute)) {
-            await handler.invoke(sourceRoute, payload, declaringScopeID)
-        }
+        await finishNavigationTransaction()
     }
 
-    func scheduleUnwindHandlersAfterDismissalCompletes(
-        for sourceRoute: (any Route)?,
+    func deliverUnwindHandlers(
+        for sourceScope: RouteScope?,
+        payload: Any?,
         in targetScope: RouteScope?,
         removing removedScopes: [RouteScope]
-    ) {
+    ) async {
         guard removedScopes.isEmpty == false else {
             return
         }
 
-        Task { @MainActor in
-            await waitForRouteScopesToLeaveView(removedScopes)
-            await invokeUnwindHandlers(
-                for: sourceRoute,
-                payload: nil,
-                in: targetScope
-            )
+        guard let sourceScope, let targetScope else {
+            return
         }
+
+        let key = UnwindHandlerDeliveryKey(
+            sourceScopeID: ObjectIdentifier(sourceScope),
+            targetScopeID: targetScope.id
+        )
+        guard deliveredUnwindHandlerKeys.insert(key).inserted else {
+            return
+        }
+
+        guard let sourceRoute = sourceScope.route,
+              let handler = targetScope.firstUnwindHandler(for: type(of: sourceRoute))
+        else {
+            return
+        }
+
+        Task { @MainActor in
+            await handler.invoke(sourceRoute, payload, targetScope.id)
+        }
+        await Task.yield()
     }
 
+    func finishNavigationTransaction() async {
+        isNavigationInProgress = false
+        await drainPendingRouteRequests()
+    }
+
+    func drainPendingRouteRequests() async {
+        guard let route = pendingRoute,
+              case .request = route.state
+        else {
+            return
+        }
+
+        pendingRoute = nil
+        await requestRoute(route.route)
+        route.resumeRequestIfNeeded()
+    }
+
+    func replacePendingRoute(_ pendingRoute: PendingRoute?) {
+        self.pendingRoute?.resumeRequestIfNeeded()
+        self.pendingRoute = pendingRoute
+    }
+
+    func requestRouteWhenReady(_ route: any Route) async {
+        guard isNavigationInProgress == false else {
+            await withCheckedContinuation { continuation in
+                replacePendingRoute(PendingRoute(
+                    route: route,
+                    state: .request(continuation)
+                ))
+            }
+            return
+        }
+
+        await requestRoute(route)
+    }
+
+    func performPresentationDismissalUnwind(
+        for sourceScope: RouteScope?,
+        in targetScope: RouteScope?,
+        removing removedScopes: [RouteScope],
+        updatePath: () -> Void
+    ) {
+        if removedScopes.isEmpty == false {
+            isNavigationInProgress = true
+            Task { @MainActor in
+                await deliverUnwindHandlers(
+                    for: sourceScope,
+                    payload: nil,
+                    in: targetScope,
+                    removing: removedScopes
+                )
+                await waitForRouteScopesToLeaveView(removedScopes)
+                await finishNavigationTransaction()
+            }
+        }
+        updatePath()
+    }
 }
 
 private extension [RoutePath] {

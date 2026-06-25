@@ -22,10 +22,9 @@
 
 /// Handles a matching route when it unwinds to this scope.
 ///
-/// The handler runs after the unwind has completed and any dismissed installed scopes have left the
-/// view hierarchy. When the route is dismissed with ``Router/unwind(to:)`` or
-/// ``Router/unwind(to:payload:)``, the unwind call stays suspended until the async handler body
-/// returns.
+/// The handler runs after the unwind request is accepted. The router does not wait for the handler
+/// body to finish before continuing the unwind. If the handler presents another route, that request
+/// is deferred until the active navigation has finished.
 ///
 /// ```swift
 /// .hooks {
@@ -39,8 +38,8 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
 
     /// Creates an unwind handler.
     ///
-    /// If this handler matches a ``Router/unwind(to:payload:)`` request, the unwind call stays
-    /// suspended until `handle` returns.
+    /// If this handler matches a ``Router/unwind(to:payload:)`` request, `handle` is scheduled when
+    /// the unwind is accepted. The router does not wait for `handle` to return.
     public init<Payload>(
         _ routeType: R.Type,
         expecting payloadType: Payload.Type,
@@ -68,8 +67,8 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
 
     /// Creates an unwind handler that ignores any payload sent with the unwind request.
     ///
-    /// If this handler matches a ``Router/unwind(to:)`` request, the unwind call stays suspended
-    /// until `handle` returns.
+    /// If this handler matches a ``Router/unwind(to:)`` request, `handle` is scheduled when the
+    /// unwind is accepted.
     public init(
         _ routeType: R.Type,
         handle: @escaping @MainActor @Sendable () async -> Void

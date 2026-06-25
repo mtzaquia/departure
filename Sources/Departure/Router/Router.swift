@@ -73,7 +73,10 @@ public final class Router: Identifiable, Equatable {
     var unwindPresentationSnapshot: UnwindPresentationSnapshot?
 
     @ObservationIgnored
-    var deferredRouteAppend: DeferredRouteAppend?
+    var isNavigationInProgress = false
+
+    @ObservationIgnored
+    var deliveredUnwindHandlerKeys: Set<UnwindHandlerDeliveryKey> = []
 
     var currentRouteScope: RouteScope {
         currentRoutePath.last?.activeLocalScope ?? activeContext.path.owner?.activeLocalScope ?? root.activeLocalScope
@@ -91,7 +94,7 @@ public final class Router: Identifiable, Equatable {
     /// This method returns after the request has resolved and the router has updated its routing state.
     /// It does not wait for SwiftUI to mount or display the destination view.
     public func present(_ route: any Route) async {
-        await requestRoute(route)
+        await requestRouteWhenReady(route)
     }
 
     /// Dismisses route scopes.  If no parameter is provided, it dismisses the current route.
