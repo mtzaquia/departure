@@ -26,6 +26,229 @@ import Testing
 @MainActor
 @Suite
 struct UnwindHookTests {
+    @Test func ancestorHandlerFiresWhenUnwindLandsOnDescendantScope() async {
+        let router = Router()
+        let recorder = UnwindRecorder()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Cover(ChallengeRoute.self, priority: .high)._routeDeclarations
+                    + Cover(LockRoute.self, priority: .critical)._routeDeclarations
+                ),
+            ]
+        )
+        router.root.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(LockRoute.self, expecting: String.self) { payload in
+                    recorder.payloads.append(payload)
+                }.declaration,
+            ]
+        )
+
+        await router.present(ChallengeRoute())
+        await router.present(LockRoute())
+
+        #expect(router.rootPath.scopes.count == 2)
+        #expect(router.rootPath.scopes.first?.route is ChallengeRoute)
+        #expect(router.rootPath.scopes.last?.route is LockRoute)
+
+        await router.unwind(payload: "unlocked")
+
+        #expect(recorder.payloads == ["unlocked"])
+        #expect(router.rootPath.scopes.count == 1)
+        #expect(router.rootPath.scopes.last?.route is ChallengeRoute)
+    }
+
+    @Test func landedScopeHandlerFiresForLowerDeclaredRoute() async throws {
+        let router = Router()
+        let recorder = UnwindRecorder()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(CardsListRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.present(CardsListRoute())
+        let cardsListScope = try #require(router.rootPath.last)
+        cardsListScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(AddMethodRoute.self)._routeDeclarations),
+            ]
+        )
+        cardsListScope.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(AddCardRoute.self, expecting: String.self) { payload in
+                    recorder.payloads.append(payload)
+                }.declaration,
+            ]
+        )
+
+        await router.present(AddMethodRoute())
+        let addMethodScope = try #require(router.rootPath.last)
+        addMethodScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(AddCardRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.present(AddCardRoute())
+        await router.unwind(to: .id(CardsListRoute().id), payload: "card-added")
+
+        #expect(recorder.payloads == ["card-added"])
+        #expect(router.rootPath.scopes.count == 1)
+        #expect(router.rootPath.scopes.last === cardsListScope)
+    }
+
+    @Test func nearestUnwindHandlerWinsOverFartherAncestor() async throws {
+        let router = Router()
+        let recorder = UnwindRecorder()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(CardsListRoute.self)._routeDeclarations),
+            ]
+        )
+        router.root.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(AddCardRoute.self) {
+                    recorder.events.append("root")
+                }.declaration,
+            ]
+        )
+
+        await router.present(CardsListRoute())
+        let cardsListScope = try #require(router.rootPath.last)
+        cardsListScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(AddMethodRoute.self)._routeDeclarations),
+            ]
+        )
+        cardsListScope.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(AddCardRoute.self) {
+                    recorder.events.append("cards")
+                }.declaration,
+            ]
+        )
+
+        await router.present(AddMethodRoute())
+        let addMethodScope = try #require(router.rootPath.last)
+        addMethodScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(AddCardRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.present(AddCardRoute())
+        await router.unwind(to: .id(CardsListRoute().id))
+
+        #expect(recorder.events == ["cards"])
+    }
+
+    @Test func siblingBranchUnwindHandlerDoesNotFire() async {
+        let router = Router()
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        let sourceScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
+        let recorder = UnwindRecorder()
+
+        router.rootPath.scopes = [landingScope]
+        landingScope.setActiveBranch(AnyHashable(AppTab.home))
+        landingScope.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(SettingsRoute.self) {
+                    recorder.events.append("ancestor")
+                }.declaration,
+            ]
+        )
+        homeScope.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(SettingsRoute.self) {
+                    recorder.events.append("home")
+                }.declaration,
+            ]
+        )
+        walletScope.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(SettingsRoute.self) {
+                    recorder.events.append("wallet")
+                }.declaration,
+            ]
+        )
+        homeScope.path.scopes = [sourceScope]
+        landingScope.registerBranchScope(homeScope, for: AppTab.home)
+        landingScope.registerBranchScope(walletScope, for: AppTab.wallet)
+
+        await router.unwind()
+
+        #expect(recorder.events == ["home"])
+        #expect(homeScope.path.isEmpty)
+    }
+
+    @Test func unwindTargetChangesLandingButNotHandlerLookupRule() async {
+        let nilTargetEvents = await branchUnwindEvents(to: nil)
+        let explicitIDEvents = await branchUnwindEvents(to: .id(AppTab.home))
+        let nearestBranchEvents = await branchUnwindEvents(to: .nearestBranch)
+
+        #expect(nilTargetEvents == ["container"])
+        #expect(explicitIDEvents == ["container"])
+        #expect(nearestBranchEvents == ["container"])
+    }
+
+    @Test func swiftUIDismissBubblesHandlerFromDescendantLandingToAncestor() async throws {
+        let router = Router()
+        let recorder = UnwindRecorder()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Cover(ChallengeRoute.self, priority: .high)._routeDeclarations
+                    + Cover(LockRoute.self, priority: .critical)._routeDeclarations
+                ),
+            ]
+        )
+        router.root.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(LockRoute.self) {
+                    recorder.events.append("root")
+                }.declaration,
+            ]
+        )
+
+        await router.present(ChallengeRoute())
+        await router.present(LockRoute())
+        let lockScope = try #require(router.rootPath.last)
+        router.routeScopeDidInstallInView(lockScope)
+
+        router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.slide)).wrappedValue = nil
+        await recorder.waitForEventCount(1)
+
+        #expect(recorder.events == ["root"])
+        #expect(router.rootPath.scopes.count == 1)
+        #expect(router.rootPath.scopes.last?.route is ChallengeRoute)
+
+        router.routeScopeDidLeaveView(lockScope)
+    }
+
     @Test func payloadHandlerReceivesPayloadWhenChildUnwindsToDeclaringScope() async {
         let router = Router()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
@@ -344,6 +567,10 @@ struct UnwindHookTests {
             await router.unwind()
         }
         await recorder.waitForEventCount(1)
+        await waitUntil {
+            router.rootPath.scopes.count == 1
+            && router.rootPath.scopes.first === parentScope
+        }
 
         #expect(router.rootPath.scopes.count == 1)
         #expect(router.rootPath.scopes.first === parentScope)
@@ -577,6 +804,30 @@ private final class UnwindRecorder {
         releaseContinuation?.resume()
         releaseContinuation = nil
     }
+}
+
+@MainActor
+private func branchUnwindEvents(to target: Router.UnwindTarget?) async -> [String] {
+    let router = Router()
+    let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+    let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+    let sourceScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
+    let recorder = UnwindRecorder()
+
+    router.rootPath.scopes = [landingScope]
+    landingScope.setActiveBranch(AnyHashable(AppTab.home))
+    landingScope.installHookDeclarations(
+        hookDeclarations: [
+            UnwindHandler(SettingsRoute.self) {
+                recorder.events.append("container")
+            }.declaration,
+        ]
+    )
+    homeScope.path.scopes = [sourceScope]
+    landingScope.registerBranchScope(homeScope, for: AppTab.home)
+
+    await router.unwind(to: target)
+    return recorder.events
 }
 
 @MainActor

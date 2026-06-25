@@ -111,6 +111,36 @@ struct MessageRoute: Route {
     }
 }
 
+struct ChallengeRoute: Route {
+    func destination() -> some View {
+        Text("Challenge")
+    }
+}
+
+struct LockRoute: Route {
+    func destination() -> some View {
+        Text("Lock")
+    }
+}
+
+struct CardsListRoute: Route {
+    func destination() -> some View {
+        Text("Cards")
+    }
+}
+
+struct AddMethodRoute: Route {
+    func destination() -> some View {
+        Text("Add Method")
+    }
+}
+
+struct AddCardRoute: Route {
+    func destination() -> some View {
+        Text("Add Card")
+    }
+}
+
 struct DroppedRoute: Route {
     func resolveRoute() async -> RouteResolution {
         .drop
