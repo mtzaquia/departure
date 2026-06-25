@@ -73,9 +73,6 @@ public final class Router: Identifiable, Equatable {
     var unwindPresentationSnapshot: UnwindPresentationSnapshot?
 
     @ObservationIgnored
-    var deferredRouteAppend: DeferredRouteAppend?
-
-    @ObservationIgnored
     var isNavigationInProgress = false
 
     @ObservationIgnored

@@ -57,12 +57,12 @@ extension Router {
         log.departureDebug(.routeMatched(
             route: resolvedRoute,
             match: matchedDeclaration,
-            highContextStart: highContext?.highStartIndex
+            elevatedContextStart: highestElevatedContext?.elevatedStartIndex
         ))
 
         switch routeRequestDecision(for: matchedDeclaration) {
         case .drop:
-            log.departureDebug(.routeBlockedByHighContext(route: resolvedRoute))
+            log.departureDebug(.routeBlockedByElevatedContext(route: resolvedRoute))
             return // Lower-priority route attached before an existing elevated context is dropped.
 
         case .append:

@@ -38,8 +38,8 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
 
     /// Creates an unwind handler.
     ///
-    /// If this handler matches a ``Router/unwind(to:payload:)`` request, the unwind call stays
-    /// suspended until `handle` returns.
+    /// If this handler matches a ``Router/unwind(to:payload:)`` request, `handle` is scheduled when
+    /// the unwind is accepted. The router does not wait for `handle` to return.
     public init<Payload>(
         _ routeType: R.Type,
         expecting payloadType: Payload.Type,

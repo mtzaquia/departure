@@ -49,10 +49,6 @@ extension Router {
             }
         }
 
-        var highStartIndex: [RouteScope].Index? {
-            elevatedStartIndex
-        }
-
         var elevatedStartIndex: [RouteScope].Index? {
             switch self {
             case .normal:
@@ -61,10 +57,6 @@ extension Router {
             case .high(_, let startIndex, _), .critical(_, let startIndex, _):
                 return startIndex
             }
-        }
-
-        var highRouteScope: RouteScope? {
-            elevatedRouteScope
         }
 
         var elevatedRouteScope: RouteScope? {
