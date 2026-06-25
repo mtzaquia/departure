@@ -194,6 +194,18 @@ If an intercepted action throws `.reroute(route)` from its original implementati
 }
 ```
 
+An `UnwindHandler` runs when the unwind request is accepted. The router does not wait for the
+handler body to finish before continuing the unwind. If the handler presents another route, that
+request is deferred until the active navigation has finished.
+
+```swift
+.hooks {
+  UnwindHandler(EditorRoute.self) {
+    await router.present(ConfirmationRoute())
+  }
+}
+```
+
 > [!NOTE]
 > If the route and target scope match, SwiftUI's `dismiss()` also triggers unwind handlers with no payloads.
 

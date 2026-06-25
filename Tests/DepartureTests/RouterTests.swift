@@ -119,7 +119,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.rootPath.isEmpty)
-        #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         homeScope.installRouteDeclarations(
@@ -241,7 +241,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.rootPath.isEmpty)
-        #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         homeScope.installRouteDeclarations(
@@ -308,7 +308,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.rootPath.count == 1)
-        #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
 
         router.resumePendingRoute(for: AppTab.home, in: landingScope)
 
@@ -965,7 +965,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .wallet)
         #expect(router.rootPath.isEmpty)
-        #expect(router.pendingRoute?.match.branchID == AnyHashable(AppTab.wallet))
+        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.wallet))
 
         walletScope.installRouteDeclarations(
             id: AnyHashable(AppTab.wallet),

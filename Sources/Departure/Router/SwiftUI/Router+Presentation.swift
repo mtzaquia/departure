@@ -268,12 +268,13 @@ private extension Router {
             let targetPathIndex = routePath.index(of: routeScope)
             let removedScopes = routePath.scopesRemovedByKeepingThrough(targetPathIndex)
             let targetScope = routePath.scope(at: targetPathIndex)
-            keepPathThrough(targetPathIndex, in: routePath)
-            scheduleUnwindHandlersAfterDismissalCompletes(
-                for: presentation.scope.route,
+            performPresentationDismissalUnwind(
+                for: presentation.scope,
                 in: targetScope,
                 removing: removedScopes
-            )
+            ) {
+                keepPathThrough(targetPathIndex, in: routePath)
+            }
             return
         }
 
@@ -282,12 +283,13 @@ private extension Router {
             : routePath.scopes.index(before: presentedPathIndex)
         let removedScopes = routePath.scopesRemovedByKeepingThrough(targetPathIndex)
         let targetScope = routePath.scope(at: targetPathIndex)
-        keepPathThrough(targetPathIndex, in: routePath)
-        scheduleUnwindHandlersAfterDismissalCompletes(
-            for: presentation.scope.route,
+        performPresentationDismissalUnwind(
+            for: presentation.scope,
             in: targetScope,
             removing: removedScopes
-        )
+        ) {
+            keepPathThrough(targetPathIndex, in: routePath)
+        }
     }
 
     func shouldHostLocally(
@@ -363,12 +365,13 @@ private extension Router {
         let targetPathIndex = context.elevatedBasePathIndex
         let removedScopes = context.path.scopesRemovedByKeepingThrough(targetPathIndex)
         let targetScope = context.path.scope(at: targetPathIndex)
-        keepPathThrough(targetPathIndex, in: context.path)
-        scheduleUnwindHandlersAfterDismissalCompletes(
-            for: presentation.scope.route,
+        performPresentationDismissalUnwind(
+            for: presentation.scope,
             in: targetScope,
             removing: removedScopes
-        )
+        ) {
+            keepPathThrough(targetPathIndex, in: context.path)
+        }
     }
 
 }

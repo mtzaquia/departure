@@ -259,7 +259,63 @@ struct UnwindHookTests {
         #expect(walletScope.path.isEmpty)
     }
 
-    @Test func handlerRunsAfterDismissedScopeLeavesViewAndCanPresentRoute() async {
+    @Test func payloadHandlerRunsWhenUnwindIsAccepted() async {
+        let router = Router()
+        let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let recorder = UnwindRecorder()
+
+        parentScope.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(LoginRoute.self, expecting: String.self) { payload in
+                    recorder.payloads.append(payload)
+                    recorder.events.append("handler")
+                }.declaration,
+            ]
+        )
+        router.rootPath.scopes = [parentScope, childScope]
+
+        await router.unwind(payload: "done")
+
+        #expect(recorder.payloads == ["done"])
+        #expect(recorder.events == ["handler"])
+        #expect(router.rootPath.count == 1)
+    }
+
+    @Test func routerUnwindDoesNotWaitForAsyncHandlerBody() async {
+        let router = Router()
+        let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let recorder = UnwindRecorder()
+
+        parentScope.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(LoginRoute.self) {
+                    recorder.events.append("handler-started")
+                    await recorder.waitForRelease()
+                    recorder.events.append("handler-finished")
+                }.declaration,
+            ]
+        )
+        router.rootPath.scopes = [parentScope, childScope]
+
+        let unwindTask = Task {
+            await router.unwind()
+            recorder.events.append("unwind-returned")
+        }
+        await recorder.waitForEventCount(1)
+        _ = await unwindTask.value
+
+        #expect(recorder.events == ["handler-started", "unwind-returned"])
+        #expect(router.rootPath.count == 1)
+
+        recorder.release()
+        await recorder.waitForEventCount(3)
+
+        #expect(recorder.events == ["handler-started", "unwind-returned", "handler-finished"])
+    }
+
+    @Test func handlerCanPresentRouteAfterRouterUnwindFinishes() async {
         let router = Router()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -276,10 +332,8 @@ struct UnwindHookTests {
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("handler")
-                    recorder.presentationTask = Task {
-                        await router.present(SettingsRoute())
-                        recorder.events.append("presented")
-                    }
+                    await router.present(SettingsRoute())
+                    recorder.events.append("presented")
                 }.declaration,
             ]
         )
@@ -289,22 +343,22 @@ struct UnwindHookTests {
         let unwindTask = Task {
             await router.unwind()
         }
-        await Task.yield()
+        await recorder.waitForEventCount(1)
 
         #expect(router.rootPath.scopes.count == 1)
         #expect(router.rootPath.scopes.first === parentScope)
-        #expect(recorder.events.isEmpty)
+        #expect(recorder.events == ["handler"])
 
         router.routeScopeDidLeaveView(childScope)
         _ = await unwindTask.value
-        await recorder.presentationTask?.value
+        await recorder.waitForEventCount(2)
 
         #expect(recorder.events == ["handler", "presented"])
         #expect(router.rootPath.scopes.count == 2)
         #expect(router.rootPath.scopes.last?.route is SettingsRoute)
     }
 
-    @Test func swiftUIDismissTriggersNoPayloadHandlerAfterDismissedScopeLeavesViewAndCanPresentRoute() async throws {
+    @Test func swiftUIDismissHandlerCanPresentRouteAfterDismissalFinishes() async throws {
         let router = Router()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = UnwindRecorder()
@@ -323,10 +377,8 @@ struct UnwindHookTests {
             hookDeclarations: [
                 UnwindHandler(LoginRoute.self) {
                     recorder.events.append("handler")
-                    recorder.presentationTask = Task {
-                        await router.present(SettingsRoute())
-                        recorder.events.append("presented")
-                    }
+                    await router.present(SettingsRoute())
+                    recorder.events.append("presented")
                 }.declaration,
             ]
         )
@@ -337,15 +389,14 @@ struct UnwindHookTests {
         router.routeScopeDidInstallInView(dismissedScope)
 
         router.routePresentationBinding(from: parentScope, matching: .sheet).wrappedValue = nil
-        await Task.yield()
+        await recorder.waitForEventCount(1)
 
         #expect(router.rootPath.scopes.count == 1)
         #expect(router.rootPath.scopes.first === parentScope)
-        #expect(recorder.events.isEmpty)
+        #expect(recorder.events == ["handler"])
 
         router.routeScopeDidLeaveView(dismissedScope)
         await recorder.waitForEventCount(2)
-        await recorder.presentationTask?.value
 
         #expect(recorder.events == ["handler", "presented"])
         #expect(router.rootPath.scopes.count == 2)
@@ -452,37 +503,18 @@ struct UnwindHookTests {
         let unwindTask = Task {
             await router.unwind()
         }
-        await Task.yield()
+        await waitUntil {
+            router.rootPath.isEmpty
+        }
 
         #expect(router.rootPath.isEmpty)
-        #expect(recorder.events.isEmpty)
+        await recorder.waitForEventCount(1)
+        #expect(recorder.events == ["handler"])
 
         router.routeScopeDidLeaveView(dismissedScope)
         _ = await unwindTask.value
 
         #expect(recorder.events == ["handler"])
-    }
-
-    @Test func routerUnwindWaitsForAsyncHandlerBody() async {
-        let router = Router()
-        let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
-        let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
-        let recorder = UnwindRecorder()
-
-        parentScope.installHookDeclarations(
-            hookDeclarations: [
-                UnwindHandler(LoginRoute.self) {
-                    recorder.events.append("started")
-                    await Task.yield()
-                    recorder.events.append("finished")
-                }.declaration,
-            ]
-        )
-        router.rootPath.scopes = [parentScope, childScope]
-
-        await router.unwind()
-
-        #expect(recorder.events == ["started", "finished"])
     }
 
     @Test func swiftUIDismissTriggersNoPayloadHandlerForHighPriorityPresentation() async throws {
@@ -512,7 +544,8 @@ struct UnwindHookTests {
         await Task.yield()
 
         #expect(router.rootPath.isEmpty)
-        #expect(recorder.events.isEmpty)
+        await recorder.waitForEventCount(1)
+        #expect(recorder.events == ["handler"])
 
         router.routeScopeDidLeaveView(dismissedScope)
         await recorder.waitForEventCount(1)
@@ -526,11 +559,29 @@ private final class UnwindRecorder {
     var events: [String] = []
     var ints: [Int] = []
     var payloads: [String] = []
-    var presentationTask: Task<Void, Never>?
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
 
     func waitForEventCount(_ count: Int) async {
-        for _ in 0..<10 where events.count < count {
+        for _ in 0..<100 where events.count < count {
             await Task.yield()
         }
+    }
+
+    func waitForRelease() async {
+        await withCheckedContinuation { continuation in
+            releaseContinuation = continuation
+        }
+    }
+
+    func release() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
+}
+
+@MainActor
+private func waitUntil(_ predicate: () -> Bool) async {
+    for _ in 0..<100 where predicate() == false {
+        await Task.yield()
     }
 }

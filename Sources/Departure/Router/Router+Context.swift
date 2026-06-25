@@ -81,10 +81,6 @@ extension Router {
             }
         }
 
-        var highBasePathIndex: [RouteScope].Index? {
-            elevatedBasePathIndex
-        }
-
         var elevatedBasePathIndex: [RouteScope].Index? {
             switch self {
             case .normal:
@@ -99,10 +95,6 @@ extension Router {
             }
         }
 
-        var highPresentationScope: RouteScope? {
-            elevatedPresentationScope
-        }
-
         var elevatedPresentationScope: RouteScope? {
             switch self {
             case .normal:
@@ -111,10 +103,6 @@ extension Router {
             case .high(_, _, let presentationScope), .critical(_, _, let presentationScope):
                 return presentationScope
             }
-        }
-
-        func contains(_ match: DeclarationMatch) -> Bool {
-            contains(path: match.path, pathIndex: match.pathIndex)
         }
 
         func contains(path: RoutePath, pathIndex: [RouteScope].Index?) -> Bool {

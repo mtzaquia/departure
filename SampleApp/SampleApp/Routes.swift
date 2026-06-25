@@ -226,7 +226,7 @@ private extension View {
     }
 }
 
-struct AppearanceSettingsRoute: Route {
+struct AppearanceSettingsRoute: Route, Equatable {
     let value: UUID?
 
     func destination() -> some View {
