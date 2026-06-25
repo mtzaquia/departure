@@ -23,11 +23,25 @@
 import Foundation
 
 extension Route {
-    func isEqual(to route: any Route) -> Bool {
+    func _isEqual(to route: any Route) -> Bool {
         guard let route = route as? Self else {
             return false
         }
 
-        return self == route
+        if let equatable = self as? any Equatable {
+            return equatable._isEqual(to: route)
+        }
+
+        return self.isEqual(to: route)
+    }
+}
+
+private extension Equatable {
+    func _isEqual(to other: Any) -> Bool {
+        guard let other = other as? Self else {
+            return false
+        }
+
+        return self == other
     }
 }

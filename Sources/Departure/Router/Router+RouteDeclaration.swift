@@ -43,7 +43,7 @@ extension Router {
         }
 
         guard let resolvedRoute else { return }
-        if let currentRoute = currentRouteScope.route, currentRoute.isEqual(to: resolvedRoute) {
+        if let currentRoute = currentRouteScope.route, currentRoute._isEqual(to: resolvedRoute) {
             log.departureDebug(.routeNoOpEquivalent(route: resolvedRoute, currentRoute: currentRoute))
             return
         }
@@ -71,6 +71,10 @@ extension Router {
             return
 
         case .replaceElevatedContext(let priority):
+            if await unwindToExistingEquivalentRouteIfNeeded(resolvedRoute, after: matchedDeclaration) {
+                return
+            }
+
             log.departureDebug(.routeAcceptedReplaceHighPriority(route: resolvedRoute))
             replaceElevatedContext(priority, with: resolvedRoute, after: matchedDeclaration)
             return

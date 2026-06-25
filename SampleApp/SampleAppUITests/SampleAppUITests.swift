@@ -161,20 +161,24 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
 
+        // A normal push declared inside the context navigates within the login stack (it is not
+        // blocked the way a normal route before the context would be).
+        tap(A11y.loginIncrementPresentationProbeButton)
+        assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
+
+        tap(A11y.loginPushDetailButton)
+        assertExists(A11y.loginDetailText)
+
+        tap(A11y.loginDetailPresentLoginButton)
+        assertGone(A11y.loginDetailText)
+        assertExists(A11y.loginTitle)
+        assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
+
         // A high-priority sheet declared inside the context presents as a normal sheet over login
         // — it must not escalate/replace the login cover, so login stays in the hierarchy behind it.
         tap(A11y.loginPresentHighPrioritySheetButton)
         assertExists(A11y.loginNoticeText)
         assertExists(A11y.loginTitle)
-
-        tap(A11y.loginNoticeDismissButton)
-        assertGone(A11y.loginNoticeText)
-        assertExists(A11y.loginTitle)
-
-        // A normal push declared inside the context navigates within the login stack (it is not
-        // blocked the way a normal route before the context would be).
-        tap(A11y.loginPushDetailButton)
-        assertExists(A11y.loginDetailText)
     }
 
     func testCriticalPriorityPresentationOverlaysAndReplacesAboveHighPriorityContext() {
@@ -516,6 +520,8 @@ private enum A11y {
 
     static let loginTitle = "sample.login.title"
     static let loginWindowEnvironmentValue = "sample.login.window-environment"
+    static let loginPresentationProbeCount = "sample.login.presentation-probe-count"
+    static let loginIncrementPresentationProbeButton = "sample.login.increment-presentation-probe"
     static let loginButton = "sample.login.button"
     static let loginCancelButton = "sample.login.cancel"
     static let loginReplaceHighPriorityButton = "sample.login.replace-high-priority"
@@ -525,6 +531,7 @@ private enum A11y {
     static let loginPresentHighPrioritySheetButton = "sample.login.present-high-priority-sheet"
 
     static let loginDetailText = "sample.login-detail.text"
+    static let loginDetailPresentLoginButton = "sample.login-detail.present-login"
     static let loginNoticeText = "sample.login-notice.text"
     static let loginNoticeDismissButton = "sample.login-notice.dismiss"
 

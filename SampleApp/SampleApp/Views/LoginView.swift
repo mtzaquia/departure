@@ -28,12 +28,39 @@ struct LoginView: View {
 
     @Environment(Router.self) private var router
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
+    @State private var presentationProbeCount = 0
 
     var body: some View {
         List {
             Section {
                 LabeledContent("Window environment", value: sampleWindowBadge)
                     .accessibilityIdentifier(SampleAppAccessibility.loginWindowEnvironmentValue)
+
+                if SampleAppUITesting.isEnabled {
+                    Text("Login presentation probe: \(presentationProbeCount)")
+                        .accessibilityIdentifier(SampleAppAccessibility.loginPresentationProbeCount)
+
+                    Button("Increment presentation probe") {
+                        presentationProbeCount += 1
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.loginIncrementPresentationProbeButton)
+                }
+            }
+
+            Section {
+                Button("Push detail") {
+                    Task {
+                        await router.present(LoginDetailRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.loginPushDetailButton)
+
+                Button("Present high-priority sheet") {
+                    Task {
+                        await router.present(LoginNoticeRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.loginPresentHighPrioritySheetButton)
             }
 
             Button("Log in") {
@@ -76,22 +103,6 @@ struct LoginView: View {
                 .bold()
                 .accessibilityIdentifier(SampleAppAccessibility.loginPresentCriticalButton)
                 Text("A critical cover should appear above this high-priority cover without replacing it.")
-            }
-
-            Section {
-                Button("Push detail") {
-                    Task {
-                        await router.present(LoginDetailRoute())
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.loginPushDetailButton)
-
-                Button("Present high-priority sheet") {
-                    Task {
-                        await router.present(LoginNoticeRoute())
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.loginPresentHighPrioritySheetButton)
             }
         }
         .navigationTitle("Login")
@@ -201,10 +212,21 @@ struct CriticalReplacementView: View {
 }
 
 struct LoginDetailView: View {
+    @Environment(Router.self) private var router
+
     var body: some View {
         List {
             Text("Pushed from the login screen.")
                 .accessibilityIdentifier(SampleAppAccessibility.loginDetailText)
+
+            if SampleAppUITesting.isEnabled {
+                Button("Present login again") {
+                    Task {
+                        await router.present(LoginRoute(nextRoute: nil))
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.loginDetailPresentLoginButton)
+            }
         }
         .navigationTitle("Login detail")
     }

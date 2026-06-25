@@ -89,6 +89,48 @@ struct UnwindHookTests {
         #expect(router.rootPath.count == 1)
     }
 
+    @Test func autoUnwindToEquivalentRouteTriggersTargetScopeHandlerForDismissedRoute() async throws {
+        let router = Router()
+        let recorder = UnwindRecorder()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Push(NumberedRoute.self)._routeDeclarations
+                    + Push(SettingsRoute.self)._routeDeclarations
+                ),
+            ]
+        )
+
+        await router.present(NumberedRoute(number: 1))
+        let numberedScope = try #require(router.rootPath.last)
+        numberedScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+        numberedScope.installHookDeclarations(
+            hookDeclarations: [
+                UnwindHandler(SettingsRoute.self) {
+                    recorder.events.append("numbered")
+                }.declaration,
+            ]
+        )
+
+        await router.present(SettingsRoute())
+        #expect(router.rootPath.count == 2)
+
+        await router.present(NumberedRoute(number: 1))
+
+        #expect(router.rootPath.count == 1)
+        #expect(router.rootPath.last === numberedScope)
+        #expect(recorder.events == ["numbered"])
+    }
+
     @Test func rootTargetTriggersRootScopeHook() async {
         let router = Router()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())

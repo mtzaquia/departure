@@ -36,7 +36,7 @@ import SwiftUI
 ///
 /// await router.present(SettingsRoute())
 /// ```
-public protocol Route: Identifiable, Equatable where ID == ObjectIdentifier {
+public protocol Route: Identifiable where ID == ObjectIdentifier {
     /// Returns the resolution result whenever attempting to present this route.
     ///
     /// Despite asynchronous, routing is suspended until this function returns. On a re-route, the target route is also evaluated.
@@ -58,6 +58,17 @@ public protocol Route: Identifiable, Equatable where ID == ObjectIdentifier {
     /// - Returns: The route to be used, or `nil` to drop the request.
     @available(*, deprecated, message: "Use `resolveRoute()` returning `RouteResolution`.")
     func resolveRoute() async -> (any Route)?
+    
+    /// **If the ``Route`` doesn't conform to `Equatable`**, this function is used to determine whether two routes of the same type are equivalent.
+    /// The default implementation returns `true` if the two routes are of the same type.
+    ///
+    /// - Important: This method is meant as a temporary workaround to ensure backwards-compatibility.
+    /// Prefer conforming your ``Route`` to `Equatable instead`.
+    ///
+    /// - Parameter route: The other route to be compared against this one.
+    /// - Returns: Whether the two routes are equivalent.
+    @available(*, deprecated, message: "Prefer conforming your `Route` to `Equatable` instead.")
+    func isEqual(to route: Self) -> Bool
 
     /// The view shown for this route.
     associatedtype Destination: View
@@ -84,10 +95,14 @@ public extension Route {
         let result: (any Route)? = await resolveRoute()
         
         return switch result {
-        case .some(let route) where self.isEqual(to: route): .allow
+        case .some(let route) where self._isEqual(to: route): .allow
         case .some(let route): .reroute(route)
         case .none: .drop
         }
+    }
+
+    func isEqual(to route: Self) -> Bool {
+        true
     }
 }
 

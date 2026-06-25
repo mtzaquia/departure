@@ -29,13 +29,13 @@ enum AppTab: Hashable, Sendable {
     case wallet
 }
 
-struct RootRoute: Route, Equatable {
+struct RootRoute: Route {
     func destination() -> some View {
         Text("Root")
     }
 }
 
-struct HomeDetailRoute: Route, Equatable {
+struct HomeDetailRoute: Route {
     func destination() -> some View {
         Text("Home Detail")
     }
@@ -47,39 +47,71 @@ struct NumberedRoute: Route, Equatable {
     func destination() -> some View {
         Text("Number \(number)")
     }
+
+    func isEqual(to route: NumberedRoute) -> Bool {
+        number == route.number
+    }
 }
 
-struct TransactionRoute: Route, Equatable {
+struct EquatableOnlyRoute: Route, Equatable {
+    let value: Int
+
+    func destination() -> some View {
+        Text("Equatable \(value)")
+    }
+
+    static func == (lhs: EquatableOnlyRoute, rhs: EquatableOnlyRoute) -> Bool {
+        lhs.value == rhs.value
+    }
+
+    func isEqual(to route: EquatableOnlyRoute) -> Bool {
+        true
+    }
+}
+
+struct ProtocolEqualOnlyRoute: Route {
+    let value: Int
+
+    func destination() -> some View {
+        Text("Protocol \(value)")
+    }
+
+    func isEqual(to route: ProtocolEqualOnlyRoute) -> Bool {
+        value == route.value
+    }
+}
+
+struct TransactionRoute: Route {
     func destination() -> some View {
         Text("Transaction")
     }
 }
 
-struct SettingsRoute: Route, Equatable {
+struct SettingsRoute: Route {
     func destination() -> some View {
         Text("Settings")
     }
 }
 
-struct LoginRoute: Route, Equatable {
+struct LoginRoute: Route {
     func destination() -> some View {
         Text("Login")
     }
 }
 
-struct AlertRoute: Route, Equatable {
+struct AlertRoute: Route {
     func destination() -> some View {
         Text("Alert")
     }
 }
 
-struct MessageRoute: Route, Equatable {
+struct MessageRoute: Route {
     func destination() -> some View {
         Text("Message")
     }
 }
 
-struct DroppedRoute: Route, Equatable {
+struct DroppedRoute: Route {
     func resolveRoute() async -> RouteResolution {
         .drop
     }
@@ -89,7 +121,7 @@ struct DroppedRoute: Route, Equatable {
     }
 }
 
-struct ReroutingRoute: Route, Equatable {
+struct ReroutingRoute: Route {
     func resolveRoute() async -> RouteResolution {
         .reroute(LoginRoute())
     }
