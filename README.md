@@ -213,7 +213,7 @@ target controls where the router lands; handler lookup always follows the same c
 that landing scope.
 
 > [!NOTE]
-> If the route and target scope match, SwiftUI's `dismiss()` also triggers unwind handlers with no payloads.
+> SwiftUI's `dismiss()` also triggers unwind handlers with no payload if the types match.
 
 ### Duplicate declarations
 
