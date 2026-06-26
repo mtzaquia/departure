@@ -135,10 +135,12 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
         assertLabel(A11y.loginWindowEnvironmentValue, contains: "forwarded from app window")
+        assertLabel(A11y.loginWindowEnvironmentValue, contains: "active")
 
         tap(A11y.loginReplaceHighPriorityButton)
         assertExists(A11y.replacementTitle)
         assertLabel(A11y.replacementWindowEnvironmentValue, contains: "forwarded from app window")
+        assertLabel(A11y.replacementWindowEnvironmentValue, contains: "active")
 
         tap(A11y.replacementDismissButton)
         assertGone(A11y.replacementTitle)
@@ -193,6 +195,7 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.loginPresentCriticalButton)
         assertExists(A11y.criticalText)
         assertLabel(A11y.criticalWindowEnvironmentValue, contains: "forwarded from app window")
+        assertLabel(A11y.criticalScenePhaseValue, contains: "active")
         assertExists(A11y.loginTitle)
 
         loginCancelCoordinate.tap()
@@ -540,6 +543,7 @@ private enum A11y {
     static let replacementDismissButton = "sample.replacement.dismiss"
     static let criticalText = "sample.critical.text"
     static let criticalWindowEnvironmentValue = "sample.critical.window-environment"
+    static let criticalScenePhaseValue = "sample.critical.scene-phase"
     static let criticalReplaceButton = "sample.critical.replace"
     static let criticalDismissButton = "sample.critical.dismiss"
     static let criticalReplacementText = "sample.critical-replacement.text"

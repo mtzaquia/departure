@@ -53,6 +53,7 @@ struct CoverFadePresentationStyleModifier: ViewModifier {
 
 struct ElevatedPriorityCoverFadeHost: View {
     @Environment(Router.self) private var router
+    @Environment(\.scenePhase) private var scenePhase
     let priority: RoutePriority
     let windowDestinationBuilder: WindowDestinationBuilder
 
@@ -62,6 +63,7 @@ struct ElevatedPriorityCoverFadeHost: View {
         ElevatedPriorityPresentationWindowBridge(
             priority: priority,
             route: presentation,
+            sourceScenePhase: scenePhase,
             windowDestinationBuilder: windowDestinationBuilder
         ) { presentation, onDismiss in
             ElevatedPriorityCoverFadePresenter(
@@ -81,12 +83,14 @@ import UIKit
 
 private struct CoverFadeModalPresenter: View {
     @Binding var route: RoutePresentation?
+    @Environment(\.scenePhase) private var scenePhase
     let router: Router
 
     var body: some View {
         CrossDissolveModalPresenter(
             presentation: route.map(RouteDestinationSnapshot.init(route:)),
             router: router,
+            sourceScenePhase: scenePhase,
             onDismiss: {
                 route = nil
             }
@@ -98,11 +102,13 @@ private struct ElevatedPriorityCoverFadePresenter: View {
     let presentation: RouteDestinationSnapshot
     let router: Router
     let onDismiss: @MainActor () -> Void
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         CrossDissolveModalPresenter(
             presentation: presentation,
             router: router,
+            sourceScenePhase: scenePhase,
             onDismiss: onDismiss
         )
     }
@@ -111,6 +117,7 @@ private struct ElevatedPriorityCoverFadePresenter: View {
 private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
     let presentation: RouteDestinationSnapshot?
     let router: Router
+    let sourceScenePhase: ScenePhase
     let onDismiss: @MainActor () -> Void
 
     func makeUIViewController(context: Context) -> Controller {
@@ -121,6 +128,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         controller.update(
             presentation: presentation,
             router: router,
+            sourceScenePhase: sourceScenePhase,
             onDismiss: onDismiss
         )
     }
@@ -132,8 +140,10 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
     final class Controller: UIViewController, UIAdaptivePresentationControllerDelegate {
         private var pendingPresentation: RouteDestinationSnapshot?
         private var router: Router?
+        private var sourceScenePhase: ScenePhase?
         private var onDismiss: (@MainActor () -> Void)?
         private var presentedRouteID: RoutePresentation.ID?
+        private var presentedScenePhase: ScenePhase?
         private var hostingController: PassThroughModalHostingController<AnyView>?
 
         override func viewDidLoad() {
@@ -149,14 +159,25 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         func update(
             presentation: RouteDestinationSnapshot?,
             router: Router,
+            sourceScenePhase: ScenePhase,
             onDismiss: @escaping @MainActor () -> Void
         ) {
             self.router = router
+            self.sourceScenePhase = sourceScenePhase
             self.onDismiss = onDismiss
 
             guard let presentation else {
                 pendingPresentation = nil
                 dismissPresentedRoute(animated: true)
+                return
+            }
+
+            if presentedRouteID == presentation.route.id {
+                updatePresentedScenePhaseIfNeeded(
+                    presentation: presentation,
+                    router: router,
+                    sourceScenePhase: sourceScenePhase
+                )
                 return
             }
 
@@ -184,7 +205,8 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         private func presentPendingRouteIfNeeded() {
             guard
                 let pendingPresentation,
-                let router
+                let router,
+                let sourceScenePhase
             else {
                 return
             }
@@ -192,7 +214,8 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
             if presentedRouteID == pendingPresentation.route.id {
                 hostingController?.rootView = rootView(
                     router: router,
-                    destination: pendingPresentation.destination
+                    destination: pendingPresentation.destination,
+                    sourceScenePhase: sourceScenePhase
                 )
                 self.pendingPresentation = nil
                 return
@@ -206,7 +229,8 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
             let hostingController = PassThroughModalHostingController(
                 rootView: rootView(
                     router: router,
-                    destination: pendingPresentation.destination
+                    destination: pendingPresentation.destination,
+                    sourceScenePhase: sourceScenePhase
                 )
             )
             hostingController.view.backgroundColor = .clear
@@ -219,19 +243,39 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 
             self.hostingController = hostingController
             self.presentedRouteID = pendingPresentation.route.id
+            self.presentedScenePhase = sourceScenePhase
             self.pendingPresentation = nil
 
             present(hostingController, animated: true)
         }
 
+        private func updatePresentedScenePhaseIfNeeded(
+            presentation: RouteDestinationSnapshot,
+            router: Router,
+            sourceScenePhase: ScenePhase
+        ) {
+            guard presentedScenePhase != sourceScenePhase else {
+                return
+            }
+
+            presentedScenePhase = sourceScenePhase
+            hostingController?.rootView = rootView(
+                router: router,
+                destination: presentation.destination,
+                sourceScenePhase: sourceScenePhase
+            )
+        }
+
         private func rootView(
             router: Router,
-            destination: AnyView
+            destination: AnyView,
+            sourceScenePhase: ScenePhase
         ) -> AnyView {
             AnyView(
                 destination
                     .environment(router)
                     .environment(\.routing, RoutingAction(router: router))
+                    .environment(\.scenePhase, sourceScenePhase)
             )
         }
 
@@ -242,6 +286,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 
             hostingController = nil
             presentedRouteID = nil
+            presentedScenePhase = nil
             onDismiss?()
 
             presentPendingRouteIfNeeded()

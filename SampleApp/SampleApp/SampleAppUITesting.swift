@@ -143,6 +143,7 @@ enum SampleAppAccessibility {
     static let replacementDismissButton = "sample.replacement.dismiss"
     static let criticalText = "sample.critical.text"
     static let criticalWindowEnvironmentValue = "sample.critical.window-environment"
+    static let criticalScenePhaseValue = "sample.critical.scene-phase"
     static let criticalReplaceButton = "sample.critical.replace"
     static let criticalDismissButton = "sample.critical.dismiss"
     static let criticalReplacementText = "sample.critical-replacement.text"

@@ -53,6 +53,7 @@ struct CoverSlidePresentationStyleModifier: ViewModifier {
 
 struct ElevatedPriorityCoverSlideHost: View {
     @Environment(Router.self) private var router
+    @Environment(\.scenePhase) private var scenePhase
     let priority: RoutePriority
     let windowDestinationBuilder: WindowDestinationBuilder
 
@@ -62,6 +63,7 @@ struct ElevatedPriorityCoverSlideHost: View {
         ElevatedPriorityPresentationWindowBridge(
             priority: priority,
             route: presentation,
+            sourceScenePhase: scenePhase,
             windowDestinationBuilder: windowDestinationBuilder
         ) { presentation, onDismiss in
             ElevatedPriorityCoverSlidePresenter(

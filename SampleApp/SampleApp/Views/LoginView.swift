@@ -28,12 +28,16 @@ struct LoginView: View {
 
     @Environment(Router.self) private var router
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
+    @Environment(\.scenePhase) private var scenePhase
     @State private var presentationProbeCount = 0
 
     var body: some View {
         List {
             Section {
-                LabeledContent("Window environment", value: sampleWindowBadge)
+                LabeledContent(
+                    "Window environment",
+                    value: "\(sampleWindowBadge) / \(scenePhase.description)"
+                )
                     .accessibilityIdentifier(SampleAppAccessibility.loginWindowEnvironmentValue)
 
                 if SampleAppUITesting.isEnabled {
@@ -127,11 +131,15 @@ struct LoginView: View {
 struct LoginReplacementView: View {
     @Environment(Router.self) private var router
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         List {
             Section {
-                LabeledContent("Window environment", value: sampleWindowBadge)
+                LabeledContent(
+                    "Window environment",
+                    value: "\(sampleWindowBadge) / \(scenePhase.description)"
+                )
                     .accessibilityIdentifier(SampleAppAccessibility.replacementWindowEnvironmentValue)
             }
 
@@ -153,6 +161,7 @@ struct LoginReplacementView: View {
 struct CriticalView: View {
     @Environment(Router.self) private var router
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         VStack(spacing: 16) {
@@ -162,6 +171,9 @@ struct CriticalView: View {
 
             LabeledContent("Window environment", value: sampleWindowBadge)
                 .accessibilityIdentifier(SampleAppAccessibility.criticalWindowEnvironmentValue)
+
+            LabeledContent("Scene phase", value: scenePhase.description)
+                .accessibilityIdentifier(SampleAppAccessibility.criticalScenePhaseValue)
 
             Button("Replace critical") {
                 Task {
@@ -208,6 +220,24 @@ struct CriticalReplacementView: View {
             Color.red
         }
         .padding()
+    }
+}
+
+private extension ScenePhase {
+    var description: String {
+        switch self {
+        case .active:
+            "active"
+
+        case .inactive:
+            "inactive"
+
+        case .background:
+            "background"
+
+        @unknown default:
+            "unknown"
+        }
     }
 }
 
