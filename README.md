@@ -170,7 +170,7 @@ Hooks attach to the current route scope and share its lifecycle.
 | Hook | Behavior |
 | --- | --- |
 | `ActionInterceptor` | Wraps or replaces execution for a matching action type. |
-| `UnwindHandler` | Reacts when a descendant route unwinds back to that scope. |
+| `UnwindHandler` | Reacts when a matching route unwinds into that scope's subtree. |
 
 For actions, `Departure` checks only the active scope for a matching `ActionInterceptor`. If no interceptor matches, the action is attempted directly. If an interceptor matches, **that interceptor owns the action flow** and must call `invocation()` when the original action should run.
 
@@ -206,8 +206,14 @@ request is deferred until the active navigation has finished.
 }
 ```
 
+When a route unwinds, `Departure` first determines the scope where the unwind lands. It then checks
+that scope for a matching `UnwindHandler` and crawls backward through its owning scopes until it
+finds one. The nearest matching handler wins, and only one handler runs for each unwind. The unwind
+target controls where the router lands; handler lookup always follows the same crawl-back rule from
+that landing scope.
+
 > [!NOTE]
-> If the route and target scope match, SwiftUI's `dismiss()` also triggers unwind handlers with no payloads.
+> SwiftUI's `dismiss()` also triggers unwind handlers with no payload if the types match.
 
 ### Duplicate declarations
 

@@ -1097,22 +1097,22 @@ extension Router {
             return
         }
 
+        guard let sourceRoute = sourceScope.route,
+              let match = targetScope.firstUnwindHandlerMatch(for: type(of: sourceRoute))
+        else {
+            return
+        }
+
         let key = UnwindHandlerDeliveryKey(
             sourceScopeID: ObjectIdentifier(sourceScope),
-            targetScopeID: targetScope.id
+            targetScopeID: match.scope.id
         )
         guard deliveredUnwindHandlerKeys.insert(key).inserted else {
             return
         }
 
-        guard let sourceRoute = sourceScope.route,
-              let handler = targetScope.firstUnwindHandler(for: type(of: sourceRoute))
-        else {
-            return
-        }
-
         Task { @MainActor in
-            await handler.invoke(sourceRoute, payload, targetScope.id)
+            await match.handler.invoke(sourceRoute, payload, match.scope.id)
         }
         await Task.yield()
     }
@@ -1185,12 +1185,44 @@ private extension [RoutePath] {
 }
 
 private extension RouteScope {
+    struct UnwindHandlerMatch {
+        let handler: AnyUnwindHandler
+        let scope: RouteScope
+    }
+
     func canDrivePresentation(for declaration: AnyRouteDeclaration) -> Bool {
         routeAttachments.contains {
             $0.routeType == declaration.routeType
             && $0.kind == declaration.kind
             && $0.drivesPresentation
         }
+    }
+
+    func firstUnwindHandlerMatch(for routeType: any Route.Type) -> UnwindHandlerMatch? {
+        var scope: RouteScope? = self
+
+        while let currentScope = scope {
+            if let handler = currentScope.firstUnwindHandler(for: routeType) {
+                return UnwindHandlerMatch(handler: handler, scope: currentScope)
+            }
+
+            scope = currentScope.nextScopeForUnwindHandlerMatch
+        }
+
+        return nil
+    }
+
+    var nextScopeForUnwindHandlerMatch: RouteScope? {
+        if let owningPath,
+           let index = owningPath.scopes.firstIndex(where: { $0 === self }) {
+            guard index > owningPath.scopes.startIndex else {
+                return owningPath.owner
+            }
+
+            return owningPath.scopes[owningPath.scopes.index(before: index)]
+        }
+
+        return parent
     }
 
     func firstUnwindHandler(for routeType: any Route.Type) -> AnyUnwindHandler? {

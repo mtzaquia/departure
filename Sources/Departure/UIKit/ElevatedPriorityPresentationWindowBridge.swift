@@ -20,14 +20,25 @@
 //  SOFTWARE.
 //
 
+import Observation
 import SwiftUI
 
 #if canImport(UIKit)
 import UIKit
 
+@Observable
+final class ElevatedPriorityCascadedScenePhase {
+    var value: ScenePhase
+
+    init(_ value: ScenePhase) {
+        self.value = value
+    }
+}
+
 struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewControllerRepresentable {
     let priority: RoutePriority
     @Binding var route: RoutePresentation?
+    let sourceScenePhase: ScenePhase
     let windowDestinationBuilder: WindowDestinationBuilder
     let content: (RouteDestinationSnapshot, @escaping @MainActor () -> Void) -> HostedContent
 
@@ -40,6 +51,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
         controller.update(
             priority: priority,
             route: route,
+            sourceScenePhase: sourceScenePhase,
             windowDestinationBuilder: windowDestinationBuilder,
             clearRoute: {
                 route = nil
@@ -51,13 +63,30 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
         controller.detach()
     }
 
+    private struct CascadedScenePhaseHost: View {
+        @State private var scenePhase: ElevatedPriorityCascadedScenePhase
+        let content: HostedContent
+
+        init(scenePhase: ElevatedPriorityCascadedScenePhase, content: HostedContent) {
+            self._scenePhase = State(initialValue: scenePhase)
+            self.content = content
+        }
+
+        var body: some View {
+            content
+                .environment(\.scenePhase, scenePhase.value)
+        }
+    }
+
     final class Controller: UIViewController {
         var content: (RouteDestinationSnapshot, @escaping @MainActor () -> Void) -> HostedContent
 
         private weak var previousKeyWindow: UIWindow?
         private var window: PassThroughWindow?
-        private var hostingController: WindowRootHostingController<HostedContent>?
+        private var hostingController: WindowRootHostingController<CascadedScenePhaseHost>?
+        private var cascadedScenePhase: ElevatedPriorityCascadedScenePhase?
         private var presentedRouteID: RoutePresentation.ID?
+        private var latestSourceScenePhase: ScenePhase?
         private var pendingPresentation: RouteDestinationSnapshot?
         private var clearRoute: (@MainActor () -> Void)?
         private var isDismissingWindow = false
@@ -73,10 +102,12 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
         func update(
             priority: RoutePriority,
             route: RoutePresentation?,
+            sourceScenePhase: ScenePhase,
             windowDestinationBuilder: WindowDestinationBuilder,
             clearRoute: @escaping @MainActor () -> Void
         ) {
             self.clearRoute = clearRoute
+            self.latestSourceScenePhase = sourceScenePhase
 
             guard isDismissingWindow == false else {
                 guard let route else {
@@ -101,6 +132,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
             }
 
             if route.id == presentedRouteID {
+                cascadedScenePhase?.value = sourceScenePhase
                 return
             }
 
@@ -115,14 +147,18 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
                 return
             }
 
-            present(presentation, priority: priority)
+            present(presentation, priority: priority, sourceScenePhase: sourceScenePhase)
         }
 
         func detach() {
             dismissWindow(callClearRoute: false)
         }
 
-        private func present(_ presentation: RouteDestinationSnapshot, priority: RoutePriority) {
+        private func present(
+            _ presentation: RouteDestinationSnapshot,
+            priority: RoutePriority,
+            sourceScenePhase: ScenePhase
+        ) {
             guard let scene = resolveScene() else {
                 clearRoute?()
                 return
@@ -133,7 +169,10 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
             window.windowLevel = windowLevel(for: priority, in: scene)
             window.backgroundColor = .clear
 
-            let hostingController = WindowRootHostingController(rootView: makeHost(for: presentation))
+            let cascadedScenePhase = ElevatedPriorityCascadedScenePhase(sourceScenePhase)
+            let hostingController = WindowRootHostingController(
+                rootView: makeHost(for: presentation, scenePhase: cascadedScenePhase)
+            )
             hostingController.view.backgroundColor = .clear
             hostingController.onDismiss = { [weak self] in
                 self?.dismissFromPresentedHost()
@@ -142,26 +181,33 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
 
             self.window = window
             self.hostingController = hostingController
+            self.cascadedScenePhase = cascadedScenePhase
             self.presentedRouteID = presentation.route.id
 
             window.makeKeyAndVisible()
         }
 
-        private func makeHost(for presentation: RouteDestinationSnapshot) -> HostedContent {
+        private func makeHost(
+            for presentation: RouteDestinationSnapshot,
+            scenePhase: ElevatedPriorityCascadedScenePhase
+        ) -> CascadedScenePhaseHost {
             let routeID = presentation.route.id
-            return content(
-                presentation,
-                { [weak self] in
-                    guard self?.presentedRouteID == routeID else {
-                        return
-                    }
+            return CascadedScenePhaseHost(
+                scenePhase: scenePhase,
+                content: content(
+                    presentation,
+                    { [weak self] in
+                        guard self?.presentedRouteID == routeID else {
+                            return
+                        }
 
-                    guard self?.isDismissingWindow == false else {
-                        return
-                    }
+                        guard self?.isDismissingWindow == false else {
+                            return
+                        }
 
-                    self?.dismissFromPresentedHost()
-                }
+                        self?.dismissFromPresentedHost()
+                    }
+                )
             )
         }
 
@@ -217,6 +263,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
                 previousKeyWindow = nil
                 window = nil
                 hostingController = nil
+                cascadedScenePhase = nil
                 presentedRouteID = nil
             }
 
@@ -228,7 +275,11 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
 
             if presentsPendingRoute, let pendingPresentation {
                 self.pendingPresentation = nil
-                present(pendingPresentation, priority: pendingPresentation.route.declaration.priority)
+                present(
+                    pendingPresentation,
+                    priority: pendingPresentation.route.declaration.priority,
+                    sourceScenePhase: latestSourceScenePhase ?? pendingPresentation.route.sourceEnvironment.scenePhase
+                )
             }
         }
 
@@ -278,6 +329,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
     init(
         priority _: RoutePriority,
         route: Binding<RoutePresentation?>,
+        sourceScenePhase _: ScenePhase,
         windowDestinationBuilder _: WindowDestinationBuilder,
         @ViewBuilder content: @escaping (
             RouteDestinationSnapshot,
