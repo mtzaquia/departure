@@ -138,15 +138,17 @@ extension Router {
     }
 
     func setElevatedContext(_ context: RouteContext?, for priority: RoutePriority) {
-        switch priority {
-        case .normal:
-            return
+        mutateRouteGraph {
+            switch priority {
+            case .normal:
+                return
 
-        case .high:
-            highContext = context
+            case .high:
+                highContext = context
 
-        case .critical:
-            criticalContext = context
+            case .critical:
+                criticalContext = context
+            }
         }
     }
 
@@ -175,8 +177,10 @@ extension Router {
     }
 
     func clearElevatedContexts() {
-        highContext = nil
-        criticalContext = nil
+        mutateRouteGraph {
+            highContext = nil
+            criticalContext = nil
+        }
     }
 
     var normalContext: RouteContext {

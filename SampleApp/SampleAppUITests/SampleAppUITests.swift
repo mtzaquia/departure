@@ -219,12 +219,20 @@ final class SampleAppUITests: XCTestCase {
         openLanding()
 
         assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 0")
+        assertLabel(A11y.homeRoutePhase, contains: "Home route phase: active")
+
+        tapSettingsTab()
+        tapHomeTab()
+        assertLabel(A11y.homeRoutePhase, contains: "Home route phase: active")
+
         let behindCoordinate = app.buttons[A11y.homePassthroughBehindButton]
             .firstMatch
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
 
         tap(A11y.homePresentHighPriorityPassthroughSheetButton)
         assertExists(A11y.highPriorityPassthroughSheetText)
+        assertLabel(A11y.highPriorityPassthroughSheetRoutePhase, contains: "Route phase: active")
+        assertLabel(A11y.homeRoutePhase, contains: "Home route phase: inactive")
 
         behindCoordinate.tap()
         assertExists(A11y.highPriorityPassthroughSheetText)
@@ -464,6 +472,7 @@ private enum A11y {
     static let homePresentHighPriorityPassthroughSheetButton = "sample.home.present-high-priority-passthrough-sheet"
     static let homePassthroughBehindButton = "sample.home.passthrough-behind"
     static let homePassthroughTapCount = "sample.home.passthrough-tap-count"
+    static let homeRoutePhase = "sample.home.route-phase"
     static let homeEmojiValue = "sample.home.emoji-value"
     static let homeUnwindPayloadStatus = "sample.home.unwind-payload-status"
     static let homeDismissProbeHookStatus = "sample.home.dismiss-probe-hook-status"
@@ -506,6 +515,7 @@ private enum A11y {
     static let topLevelReplacementCoverText = "sample.top-level-replacement-cover.text"
     static let topLevelReplacementCoverDismissButton = "sample.top-level-replacement-cover.dismiss"
     static let highPriorityPassthroughSheetText = "sample.high-priority-passthrough-sheet.text"
+    static let highPriorityPassthroughSheetRoutePhase = "sample.high-priority-passthrough-sheet.route-phase"
     static let highPriorityPassthroughSheetDismissButton = "sample.high-priority-passthrough-sheet.dismiss"
 
     static let messageText = "sample.message.text"

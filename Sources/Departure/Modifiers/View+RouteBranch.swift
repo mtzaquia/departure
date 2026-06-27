@@ -59,7 +59,7 @@ private struct RouteBranchModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .environment(\.routeScope, branchScope)
+            .routeScopeEnvironment(branchScope, router: router)
             .onLifecycleEvent { event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
@@ -78,7 +78,7 @@ private struct RouteBranchModifier: ViewModifier {
             .background {
                 Color.black.frame(width: .zero, height: .zero)
                     .routePresentationStyleModifiers(for: adoptedDeclarations)
-                    .environment(\.routeScope, branchScope)
+                    .routeScopeEnvironment(branchScope, router: router)
             }
     }
 
@@ -87,16 +87,20 @@ private struct RouteBranchModifier: ViewModifier {
             return
         }
 
-        parentScope.registerBranchScope(
-            branchScope,
-            for: branch,
-            sourceEnvironment: sourceEnvironment
-        )
+        router.mutateRouteGraph {
+            parentScope.registerBranchScope(
+                branchScope,
+                for: branch,
+                sourceEnvironment: sourceEnvironment
+            )
+        }
         router.resumePendingRoute(for: branch, in: parentScope)
     }
 
     private func unregisterBranchScope() {
-        parentScope?.unregisterBranchScope(branchScope, for: branch)
+        router.mutateRouteGraph {
+            parentScope?.unregisterBranchScope(branchScope, for: branch)
+        }
     }
 
     private var adoptedDeclarations: [RouteScopeDeclaration] {

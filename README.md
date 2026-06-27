@@ -303,6 +303,24 @@ struct ToolbarView: View {
 
 Actions do not crawl for work execution; they run in the active route scope, or unconditionally when there are no interceptors.
 
+### Route phase
+
+Read `routePhase` from the environment when a view needs to know whether its route scope is active.
+
+```swift
+struct EditorToolbar: View {
+  @Environment(\.routePhase) private var routePhase
+
+  var body: some View {
+    SaveButton()
+      .disabled(routePhase != .active)
+  }
+}
+```
+
+The value is local to the current route scope. It updates for root content, route destinations, and
+branch roots, including destinations presented in elevated-priority windows.
+
 ### `.unwind(...)`
 
 Unwind is the counterpart to presentation: it allows scopes to dismiss themselves or return to a known route scope.

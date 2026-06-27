@@ -25,6 +25,7 @@ import SwiftUI
 
 struct HomeView: View {
     @Environment(Router.self) private var router
+    @Environment(\.routePhase) private var routePhase
     @State private var storage = Storage.shared
     @State private var passthroughTapCount = 0
 
@@ -63,6 +64,9 @@ struct HomeView: View {
 
             Text("Behind sheet taps: \(passthroughTapCount)")
                 .accessibilityIdentifier(SampleAppAccessibility.homePassthroughTapCount)
+
+            Text("Home route phase: \(routePhaseLabel)")
+                .accessibilityIdentifier(SampleAppAccessibility.homeRoutePhase)
 
             Section {
                 LabeledContent {
@@ -117,6 +121,16 @@ struct HomeView: View {
 
                 Storage.shared.homeUnwindPayloads.append(payload)
             }
+        }
+    }
+
+    private var routePhaseLabel: String {
+        switch routePhase {
+        case .active:
+            return "active"
+
+        case .inactive:
+            return "inactive"
         }
     }
 }

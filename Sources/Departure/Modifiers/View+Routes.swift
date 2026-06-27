@@ -125,13 +125,15 @@ private struct RoutesModifier: ViewModifier {
     }
 
     private func installScopeDeclarations() {
-        routeScope?.installRouteDeclarations(
-            sourceID: sourceID,
-            id: explicitScopeID,
-            branchSelection: selection,
-            routeDeclarations: declarations,
-            sourceEnvironment: sourceEnvironment
-        )
+        router.mutateRouteGraph {
+            routeScope?.installRouteDeclarations(
+                sourceID: sourceID,
+                id: explicitScopeID,
+                branchSelection: selection,
+                routeDeclarations: declarations,
+                sourceEnvironment: sourceEnvironment
+            )
+        }
 
         guard let routeScope, let parentScope = routeScope.parent else {
             return
@@ -141,7 +143,9 @@ private struct RoutesModifier: ViewModifier {
     }
 
     private func uninstallScopeDeclarations() {
-        routeScope?.uninstallRouteDeclarations(sourceID: sourceID)
+        router.mutateRouteGraph {
+            routeScope?.uninstallRouteDeclarations(sourceID: sourceID)
+        }
     }
 
     private var accumulatedBranchRouteDeclarations: [RouteScopeDeclaration] {

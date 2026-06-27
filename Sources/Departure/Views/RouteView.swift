@@ -35,7 +35,7 @@ public struct RouteView: View {
 
     public var body: some View {
         content
-            .environment(\.routeScope, scope)
+            .routeScopeEnvironment(scope, router: router)
             .environment(\.routing, RoutingAction(router: router))
             .onLifecycleEvent { event in
                 switch event {
