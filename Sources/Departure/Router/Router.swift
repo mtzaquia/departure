@@ -78,6 +78,11 @@ public final class Router: Identifiable, Equatable {
     @ObservationIgnored
     var deliveredUnwindHandlerKeys: Set<UnwindHandlerDeliveryKey> = []
 
+    @ObservationIgnored
+    var routeGraphMutationDepth = 0
+
+    var activeRouteScopeID: ObjectIdentifier
+
     var currentRouteScope: RouteScope {
         currentRoutePath.last?.activeLocalScope ?? activeContext.path.owner?.activeLocalScope ?? root.activeLocalScope
     }
@@ -87,6 +92,7 @@ public final class Router: Identifiable, Equatable {
         let root = RouteScope(id: UUID(), route: nil)
         self.root = root
         self.rootPath = RoutePath(owner: root)
+        self.activeRouteScopeID = ObjectIdentifier(root)
     }
 
     /// Requests a route presentation.
@@ -130,5 +136,24 @@ public final class Router: Identifiable, Equatable {
 
     public static func == (lhs: Router, rhs: Router) -> Bool {
         lhs.id == rhs.id
+    }
+}
+
+extension Router {
+    func mutateRouteGraph(_ mutation: () -> Void) {
+        routeGraphMutationDepth += 1
+        mutation()
+        routeGraphMutationDepth -= 1
+
+        if routeGraphMutationDepth == 0 {
+            reconcileActiveRouteScopeID()
+        }
+    }
+
+    private func reconcileActiveRouteScopeID() {
+        let routeScopeID = ObjectIdentifier(currentRouteScope)
+        if activeRouteScopeID != routeScopeID {
+            activeRouteScopeID = routeScopeID
+        }
     }
 }

@@ -75,6 +75,68 @@ struct RouterTests {
         #expect(await actionRecorder.values() == [true])
     }
 
+    @Test func routePhaseTracksCurrentRouteScope() {
+        let router = Router()
+        let routeScope = RouteScope(id: RootRoute().id, route: RootRoute())
+
+        #expect(router.routePhase(for: router.root) == .active)
+        #expect(router.routePhase(for: routeScope) == .inactive)
+
+        router.mutateRouteGraph {
+            router.rootPath.scopes = [routeScope]
+        }
+
+        #expect(router.routePhase(for: router.root) == .inactive)
+        #expect(router.routePhase(for: routeScope) == .active)
+    }
+
+    @Test func routePhaseTreatsActiveBranchRootAsCurrentScope() {
+        let router = Router()
+        let containerScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+
+        router.mutateRouteGraph {
+            router.rootPath.scopes = [containerScope]
+            containerScope.setActiveBranch(AnyHashable(AppTab.home))
+            containerScope.registerBranchScope(homeScope, for: AppTab.home)
+            containerScope.registerBranchScope(walletScope, for: AppTab.wallet)
+        }
+
+        #expect(router.routePhase(for: containerScope) == .inactive)
+        #expect(router.routePhase(for: homeScope) == .active)
+        #expect(router.routePhase(for: walletScope) == .inactive)
+
+        let detailScope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute())
+        router.mutateRouteGraph {
+            homeScope.path.scopes = [detailScope]
+        }
+
+        #expect(router.routePhase(for: homeScope) == .inactive)
+        #expect(router.routePhase(for: detailScope) == .active)
+    }
+
+    @Test func routePhaseTracksActiveBranchChanges() {
+        let router = Router()
+        let containerScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+
+        router.mutateRouteGraph {
+            router.rootPath.scopes = [containerScope]
+            containerScope.setActiveBranch(AnyHashable(AppTab.home))
+            containerScope.registerBranchScope(homeScope, for: AppTab.home)
+            containerScope.registerBranchScope(walletScope, for: AppTab.wallet)
+        }
+
+        router.mutateRouteGraph {
+            containerScope.setActiveBranch(AnyHashable(AppTab.wallet))
+        }
+
+        #expect(router.routePhase(for: homeScope) == .inactive)
+        #expect(router.routePhase(for: walletScope) == .active)
+    }
+
     @Test func publicUnwindReportsMissingTargetBeforeContinuation() async {
         let router = Router()
         router.root.installRouteDeclarations(

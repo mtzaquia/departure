@@ -22,6 +22,38 @@
 
 import SwiftUI
 
+/// The current routing phase for a view's local route scope.
+public enum RoutePhase: Equatable, Sendable {
+    /// This view's route scope is the router's current route scope.
+    case active
+
+    /// This view's route scope is installed, but another route scope is current.
+    case inactive
+}
+
 extension EnvironmentValues {
     @Entry var routeScope: RouteScope?
+}
+
+public extension EnvironmentValues {
+    /// The current routing phase for this view's local route scope.
+    ///
+    /// This value is local to the view hierarchy it is read from. The current route destination,
+    /// branch root, or root content reads ``RoutePhase/active``; installed scopes behind another
+    /// route read ``RoutePhase/inactive``.
+    @Entry var routePhase = RoutePhase.inactive
+}
+
+extension View {
+    func routeScopeEnvironment(_ routeScope: RouteScope, router: Router) -> some View {
+        self
+            .environment(\.routeScope, routeScope)
+            .environment(\.routePhase, router.routePhase(for: routeScope))
+    }
+}
+
+extension Router {
+    func routePhase(for routeScope: RouteScope) -> RoutePhase {
+        activeRouteScopeID == ObjectIdentifier(routeScope) ? .active : .inactive
+    }
 }

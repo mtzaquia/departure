@@ -194,12 +194,16 @@ struct TopLevelReplacementCoverView: View {
 
 struct HighPriorityPassthroughSheetView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.routePhase) private var routePhase
 
     var body: some View {
         VStack(spacing: 16) {
             Text("High-priority passthrough sheet")
                 .font(.headline)
                 .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetText)
+
+            Text("Route phase: \(routePhaseLabel)")
+                .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetRoutePhase)
 
             Button("Dismiss") {
                 dismiss()
@@ -212,6 +216,16 @@ struct HighPriorityPassthroughSheetView: View {
         .presentationDetents([.height(220)])
         .presentationBackgroundInteraction(.enabled(upThrough: .height(220)))
         .samplePresentationSizing()
+    }
+
+    private var routePhaseLabel: String {
+        switch routePhase {
+        case .active:
+            return "active"
+
+        case .inactive:
+            return "inactive"
+        }
     }
 }
 

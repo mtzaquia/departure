@@ -36,7 +36,7 @@ public struct WithRouter<Content: View>: View {
 
     public var body: some View {
         content
-            .environment(\.routeScope, router.root)
+            .routeScopeEnvironment(router.root, router: router)
             .environment(\.routing, RoutingAction(router: router))
             .background {
                 ElevatedPrioritySheetHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)

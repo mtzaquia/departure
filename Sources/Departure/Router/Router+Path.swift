@@ -464,7 +464,10 @@ extension Router {
         }
 
         let previousBranch = scope.activeBranch
-        let didActivate = scope.setActiveBranch(branchID)
+        var didActivate = false
+        mutateRouteGraph {
+            didActivate = scope.setActiveBranch(branchID)
+        }
 
         if didActivate {
             log.departureDebug(.branchActivated(from: previousBranch, to: branchID, scope: scope))
@@ -538,56 +541,63 @@ extension Router {
             ? match.path.scope(at: match.pathIndex)
             : match.path.owner
 
-        if case .startElevatedContext(let priority) = behavior {
-            trimExistingElevatedContextForReplacement(priority)
-            guard let hostScope else {
-                return
-            }
-
-            let context: RouteContext = switch priority {
-            case .normal:
-                .normal(path: match.path)
-
-            case .high:
-                .high(
-                    path: match.path,
-                    startIndex: match.path.endIndex,
-                    presentationScope: hostScope
-                )
-
-            case .critical:
-                .critical(
-                    path: match.path,
-                    startIndex: match.path.endIndex,
-                    presentationScope: hostScope
-                )
-            }
-            setElevatedContext(context, for: priority)
-            log.departureDebug(.elevatedContextStarted(pathIndex: match.path.endIndex))
+        if behavior.startsElevatedContext, hostScope == nil {
+            return
         }
 
-        let appendedScope = RouteScope(id: route.id, route: route)
-        appendedScope.hostScope = hostScope
-        // `match.declaration` may be the discovery copy (drivesPresentation == false). The host
-        // presents using its own adopted/local copy that actually drives presentation, so resolve
-        // that from the host's attachments.
-        appendedScope.hostDeclaration = hostScope?.routeAttachments.first(where: {
-            $0.routeType == match.declaration.routeType
-            && $0.presentationKind == match.declaration.presentationKind
-            && $0.drivesPresentation
-        }) ?? match.declaration
-        // Place the route in its host's structural slot. Assigning `modalChild` replaces any prior
-        // modal (the old one is trimmed from the path before we get here), so a host can never hold
-        // two modals at once. An elevated root is presented by a separate elevated-priority
-        // binding, so it must not replace the normal context's host slot underneath it.
-        if behavior.startsElevatedContext == false {
-            if match.declaration.presentationKind == .push {
-                hostScope?.pushChild = appendedScope
-            } else {
-                hostScope?.modalChild = appendedScope
+        mutateRouteGraph {
+            if case .startElevatedContext(let priority) = behavior {
+                trimExistingElevatedContextForReplacement(priority)
+                guard let presentationScope = hostScope else {
+                    return
+                }
+
+                let context: RouteContext = switch priority {
+                case .normal:
+                    .normal(path: match.path)
+
+                case .high:
+                    .high(
+                        path: match.path,
+                        startIndex: match.path.endIndex,
+                        presentationScope: presentationScope
+                    )
+
+                case .critical:
+                    .critical(
+                        path: match.path,
+                        startIndex: match.path.endIndex,
+                        presentationScope: presentationScope
+                    )
+                }
+                setElevatedContext(context, for: priority)
+                log.departureDebug(.elevatedContextStarted(pathIndex: match.path.endIndex))
             }
+
+            let appendedScope = RouteScope(id: route.id, route: route)
+            appendedScope.hostScope = hostScope
+            // `match.declaration` may be the discovery copy (drivesPresentation == false). The host
+            // presents using its own adopted/local copy that actually drives presentation, so resolve
+            // that from the host's attachments.
+            appendedScope.hostDeclaration = hostScope?.routeAttachments.first(where: {
+                $0.routeType == match.declaration.routeType
+                && $0.presentationKind == match.declaration.presentationKind
+                && $0.drivesPresentation
+            }) ?? match.declaration
+            // Place the route in its host's structural slot. Assigning `modalChild` replaces any
+            // prior modal (the old one is trimmed from the path before we get here), so a host can
+            // never hold two modals at once. An elevated root is presented by a separate
+            // elevated-priority binding, so it must not replace the normal context's host slot
+            // underneath it.
+            if behavior.startsElevatedContext == false {
+                if match.declaration.presentationKind == .push {
+                    hostScope?.pushChild = appendedScope
+                } else {
+                    hostScope?.modalChild = appendedScope
+                }
+            }
+            match.path.append(appendedScope)
         }
-        match.path.append(appendedScope)
         log.departureDebug(.routeAppended(route: route, pathCount: match.path.count))
     }
 
@@ -685,9 +695,37 @@ extension Router {
     }
 
     func keepPathThrough(_ pathIndex: [RouteScope].Index?, in routePath: RoutePath) {
-        // Scopes leaving the path must release their host's structural slots, otherwise a dismissed
-        // modal/push would still be reachable through `modalChild`/`pushChild`.
-        for removed in routePath.scopesRemovedByKeepingThrough(pathIndex) {
+        guard let pathIndex else {
+            let removedCount = routePath.count
+            mutateRouteGraph {
+                releaseHostSlots(for: routePath.scopesRemovedByKeepingThrough(nil))
+                routePath.keepThrough(nil)
+                removeElevatedContextsIfNeeded(in: routePath)
+            }
+            log.departureDebug(.pathCleared(removedCount: removedCount))
+            return
+        }
+
+        let removalStartIndex = routePath.scopes.index(after: pathIndex)
+        guard removalStartIndex < routePath.endIndex else {
+            mutateRouteGraph {
+                removeElevatedContextsIfNeeded(in: routePath)
+            }
+            log.departureDebug(.pathUnchanged(keepThrough: pathIndex))
+            return
+        }
+
+        let removedCount = routePath.scopes.distance(from: removalStartIndex, to: routePath.endIndex)
+        mutateRouteGraph {
+            releaseHostSlots(for: routePath.scopesRemovedByKeepingThrough(pathIndex))
+            routePath.keepThrough(pathIndex)
+            removeElevatedContextsIfNeeded(in: routePath)
+        }
+        log.departureDebug(.pathTrimmed(keepThrough: pathIndex, removedCount: removedCount))
+    }
+
+    func releaseHostSlots(for routeScopes: [RouteScope]) {
+        for removed in routeScopes {
             if removed.hostScope?.pushChild === removed {
                 removed.hostScope?.pushChild = nil
             }
@@ -695,26 +733,6 @@ extension Router {
                 removed.hostScope?.modalChild = nil
             }
         }
-
-        guard let pathIndex else {
-            let removedCount = routePath.count
-            routePath.keepThrough(nil)
-            removeElevatedContextsIfNeeded(in: routePath)
-            log.departureDebug(.pathCleared(removedCount: removedCount))
-            return
-        }
-
-        let removalStartIndex = routePath.scopes.index(after: pathIndex)
-        guard removalStartIndex < routePath.endIndex else {
-            removeElevatedContextsIfNeeded(in: routePath)
-            log.departureDebug(.pathUnchanged(keepThrough: pathIndex))
-            return
-        }
-
-        let removedCount = routePath.scopes.distance(from: removalStartIndex, to: routePath.endIndex)
-        routePath.keepThrough(pathIndex)
-        removeElevatedContextsIfNeeded(in: routePath)
-        log.departureDebug(.pathTrimmed(keepThrough: pathIndex, removedCount: removedCount))
     }
 
     func preservesCurrentPath(for match: DeclarationMatch) -> Bool {
@@ -840,9 +858,11 @@ extension Router {
     func routeScopeDidLeaveView(_ routeScope: RouteScope) {
         guard routeScope.isInstalledInView else { return }
 
-        routeScope.uninstallFromView()
+        mutateRouteGraph {
+            routeScope.uninstallFromView()
+            clearElevatedContextIfNeeded(forRemovedViewScope: routeScope)
+        }
         log.departureDebug(.scopeUninstalledFromView(scope: routeScope))
-        clearElevatedContextIfNeeded(forRemovedViewScope: routeScope)
     }
 
     func clearElevatedContextIfNeeded(forRemovedViewScope routeScope: RouteScope) {
