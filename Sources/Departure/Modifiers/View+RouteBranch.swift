@@ -78,7 +78,7 @@ private struct RouteBranchModifier: ViewModifier {
             .background {
                 Color.black.frame(width: .zero, height: .zero)
                     .routePresentationStyleModifiers(for: adoptedDeclarations)
-                    .routeScopeEnvironment(branchScope, router: router)
+                    .routeScopeEnvironment(branchScope)
             }
     }
 

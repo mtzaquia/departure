@@ -45,6 +45,10 @@ public extension EnvironmentValues {
 }
 
 extension View {
+    func routeScopeEnvironment(_ routeScope: RouteScope) -> some View {
+        environment(\.routeScope, routeScope)
+    }
+
     func routeScopeEnvironment(_ routeScope: RouteScope, router: Router) -> some View {
         self
             .environment(\.routeScope, routeScope)
@@ -54,6 +58,6 @@ extension View {
 
 extension Router {
     func routePhase(for routeScope: RouteScope) -> RoutePhase {
-        activeRouteScopeID == ObjectIdentifier(routeScope) ? .active : .inactive
+        activeRouteScopeIDs.contains(ObjectIdentifier(routeScope)) ? .active : .inactive
     }
 }

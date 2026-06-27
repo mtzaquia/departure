@@ -60,7 +60,7 @@ extension Router {
         matching presentationKind: RoutePresentationKind
     ) -> Binding<RoutePresentation?> {
         let routeScope = routeScope ?? root
-        let routePath = routePath(containing: routeScope) ?? rootPath
+        let routePath = routeForest.routePath(containing: routeScope) ?? normalTree.rootPath
         _ = routePath.scopes
         if routeScope !== root {
             _ = routeScope.path.scopes
@@ -90,7 +90,7 @@ extension Router {
         from routeScope: RouteScope,
         matching presentationKind: RoutePresentationKind
     ) -> RoutePresentation? {
-        let routePath = routePath(containing: routeScope) ?? rootPath
+        let routePath = routeForest.routePath(containing: routeScope) ?? normalTree.rootPath
 
         // Live read: return the host's structural slot directly.
         if let presentation = hostedPresentation(
@@ -132,7 +132,7 @@ extension Router {
         priority: RoutePriority,
         matching presentationKind: RoutePresentationKind
     ) -> Binding<RoutePresentation?> {
-        _ = elevatedContext(for: priority)?.path.scopes
+        _ = routeForest.tree(for: priority)?.rootPath.scopes
 
         return Binding(
             get: {
@@ -176,12 +176,12 @@ private extension Router {
         }
 
         // The elevated-priority gate keys off the host's position relative to an equal-or-higher
-        // context. The path owner maps to `nil`, i.e. before the elevated context begins.
-        let hostIndex = routePath.scopes.firstIndex { $0 === host }
+        // tree. The path owner is before the elevated tree begins.
+        let hostPosition = routePath.position(of: host) ?? .owner
         guard
             shouldHostLocally(
                 declaration,
-                from: hostIndex,
+                from: hostPosition,
                 in: routePath
             )
         else {
@@ -225,8 +225,7 @@ private extension Router {
             return nil
         }
 
-        let hostIndex = path.scopes.firstIndex { $0 === host }
-        let originalHostIndex = path.originalPathIndex(forPreservedPathIndex: hostIndex)
+        let hostPosition = RoutePath.Position.scope(host)
 
         for presentedScope in path.scopes {
             guard
@@ -236,7 +235,7 @@ private extension Router {
                 declaration.drivesPresentation,
                 shouldHostLocally(
                     declaration,
-                    from: originalHostIndex,
+                    from: hostPosition,
                     in: path.routePath,
                     snapshot: snapshot
                 )
@@ -262,55 +261,52 @@ private extension Router {
             return
         }
 
-        let routePath = routePath(containing: presentation.scope) ?? rootPath
+        let routePath = routeForest.routePath(containing: presentation.scope) ?? normalTree.rootPath
 
-        guard let presentedPathIndex = routePath.scopes.firstIndex(where: { $0 === presentation.scope }) else {
-            let targetPathIndex = routePath.index(of: routeScope)
-            let removedScopes = routePath.scopesRemovedByKeepingThrough(targetPathIndex)
-            let targetScope = routePath.scope(at: targetPathIndex)
+        guard let targetPosition = routePath.positionBefore(presentation.scope) else {
+            let fallbackPosition = routePath.position(of: routeScope) ?? .owner
+            let removedScopes = routePath.scopesRemovedAfter(fallbackPosition)
+            let targetScope = routePath.scope(at: fallbackPosition)
             performPresentationDismissalUnwind(
                 for: presentation.scope,
                 in: targetScope,
                 removing: removedScopes
             ) {
-                keepPathThrough(targetPathIndex, in: routePath)
+                keepPathThrough(fallbackPosition, in: routePath)
             }
             return
         }
 
-        let targetPathIndex = presentedPathIndex == routePath.scopes.startIndex
-            ? nil
-            : routePath.scopes.index(before: presentedPathIndex)
-        let removedScopes = routePath.scopesRemovedByKeepingThrough(targetPathIndex)
-        let targetScope = routePath.scope(at: targetPathIndex)
+        let removedScopes = routePath.scopesRemovedAfter(targetPosition)
+        let targetScope = routePath.scope(at: targetPosition)
         performPresentationDismissalUnwind(
             for: presentation.scope,
             in: targetScope,
             removing: removedScopes
         ) {
-            keepPathThrough(targetPathIndex, in: routePath)
+            keepPathThrough(targetPosition, in: routePath)
         }
     }
 
     func shouldHostLocally(
         _ declaration: AnyRouteDeclaration,
-        from pathIndex: [RouteScope].Index?,
+        from position: RoutePath.Position,
         in routePath: RoutePath
     ) -> Bool {
         guard declaration.priority != .normal else {
             return true
         }
 
-        return elevatedContext(
+        return routeForest.elevatedTree(
             containingPath: routePath,
-            pathIndex: pathIndex,
+            position: position,
             minimumPriority: declaration.priority
         ) != nil
     }
 
     func shouldHostLocally(
         _ declaration: AnyRouteDeclaration,
-        from pathIndex: [RouteScope].Index?,
+        from position: RoutePath.Position,
         in routePath: RoutePath,
         snapshot: UnwindPresentationSnapshot
     ) -> Bool {
@@ -318,9 +314,9 @@ private extension Router {
             return true
         }
 
-        return snapshot.elevatedContext(
+        return snapshot.routeForest.elevatedTree(
             containingPath: routePath,
-            pathIndex: pathIndex,
+            position: position,
             minimumPriority: declaration.priority
         ) != nil
     }
@@ -330,23 +326,19 @@ private extension Router {
         matching presentationKind: RoutePresentationKind
     ) -> RoutePresentation? {
         guard
-            let context = elevatedContext(for: priority),
-            let routeScope = context.elevatedRouteScope,
-            let route = routeScope.route,
-            let presentationScope = context.elevatedPresentationScope,
-            let attachment = presentationScope.elevatedRouteAttachment(
-                priority: priority,
-                for: type(of: route),
-                matching: presentationKind
-            )
+            let tree = routeForest.tree(for: priority),
+            let routeScope = tree.elevatedRouteScope,
+            let anchor = tree.anchor,
+            anchor.declaration.presentationKind == presentationKind,
+            anchor.declaration.drivesPresentation
         else {
             return nil
         }
 
         return RoutePresentation(
             scope: routeScope,
-            declaration: attachment.declaration,
-            sourceEnvironment: attachment.routeScope.sourceEnvironment
+            declaration: anchor.declaration,
+            sourceEnvironment: anchor.routeScope?.sourceEnvironment ?? EnvironmentValues()
         )
     }
 
@@ -358,50 +350,22 @@ private extension Router {
             return
         }
 
-        guard let context = elevatedContext(for: priority) else {
+        guard let tree = routeForest.tree(for: priority) else {
             return
         }
 
-        let targetPathIndex = context.elevatedBasePathIndex
-        let removedScopes = context.path.scopesRemovedByKeepingThrough(targetPathIndex)
-        let targetScope = context.path.scope(at: targetPathIndex)
+        let removedScopes = tree.rootPath.scopesRemovedAfter(.owner)
+        let targetScope = tree.anchor?.routeScope
         performPresentationDismissalUnwind(
             for: presentation.scope,
             in: targetScope,
             removing: removedScopes
         ) {
-            keepPathThrough(targetPathIndex, in: context.path)
+            keepPathThrough(.owner, in: tree.rootPath)
+            mutateRouteGraph {
+                routeForest.setElevatedTree(nil, for: priority)
+            }
         }
     }
 
-}
-
-private extension RouteScope {
-    func elevatedRouteAttachment(
-        priority: RoutePriority,
-        for routeType: any Route.Type,
-        matching presentationKind: RoutePresentationKind
-    ) -> (routeScope: RouteScope, declaration: AnyRouteDeclaration)? {
-        let activeLocalScope = activeLocalScope
-
-        if let declaration = activeLocalScope.routeAttachments.first(where: {
-            $0.routeType == routeType
-            && $0.presentationKind == presentationKind
-            && $0.priority == priority
-            && $0.drivesPresentation
-        }) {
-            return (activeLocalScope, declaration)
-        }
-
-        guard activeLocalScope !== self else {
-            return nil
-        }
-
-        return routeAttachments.first(where: {
-            $0.routeType == routeType
-            && $0.presentationKind == presentationKind
-            && $0.priority == priority
-            && $0.drivesPresentation
-        }).map { (self, $0) }
-    }
 }

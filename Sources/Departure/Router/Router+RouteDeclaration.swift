@@ -49,34 +49,37 @@ extension Router {
         }
 
         let resolvedRouteType = type(of: resolvedRoute)
-        guard let matchedDeclaration = firstDeclaration(including: resolvedRouteType) else {
+        guard let matchedDeclaration = routeForest.firstDeclaration(including: resolvedRouteType) else {
             log.departureDebug(.routeDroppedNoDeclaration(routeType: resolvedRouteType))
             return // Cannot find matching route, dropped.
         }
 
         log.departureDebug(.routeMatched(
             route: resolvedRoute,
-            match: matchedDeclaration,
-            elevatedContextStart: highestElevatedContext?.elevatedStartIndex
+            match: matchedDeclaration
         ))
 
         switch routeRequestDecision(for: matchedDeclaration) {
         case .drop:
-            log.departureDebug(.routeBlockedByElevatedContext(route: resolvedRoute))
-            return // Lower-priority route attached before an existing elevated context is dropped.
+            log.departureDebug(.routeBlockedByElevatedTree(route: resolvedRoute))
+            return // Lower-priority route attached before an existing elevated tree is dropped.
 
         case .append:
             log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
             await appendRoute(resolvedRoute, after: matchedDeclaration)
             return
 
-        case .replaceElevatedContext(let priority):
+        case .replaceElevatedTree(let priority):
+            if await unwindToExistingEquivalentRouteInPriorityTreeIfNeeded(resolvedRoute, priority: priority) {
+                return
+            }
+
             if await unwindToExistingEquivalentRouteIfNeeded(resolvedRoute, after: matchedDeclaration) {
                 return
             }
 
             log.departureDebug(.routeAcceptedReplaceHighPriority(route: resolvedRoute))
-            replaceElevatedContext(priority, with: resolvedRoute, after: matchedDeclaration)
+            replaceElevatedTree(priority, with: resolvedRoute, after: matchedDeclaration)
             return
         }
     }
@@ -85,117 +88,34 @@ extension Router {
 extension Router {
     enum RouteRequestDecision {
         case append
-        case replaceElevatedContext(RoutePriority)
+        case replaceElevatedTree(RoutePriority)
         case drop
     }
 
     struct DeclarationMatch {
         var path: RoutePath
-        var pathIndex: [RouteScope].Index?
+        var position: RoutePath.Position
+        var tree: RouteTree
         var declaringPath: RoutePath
-        var declaringPathIndex: [RouteScope].Index?
+        var declaringPosition: RoutePath.Position
         var branchID: AnyHashable?
         var declaration: AnyRouteDeclaration
     }
 
     func routeRequestDecision(for match: DeclarationMatch) -> RouteRequestDecision {
-        if let containingContext = elevatedContext(containing: match),
-           containingContext.priority >= match.declaration.priority {
+        if match.tree === routeForest.activeTree, match.tree.priority >= match.declaration.priority {
             return .append
         }
 
         guard match.declaration.priority != .normal else {
-            return highestElevatedContext == nil ? .append : .drop
+            return routeForest.activeTree.priority == .normal ? .append : .drop
         }
 
-        if let highestElevatedContext,
-           highestElevatedContext.priority > match.declaration.priority {
+        if routeForest.activeTree.priority > match.declaration.priority {
             return .drop
         }
 
-        return .replaceElevatedContext(match.declaration.priority)
-    }
-
-    func firstDeclaration(including routeType: any Route.Type) -> DeclarationMatch? {
-        if let match = firstDeclaration(in: currentRoutePath, including: routeType) {
-            return match
-        }
-
-        if currentRoutePath !== rootPath,
-           let match = firstDeclaration(in: rootPath, including: routeType) {
-            return match
-        }
-
-        if let match = root.firstBranchScopeRouteAttachment(
-            for: routeType,
-            in: root.activeBranch
-        ) {
-            let routePath = routePath(for: match, under: root, fallbackPath: rootPath, fallbackPathIndex: nil)
-            return DeclarationMatch(
-                routePath: routePath,
-                declaringPath: rootPath,
-                declaringPathIndex: nil,
-                attachment: match
-            )
-        }
-
-        if let match = root.firstRouteAttachment(for: routeType) {
-            let routePath = routePath(for: match, under: root, fallbackPath: rootPath, fallbackPathIndex: nil)
-            return DeclarationMatch(
-                routePath: routePath,
-                declaringPath: rootPath,
-                declaringPathIndex: nil,
-                attachment: match
-            )
-        }
-
-        return nil
-    }
-
-    func firstDeclaration(in searchPath: RoutePath, including routeType: any Route.Type) -> DeclarationMatch? {
-        for index in searchPath.scopes.indices.reversed() {
-            if let match = searchPath.scopes[index].firstBranchScopeRouteAttachment(
-                for: routeType,
-                in: searchPath.scopes[index].activeBranch
-            ) {
-                let routePath = routePath(
-                    for: match,
-                    under: searchPath.scopes[index],
-                    fallbackPath: searchPath,
-                    fallbackPathIndex: index
-                )
-                return DeclarationMatch(
-                    routePath: routePath,
-                    declaringPath: searchPath,
-                    declaringPathIndex: index,
-                    attachment: match
-                )
-            }
-
-            if let match = searchPath.scopes[index].firstRouteAttachment(for: routeType) {
-                return DeclarationMatch(
-                    routePath: (path: searchPath, pathIndex: index),
-                    declaringPath: searchPath,
-                    declaringPathIndex: index,
-                    attachment: match
-                )
-            }
-        }
-
-        guard let owner = searchPath.owner, owner !== root else {
-            return nil
-        }
-
-        if let match = owner.firstRouteAttachment(for: routeType) {
-            return DeclarationMatch(
-                routePath: (path: searchPath, pathIndex: nil),
-                declaringPath: searchPath,
-                declaringPathIndex: nil,
-                attachment: match
-            )
-        }
-
-        return nil
+        return .replaceElevatedTree(match.declaration.priority)
     }
 
     /// The path owned by the branch nearest to the current position, or `nil` when the current
@@ -213,64 +133,36 @@ extension Router {
         return nil
     }
 
-    func routePath(
-        for match: RouteScope.RouteAttachmentMatch,
-        under routeScope: RouteScope,
-        fallbackPath: RoutePath,
-        fallbackPathIndex: [RouteScope].Index?
-    ) -> (path: RoutePath, pathIndex: [RouteScope].Index?) {
-        guard let branchID = match.branchID else {
-            return (path: fallbackPath, pathIndex: fallbackPathIndex)
-        }
-
-        return routePath(forBranch: branchID, under: routeScope, declaration: match.declaration)
-    }
-
-    func routePath(
-        forBranch branchID: AnyHashable,
-        under routeScope: RouteScope,
-        declaration: AnyRouteDeclaration
-    ) -> (path: RoutePath, pathIndex: [RouteScope].Index?) {
-        guard let branchScope = routeScope.branchScopes[branchID] else {
-            return (path: routePath(containing: routeScope) ?? rootPath, pathIndex: nil)
-        }
-
-        guard declaration.presentationKind != .push else {
-            return (path: branchScope.path, pathIndex: nil)
-        }
-
-        return (
-            path: branchScope.path,
-            pathIndex: branchScope.path.scopes.indices.last
-        )
-    }
 }
 
 extension Router.DeclarationMatch {
     init(
-        routePath: (path: RoutePath, pathIndex: [RouteScope].Index?),
+        routePath: (path: RoutePath, position: RoutePath.Position),
+        tree: RouteTree,
         declaringPath: RoutePath,
-        declaringPathIndex: [RouteScope].Index?,
+        declaringPosition: RoutePath.Position,
         attachment: RouteScope.RouteAttachmentMatch
     ) {
         self.init(
             path: routePath.path,
-            pathIndex: routePath.pathIndex,
+            position: routePath.position,
+            tree: tree,
             declaringPath: declaringPath,
-            declaringPathIndex: declaringPathIndex,
+            declaringPosition: declaringPosition,
             branchID: attachment.branchID,
             declaration: attachment.declaration
         )
     }
 
     func updatingPresentationPath(
-        _ routePath: (path: RoutePath, pathIndex: [RouteScope].Index?)
+        _ routePath: (path: RoutePath, position: RoutePath.Position)
     ) -> Self {
         .init(
             path: routePath.path,
-            pathIndex: routePath.pathIndex,
+            position: routePath.position,
+            tree: tree,
             declaringPath: declaringPath,
-            declaringPathIndex: declaringPathIndex,
+            declaringPosition: declaringPosition,
             branchID: branchID,
             declaration: declaration
         )
