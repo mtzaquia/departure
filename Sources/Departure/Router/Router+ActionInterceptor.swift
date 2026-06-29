@@ -45,7 +45,14 @@ extension Router {
             case let .reroute(route):
                 log.departureDebug(.actionRerouteRequested(action: action, route: route))
                 Task {
-                    await requestRoute(route)
+                    let sourceScope = currentRouteScope
+                    await requestRouteWhenReady(route)
+                    let targetScope = currentRouteScope
+
+                    if targetScope !== sourceScope || targetScope.isInstalledInView {
+                        await waitForRouteScopeToInstall(targetScope)
+                    }
+
                     await performAction(action, hasRerouted: true)
                 }
                 
@@ -60,6 +67,18 @@ extension Router {
 }
 
 private extension Router {
+    func waitForRouteScopeToInstall(_ routeScope: RouteScope) async {
+        guard routeScope.isInstalledInView == false else {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            routeScope.onInstallInView {
+                continuation.resume()
+            }
+        }
+    }
+
     func performAction<A: Action>(_ action: A, hasRerouted: Bool) async {
         if let interceptor = currentRouteScope.firstInterceptor(for: A.self) {
             log.departureDebug(.actionIntercepted(action: action, scope: currentRouteScope))

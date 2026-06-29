@@ -42,6 +42,7 @@ final class RouteScope: Identifiable {
     var branchScopes: [AnyHashable: RouteScope] = [:]
 
     let declarationInstallation: DeclarationInstallationState
+    private var installObservers: [@MainActor () -> Void] = []
     private var uninstallObservers: [@MainActor () -> Void] = []
 
     lazy var path = RoutePath(owner: self)
@@ -95,7 +96,14 @@ extension RouteScope {
 
 extension RouteScope {
     func installInView() {
+        guard isInstalledInView == false else {
+            return
+        }
+
         isInstalledInView = true
+
+        installObservers.forEach { $0() }
+        installObservers.removeAll()
     }
 
     func uninstallFromView() {
@@ -112,6 +120,15 @@ extension RouteScope {
         }
 
         uninstallObservers.append(observer)
+    }
+
+    func onInstallInView(_ observer: @escaping @MainActor () -> Void) {
+        guard isInstalledInView == false else {
+            observer()
+            return
+        }
+
+        installObservers.append(observer)
     }
 }
 
