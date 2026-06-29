@@ -31,9 +31,16 @@ final class PassThroughWindow: UIWindow {
             return view
         }
 
-        if let presentedView = rootViewController?.presentedViewController?.view,
+        if let rootViewController,
+           rootViewController.presentedViewController != nil,
            let view {
-            if view.isDescendant(of: presentedView) {
+            if rootViewController.presentedViewControllers.contains(where: { presentedViewController in
+                guard let presentedView = presentedViewController.view else {
+                    return false
+                }
+
+                return view === presentedView || view.isDescendant(of: presentedView)
+            }) {
                 return view
             }
 
@@ -45,6 +52,20 @@ final class PassThroughWindow: UIWindow {
         }
 
         return view
+    }
+}
+
+private extension UIViewController {
+    var presentedViewControllers: [UIViewController] {
+        var viewControllers: [UIViewController] = []
+        var current = presentedViewController
+
+        while let viewController = current {
+            viewControllers.append(viewController)
+            current = viewController.presentedViewController
+        }
+
+        return viewControllers
     }
 }
 #endif

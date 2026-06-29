@@ -27,6 +27,7 @@ struct LoginView: View {
     let nextRoute: (any Route)?
 
     @Environment(Router.self) private var router
+    @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
     @State private var presentationProbeCount = 0
@@ -41,6 +42,9 @@ struct LoginView: View {
                     .accessibilityIdentifier(SampleAppAccessibility.loginWindowEnvironmentValue)
 
                 if SampleAppUITesting.isEnabled {
+                    LabeledContent("SwiftUI isPresented", value: "\(isPresented)")
+                        .accessibilityIdentifier(SampleAppAccessibility.loginIsPresented)
+
                     Text("Login presentation probe: \(presentationProbeCount)")
                         .accessibilityIdentifier(SampleAppAccessibility.loginPresentationProbeCount)
 
@@ -130,6 +134,7 @@ struct LoginView: View {
 
 struct LoginReplacementView: View {
     @Environment(Router.self) private var router
+    @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
 
@@ -141,6 +146,11 @@ struct LoginReplacementView: View {
                     value: "\(sampleWindowBadge) / \(scenePhase.description)"
                 )
                     .accessibilityIdentifier(SampleAppAccessibility.replacementWindowEnvironmentValue)
+
+                if SampleAppUITesting.isEnabled {
+                    LabeledContent("SwiftUI isPresented", value: "\(isPresented)")
+                        .accessibilityIdentifier(SampleAppAccessibility.replacementIsPresented)
+                }
             }
 
             Text("This high-priority cover replaced the login high-priority cover.")
@@ -160,6 +170,7 @@ struct LoginReplacementView: View {
 
 struct CriticalView: View {
     @Environment(Router.self) private var router
+    @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
 
@@ -167,6 +178,7 @@ struct CriticalView: View {
         VStack(spacing: 16) {
             Text("Critical route")
                 .font(.headline)
+                .accessibilityLabel(presentationLabel("Critical route"))
                 .accessibilityIdentifier(SampleAppAccessibility.criticalText)
 
             LabeledContent("Window environment", value: sampleWindowBadge)
@@ -198,13 +210,25 @@ struct CriticalView: View {
     }
 }
 
+private extension CriticalView {
+    func presentationLabel(_ label: String) -> String {
+        guard SampleAppUITesting.isEnabled else {
+            return label
+        }
+
+        return label + " SwiftUI isPresented: " + String(isPresented)
+    }
+}
+
 struct CriticalReplacementView: View {
     @Environment(Router.self) private var router
+    @Environment(\.isPresented) private var isPresented
 
     var body: some View {
         VStack(spacing: 16) {
             Text("Critical replacement")
                 .font(.headline)
+                .accessibilityLabel(presentationLabel("Critical replacement"))
                 .accessibilityIdentifier(SampleAppAccessibility.criticalReplacementText)
 
             Button("Dismiss critical replacement") {
@@ -220,6 +244,16 @@ struct CriticalReplacementView: View {
             Color.red
         }
         .padding()
+    }
+}
+
+private extension CriticalReplacementView {
+    func presentationLabel(_ label: String) -> String {
+        guard SampleAppUITesting.isEnabled else {
+            return label
+        }
+
+        return label + " SwiftUI isPresented: " + String(isPresented)
     }
 }
 
@@ -264,11 +298,13 @@ struct LoginDetailView: View {
 
 struct LoginNoticeView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPresented
 
     var body: some View {
         VStack(spacing: 16) {
             Text("Login notice")
                 .font(.headline)
+                .accessibilityLabel(presentationLabel("Login notice"))
                 .accessibilityIdentifier(SampleAppAccessibility.loginNoticeText)
 
             Button("Dismiss") {
@@ -278,5 +314,15 @@ struct LoginNoticeView: View {
             .accessibilityIdentifier(SampleAppAccessibility.loginNoticeDismissButton)
         }
         .padding()
+    }
+}
+
+private extension LoginNoticeView {
+    func presentationLabel(_ label: String) -> String {
+        guard SampleAppUITesting.isEnabled else {
+            return label
+        }
+
+        return label + " SwiftUI isPresented: " + String(isPresented)
     }
 }

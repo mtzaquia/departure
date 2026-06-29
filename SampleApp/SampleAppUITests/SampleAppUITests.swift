@@ -135,11 +135,13 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
+        assertLabel(A11y.loginIsPresented, contains: "true")
         assertLabel(A11y.loginWindowEnvironmentValue, contains: "forwarded from app window")
         assertLabel(A11y.loginWindowEnvironmentValue, contains: "active")
 
         tap(A11y.loginReplaceHighPriorityButton)
         assertExists(A11y.replacementTitle)
+        assertLabel(A11y.replacementIsPresented, contains: "true")
         assertLabel(A11y.replacementWindowEnvironmentValue, contains: "forwarded from app window")
         assertLabel(A11y.replacementWindowEnvironmentValue, contains: "active")
 
@@ -163,6 +165,7 @@ final class SampleAppUITests: XCTestCase {
         // high-priority tree.
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
+        assertLabel(A11y.loginIsPresented, contains: "true")
 
         // A normal push declared inside the tree navigates within the login stack (it is not
         // blocked the way a normal route before the tree would be).
@@ -181,6 +184,11 @@ final class SampleAppUITests: XCTestCase {
         // — it must not escalate/replace the login cover, so login stays in the hierarchy behind it.
         tap(A11y.loginPresentHighPrioritySheetButton)
         assertExists(A11y.loginNoticeText)
+        assertLabel(A11y.loginNoticeText, contains: "true")
+        assertExists(A11y.loginTitle)
+
+        tap(A11y.loginNoticeDismissButton)
+        assertGone(A11y.loginNoticeText)
         assertExists(A11y.loginTitle)
     }
 
@@ -189,12 +197,15 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
+        assertLabel(A11y.loginIsPresented, contains: "true")
+        app.swipeUp()
         let loginCancelCoordinate = app.buttons[A11y.loginCancelButton]
             .firstMatch
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
 
         tap(A11y.loginPresentCriticalButton)
         assertExists(A11y.criticalText)
+        assertLabel(A11y.criticalText, contains: "true")
         assertLabel(A11y.criticalWindowEnvironmentValue, contains: "forwarded from app window")
         assertLabel(A11y.criticalScenePhaseValue, contains: "active")
         assertExists(A11y.loginTitle)
@@ -203,11 +214,14 @@ final class SampleAppUITests: XCTestCase {
         assertGone(A11y.criticalText)
         assertExists(A11y.loginTitle)
 
+        app.swipeUp()
         tap(A11y.loginPresentCriticalButton)
         assertExists(A11y.criticalText)
+        assertLabel(A11y.criticalText, contains: "true")
 
         tap(A11y.criticalReplaceButton)
         assertExists(A11y.criticalReplacementText)
+        assertLabel(A11y.criticalReplacementText, contains: "true")
         assertGone(A11y.criticalText)
         assertExists(A11y.loginTitle)
 
@@ -232,6 +246,7 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.homePresentHighPriorityPassthroughSheetButton)
         assertExists(A11y.highPriorityPassthroughSheetText)
+        assertLabel(A11y.highPriorityPassthroughSheetText, contains: "true")
         assertLabel(A11y.highPriorityPassthroughSheetRoutePhase, contains: "Route phase: active")
         assertLabel(A11y.homeRoutePhase, contains: "Home route phase: inactive")
 
@@ -534,6 +549,7 @@ private enum A11y {
     static let alertDismissSwiftUIButton = "sample.alert.dismiss-swiftui"
 
     static let loginTitle = "sample.login.title"
+    static let loginIsPresented = "sample.login.is-presented"
     static let loginWindowEnvironmentValue = "sample.login.window-environment"
     static let loginPresentationProbeCount = "sample.login.presentation-probe-count"
     static let loginIncrementPresentationProbeButton = "sample.login.increment-presentation-probe"
@@ -551,6 +567,7 @@ private enum A11y {
     static let loginNoticeDismissButton = "sample.login-notice.dismiss"
 
     static let replacementTitle = "sample.replacement.title"
+    static let replacementIsPresented = "sample.replacement.is-presented"
     static let replacementWindowEnvironmentValue = "sample.replacement.window-environment"
     static let replacementDismissButton = "sample.replacement.dismiss"
     static let criticalText = "sample.critical.text"

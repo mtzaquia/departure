@@ -123,6 +123,7 @@ enum SampleAppAccessibility {
     static let alertDismissSwiftUIButton = "sample.alert.dismiss-swiftui"
 
     static let loginTitle = "sample.login.title"
+    static let loginIsPresented = "sample.login.is-presented"
     static let loginWindowEnvironmentValue = "sample.login.window-environment"
     static let loginPresentationProbeCount = "sample.login.presentation-probe-count"
     static let loginIncrementPresentationProbeButton = "sample.login.increment-presentation-probe"
@@ -142,6 +143,7 @@ enum SampleAppAccessibility {
     static let loginNoticeDismissButton = "sample.login-notice.dismiss"
 
     static let replacementTitle = "sample.replacement.title"
+    static let replacementIsPresented = "sample.replacement.is-presented"
     static let replacementWindowEnvironmentValue = "sample.replacement.window-environment"
     static let replacementDismissButton = "sample.replacement.dismiss"
     static let criticalText = "sample.critical.text"

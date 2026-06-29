@@ -25,52 +25,58 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 
-final class PassThroughModalHostingController<Content: View>: UIViewController {
+final class PassThroughModalHostingController<Content: View>: UIHostingController<Content> {
     var onDismiss: (@MainActor () -> Void)?
-    private let hostingController: UIHostingController<Content>
+    private weak var hostedView: UIView?
 
-    var rootView: Content {
-        get { hostingController.rootView }
-        set {
-            hostingController.rootView = newValue
-            view.setNeedsLayout()
-        }
-    }
-
-    init(rootView: Content) {
-        self.hostingController = UIHostingController(rootView: rootView)
-        super.init(nibName: nil, bundle: nil)
+    override init(rootView: Content) {
+        super.init(rootView: rootView)
+        sizingOptions = [.preferredContentSize]
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
     override func loadView() {
-        view = PassThroughRootView()
+        super.loadView()
+
+        guard let hostedView = view else {
+            assertionFailure("UIHostingController did not install a root view.")
+            view = PassThroughRootView()
+            return
+        }
+
+        hostedView.backgroundColor = .clear
+        hostedView.isOpaque = false
+        hostedView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+
+        let passThroughRootView = PassThroughRootView()
+        passThroughRootView.backgroundColor = .clear
+        passThroughRootView.isOpaque = false
+        passThroughRootView.addSubview(hostedView)
+
+        self.hostedView = hostedView
+        view = passThroughRootView
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
         view.backgroundColor = .clear
-        hostingController.view.backgroundColor = .clear
-
-        addChild(hostingController)
-        view.addSubview(hostingController.view)
-        hostingController.didMove(toParent: self)
+        view.isOpaque = false
     }
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
 
         let bounds = view.bounds
-        let fittingSize = hostingController.sizeThatFits(in: bounds.size)
+        let fittingSize = sizeThatFits(in: bounds.size)
         let contentSize = CGSize(
             width: min(max(fittingSize.width, 1), bounds.width),
             height: min(max(fittingSize.height, 1), bounds.height)
         )
 
-        hostingController.view.frame = CGRect(
+        hostedView?.frame = CGRect(
             x: bounds.midX - contentSize.width / 2,
             y: bounds.midY - contentSize.height / 2,
             width: contentSize.width,
@@ -88,7 +94,12 @@ final class PassThroughModalHostingController<Content: View>: UIViewController {
 private final class PassThroughRootView: UIView {
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let view = super.hitTest(point, with: event)
-        return view === self ? nil : view
+
+        if view === self {
+            return nil
+        }
+
+        return view
     }
 }
 #endif

@@ -194,12 +194,14 @@ struct TopLevelReplacementCoverView: View {
 
 struct HighPriorityPassthroughSheetView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPresented
     @Environment(\.routePhase) private var routePhase
 
     var body: some View {
         VStack(spacing: 16) {
             Text("High-priority passthrough sheet")
                 .font(.headline)
+                .accessibilityLabel(presentationLabel("High-priority passthrough sheet"))
                 .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetText)
 
             Text("Route phase: \(routePhaseLabel)")
@@ -226,6 +228,14 @@ struct HighPriorityPassthroughSheetView: View {
         case .inactive:
             return "inactive"
         }
+    }
+
+    private func presentationLabel(_ label: String) -> String {
+        guard SampleAppUITesting.isEnabled else {
+            return label
+        }
+
+        return label + " SwiftUI isPresented: " + String(isPresented)
     }
 }
 
