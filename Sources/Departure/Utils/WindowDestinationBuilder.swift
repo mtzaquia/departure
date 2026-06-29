@@ -31,3 +31,9 @@ struct WindowDestinationBuilder {
         }
     }
 }
+
+extension EnvironmentValues {
+    @Entry var windowDestinationBuilder = WindowDestinationBuilder { destination, _ in
+        destination
+    }
+}

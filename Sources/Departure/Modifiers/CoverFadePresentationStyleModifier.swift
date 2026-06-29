@@ -84,11 +84,14 @@ import UIKit
 private struct CoverFadeModalPresenter: View {
     @Binding var route: RoutePresentation?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.windowDestinationBuilder) private var windowDestinationBuilder
     let router: Router
 
     var body: some View {
         CrossDissolveModalPresenter(
-            presentation: route.map(RouteDestinationSnapshot.init(route:)),
+            presentation: route.map {
+                RouteDestinationSnapshot(route: $0, destinationBuilder: windowDestinationBuilder)
+            },
             router: router,
             sourceScenePhase: scenePhase,
             onDismiss: {

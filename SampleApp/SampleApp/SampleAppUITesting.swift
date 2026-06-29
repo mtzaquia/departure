@@ -109,6 +109,7 @@ enum SampleAppAccessibility {
     static let highPriorityPassthroughSheetDismissButton = "sample.high-priority-passthrough-sheet.dismiss"
 
     static let messageText = "sample.message.text"
+    static let messagePresentationSource = "sample.message.presentation-source"
     static let messageDismissUnwindButton = "sample.message.dismiss-unwind"
     static let messageDismissSwiftUIButton = "sample.message.dismiss-swiftui"
     static let messageDismissPayloadButton = "sample.message.dismiss-payload"

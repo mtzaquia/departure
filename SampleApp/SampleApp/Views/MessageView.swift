@@ -26,6 +26,7 @@ import SwiftUI
 struct MessageView: View {
     @Environment(Router.self) private var router
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.samplePresentationSource) private var samplePresentationSource
 
     var body: some View {
         ZStack {
@@ -35,6 +36,9 @@ struct MessageView: View {
             VStack(spacing: 12) {
                 Text("This is a message.")
                     .accessibilityIdentifier(SampleAppAccessibility.messageText)
+
+                Text("Presented from: \(samplePresentationSource)")
+                    .accessibilityIdentifier(SampleAppAccessibility.messagePresentationSource)
 
                 Button("Dismiss with unwind") {
                     Task {
