@@ -43,6 +43,7 @@ final class PassThroughModalHostingController<Content: View>: UIHostingControlle
         super.viewDidLoad()
 
         view.backgroundColor = .clear
+        view.clipsToBounds = true
         view.isOpaque = false
     }
 

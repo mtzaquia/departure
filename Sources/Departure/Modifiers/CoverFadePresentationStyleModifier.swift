@@ -86,18 +86,152 @@ private struct CoverFadeModalPresenter: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.windowDestinationBuilder) private var windowDestinationBuilder
     let router: Router
+    @State private var systemPresentation: RouteDestinationSnapshot?
+    @State private var isContentVisible = false
+    @State private var isDismissing = false
+    @State private var presentationTask: Task<Void, Never>?
+    @State private var dismissalTask: Task<Void, Never>?
 
     var body: some View {
-        CrossDissolveModalPresenter(
-            presentation: route.map {
-                RouteDestinationSnapshot(route: $0, destinationBuilder: windowDestinationBuilder)
+        Color.clear
+            .fullScreenCover(item: systemPresentationBinding, onDismiss: finishSystemDismissal) { presentation in
+                destination(for: presentation)
+                    .opacity(isContentVisible ? 1 : 0)
+                    .presentationBackground(.clear)
+            }
+            .transaction { transaction in
+                transaction.disablesAnimations = true
+            }
+            .onAppear {
+                syncPresentation()
+            }
+            .onChange(of: route?.id) { _, _ in
+                syncPresentation()
+            }
+            .onChange(of: scenePhase) { _, _ in
+                syncPresentation()
+            }
+    }
+
+    private var systemPresentationBinding: Binding<RouteDestinationSnapshot?> {
+        Binding(
+            get: {
+                systemPresentation
             },
-            router: router,
-            sourceScenePhase: scenePhase,
-            onDismiss: {
-                route = nil
+            set: { newValue in
+                guard newValue == nil else {
+                    setSystemPresentation(newValue)
+                    return
+                }
+
+                dismissWithFade()
             }
         )
+    }
+
+    private func syncPresentation() {
+        if isDismissing {
+            guard let route, route.id != systemPresentation?.id else {
+                return
+            }
+
+            dismissalTask?.cancel()
+            dismissalTask = nil
+            presentationTask?.cancel()
+            presentationTask = nil
+            isDismissing = false
+        }
+
+        guard let route else {
+            dismissWithFade()
+            return
+        }
+
+        let presentation = RouteDestinationSnapshot(route: route, destinationBuilder: windowDestinationBuilder)
+
+        guard systemPresentation?.id != presentation.id else {
+            return
+        }
+
+        dismissalTask?.cancel()
+        presentationTask?.cancel()
+        presentationTask = nil
+        setSystemPresentation(presentation)
+        isContentVisible = false
+
+        presentationTask = Task { @MainActor in
+            await Task.yield()
+            guard Task.isCancelled == false, systemPresentation?.id == presentation.id else {
+                return
+            }
+
+            withAnimation(.easeInOut(duration: 0.25)) {
+                isContentVisible = true
+            }
+            presentationTask = nil
+        }
+    }
+
+    private func dismissWithFade() {
+        guard systemPresentation != nil else {
+            route = nil
+            return
+        }
+
+        guard isDismissing == false else {
+            return
+        }
+
+        isDismissing = true
+        presentationTask?.cancel()
+        presentationTask = nil
+        dismissalTask?.cancel()
+        dismissalTask = Task { @MainActor in
+            withAnimation(.easeInOut(duration: 0.25)) {
+                isContentVisible = false
+            }
+
+            try? await Task.sleep(for: .seconds(0.25))
+            guard Task.isCancelled == false else {
+                return
+            }
+
+            setSystemPresentation(nil)
+            route = nil
+            isDismissing = false
+            dismissalTask = nil
+        }
+    }
+
+    private func finishSystemDismissal() {
+        guard isDismissing || route == nil || systemPresentation == nil else {
+            return
+        }
+
+        presentationTask?.cancel()
+        presentationTask = nil
+        dismissalTask?.cancel()
+        dismissalTask = nil
+        isDismissing = false
+        isContentVisible = false
+        systemPresentation = nil
+        route = nil
+    }
+
+    private func destination(for presentation: RouteDestinationSnapshot) -> some View {
+        presentation.destination
+            .environment(router)
+            .environment(\.routing, RoutingAction(router: router))
+            .environment(\.scenePhase, scenePhase)
+    }
+
+    private func setSystemPresentation(_ presentation: RouteDestinationSnapshot?) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+
+        withTransaction(transaction) {
+            systemPresentation = presentation
+        }
     }
 }
 
@@ -152,6 +286,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         override func viewDidLoad() {
             super.viewDidLoad()
             view.backgroundColor = .clear
+            view.isUserInteractionEnabled = false
         }
 
         override func viewDidAppear(_ animated: Bool) {

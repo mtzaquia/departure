@@ -69,6 +69,7 @@ struct LandingView: View {
                 Sheet(ProfileRoute.self)
                 Sheet(DismissProbeRoute.self, providesNavigation: false)
                 Cover(MessageRoute.self, transition: .fade, providesNavigation: false)
+                Cover(NavigationBarFadeOcclusionRoute.self, transition: .fade)
             }
 
             Branch(.settings) {

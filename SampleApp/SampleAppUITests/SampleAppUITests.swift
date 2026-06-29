@@ -285,6 +285,20 @@ final class SampleAppUITests: XCTestCase {
         assertLabel(A11y.homeDismissProbeHookStatus, contains: "Dismiss probe hooks: 1")
     }
 
+    func testFadeCoverContentStaysInsideItsNavigationStack() {
+        openLanding()
+
+        tap(A11y.homeShowNavigationBarFadeButton)
+        assertExists(A11y.navigationBarFadeText)
+        assertLabel(A11y.navigationBarFadeToolbarTapCount, contains: "Toolbar taps: 0")
+
+        let toolbarButton = app.buttons[A11y.navigationBarFadeToolbarButton]
+        XCTAssertTrue(toolbarButton.waitForExistence(timeout: 5), "Expected toolbar button to exist")
+        toolbarButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        assertLabel(A11y.navigationBarFadeToolbarTapCount, contains: "Toolbar taps: 1")
+    }
+
     func testUnwindTargetsAcrossBranchContainer() {
         openLanding()
         tapSettingsTab()
@@ -486,6 +500,7 @@ private enum A11y {
     static let homeProfileButton = "sample.home.profile"
     static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
     static let homePresentHighPriorityPassthroughSheetButton = "sample.home.present-high-priority-passthrough-sheet"
+    static let homeShowNavigationBarFadeButton = "sample.home.show-navigation-bar-fade"
     static let homePassthroughBehindButton = "sample.home.passthrough-behind"
     static let homePassthroughTapCount = "sample.home.passthrough-tap-count"
     static let homeRoutePhase = "sample.home.route-phase"
@@ -540,6 +555,11 @@ private enum A11y {
     static let messageDismissSwiftUIButton = "sample.message.dismiss-swiftui"
     static let messageDismissPayloadButton = "sample.message.dismiss-payload"
     static let messageDismissMismatchedPayloadButton = "sample.message.dismiss-mismatched-payload"
+    static let navigationBarFadeText = "sample.navigation-bar-fade.text"
+    static let navigationBarFadePresentNestedButton = "sample.navigation-bar-fade.present-nested"
+    static let navigationBarFadeToolbarButton = "sample.navigation-bar-fade.toolbar-button"
+    static let navigationBarFadeToolbarTapCount = "sample.navigation-bar-fade.toolbar-tap-count"
+    static let nestedNavigationBarFadeText = "sample.nested-navigation-bar-fade.text"
 
     static let dismissProbeText = "sample.dismiss-probe.text"
     static let dismissProbeDismissButton = "sample.dismiss-probe.dismiss"

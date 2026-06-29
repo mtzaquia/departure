@@ -48,6 +48,13 @@ struct HomeView: View {
                     }
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.homeShowDismissProbeButton)
+
+                Button("Show navigation bar fade probe") {
+                    Task {
+                        await router.present(NavigationBarFadeOcclusionRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.homeShowNavigationBarFadeButton)
             }
 
             Button("Show high-priority passthrough sheet") {

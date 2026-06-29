@@ -120,6 +120,18 @@ struct HighPriorityPassthroughSheetRoute: Route {
     }
 }
 
+struct NavigationBarFadeOcclusionRoute: Route {
+    func destination() -> some View {
+        NavigationBarFadeOcclusionView()
+    }
+}
+
+struct NestedNavigationBarFadeRoute: Route {
+    func destination() -> some View {
+        NestedNavigationBarFadeView()
+    }
+}
+
 struct TopLevelSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.samplePresentationSource) private var samplePresentationSource
@@ -236,6 +248,58 @@ struct HighPriorityPassthroughSheetView: View {
         }
 
         return label + " SwiftUI isPresented: " + String(isPresented)
+    }
+}
+
+struct NavigationBarFadeOcclusionView: View {
+    @Environment(Router.self) private var router
+    @State private var toolbarTapCount = 0
+
+    var body: some View {
+        ZStack {
+            Color.white
+                .ignoresSafeArea()
+
+            List {
+                Text("Navigation bar fade probe")
+                    .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeText)
+
+                Text("Toolbar taps: \(toolbarTapCount)")
+                    .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeToolbarTapCount)
+
+                Button("Present nested fade") {
+                    Task {
+                        await router.present(NestedNavigationBarFadeRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadePresentNestedButton)
+            }
+            .scrollContentBackground(.hidden)
+        }
+        .navigationTitle("Fade Chrome")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Tap toolbar") {
+                    toolbarTapCount += 1
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeToolbarButton)
+            }
+        }
+        .routes {
+            Cover(NestedNavigationBarFadeRoute.self, transition: .fade, providesNavigation: false)
+        }
+    }
+}
+
+struct NestedNavigationBarFadeView: View {
+    var body: some View {
+        ZStack {
+            Color.white
+                .ignoresSafeArea()
+
+            Text("Nested navigation bar fade")
+                .accessibilityIdentifier(SampleAppAccessibility.nestedNavigationBarFadeText)
+        }
     }
 }
 
