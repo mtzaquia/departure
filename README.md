@@ -476,7 +476,9 @@ Sheets and covers can have normal, high, or critical priority.
 > [!IMPORTANT]
 > Elevated priority changes presentation context, not route lookup. Branch routes are still resolved with the same crawling rules; when an elevated-priority branch route is selected, the elevated window uses the active branch presentation scope.
 
-Because elevated-priority presentations use separate `UIWindow`s, SwiftUI cannot automatically propagate custom environment values. Use the `windowDestination` parameter from `WithRouter` to customize these destinations.
+Some Departure presentations render their route destination in a SwiftUI host that is detached from the surrounding app view tree. Elevated-priority presentations do this because they use separate `UIWindow`s. Normal-priority fade covers do this because of their custom transition.
+
+SwiftUI does not automatically carry custom environment values across those detached boundaries. Use `windowDestination` on `WithRouter` to customize detached destinations and explicitly forward the values they need.
 
 ```swift
 WithRouter {
@@ -486,9 +488,6 @@ WithRouter {
     .environment(\.myCustomKey, environment.myCustomKey)
 }
 ```
-
-> [!IMPORTANT]
-> Normal-priority routes **do not** allow customization through the `windowDestination` builder.
 
 ```mermaid
 flowchart TD

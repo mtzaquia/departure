@@ -94,6 +94,7 @@ struct DepartureSampleApp: App {
             } windowDestination: { destination, environment in
                 destination
                     .environment(\.sampleWindowBadge, environment.sampleWindowBadge)
+                    .environment(\.samplePresentationSource, environment.samplePresentationSource)
             }
             .transaction { transaction in
                 guard SampleAppUITesting.isEnabled else {

@@ -38,6 +38,7 @@ public struct WithRouter<Content: View>: View {
         content
             .routeScopeEnvironment(router.root, router: router)
             .environment(\.routing, RoutingAction(router: router))
+            .environment(\.windowDestinationBuilder, windowDestinationBuilder)
             .background {
                 ElevatedPrioritySheetHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
                 ElevatedPriorityCoverSlideHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
@@ -60,13 +61,13 @@ public struct WithRouter<Content: View>: View {
         }
     }
 
-    /// Creates a router host with an elevated-priority window destination customizer.
+    /// Creates a router host with a detached presentation customizer.
     ///
     /// Pass a ``Router`` when app code needs to keep an explicit reference.
     ///
-    /// `windowDestination` customizes destinations presented through Departure's
-    /// separate elevated-priority windows. Use it to explicitly forward environment
-    /// values that should cross the `UIWindow` boundary.
+    /// `windowDestination` customizes destinations that Departure renders in a detached
+    /// SwiftUI host, including elevated-priority presentations and normal-priority fade
+    /// covers. Use it to explicitly forward environment values those destinations need.
     public init<WindowContent: View>(
         router: Router? = nil,
         @ViewBuilder _ content: () -> Content,

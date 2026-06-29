@@ -48,6 +48,13 @@ struct HomeView: View {
                     }
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.homeShowDismissProbeButton)
+
+                Button("Show navigation bar fade probe") {
+                    Task {
+                        await router.present(NavigationBarFadeOcclusionRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.homeShowNavigationBarFadeButton)
             }
 
             Button("Show high-priority passthrough sheet") {
@@ -56,6 +63,13 @@ struct HomeView: View {
                 }
             }
             .accessibilityIdentifier(SampleAppAccessibility.homePresentHighPriorityPassthroughSheetButton)
+
+            Button("Show high-priority blocking sheet") {
+                Task {
+                    await router.present(HighPriorityBlockingSheetRoute())
+                }
+            }
+            .accessibilityIdentifier(SampleAppAccessibility.homePresentHighPriorityBlockingSheetButton)
 
             Button("Tap behind presentation") {
                 passthroughTapCount += 1

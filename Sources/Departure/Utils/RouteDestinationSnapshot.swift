@@ -46,3 +46,9 @@ struct RouteDestinationSnapshot {
         )
     }
 }
+
+extension RouteDestinationSnapshot: Identifiable {
+    var id: RoutePresentation.ID {
+        route.id
+    }
+}

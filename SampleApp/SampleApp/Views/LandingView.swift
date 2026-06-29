@@ -61,6 +61,7 @@ struct LandingView: View {
             Cover(CriticalRoute.self, priority: .critical, transition: .fade, providesNavigation: false)
             Cover(CriticalReplacementRoute.self, priority: .critical, transition: .fade, providesNavigation: false)
             Sheet(HighPriorityPassthroughSheetRoute.self, priority: .high, providesNavigation: false)
+            Sheet(HighPriorityBlockingSheetRoute.self, priority: .high, providesNavigation: false)
             Sheet(TopLevelSheetRoute.self, providesNavigation: false)
             Cover(TopLevelCoverRoute.self, providesNavigation: false)
             Cover(TopLevelReplacementCoverRoute.self, providesNavigation: false)
@@ -69,6 +70,7 @@ struct LandingView: View {
                 Sheet(ProfileRoute.self)
                 Sheet(DismissProbeRoute.self, providesNavigation: false)
                 Cover(MessageRoute.self, transition: .fade, providesNavigation: false)
+                Cover(NavigationBarFadeOcclusionRoute.self, transition: .fade)
             }
 
             Branch(.settings) {

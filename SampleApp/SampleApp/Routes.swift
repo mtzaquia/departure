@@ -120,6 +120,18 @@ struct HighPriorityPassthroughSheetRoute: Route {
     }
 }
 
+struct HighPriorityBlockingSheetRoute: Route {
+    func destination() -> some View {
+        HighPriorityBlockingSheetView()
+    }
+}
+
+struct NavigationBarFadeOcclusionRoute: Route {
+    func destination() -> some View {
+        NavigationBarFadeOcclusionView()
+    }
+}
+
 struct TopLevelSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.samplePresentationSource) private var samplePresentationSource
@@ -194,12 +206,14 @@ struct TopLevelReplacementCoverView: View {
 
 struct HighPriorityPassthroughSheetView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPresented
     @Environment(\.routePhase) private var routePhase
 
     var body: some View {
         VStack(spacing: 16) {
             Text("High-priority passthrough sheet")
                 .font(.headline)
+                .accessibilityLabel(presentationLabel("High-priority passthrough sheet"))
                 .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetText)
 
             Text("Route phase: \(routePhaseLabel)")
@@ -225,6 +239,77 @@ struct HighPriorityPassthroughSheetView: View {
 
         case .inactive:
             return "inactive"
+        }
+    }
+
+    private func presentationLabel(_ label: String) -> String {
+        guard SampleAppUITesting.isEnabled else {
+            return label
+        }
+
+        return label + " SwiftUI isPresented: " + String(isPresented)
+    }
+}
+
+struct HighPriorityBlockingSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPresented
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("High-priority blocking sheet")
+                .font(.headline)
+                .accessibilityLabel(presentationLabel("High-priority blocking sheet"))
+                .accessibilityIdentifier(SampleAppAccessibility.highPriorityBlockingSheetText)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.highPriorityBlockingSheetDismissButton)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .presentationDetents([.height(220)])
+        .samplePresentationSizing()
+    }
+
+    private func presentationLabel(_ label: String) -> String {
+        guard SampleAppUITesting.isEnabled else {
+            return label
+        }
+
+        return label + " SwiftUI isPresented: " + String(isPresented)
+    }
+}
+
+struct NavigationBarFadeOcclusionView: View {
+    @Environment(Router.self) private var router
+    @State private var toolbarTapCount = 0
+
+    var body: some View {
+        ZStack {
+            Color.white
+                .ignoresSafeArea()
+
+            List {
+                Text("Navigation bar fade probe")
+                    .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeText)
+
+                Text("Toolbar taps: \(toolbarTapCount)")
+                    .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeToolbarTapCount)
+
+            }
+            .scrollContentBackground(.hidden)
+        }
+        .navigationTitle("Fade Chrome")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Tap toolbar") {
+                    toolbarTapCount += 1
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeToolbarButton)
+            }
         }
     }
 }

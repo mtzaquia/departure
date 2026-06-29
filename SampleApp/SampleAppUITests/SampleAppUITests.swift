@@ -71,6 +71,7 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.settingsPresentHomeMessageButton)
         assertExists(A11y.homeWelcome)
         assertExists(A11y.messageText)
+        assertLabel(A11y.messagePresentationSource, contains: "top-level branched scope")
     }
 
     func testModalArbitrationAndChainingFromPushedBranch() {
@@ -134,11 +135,13 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
+        assertLabel(A11y.loginIsPresented, contains: "true")
         assertLabel(A11y.loginWindowEnvironmentValue, contains: "forwarded from app window")
         assertLabel(A11y.loginWindowEnvironmentValue, contains: "active")
 
         tap(A11y.loginReplaceHighPriorityButton)
         assertExists(A11y.replacementTitle)
+        assertLabel(A11y.replacementIsPresented, contains: "true")
         assertLabel(A11y.replacementWindowEnvironmentValue, contains: "forwarded from app window")
         assertLabel(A11y.replacementWindowEnvironmentValue, contains: "active")
 
@@ -162,6 +165,7 @@ final class SampleAppUITests: XCTestCase {
         // high-priority tree.
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
+        assertLabel(A11y.loginIsPresented, contains: "true")
 
         // A normal push declared inside the tree navigates within the login stack (it is not
         // blocked the way a normal route before the tree would be).
@@ -180,6 +184,11 @@ final class SampleAppUITests: XCTestCase {
         // — it must not escalate/replace the login cover, so login stays in the hierarchy behind it.
         tap(A11y.loginPresentHighPrioritySheetButton)
         assertExists(A11y.loginNoticeText)
+        assertLabel(A11y.loginNoticeText, contains: "true")
+        assertExists(A11y.loginTitle)
+
+        tap(A11y.loginNoticeDismissButton)
+        assertGone(A11y.loginNoticeText)
         assertExists(A11y.loginTitle)
     }
 
@@ -188,25 +197,39 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
+        assertLabel(A11y.loginIsPresented, contains: "true")
+        assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 0")
+        let loginProbeCoordinate = app.buttons[A11y.loginToolbarIncrementPresentationProbeButton]
+            .firstMatch
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        app.swipeUp()
         let loginCancelCoordinate = app.buttons[A11y.loginCancelButton]
             .firstMatch
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
 
         tap(A11y.loginPresentCriticalButton)
         assertExists(A11y.criticalText)
+        assertLabel(A11y.criticalText, contains: "true")
         assertLabel(A11y.criticalWindowEnvironmentValue, contains: "forwarded from app window")
         assertLabel(A11y.criticalScenePhaseValue, contains: "active")
         assertExists(A11y.loginTitle)
+
+        loginProbeCoordinate.tap()
+        assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
+        assertExists(A11y.criticalText)
 
         loginCancelCoordinate.tap()
         assertGone(A11y.criticalText)
         assertExists(A11y.loginTitle)
 
+        app.swipeUp()
         tap(A11y.loginPresentCriticalButton)
         assertExists(A11y.criticalText)
+        assertLabel(A11y.criticalText, contains: "true")
 
         tap(A11y.criticalReplaceButton)
         assertExists(A11y.criticalReplacementText)
+        assertLabel(A11y.criticalReplacementText, contains: "true")
         assertGone(A11y.criticalText)
         assertExists(A11y.loginTitle)
 
@@ -231,6 +254,7 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.homePresentHighPriorityPassthroughSheetButton)
         assertExists(A11y.highPriorityPassthroughSheetText)
+        assertLabel(A11y.highPriorityPassthroughSheetText, contains: "true")
         assertLabel(A11y.highPriorityPassthroughSheetRoutePhase, contains: "Route phase: active")
         assertLabel(A11y.homeRoutePhase, contains: "Home route phase: inactive")
 
@@ -240,6 +264,30 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.highPriorityPassthroughSheetDismissButton)
         assertGone(A11y.highPriorityPassthroughSheetText)
+    }
+
+    func testHighPrioritySheetScrimBlocksPresentationPassthrough() {
+        openLanding()
+
+        assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 0")
+
+        let behindCoordinate = app.buttons[A11y.homePassthroughBehindButton]
+            .firstMatch
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+
+        tap(A11y.homePresentHighPriorityBlockingSheetButton)
+        assertExists(A11y.highPriorityBlockingSheetText)
+        assertLabel(A11y.highPriorityBlockingSheetText, contains: "true")
+
+        behindCoordinate.tap()
+        assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 0")
+
+        guard element(A11y.highPriorityBlockingSheetDismissButton).exists else {
+            return
+        }
+
+        tap(A11y.highPriorityBlockingSheetDismissButton)
+        assertGone(A11y.highPriorityBlockingSheetText)
     }
 
     func testSwiftUIDismissSynchronizationAndHandlerTiming() {
@@ -267,6 +315,20 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.messageDismissUnwindButton)
         assertGone(A11y.messageText)
         assertLabel(A11y.homeDismissProbeHookStatus, contains: "Dismiss probe hooks: 1")
+    }
+
+    func testFadeCoverContentStaysInsideItsNavigationStack() {
+        openLanding()
+
+        tap(A11y.homeShowNavigationBarFadeButton)
+        assertExists(A11y.navigationBarFadeText)
+        assertLabel(A11y.navigationBarFadeToolbarTapCount, contains: "Toolbar taps: 0")
+
+        let toolbarButton = app.buttons[A11y.navigationBarFadeToolbarButton]
+        XCTAssertTrue(toolbarButton.waitForExistence(timeout: 5), "Expected toolbar button to exist")
+        toolbarButton.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        assertLabel(A11y.navigationBarFadeToolbarTapCount, contains: "Toolbar taps: 1")
     }
 
     func testUnwindTargetsAcrossBranchContainer() {
@@ -470,6 +532,8 @@ private enum A11y {
     static let homeProfileButton = "sample.home.profile"
     static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
     static let homePresentHighPriorityPassthroughSheetButton = "sample.home.present-high-priority-passthrough-sheet"
+    static let homePresentHighPriorityBlockingSheetButton = "sample.home.present-high-priority-blocking-sheet"
+    static let homeShowNavigationBarFadeButton = "sample.home.show-navigation-bar-fade"
     static let homePassthroughBehindButton = "sample.home.passthrough-behind"
     static let homePassthroughTapCount = "sample.home.passthrough-tap-count"
     static let homeRoutePhase = "sample.home.route-phase"
@@ -517,12 +581,18 @@ private enum A11y {
     static let highPriorityPassthroughSheetText = "sample.high-priority-passthrough-sheet.text"
     static let highPriorityPassthroughSheetRoutePhase = "sample.high-priority-passthrough-sheet.route-phase"
     static let highPriorityPassthroughSheetDismissButton = "sample.high-priority-passthrough-sheet.dismiss"
+    static let highPriorityBlockingSheetText = "sample.high-priority-blocking-sheet.text"
+    static let highPriorityBlockingSheetDismissButton = "sample.high-priority-blocking-sheet.dismiss"
 
     static let messageText = "sample.message.text"
+    static let messagePresentationSource = "sample.message.presentation-source"
     static let messageDismissUnwindButton = "sample.message.dismiss-unwind"
     static let messageDismissSwiftUIButton = "sample.message.dismiss-swiftui"
     static let messageDismissPayloadButton = "sample.message.dismiss-payload"
     static let messageDismissMismatchedPayloadButton = "sample.message.dismiss-mismatched-payload"
+    static let navigationBarFadeText = "sample.navigation-bar-fade.text"
+    static let navigationBarFadeToolbarButton = "sample.navigation-bar-fade.toolbar-button"
+    static let navigationBarFadeToolbarTapCount = "sample.navigation-bar-fade.toolbar-tap-count"
 
     static let dismissProbeText = "sample.dismiss-probe.text"
     static let dismissProbeDismissButton = "sample.dismiss-probe.dismiss"
@@ -532,9 +602,11 @@ private enum A11y {
     static let alertDismissSwiftUIButton = "sample.alert.dismiss-swiftui"
 
     static let loginTitle = "sample.login.title"
+    static let loginIsPresented = "sample.login.is-presented"
     static let loginWindowEnvironmentValue = "sample.login.window-environment"
     static let loginPresentationProbeCount = "sample.login.presentation-probe-count"
     static let loginIncrementPresentationProbeButton = "sample.login.increment-presentation-probe"
+    static let loginToolbarIncrementPresentationProbeButton = "sample.login.toolbar-increment-presentation-probe"
     static let loginButton = "sample.login.button"
     static let loginCancelButton = "sample.login.cancel"
     static let loginReplaceHighPriorityButton = "sample.login.replace-high-priority"
@@ -549,6 +621,7 @@ private enum A11y {
     static let loginNoticeDismissButton = "sample.login-notice.dismiss"
 
     static let replacementTitle = "sample.replacement.title"
+    static let replacementIsPresented = "sample.replacement.is-presented"
     static let replacementWindowEnvironmentValue = "sample.replacement.window-environment"
     static let replacementDismissButton = "sample.replacement.dismiss"
     static let criticalText = "sample.critical.text"

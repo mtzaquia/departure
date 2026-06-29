@@ -126,7 +126,7 @@ struct ActionHookTests {
         #expect(recorder.bools == [true])
     }
 
-    @Test func actionReroutePresentsRouteAndRetriesOnce() async {
+    @Test func actionReroutePresentsRouteAndRetriesOnce() async throws {
         let router = Router()
         let recorder = ActionEventRecorder()
 
@@ -139,11 +139,47 @@ struct ActionHookTests {
         )
 
         await router.performAction(ReroutingProbeAction(recorder: recorder))
+        await recorder.waitForEvent("reroute")
+        let settingsScope = try #require(router.normalTree.rootPath.last)
+        router.routeScopeDidInstallInView(settingsScope)
         await recorder.waitForEvent("ran")
 
         #expect(await recorder.values() == ["reroute", "ran"])
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last?.route is SettingsRoute)
+    }
+
+    @Test func actionRerouteWaitsForInstalledDestinationInterceptorsBeforeRetrying() async throws {
+        let router = Router()
+        let recorder = ActionEventRecorder()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.performAction(ReroutingProbeAction(recorder: recorder))
+        await recorder.waitForEvent("reroute")
+        await Task.yield()
+
+        #expect(await recorder.values() == ["reroute"])
+
+        let settingsScope = try #require(router.normalTree.rootPath.last)
+        settingsScope.installHookDeclarations(
+            hookDeclarations: [
+                ActionInterceptor(ReroutingProbeAction.self) { _ in
+                    await recorder.append("intercepted")
+                }.declaration,
+            ]
+        )
+
+        router.routeScopeDidInstallInView(settingsScope)
+        await recorder.waitForEvent("intercepted")
+
+        #expect(await recorder.values() == ["reroute", "intercepted"])
     }
 
     @Test func actionRerouteLoopIsDroppedAfterRetry() async {
@@ -159,6 +195,10 @@ struct ActionHookTests {
         )
 
         await router.performAction(LoopingRerouteAction(recorder: recorder))
+        await recorder.waitForEventCount(1)
+        if let settingsScope = router.normalTree.rootPath.last {
+            router.routeScopeDidInstallInView(settingsScope)
+        }
         await recorder.waitForEventCount(2)
 
         #expect(await recorder.values() == ["attempt", "attempt"])
