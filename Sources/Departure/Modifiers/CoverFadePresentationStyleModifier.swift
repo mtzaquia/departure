@@ -237,8 +237,6 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
                 )
             )
             hostingController.view.backgroundColor = .clear
-            hostingController.modalPresentationStyle = .overFullScreen
-            hostingController.modalTransitionStyle = .crossDissolve
             hostingController.presentationController?.delegate = self
             hostingController.onDismiss = { [weak self] in
                 self?.finishDismiss()
