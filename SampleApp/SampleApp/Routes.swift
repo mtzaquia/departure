@@ -120,6 +120,12 @@ struct HighPriorityPassthroughSheetRoute: Route {
     }
 }
 
+struct HighPriorityBlockingSheetRoute: Route {
+    func destination() -> some View {
+        HighPriorityBlockingSheetView()
+    }
+}
+
 struct NavigationBarFadeOcclusionRoute: Route {
     func destination() -> some View {
         NavigationBarFadeOcclusionView()
@@ -234,6 +240,38 @@ struct HighPriorityPassthroughSheetView: View {
         case .inactive:
             return "inactive"
         }
+    }
+
+    private func presentationLabel(_ label: String) -> String {
+        guard SampleAppUITesting.isEnabled else {
+            return label
+        }
+
+        return label + " SwiftUI isPresented: " + String(isPresented)
+    }
+}
+
+struct HighPriorityBlockingSheetView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPresented
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("High-priority blocking sheet")
+                .font(.headline)
+                .accessibilityLabel(presentationLabel("High-priority blocking sheet"))
+                .accessibilityIdentifier(SampleAppAccessibility.highPriorityBlockingSheetText)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.highPriorityBlockingSheetDismissButton)
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .presentationDetents([.height(220)])
+        .samplePresentationSizing()
     }
 
     private func presentationLabel(_ label: String) -> String {

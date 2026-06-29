@@ -64,6 +64,13 @@ struct HomeView: View {
             }
             .accessibilityIdentifier(SampleAppAccessibility.homePresentHighPriorityPassthroughSheetButton)
 
+            Button("Show high-priority blocking sheet") {
+                Task {
+                    await router.present(HighPriorityBlockingSheetRoute())
+                }
+            }
+            .accessibilityIdentifier(SampleAppAccessibility.homePresentHighPriorityBlockingSheetButton)
+
             Button("Tap behind presentation") {
                 passthroughTapCount += 1
             }

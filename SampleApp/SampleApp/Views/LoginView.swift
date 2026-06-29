@@ -128,6 +128,15 @@ struct LoginView: View {
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.loginCancelButton)
             }
+
+            if SampleAppUITesting.isEnabled {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Probe") {
+                        presentationProbeCount += 1
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.loginToolbarIncrementPresentationProbeButton)
+                }
+            }
         }
     }
 }

@@ -25,7 +25,9 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 
-final class PassThroughModalHostingController<Content: View>: UIHostingController<Content> {
+protocol AnyPassThroughModalHostingController: UIViewController {}
+
+final class PassThroughModalHostingController<Content: View>: UIHostingController<Content>, AnyPassThroughModalHostingController {
     var onDismiss: (@MainActor () -> Void)?
     private let modalTransitioningDelegate = PassThroughModalTransitioningDelegate()
 

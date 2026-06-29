@@ -198,6 +198,10 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
         assertLabel(A11y.loginIsPresented, contains: "true")
+        assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 0")
+        let loginProbeCoordinate = app.buttons[A11y.loginToolbarIncrementPresentationProbeButton]
+            .firstMatch
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         app.swipeUp()
         let loginCancelCoordinate = app.buttons[A11y.loginCancelButton]
             .firstMatch
@@ -209,6 +213,10 @@ final class SampleAppUITests: XCTestCase {
         assertLabel(A11y.criticalWindowEnvironmentValue, contains: "forwarded from app window")
         assertLabel(A11y.criticalScenePhaseValue, contains: "active")
         assertExists(A11y.loginTitle)
+
+        loginProbeCoordinate.tap()
+        assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
+        assertExists(A11y.criticalText)
 
         loginCancelCoordinate.tap()
         assertGone(A11y.criticalText)
@@ -256,6 +264,30 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.highPriorityPassthroughSheetDismissButton)
         assertGone(A11y.highPriorityPassthroughSheetText)
+    }
+
+    func testHighPrioritySheetScrimBlocksPresentationPassthrough() {
+        openLanding()
+
+        assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 0")
+
+        let behindCoordinate = app.buttons[A11y.homePassthroughBehindButton]
+            .firstMatch
+            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+
+        tap(A11y.homePresentHighPriorityBlockingSheetButton)
+        assertExists(A11y.highPriorityBlockingSheetText)
+        assertLabel(A11y.highPriorityBlockingSheetText, contains: "true")
+
+        behindCoordinate.tap()
+        assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 0")
+
+        guard element(A11y.highPriorityBlockingSheetDismissButton).exists else {
+            return
+        }
+
+        tap(A11y.highPriorityBlockingSheetDismissButton)
+        assertGone(A11y.highPriorityBlockingSheetText)
     }
 
     func testSwiftUIDismissSynchronizationAndHandlerTiming() {
@@ -500,6 +532,7 @@ private enum A11y {
     static let homeProfileButton = "sample.home.profile"
     static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
     static let homePresentHighPriorityPassthroughSheetButton = "sample.home.present-high-priority-passthrough-sheet"
+    static let homePresentHighPriorityBlockingSheetButton = "sample.home.present-high-priority-blocking-sheet"
     static let homeShowNavigationBarFadeButton = "sample.home.show-navigation-bar-fade"
     static let homePassthroughBehindButton = "sample.home.passthrough-behind"
     static let homePassthroughTapCount = "sample.home.passthrough-tap-count"
@@ -548,6 +581,8 @@ private enum A11y {
     static let highPriorityPassthroughSheetText = "sample.high-priority-passthrough-sheet.text"
     static let highPriorityPassthroughSheetRoutePhase = "sample.high-priority-passthrough-sheet.route-phase"
     static let highPriorityPassthroughSheetDismissButton = "sample.high-priority-passthrough-sheet.dismiss"
+    static let highPriorityBlockingSheetText = "sample.high-priority-blocking-sheet.text"
+    static let highPriorityBlockingSheetDismissButton = "sample.high-priority-blocking-sheet.dismiss"
 
     static let messageText = "sample.message.text"
     static let messagePresentationSource = "sample.message.presentation-source"
@@ -571,6 +606,7 @@ private enum A11y {
     static let loginWindowEnvironmentValue = "sample.login.window-environment"
     static let loginPresentationProbeCount = "sample.login.presentation-probe-count"
     static let loginIncrementPresentationProbeButton = "sample.login.increment-presentation-probe"
+    static let loginToolbarIncrementPresentationProbeButton = "sample.login.toolbar-increment-presentation-probe"
     static let loginButton = "sample.login.button"
     static let loginCancelButton = "sample.login.cancel"
     static let loginReplaceHighPriorityButton = "sample.login.replace-high-priority"

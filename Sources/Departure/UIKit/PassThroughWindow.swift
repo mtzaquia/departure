@@ -34,17 +34,22 @@ final class PassThroughWindow: UIWindow {
         if let rootViewController,
            rootViewController.presentedViewController != nil,
            let view {
-            if rootViewController.presentedViewControllers.contains(where: { presentedViewController in
-                guard let presentedView = presentedViewController.view else {
-                    return false
-                }
+            if rootViewController.topPresentedControllerAllowsChromePassthrough,
+               rootViewController.presentedViewControllers.contains(where: { presentedViewController in
+                   guard let presentedView = presentedViewController.view else {
+                       return false
+                   }
 
-                return view === presentedView || view.isDescendant(of: presentedView)
-            }) {
-                return view
+                   return view === presentedView || view.isDescendant(of: presentedView)
+               }) == false {
+                return nil
             }
 
-            return nil
+            if view === rootView || view.isDescendant(of: rootView) {
+                return nil
+            }
+
+            return view
         }
 
         if let view, view === rootView || view.isDescendant(of: rootView) {
@@ -66,6 +71,10 @@ private extension UIViewController {
         }
 
         return viewControllers
+    }
+
+    var topPresentedControllerAllowsChromePassthrough: Bool {
+        presentedViewControllers.last is AnyPassThroughModalHostingController
     }
 }
 #endif
