@@ -94,14 +94,20 @@ private struct CoverFadeModalPresenter: View {
 
     var body: some View {
         Color.clear
-            .fullScreenCover(item: systemPresentationBinding, onDismiss: finishSystemDismissal) { presentation in
+            .fullScreenCover(item: systemPresentationBinding, onDismiss: {
+                scheduleStateMutation {
+                    finishSystemDismissal()
+                }
+            }) { presentation in
                 destination(for: presentation)
                     .id(presentation.id)
                     .opacity(isContentVisible ? 1 : 0)
                     .presentationBackground(.clear)
                     .onLifecycleEvent { event in
                         if case .installedInWindow(isInitial: true) = event {
-                            fadeInContentIfNeeded(for: presentation.id)
+                            scheduleStateMutation {
+                                fadeInContentIfNeeded(for: presentation.id)
+                            }
                         }
                     }
             }
@@ -117,17 +123,23 @@ private struct CoverFadeModalPresenter: View {
             .onLifecycleEvent { event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
-                    syncPresentation()
+                    scheduleStateMutation {
+                        syncPresentation()
+                    }
 
                 case .updated(isInstalledInWindow: false), .dismantled, .deinitialized:
                     break
                 }
             }
             .onChange(of: route?.id) { _, _ in
-                syncPresentation()
+                scheduleStateMutation {
+                    syncPresentation()
+                }
             }
             .onChange(of: scenePhase) { _, _ in
-                syncPresentation()
+                scheduleStateMutation {
+                    syncPresentation()
+                }
             }
     }
 
@@ -138,13 +150,24 @@ private struct CoverFadeModalPresenter: View {
             },
             set: { newValue in
                 guard newValue == nil else {
-                    setSystemPresentation(newValue)
+                    scheduleStateMutation {
+                        setSystemPresentation(newValue)
+                    }
                     return
                 }
 
-                dismissWithFade()
+                scheduleStateMutation {
+                    dismissWithFade()
+                }
             }
         )
+    }
+
+    private func scheduleStateMutation(_ mutation: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            await Task.yield()
+            mutation()
+        }
     }
 
     private func syncPresentation() {
