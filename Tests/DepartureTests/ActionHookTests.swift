@@ -46,7 +46,7 @@ struct ActionHookTests {
                 }.declaration,
             ]
         )
-        router.rootPath.scopes = [parentScope, childScope]
+        router.normalTree.rootPath.scopes = [parentScope, childScope]
 
         await router.performAction(ContextProbeAction())
 
@@ -58,7 +58,7 @@ struct ActionHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
 
-        router.rootPath.scopes.append(parentScope)
+        router.normalTree.rootPath.scopes.append(parentScope)
         parentScope.setActiveBranch(AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -83,7 +83,7 @@ struct ActionHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
 
-        router.rootPath.scopes.append(parentScope)
+        router.normalTree.rootPath.scopes.append(parentScope)
         parentScope.setActiveBranch(AnyHashable(AppTab.wallet))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -109,7 +109,7 @@ struct ActionHookTests {
         let sourceID = AnyHashable("hooks")
         let recorder = ActionRecorder()
 
-        router.rootPath.scopes.append(scope)
+        router.normalTree.rootPath.scopes.append(scope)
         scope.installHookDeclarations(
             sourceID: sourceID,
             hookDeclarations: [
@@ -142,8 +142,8 @@ struct ActionHookTests {
         await recorder.waitForEvent("ran")
 
         #expect(await recorder.values() == ["reroute", "ran"])
-        #expect(router.rootPath.count == 1)
-        #expect(router.rootPath.last?.route is SettingsRoute)
+        #expect(router.normalTree.rootPath.count == 1)
+        #expect(router.normalTree.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func actionRerouteLoopIsDroppedAfterRetry() async {
@@ -162,8 +162,8 @@ struct ActionHookTests {
         await recorder.waitForEventCount(2)
 
         #expect(await recorder.values() == ["attempt", "attempt"])
-        #expect(router.rootPath.count == 1)
-        #expect(router.rootPath.last?.route is SettingsRoute)
+        #expect(router.normalTree.rootPath.count == 1)
+        #expect(router.normalTree.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func selectedBranchScopeChangesWhenActiveBranchChanges() {
@@ -172,7 +172,7 @@ struct ActionHookTests {
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
 
-        router.rootPath.scopes.append(parentScope)
+        router.normalTree.rootPath.scopes.append(parentScope)
         parentScope.registerBranchScope(homeScope, for: AppTab.home)
         parentScope.registerBranchScope(walletScope, for: AppTab.wallet)
 

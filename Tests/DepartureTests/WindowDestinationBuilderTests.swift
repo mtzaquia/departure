@@ -293,7 +293,7 @@ struct WindowDestinationBuilderTests {
         var branchEnvironment = EnvironmentValues()
         branchEnvironment.windowDestinationTestValue = "branch"
 
-        router.rootPath.scopes = [landingScope]
+        router.normalTree.rootPath.scopes = [landingScope]
         landingScope.installRouteDeclarations(
             id: RootRoute().id,
             branchSelection: AnyRouteBranchSelection(selection),
@@ -360,7 +360,7 @@ struct WindowDestinationBuilderTests {
             matching: .sheet
         ).wrappedValue)
 
-        #expect(presentation.scope === router.rootPath.last)
+        #expect(presentation.scope === router.normalTree.rootPath.last)
         #expect(recorder.values.isEmpty)
         _ = host
     }

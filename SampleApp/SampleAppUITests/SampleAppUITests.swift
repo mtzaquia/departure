@@ -155,16 +155,16 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.startButton)
     }
 
-    func testRoutesFromHighPriorityContextBehaveAsNormalNavigationAndModal() {
+    func testRoutesFromHighPriorityTreeBehaveAsNormalNavigationAndModal() {
         openLanding()
 
         // Reaching profile while logged out reroutes to the login high-priority cover, starting a
-        // high-priority context.
+        // high-priority tree.
         tap(A11y.homeProfileButton)
         assertExists(A11y.loginTitle)
 
-        // A normal push declared inside the context navigates within the login stack (it is not
-        // blocked the way a normal route before the context would be).
+        // A normal push declared inside the tree navigates within the login stack (it is not
+        // blocked the way a normal route before the tree would be).
         tap(A11y.loginIncrementPresentationProbeButton)
         assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
 
@@ -176,14 +176,14 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.loginTitle)
         assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
 
-        // A high-priority sheet declared inside the context presents as a normal sheet over login
+        // A high-priority sheet declared inside the tree presents as a normal sheet over login
         // — it must not escalate/replace the login cover, so login stays in the hierarchy behind it.
         tap(A11y.loginPresentHighPrioritySheetButton)
         assertExists(A11y.loginNoticeText)
         assertExists(A11y.loginTitle)
     }
 
-    func testCriticalPriorityPresentationOverlaysAndReplacesAboveHighPriorityContext() {
+    func testCriticalPriorityPresentationOverlaysAndReplacesAboveHighPriorityTree() {
         openLanding()
 
         tap(A11y.homeProfileButton)

@@ -25,10 +25,38 @@ import Observation
 
 @Observable
 final class RoutePath: Identifiable {
+    enum Position: Equatable, CustomStringConvertible {
+        case owner
+        case scope(RouteScope)
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            switch (lhs, rhs) {
+            case (.owner, .owner):
+                true
+
+            case let (.scope(lhs), .scope(rhs)):
+                lhs === rhs
+
+            case (.owner, .scope), (.scope, .owner):
+                false
+            }
+        }
+
+        var description: String {
+            switch self {
+            case .owner:
+                "owner"
+
+            case let .scope(scope):
+                "scope(\(scope.departureDebugDescription))"
+            }
+        }
+    }
+
     enum UnwindResolution {
         case noRouteToUnwind
         case targetNotFound
-        case keepPathThrough([RouteScope].Index?)
+        case keepPathThrough(Position)
     }
 
     @ObservationIgnored let id = UUID()
@@ -60,10 +88,6 @@ final class RoutePath: Identifiable {
         scopes.count
     }
 
-    var endIndex: [RouteScope].Index {
-        scopes.endIndex
-    }
-
     var first: RouteScope? {
         scopes.first
     }
@@ -76,61 +100,50 @@ final class RoutePath: Identifiable {
         scopes.append(routeScope)
     }
 
-    func index(of routeScope: RouteScope) -> [RouteScope].Index? {
+    func position(of routeScope: RouteScope) -> Position? {
         guard routeScope !== owner else {
-            return nil
+            return .owner
         }
 
-        if let index = scopes.firstIndex(where: { $0 === routeScope }) {
-            return index
+        if let scope = scopes.first(where: { $0 === routeScope }) {
+            return .scope(scope)
         }
 
         guard let parent = routeScope.parent else {
             return nil
         }
 
-        return index(of: parent)
+        return position(of: parent)
     }
 
     func contains(_ routeScope: RouteScope) -> Bool {
         routeScope === owner
-        || index(of: routeScope) != nil
+        || position(of: routeScope) != nil
         || routeScope.parent === owner
     }
 
-    func scope(at index: [RouteScope].Index?) -> RouteScope? {
-        guard let index else {
+    func scope(at position: Position) -> RouteScope? {
+        switch position {
+        case .owner:
             return owner
-        }
 
-        guard scopes.indices.contains(index) else {
-            return nil
+        case let .scope(scope):
+            return scope
         }
-
-        return scopes[index]
     }
 
-    func keepThrough(_ index: [RouteScope].Index?) {
-        guard let index else {
-            scopes.removeAll()
-            return
-        }
-
-        let removalStartIndex = scopes.index(after: index)
-        guard removalStartIndex < scopes.endIndex else {
+    func keepThrough(_ position: Position) {
+        guard let removalStartIndex = index(after: position) else {
             return
         }
 
         scopes.removeSubrange(removalStartIndex..<scopes.endIndex)
     }
 
-    /// The scopes dropped when keeping the path through `index` (i.e. everything after it).
-    func scopesRemovedByKeepingThrough(_ index: [RouteScope].Index?) -> [RouteScope] {
-        guard let index else {
-            return scopes
+    func scopesRemovedAfter(_ position: Position) -> [RouteScope] {
+        guard let removalStartIndex = index(after: position) else {
+            return []
         }
-
-        let removalStartIndex = scopes.index(after: index)
 
         guard removalStartIndex < scopes.endIndex else {
             return []
@@ -139,17 +152,51 @@ final class RoutePath: Identifiable {
         return Array(scopes[removalStartIndex..<scopes.endIndex])
     }
 
+    func positionBefore(_ routeScope: RouteScope) -> Position? {
+        guard let index = scopes.firstIndex(where: { $0 === routeScope }) else {
+            return position(of: routeScope)
+        }
+
+        guard index > scopes.startIndex else {
+            return .owner
+        }
+
+        return .scope(scopes[scopes.index(before: index)])
+    }
+
+    func firstModalPosition(after position: Position) -> Position? {
+        guard let searchStartIndex = index(after: position) else {
+            return nil
+        }
+
+        guard searchStartIndex < scopes.endIndex else {
+            return nil
+        }
+
+        guard let index = scopes[searchStartIndex...].firstIndex(where: {
+            $0.hostDeclaration?.presentationKind != .push
+        }) else {
+            return nil
+        }
+
+        return .scope(scopes[index])
+    }
+
+    var lastPosition: Position {
+        guard let last else {
+            return .owner
+        }
+
+        return .scope(last)
+    }
+
     func unwindResolution(to target: Router.UnwindTarget?) -> UnwindResolution {
         guard let target else {
-            guard let currentPathIndex = scopes.indices.last else {
+            guard let currentScope = scopes.last else {
                 return .noRouteToUnwind
             }
 
-            guard currentPathIndex > scopes.startIndex else {
-                return .keepPathThrough(nil)
-            }
-
-            return .keepPathThrough(scopes.index(before: currentPathIndex))
+            return .keepPathThrough(positionBefore(currentScope) ?? .owner)
         }
 
         switch target {
@@ -157,18 +204,32 @@ final class RoutePath: Identifiable {
             // Both clear the resolved path entirely; they differ only in which path
             // `Router.unwindAndWait` resolves against (the root path vs. the nearest branch path).
             // Clearing an already-empty branch path is the `.nearestBranch` no-op.
-            return .keepPathThrough(nil)
+            return .keepPathThrough(.owner)
 
         case let .id(id):
             if owner?.id == id {
-                return .keepPathThrough(nil)
+                return .keepPathThrough(.owner)
             }
 
-            guard let pathIndex = scopes.lastIndex(where: { $0.id == id }) else {
+            guard let scope = scopes.last(where: { $0.id == id }) else {
                 return .targetNotFound
             }
 
-            return .keepPathThrough(pathIndex)
+            return .keepPathThrough(.scope(scope))
+        }
+    }
+
+    private func index(after position: Position) -> [RouteScope].Index? {
+        switch position {
+        case .owner:
+            return scopes.startIndex
+
+        case let .scope(scope):
+            guard let index = scopes.firstIndex(where: { $0 === scope }) else {
+                return nil
+            }
+
+            return scopes.index(after: index)
         }
     }
 }

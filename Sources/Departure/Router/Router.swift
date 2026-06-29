@@ -60,11 +60,9 @@ public final class Router: Identifiable, Equatable {
     let root: RouteScope
 
     @ObservationIgnored
-    let rootPath: RoutePath
+    let normalTree: RouteTree
 
-    var highContext: RouteContext?
-
-    var criticalContext: RouteContext?
+    var routeForest: RouteForest
 
     @ObservationIgnored
     var pendingRoute: PendingRoute?
@@ -76,23 +74,26 @@ public final class Router: Identifiable, Equatable {
     var isNavigationInProgress = false
 
     @ObservationIgnored
-    var deliveredUnwindHandlerKeys: Set<UnwindHandlerDeliveryKey> = []
+    var deliveredUnwindHandlers: [UnwindHandlerDeliveryKey: DeliveredUnwindHandler] = [:]
 
     @ObservationIgnored
     var routeGraphMutationDepth = 0
 
-    var activeRouteScopeID: ObjectIdentifier
+    var activeRouteScopeIDs: Set<ObjectIdentifier>
 
     var currentRouteScope: RouteScope {
-        currentRoutePath.last?.activeLocalScope ?? activeContext.path.owner?.activeLocalScope ?? root.activeLocalScope
+        routeForest.activeTree.currentRouteScope
     }
 
     /// Creates an empty router.
     public init() {
         let root = RouteScope(id: UUID(), route: nil)
+        let rootPath = RoutePath(owner: root)
         self.root = root
-        self.rootPath = RoutePath(owner: root)
-        self.activeRouteScopeID = ObjectIdentifier(root)
+        let normalTree = RouteTree(priority: .normal, root: root, rootPath: rootPath)
+        self.normalTree = normalTree
+        self.routeForest = RouteForest(normalTree: normalTree)
+        self.activeRouteScopeIDs = normalTree.activeRouteScopeIDs
     }
 
     /// Requests a route presentation.
@@ -151,9 +152,9 @@ extension Router {
     }
 
     private func reconcileActiveRouteScopeID() {
-        let routeScopeID = ObjectIdentifier(currentRouteScope)
-        if activeRouteScopeID != routeScopeID {
-            activeRouteScopeID = routeScopeID
+        let routeScopeIDs = routeForest.activeTree.activeRouteScopeIDs
+        if activeRouteScopeIDs != routeScopeIDs {
+            activeRouteScopeIDs = routeScopeIDs
         }
     }
 }
