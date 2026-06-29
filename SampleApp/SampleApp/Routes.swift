@@ -126,12 +126,6 @@ struct NavigationBarFadeOcclusionRoute: Route {
     }
 }
 
-struct NestedNavigationBarFadeRoute: Route {
-    func destination() -> some View {
-        NestedNavigationBarFadeView()
-    }
-}
-
 struct TopLevelSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.samplePresentationSource) private var samplePresentationSource
@@ -267,12 +261,6 @@ struct NavigationBarFadeOcclusionView: View {
                 Text("Toolbar taps: \(toolbarTapCount)")
                     .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeToolbarTapCount)
 
-                Button("Present nested fade") {
-                    Task {
-                        await router.present(NestedNavigationBarFadeRoute())
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadePresentNestedButton)
             }
             .scrollContentBackground(.hidden)
         }
@@ -284,21 +272,6 @@ struct NavigationBarFadeOcclusionView: View {
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeToolbarButton)
             }
-        }
-        .routes {
-            Cover(NestedNavigationBarFadeRoute.self, transition: .fade, providesNavigation: false)
-        }
-    }
-}
-
-struct NestedNavigationBarFadeView: View {
-    var body: some View {
-        ZStack {
-            Color.white
-                .ignoresSafeArea()
-
-            Text("Nested navigation bar fade")
-                .accessibilityIdentifier(SampleAppAccessibility.nestedNavigationBarFadeText)
         }
     }
 }

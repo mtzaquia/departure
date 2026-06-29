@@ -332,7 +332,7 @@ struct WindowDestinationBuilderTests {
         #expect(presentation.sourceEnvironment.windowDestinationTestValue == "container")
     }
 
-    @Test func normalPresentationResolutionDoesNotUseWindowDestinationBuilder() async throws {
+    @Test func normalSheetPresentationDoesNotUseWindowDestinationBuilder() async throws {
         let router = Router()
         let recorder = WindowDestinationRecorder()
 
@@ -363,5 +363,45 @@ struct WindowDestinationBuilderTests {
         #expect(presentation.scope === router.normalTree.rootPath.last)
         #expect(recorder.values.isEmpty)
         _ = host
+    }
+
+    @Test func normalFadeCoverDestinationUsesWindowDestinationBuilder() async throws {
+        let router = Router()
+        let recorder = WindowDestinationRecorder()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(SettingsRoute.self, transition: .fade)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(SettingsRoute())
+        let presentation = try #require(router.routePresentationBinding(
+            from: router.root,
+            matching: .cover(.fade)
+        ).wrappedValue)
+        var environment = EnvironmentValues()
+        environment.windowDestinationTestValue = "fade"
+
+        let destinationBuilder = WindowDestinationBuilder { destination, environment in
+            RecordingWindowDestinationView(
+                destination: destination,
+                environment: environment,
+                recorder: recorder
+            )
+        }
+
+        _ = RouteDestinationSnapshot(
+            route: RoutePresentation(
+                scope: presentation.scope,
+                declaration: presentation.declaration,
+                sourceEnvironment: environment
+            ),
+            destinationBuilder: destinationBuilder
+        )
+
+        #expect(recorder.values == ["fade"])
     }
 }

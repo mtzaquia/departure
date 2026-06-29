@@ -116,10 +116,8 @@ enum SampleAppAccessibility {
     static let messageDismissPayloadButton = "sample.message.dismiss-payload"
     static let messageDismissMismatchedPayloadButton = "sample.message.dismiss-mismatched-payload"
     static let navigationBarFadeText = "sample.navigation-bar-fade.text"
-    static let navigationBarFadePresentNestedButton = "sample.navigation-bar-fade.present-nested"
     static let navigationBarFadeToolbarButton = "sample.navigation-bar-fade.toolbar-button"
     static let navigationBarFadeToolbarTapCount = "sample.navigation-bar-fade.toolbar-tap-count"
-    static let nestedNavigationBarFadeText = "sample.nested-navigation-bar-fade.text"
 
     static let dismissProbeText = "sample.dismiss-probe.text"
     static let dismissProbeDismissButton = "sample.dismiss-probe.dismiss"
