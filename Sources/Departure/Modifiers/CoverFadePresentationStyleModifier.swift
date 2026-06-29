@@ -96,8 +96,12 @@ private struct CoverFadeModalPresenter: View {
         Color.clear
             .fullScreenCover(item: systemPresentationBinding, onDismiss: finishSystemDismissal) { presentation in
                 destination(for: presentation)
+                    .id(presentation.id)
                     .opacity(isContentVisible ? 1 : 0)
                     .presentationBackground(.clear)
+                    .onAppear {
+                        presentContentIfNeeded(for: presentation.id)
+                    }
             }
             .transaction { transaction in
                 transaction.disablesAnimations = true
@@ -156,16 +160,23 @@ private struct CoverFadeModalPresenter: View {
         dismissalTask?.cancel()
         presentationTask?.cancel()
         presentationTask = nil
-        setSystemPresentation(presentation)
         isContentVisible = false
+        setSystemPresentation(presentation)
+    }
 
+    private func presentContentIfNeeded(for id: RoutePresentation.ID) {
+        presentationTask?.cancel()
         presentationTask = Task { @MainActor in
             await Task.yield()
-            guard Task.isCancelled == false, systemPresentation?.id == presentation.id else {
+            guard
+                Task.isCancelled == false,
+                isDismissing == false,
+                systemPresentation?.id == id
+            else {
                 return
             }
 
-            withAnimation(.easeInOut(duration: 0.25)) {
+            withAnimation(.easeInOut(duration: presentationFadeDuration)) {
                 isContentVisible = true
             }
             presentationTask = nil
@@ -187,11 +198,11 @@ private struct CoverFadeModalPresenter: View {
         presentationTask = nil
         dismissalTask?.cancel()
         dismissalTask = Task { @MainActor in
-            withAnimation(.easeInOut(duration: 0.25)) {
+            withAnimation(.easeInOut(duration: dismissalFadeDuration)) {
                 isContentVisible = false
             }
 
-            try? await Task.sleep(for: .seconds(0.25))
+            try? await Task.sleep(for: .seconds(dismissalFadeDuration))
             guard Task.isCancelled == false else {
                 return
             }
@@ -232,6 +243,14 @@ private struct CoverFadeModalPresenter: View {
         withTransaction(transaction) {
             systemPresentation = presentation
         }
+    }
+
+    private var presentationFadeDuration: TimeInterval {
+        0.35
+    }
+
+    private var dismissalFadeDuration: TimeInterval {
+        0.25
     }
 }
 
