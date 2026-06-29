@@ -14,7 +14,7 @@ await router.present(SettingsRoute())
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/mtzaquia/departure.git", from: "1.2.0"),
+  .package(url: "https://github.com/mtzaquia/departure.git", from: "1.3.0"),
 ],
 ```
 
