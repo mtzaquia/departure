@@ -370,6 +370,40 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.startButton)
     }
 
+    func testCapturedLandingUnwindRouteActionFromDeepNavigationPath() {
+        openLanding()
+        tapSettingsTab()
+
+        assertLabel(A11y.landingContainerHookStatus, contains: "Container unwind hooks: 0")
+        assertLabel(A11y.settingsBranchHookStatus, contains: "Branch unwind hooks: 0")
+
+        tap(A11y.settingsAppearanceButton)
+        assertExists(A11y.appearanceTitle)
+
+        tap(A11y.appearancePresentAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        tap(A11y.authenticationUnwindCapturedLandingButton)
+        assertExists(A11y.startButton)
+        assertGone(A11y.landing)
+        assertGone(A11y.authenticationTitle)
+        assertGone(A11y.appearanceTitle)
+        assertLabel(A11y.rootHookStatus, contains: "Root unwind hooks: 0")
+
+        openLanding()
+        tapSettingsTab()
+        assertExists(A11y.settingsAuthenticationButton)
+        assertGone(A11y.authenticationTitle)
+        assertGone(A11y.appearanceTitle)
+        assertLabel(A11y.landingContainerHookStatus, contains: "Container unwind hooks: 0")
+        assertLabel(A11y.settingsBranchHookStatus, contains: "Branch unwind hooks: 0")
+
+        tap(A11y.settingsPresentHomeMessageButton)
+        assertExists(A11y.homeWelcome)
+        assertExists(A11y.messageText)
+        assertLabel(A11y.messagePresentationSource, contains: "top-level branched scope")
+    }
+
     func testAppSmokeForActionsResolutionAndDroppedRoutes() {
         openLanding()
         tapSettingsTab()
@@ -569,6 +603,7 @@ private enum A11y {
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
     static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
     static let authenticationUnwindToBranchIDButton = "sample.authentication.unwind-to-branch-id"
+    static let authenticationUnwindCapturedLandingButton = "sample.authentication.unwind-captured-landing"
 
     static let topLevelSheetText = "sample.top-level-sheet.text"
     static let topLevelSheetPresentationSource = "sample.top-level-sheet.presentation-source"

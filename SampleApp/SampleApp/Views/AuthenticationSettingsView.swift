@@ -91,6 +91,11 @@ struct AuthenticationSettingsView: View {
                     }
                     .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToBranchIDButton)
                 }
+
+                Button("Unwind captured Landing route") {
+                    Storage.shared.landingUnwindRoute()
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindCapturedLandingButton)
             }
         }
         .navigationTitle("Authentication")

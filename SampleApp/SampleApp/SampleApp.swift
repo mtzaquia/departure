@@ -36,6 +36,7 @@ final class Storage {
     var rootUnwindHookCount = 0
     var landingContainerUnwindHookCount = 0
     var settingsBranchUnwindHookCount = 0
+    var landingUnwindRoute = UnwindRouteAction()
 
     func reset() {
         isLoggedIn = false
@@ -47,6 +48,7 @@ final class Storage {
         rootUnwindHookCount = 0
         landingContainerUnwindHookCount = 0
         settingsBranchUnwindHookCount = 0
+        landingUnwindRoute = UnwindRouteAction()
     }
 }
 

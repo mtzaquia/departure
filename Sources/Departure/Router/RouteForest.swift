@@ -38,6 +38,12 @@ struct RouteForest {
         let preservedPaths: [PreservedRoutePath]
     }
 
+    struct ScopedUnwindPlan {
+        let removedScopes: [RouteScope]
+        let pathTrims: [(path: RoutePath, keepThrough: RoutePath.Position)]
+        let preservedPaths: [PreservedRoutePath]
+    }
+
     let normalTree: RouteTree
     var highTree: RouteTree?
     var criticalTree: RouteTree?
@@ -143,6 +149,50 @@ struct RouteForest {
             removedScopes: removedScopes,
             branchPaths: branchPaths,
             inactiveBranchModalTrims: inactiveBranchModalTrims,
+            preservedPaths: preservedPaths
+        )
+    }
+
+    func scopedUnwindPlan(
+        from routePath: RoutePath,
+        after position: RoutePath.Position
+    ) -> ScopedUnwindPlan {
+        let directlyRemovedScopes = routePath.scopesRemovedAfter(position)
+        var ownedPaths: [RoutePath] = []
+
+        for removedScope in directlyRemovedScopes {
+            for tree in allTrees {
+                ownedPaths.appendUnique(contentsOf: tree.allBranchPaths(under: removedScope))
+            }
+        }
+
+        for elevatedTree in elevatedTrees {
+            guard let anchorScope = elevatedTree.anchor?.routeScope else {
+                continue
+            }
+
+            guard directlyRemovedScopes.contains(where: { $0 === anchorScope }) else {
+                continue
+            }
+
+            ownedPaths.appendUnique(contentsOf: [elevatedTree.rootPath])
+            ownedPaths.appendUnique(contentsOf: elevatedTree.allBranchPaths())
+        }
+
+        let pathTrims = [(path: routePath, keepThrough: position)]
+        + ownedPaths.map { (path: $0, keepThrough: RoutePath.Position.owner) }
+
+        let removedScopes = pathTrims.flatMap {
+            $0.path.scopesRemovedAfter($0.keepThrough)
+        }
+
+        let preservedPaths = pathTrims.map {
+            PreservedRoutePath($0.path, after: $0.keepThrough)
+        }.filter { $0.scopes.isEmpty == false }
+
+        return ScopedUnwindPlan(
+            removedScopes: removedScopes,
+            pathTrims: pathTrims,
             preservedPaths: preservedPaths
         )
     }

@@ -259,6 +259,62 @@ extension Router {
         }
     }
 
+    @discardableResult
+    func unwindRoute(from sourceScope: RouteScope, payload: Any? = nil) async -> Bool {
+        log.departureDebug(.unwindRequested(target: nil))
+
+        guard
+            let routePath = routeForest.routePath(containing: sourceScope),
+            let targetPosition = routePath.positionBefore(sourceScope)
+        else {
+            log.departureDebug(.unwindSkippedNoRoute)
+            return true
+        }
+
+        let plan = routeForest.scopedUnwindPlan(from: routePath, after: targetPosition)
+        guard plan.removedScopes.isEmpty == false else {
+            log.departureDebug(.unwindSkippedNoRoute)
+            return true
+        }
+
+        log.departureDebug(.unwindAccepted(
+            keepThrough: targetPosition,
+            removing: plan.removedScopes.count
+        ))
+
+        let targetScope = unwindHandlerScope(
+            for: nil,
+            in: routePath,
+            keepThrough: targetPosition
+        )
+
+        await performAcceptedUnwind(
+            for: sourceScope,
+            payload: payload,
+            in: targetScope,
+            removing: plan.removedScopes,
+            afterScopesLeave: {
+                unwindPresentationSnapshot = nil
+            }
+        ) {
+            unwindPresentationSnapshot = UnwindPresentationSnapshot(
+                preservedPaths: plan.preservedPaths.map {
+                    UnwindPresentationSnapshot.PreservedRoutePath(
+                        routePath: $0.routePath,
+                        scopes: $0.scopes
+                    )
+                },
+                routeForest: routeForest
+            )
+
+            for trim in plan.pathTrims {
+                keepPathThrough(trim.keepThrough, in: trim.path)
+            }
+        }
+
+        return true
+    }
+
     func unwindRootAndWait(sourceScope: RouteScope?, payload: Any?) async -> Bool {
         let plan = routeForest.rootUnwindPlan()
 
