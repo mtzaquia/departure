@@ -373,6 +373,45 @@ await router.unwind(to: .id("documents"), payload: SaveResult.saved)
 > [!NOTE]
 > `unwind(to:)` returns `false` when an explicit target is not found. Check the return value before presenting a continuation route if your flow requires it.
 
+### `@Environment(\.unwindRoute)`
+
+Use `unwindRoute` when a view needs to dismiss its own route scope, even if another route has been
+presented above it by the time the action runs.
+
+```swift
+struct EditorView: View {
+  @Environment(\.unwindRoute) private var unwindRoute
+
+  var body: some View {
+    Button("Done") {
+      unwindRoute()
+    }
+  }
+}
+```
+
+`unwindRoute` is scoped to the view hierarchy where it is read. Calling it later still starts the
+unwind from that captured route scope rather than from the router's current top scope. This is useful
+for passing a dismiss action into deeper views, toolbars, or callbacks without changing which route
+owns the unwind.
+
+```swift
+struct EditorView: View {
+  @Environment(\.unwindRoute) private var unwindRoute
+
+  var body: some View {
+    EditorForm(onComplete: {
+      unwindRoute(payload: SaveResult.saved)
+    })
+  }
+}
+```
+
+All unwind rules still apply: owned branch paths and elevated presentations are cleared when the
+originating scope is removed, presentation snapshots are preserved while removed scopes leave the
+view hierarchy, and `UnwindHandler` lookup starts from the scope where the unwind lands. Payloads are
+delivered to matching typed `UnwindHandler` declarations just like `router.unwind(payload:)`.
+
 ## Branches
 
 Use branched scopes for selection-based containers with lazy content, such as `TabView`.
