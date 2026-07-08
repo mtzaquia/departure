@@ -58,8 +58,7 @@ struct ElevatedPrioritySheetHost: View {
                 onDismiss: onDismiss,
                 destination: presentation.destination
             )
-                .environment(router)
-                .environment(\.routing, RoutingAction(router: router))
+            .environment(router)
         }
         .allowsHitTesting(false)
     }

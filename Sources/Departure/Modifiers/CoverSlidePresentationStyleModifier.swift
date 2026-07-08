@@ -71,7 +71,6 @@ struct ElevatedPriorityCoverSlideHost: View {
                 destination: presentation.destination
             )
                 .environment(router)
-                .environment(\.routing, RoutingAction(router: router))
         }
         .allowsHitTesting(false)
     }

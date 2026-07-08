@@ -364,11 +364,6 @@ await router.unwind(to: .id("documents"), payload: SaveResult.saved)
 > [!NOTE]
 > `unwind(to:)` returns `false` when an explicit target is not found. Check the return value before presenting a continuation route if your flow requires it.
 
-> [!IMPORTANT]
-> Parameterless `router.unwind()` and `router.unwind(payload:)` are deprecated. In SwiftUI views,
-> use `@Environment(\.unwindRoute)` to unwind the local route scope. Use `router.unwind(to:)` only
-> when the target is explicit.
-
 ### `@Environment(\.unwindRoute)`
 
 Use `unwindRoute` when a view needs to dismiss its own route scope, even if another route has been

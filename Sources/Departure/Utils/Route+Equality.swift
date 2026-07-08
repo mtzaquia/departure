@@ -32,7 +32,7 @@ extension Route {
             return equatable._isEqual(to: route)
         }
 
-        return self.isEqual(to: route)
+        return false
     }
 }
 

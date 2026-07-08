@@ -161,7 +161,7 @@ extension Router {
             }
             routePath = branchPath
 
-        case nil, .id:
+        case nil, .previous, .id:
             routePath = routeForest.activeTree.currentRoutePath
         }
 
