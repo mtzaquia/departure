@@ -333,7 +333,7 @@ struct UnwindHookTests {
         )
         router.normalTree.rootPath.scopes = [parentScope, sourceScope, childScope, topScope]
 
-        UnwindRouteAction(router: router, routeScope: sourceScope)(payload: "done")
+        await UnwindRouteAction(router: router, routeScope: sourceScope)(payload: "done")
         await waitUntil {
             router.normalTree.rootPath.scopes.count == 1
             && router.normalTree.rootPath.scopes.first === parentScope

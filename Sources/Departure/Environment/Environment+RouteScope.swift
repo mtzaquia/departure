@@ -29,7 +29,9 @@ import SwiftUI
 /// @Environment(\.unwindRoute) private var unwindRoute
 ///
 /// Button("Done") {
-///     unwindRoute()
+///     Task {
+///         await unwindRoute()
+///     }
 /// }
 /// ```
 public struct UnwindRouteAction: Equatable {
@@ -39,12 +41,12 @@ public struct UnwindRouteAction: Equatable {
     }
 
     private let identity: Identity
-    private let handle: @MainActor (Any?) -> Void
+    private let handle: @MainActor (Any?) async -> Bool
 
     /// Creates an inactive unwind action.
     public init() {
         self.identity = .inactive
-        self.handle = { _ in }
+        self.handle = { _ in true }
     }
 
     init(router: Router, routeScope: RouteScope) {
@@ -54,23 +56,29 @@ public struct UnwindRouteAction: Equatable {
         )
         self.handle = { [weak routeScope] payload in
             guard let routeScope else {
-                return
+                return true
             }
 
-            Task { @MainActor in
-                await router.unwindRoute(from: routeScope, payload: payload)
-            }
+            return await router.unwindRoute(from: routeScope, payload: payload)
         }
     }
 
     /// Unwinds this view's local route scope.
-    public func callAsFunction() {
-        handle(nil)
+    ///
+    /// This method returns after the unwind request has resolved, the router path has been updated,
+    /// and any removed installed route scopes have left the view hierarchy.
+    @discardableResult
+    public func callAsFunction() async -> Bool {
+        await handle(nil)
     }
 
     /// Unwinds this view's local route scope and delivers a payload to a matching ``UnwindHandler``.
-    public func callAsFunction<Payload>(payload: Payload) {
-        handle(payload)
+    ///
+    /// This method returns after the unwind request has resolved, the router path has been updated,
+    /// and any removed installed route scopes have left the view hierarchy.
+    @discardableResult
+    public func callAsFunction<Payload>(payload: Payload) async -> Bool {
+        await handle(payload)
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {

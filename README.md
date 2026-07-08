@@ -384,7 +384,9 @@ struct EditorView: View {
 
   var body: some View {
     Button("Done") {
-      unwindRoute()
+      Task {
+        await unwindRoute()
+      }
     }
   }
 }
@@ -393,7 +395,9 @@ struct EditorView: View {
 `unwindRoute` is scoped to the view hierarchy where it is read. Calling it later still starts the
 unwind from that captured route scope rather than from the router's current top scope. This is useful
 for passing a dismiss action into deeper views, toolbars, or callbacks without changing which route
-owns the unwind.
+owns the unwind. Like `router.unwind(...)`, it is asynchronous and returns after the unwind has
+resolved, the router path has been updated, and removed installed route scopes have left the view
+hierarchy.
 
 ```swift
 struct EditorView: View {
@@ -401,7 +405,9 @@ struct EditorView: View {
 
   var body: some View {
     EditorForm(onComplete: {
-      unwindRoute(payload: SaveResult.saved)
+      Task {
+        await unwindRoute(payload: SaveResult.saved)
+      }
     })
   }
 }
