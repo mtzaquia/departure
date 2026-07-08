@@ -216,16 +216,6 @@ struct RouteForest {
             }
         }
 
-        if position == .owner,
-           let clearedTree = tree(containing: routePath),
-           clearedTree.priority != .normal,
-           directlyRemovedScopes.isEmpty == false {
-            for elevatedTree in elevatedTrees where elevatedTree.priority > clearedTree.priority {
-                ownedPaths.appendUnique(contentsOf: [elevatedTree.rootPath])
-                ownedPaths.appendUnique(contentsOf: elevatedTree.allBranchPaths())
-            }
-        }
-
         for elevatedTree in elevatedTrees {
             guard let anchorScope = elevatedTree.anchor?.routeScope else {
                 continue
