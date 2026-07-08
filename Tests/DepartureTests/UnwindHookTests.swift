@@ -333,13 +333,14 @@ struct UnwindHookTests {
         )
         router.normalTree.rootPath.scopes = [parentScope, sourceScope, childScope, topScope]
 
-        await UnwindRouteAction(router: router, routeScope: sourceScope)(payload: "done")
+        let didUnwind = await UnwindRouteAction(router: router, routeScope: sourceScope)(payload: "done")
         await waitUntil {
             router.normalTree.rootPath.scopes.count == 1
             && router.normalTree.rootPath.scopes.first === parentScope
         }
         await recorder.waitForEventCount(1)
 
+        #expect(didUnwind)
         #expect(recorder.events == ["parent"])
         #expect(recorder.payloads == ["done"])
         #expect(router.normalTree.rootPath.scopes.count == 1)
@@ -373,12 +374,17 @@ struct UnwindHookTests {
         settingsScope.path.scopes = [appearanceScope, authenticationScope]
         landingScope.registerBranchScope(settingsScope, for: AppTab.wallet)
 
-        await router.unwindRoute(from: landingScope)
+        let didUnwind = await UnwindRouteAction(router: router, routeScope: landingScope)()
         await Task.yield()
 
+        #expect(didUnwind)
         #expect(recorder.events.isEmpty)
         #expect(router.normalTree.rootPath.isEmpty)
         #expect(settingsScope.path.isEmpty)
+    }
+
+    @Test func inactiveUnwindRouteActionReportsNoRoute() async {
+        #expect(await UnwindRouteAction()() == false)
     }
 
     @Test func unwindRouteActionHasStableIdentityForSameRouterAndScope() {

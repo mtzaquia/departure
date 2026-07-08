@@ -46,7 +46,8 @@ public final class Router: Identifiable, Equatable {
         /// Unwinds to the first scope of the nearest enclosing branch.
         ///
         /// Brings the user to the branch's root regardless of how deep the current route is. If the
-        /// user is already at the branch root — or is not inside a branch — this is a no-op.
+        /// user is already at the branch root, this is a no-op. If the user is not inside a branch,
+        /// the unwind request returns `false`.
         case nearestBranch
 
         /// Unwinds to the scope immediately before the current, top-most scope.
@@ -113,7 +114,7 @@ public final class Router: Identifiable, Equatable {
     /// and any removed installed route scopes have left the view hierarchy.
     ///
     /// - Parameter target: The target to unwind to.
-    /// - Returns: `false` when an explicit target was requested but not found.
+    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
     @discardableResult
     public func unwind(to target: UnwindTarget) async -> Bool {
         await unwindAndWait(to: target)
@@ -127,7 +128,7 @@ public final class Router: Identifiable, Equatable {
     /// - Parameters:
     ///   - target: The target to unwind to.
     ///   - payload: A value delivered to a matching ``UnwindHandler``.
-    /// - Returns: `false` when an explicit target was requested but not found.
+    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
     @discardableResult
     public func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {
         await unwindAndWait(to: target, payload: payload)

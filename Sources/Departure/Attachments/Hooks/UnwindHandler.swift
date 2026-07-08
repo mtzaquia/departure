@@ -23,7 +23,7 @@
 /// Handles a matching route when it unwinds to this scope.
 ///
 /// Unwinds can be requested with ``UnwindRouteAction`` from `@Environment(\.unwindRoute)` for
-/// local route-scope dismissal, or with ``Router/unwind(to:)`` and
+/// captured route-scope dismissal, or with ``Router/unwind(to:)`` and
 /// ``Router/unwind(to:payload:)`` for explicit router-level targets.
 ///
 /// The handler runs after the unwind request is accepted. The router does not wait for the handler

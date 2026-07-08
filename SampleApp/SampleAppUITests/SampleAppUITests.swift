@@ -370,7 +370,7 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.startButton)
     }
 
-    func testCapturedLandingUnwindRouteActionFromDeepNavigationPath() {
+    func testStoredUnwindRouteActionDismissesCapturedRouteScope() {
         openLanding()
         tapSettingsTab()
 
@@ -383,7 +383,7 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.appearancePresentAuthenticationButton)
         assertExists(A11y.authenticationTitle)
 
-        tap(A11y.authenticationUnwindCapturedLandingButton)
+        tap(A11y.authenticationUnwindStoredActionButton)
         assertExists(A11y.startButton)
         assertGone(A11y.landing)
         assertGone(A11y.authenticationTitle)
@@ -603,7 +603,7 @@ private enum A11y {
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
     static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
     static let authenticationUnwindToBranchIDButton = "sample.authentication.unwind-to-branch-id"
-    static let authenticationUnwindCapturedLandingButton = "sample.authentication.unwind-captured-landing"
+    static let authenticationUnwindStoredActionButton = "sample.authentication.unwind-stored-action"
 
     static let topLevelSheetText = "sample.top-level-sheet.text"
     static let topLevelSheetPresentationSource = "sample.top-level-sheet.presentation-source"

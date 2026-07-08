@@ -97,7 +97,7 @@ enum SampleAppAccessibility {
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
     static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
     static let authenticationUnwindToBranchIDButton = "sample.authentication.unwind-to-branch-id"
-    static let authenticationUnwindCapturedLandingButton = "sample.authentication.unwind-captured-landing"
+    static let authenticationUnwindStoredActionButton = "sample.authentication.unwind-stored-action"
 
     static let topLevelSheetText = "sample.top-level-sheet.text"
     static let topLevelSheetPresentationSource = "sample.top-level-sheet.presentation-source"

@@ -74,7 +74,7 @@ public extension Route {
 
 // MARK: - Supporting types
 
-/// The result of a ``Route/resolveRoute()-56snl`` evaluation.
+/// The result of a ``Route/resolveRoute()`` evaluation.
 public enum RouteResolution {
     /// The router is allowed to present the requested route.
     case allow

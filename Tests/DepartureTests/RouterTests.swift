@@ -155,6 +155,21 @@ struct RouterTests {
         #expect(router.normalTree.rootPath.isEmpty)
     }
 
+    @Test func publicUnwindReportsNoRouteAtRoot() async {
+        let router = Router()
+
+        #expect(await router.unwind(to: .root) == false)
+        #expect(await router.unwind(to: .previous) == false)
+        #expect(router.normalTree.rootPath.isEmpty)
+    }
+
+    @Test func publicUnwindReportsMissingNearestBranch() async {
+        let router = Router()
+
+        #expect(await router.unwind(to: .nearestBranch) == false)
+        #expect(router.normalTree.rootPath.isEmpty)
+    }
+
     @Test func routeRequestSelectsInactiveBranchAndWaitsForInstalledBranchScope() async {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.wallet)
