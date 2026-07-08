@@ -142,6 +142,11 @@ extension Router {
 
         if case .root = target {
             let plan = routeForest.unwindPlan(for: .root)
+            guard plan.removedScopes.isEmpty == false else {
+                log.departureDebug(.unwindSkippedNoRoute)
+                return false
+            }
+
             log.departureDebug(.unwindAccepted(
                 keepThrough: .owner,
                 removing: plan.removedScopes.count
@@ -157,8 +162,7 @@ extension Router {
         }
 
         // Non-root targets differ only by which path they clear. `.nearestBranch` resolves against
-        // the enclosing branch path (no-op when there isn't one). Everything else resolves against
-        // the current path.
+        // the enclosing branch path. Everything else resolves against the current path.
         let routePath: RoutePath
         switch target {
         case .root:
@@ -168,18 +172,18 @@ extension Router {
             guard let branchPath = nearestBranchPath else {
                 // Not inside a branch — there is nothing nearer to unwind to.
                 log.departureDebug(.unwindSkippedNotInsideBranch)
-                return true
+                return false
             }
             routePath = branchPath
 
-        case nil, .id:
+        case nil, .previous, .id:
             routePath = routeForest.activeTree.currentRoutePath
         }
 
         switch routePath.unwindResolution(to: target) {
         case .noRouteToUnwind:
             log.departureDebug(.unwindSkippedNoRoute)
-            return true
+            return false
 
         case .targetNotFound:
             guard let ancestorResolution = routeForest.ancestorUnwindResolution(from: routePath, to: target) else {
@@ -232,21 +236,21 @@ extension Router {
     }
 
     @discardableResult
-    func unwindRoute(from sourceScope: RouteScope, payload: Any? = nil) async -> Bool {
-        log.departureDebug(.unwindRequested(target: nil))
+    func unwindPrevious(from sourceScope: RouteScope, payload: Any? = nil) async -> Bool {
+        log.departureDebug(.unwindRequested(target: .previous))
 
         guard
             let routePath = routeForest.routePath(containing: sourceScope),
             let targetPosition = routePath.positionBefore(sourceScope)
         else {
             log.departureDebug(.unwindSkippedNoRoute)
-            return true
+            return false
         }
 
         let plan = routeForest.unwindPlan(for: .scoped(routePath: routePath, after: targetPosition))
         guard plan.removedScopes.isEmpty == false else {
             log.departureDebug(.unwindSkippedNoRoute)
-            return true
+            return false
         }
 
         log.departureDebug(.unwindAccepted(
@@ -255,7 +259,7 @@ extension Router {
         ))
 
         let targetScope = unwindHandlerScope(
-            for: nil,
+            for: .previous,
             in: routePath,
             keepThrough: targetPosition
         )

@@ -43,9 +43,8 @@ struct RouterTests {
         #expect(EquatableOnlyRoute(value: 1)._isEqual(to: EquatableOnlyRoute(value: 2)) == false)
     }
 
-    @Test func routeEqualityFallsBackToProtocolEqualityForNonEquatableRoutes() {
-        #expect(ProtocolEqualOnlyRoute(value: 1)._isEqual(to: ProtocolEqualOnlyRoute(value: 1)))
-        #expect(ProtocolEqualOnlyRoute(value: 1)._isEqual(to: ProtocolEqualOnlyRoute(value: 2)) == false)
+    @Test func routeEqualityRequiresEquatableConformance() {
+        #expect(NonEquatableRoute(value: 1)._isEqual(to: NonEquatableRoute(value: 1)) == false)
     }
 
     @Test func publicRoutingActionsDispatchThroughRouter() async {
@@ -65,7 +64,7 @@ struct RouterTests {
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last?.route is HomeDetailRoute)
 
-        await router.unwind(to: nil)
+        await router.unwind(to: .previous)
 
         #expect(router.normalTree.rootPath.isEmpty)
 
@@ -209,6 +208,21 @@ struct RouterTests {
         }
 
         #expect(didUnwind == false)
+        #expect(router.normalTree.rootPath.isEmpty)
+    }
+
+    @Test func publicUnwindReportsNoRouteAtRoot() async {
+        let router = Router()
+
+        #expect(await router.unwind(to: .root) == false)
+        #expect(await router.unwind(to: .previous) == false)
+        #expect(router.normalTree.rootPath.isEmpty)
+    }
+
+    @Test func publicUnwindReportsMissingNearestBranch() async {
+        let router = Router()
+
+        #expect(await router.unwind(to: .nearestBranch) == false)
         #expect(router.normalTree.rootPath.isEmpty)
     }
 
@@ -1887,7 +1901,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(loginScope)
 
         let unwindTask = Task {
-            guard await router.unwind(to: nil) else {
+            guard await router.unwind(to: .previous) else {
                 return
             }
 
@@ -2227,7 +2241,7 @@ struct RouterTests {
         await router.requestRoute(MessageRoute())
         #expect(homeScope.path.count == 1)
 
-        await router.unwind(to: nil)
+        await router.unwind(to: .previous)
 
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last === landingScope)
@@ -2288,7 +2302,7 @@ struct RouterTests {
         #expect(router.routeForest.highTree?.rootPath.last?.route is LoginRoute)
         #expect(router.routeForest.highTree?.currentRoutePath === router.routeForest.highTree?.rootPath)
 
-        await router.unwind(to: nil)
+        await router.unwind(to: .previous)
 
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last === landingScope)
@@ -3306,7 +3320,7 @@ struct RouterTests {
         let loginScope = try #require(router.routeForest.highTree?.rootPath.last)
         await router.requestRoute(AlertRoute())
 
-        let didUnwind = await router.unwindRoute(from: loginScope)
+        let didUnwind = await router.unwindPrevious(from: loginScope)
 
         #expect(didUnwind)
         #expect(router.routeForest.highTree == nil)

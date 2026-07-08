@@ -21,12 +21,11 @@
 //
 
 import Foundation
-import OrderedCollections
 
 struct ScopeDeclarations {
-    private var routesByType: OrderedDictionary<ObjectIdentifier, AnyRouteDeclaration> = [:]
-    private var actionInterceptorsByType: OrderedDictionary<ObjectIdentifier, AnyHookDeclaration> = [:]
-    private var unwindHandlersByRouteType: OrderedDictionary<ObjectIdentifier, AnyHookDeclaration> = [:]
+    private var routesByType = OrderedStorage<ObjectIdentifier, AnyRouteDeclaration>()
+    private var actionInterceptorsByType = OrderedStorage<ObjectIdentifier, AnyHookDeclaration>()
+    private var unwindHandlersByRouteType = OrderedStorage<ObjectIdentifier, AnyHookDeclaration>()
 
     var routeAttachments: [AnyRouteDeclaration] {
         Array(routesByType.values)
@@ -89,7 +88,7 @@ struct ScopeDeclarations {
 struct DeclarationStore {
     var local = ScopeDeclarations()
 
-    private var branches: OrderedDictionary<AnyHashable, ScopeDeclarations> = [:]
+    private var branches = OrderedStorage<AnyHashable, ScopeDeclarations>()
 
     init(branchIDs: [AnyHashable] = []) {
         for branchID in branchIDs where branches[branchID] == nil {

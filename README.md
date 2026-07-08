@@ -38,11 +38,11 @@ await router.present(SettingsRoute())
 
 ## Install
 
-`Departure` is available via Swift Package Manager, and supports iOS 17.5 or later.
+`Departure` is available via Swift Package Manager, and supports iOS 17 or later and macOS 14 or later.
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/mtzaquia/departure.git", from: "1.3.0"),
+  .package(url: "https://github.com/mtzaquia/departure.git", from: "2.0.0"),
 ],
 ```
 
@@ -284,15 +284,15 @@ struct ToolbarView: View {
 }
 ```
 
-Route requests crawl backward to find an owner. If an equal route is found along the way, the router unwinds back to it rather than attempting to re-present it.
+Route requests crawl backward to find an owner. If an existing route compares equal through `Equatable`, the router unwinds back to it rather than attempting to re-present it.
 
 ```mermaid
 flowchart TD
     request["await router.present(ReceiptRoute())"]
-    current{"Is the active route already ReceiptRoute?"}
+    current{"Is the active route an equal ReceiptRoute?"}
     owns{"Does this scope declare ReceiptRoute?"}
     previous["Move to previous route owner"]
-    sameRoute{"Is this route also ReceiptRoute?"}
+    sameRoute{"Is this an equal ReceiptRoute?"}
     present["Present from matching scope"]
     unwind["Unwind to this existing route"]
     noop["No-op"]
@@ -356,6 +356,7 @@ state. Prefer `@Environment(\.unwindRoute)` for local dismiss buttons and callba
 
 ```swift
 await router.unwind(to: .root)
+await router.unwind(to: .previous)
 await router.unwind(to: .nearestBranch)
 await router.unwind(to: .id("settings-flow"))
 ```
@@ -363,6 +364,7 @@ await router.unwind(to: .id("settings-flow"))
 | API | Behavior |
 | --- | --- |
 | `await router.unwind(to: .root)` | Returns to the app root, clearing presented routes and any branch containers owned by those routes. |
+| `await router.unwind(to: .previous)` | Dismisses the current top-most route scope. |
 | `await router.unwind(to: .nearestBranch)` | Clears the nearest enclosing branch path back to that branch's root without unwinding to the app root. |
 | `await router.unwind(to: .id(id))` | Keeps the matching route scope and dismisses everything after it. |
 
@@ -390,12 +392,7 @@ await router.unwind(to: .id("documents"), payload: SaveResult.saved)
 ```
 
 > [!NOTE]
-> `unwind(to:)` returns `false` when an explicit target is not found. Check the return value before presenting a continuation route if your flow requires it.
-
-> [!IMPORTANT]
-> Parameterless `router.unwind()` and `router.unwind(payload:)` are deprecated. In SwiftUI views,
-> use `@Environment(\.unwindRoute)` to unwind the local route scope. Use `router.unwind(to:)` only
-> when the target is explicit.
+> `unwind(to:)` returns `false` when there is no route to unwind, when `.nearestBranch` is requested outside a branch, or when an `.id(...)` target is not found. Check the return value before presenting a continuation route if your flow requires it.
 
 ### `@Environment(\.unwindRoute)`
 
@@ -416,12 +413,12 @@ struct EditorView: View {
 }
 ```
 
-`unwindRoute` is scoped to the view hierarchy where it is read. Calling it later still starts the
-unwind from that captured route scope rather than from the router's current top scope. This is useful
-for passing a dismiss action into deeper views, toolbars, or callbacks without changing which route
-owns the unwind. Like `router.unwind(...)`, it is asynchronous and returns after the unwind has
-resolved, the router path has been updated, and removed installed route scopes have left the view
-hierarchy.
+`unwindRoute` is scoped to the view hierarchy where it is read. Calling it later still starts a
+previous-style unwind from that captured route scope rather than from the router's current top scope.
+This is useful for passing a dismiss action into deeper views, toolbars, or callbacks without
+changing which route owns the unwind. Like `router.unwind(...)`, it is asynchronous and returns after
+the unwind has resolved, the router path has been updated, and removed installed route scopes have
+left the view hierarchy.
 
 ```swift
 struct EditorView: View {
@@ -496,7 +493,7 @@ To unwind within the current branch without escaping to the app root, target `.n
 await router.unwind(to: .nearestBranch)
 ```
 
-This clears the nearest enclosing branch path back to that branch's root. The accepted target scope is the branch container that declared the branch. To target the installed branch root itself, unwind to that branch root's explicit ID.
+This clears the nearest enclosing branch path back to that branch's root. The accepted target scope is the branch container that declared the branch. If there is no enclosing branch, the request returns `false`. To target the installed branch root itself, unwind to that branch root's explicit ID.
 
 ```mermaid
 flowchart TD

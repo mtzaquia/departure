@@ -35,7 +35,7 @@ struct StartInfoRoute: Route {
     }
 }
 
-struct LoginRoute: Route {
+struct LoginRoute: Route, Equatable {
     let nextRoute: (any Route)?
 
     func destination() -> some View {

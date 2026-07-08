@@ -23,7 +23,7 @@
 import Foundation
 import SwiftUI
 
-/// Unwinds the local route scope from SwiftUI views.
+/// Unwinds the captured route scope from SwiftUI views.
 ///
 /// ```swift
 /// @Environment(\.unwindRoute) private var unwindRoute
@@ -46,7 +46,7 @@ public struct UnwindRouteAction: Equatable {
     /// Creates an inactive unwind action.
     public init() {
         self.identity = .inactive
-        self.handle = { _ in true }
+        self.handle = { _ in false }
     }
 
     init(router: Router, routeScope: RouteScope) {
@@ -56,14 +56,14 @@ public struct UnwindRouteAction: Equatable {
         )
         self.handle = { [weak routeScope] payload in
             guard let routeScope else {
-                return true
+                return false
             }
 
-            return await router.unwindRoute(from: routeScope, payload: payload)
+            return await router.unwindPrevious(from: routeScope, payload: payload)
         }
     }
 
-    /// Unwinds this view's local route scope.
+    /// Unwinds the captured route scope.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
     /// and any removed installed route scopes have left the view hierarchy.
@@ -72,7 +72,7 @@ public struct UnwindRouteAction: Equatable {
         await handle(nil)
     }
 
-    /// Unwinds this view's local route scope and delivers a payload to a matching ``UnwindHandler``.
+    /// Unwinds the captured route scope and delivers a payload to a matching ``UnwindHandler``.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
     /// and any removed installed route scopes have left the view hierarchy.
@@ -100,7 +100,7 @@ extension EnvironmentValues {
 }
 
 public extension EnvironmentValues {
-    /// Unwinds this view's local route scope.
+    /// Unwinds the captured route scope.
     @Entry var unwindRoute = UnwindRouteAction()
 
     /// The current routing phase for this view's local route scope.

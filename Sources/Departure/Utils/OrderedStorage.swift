@@ -20,47 +20,41 @@
 //  SOFTWARE.
 //
 
-import SwiftUI
+import Foundation
 
-public struct RouteView: View {
-    let scope: RouteScope
-    let providesNavigation: Bool
+struct OrderedStorage<Key: Hashable, Value> {
+    private var orderedKeys: [Key] = []
+    private var valuesByKey: [Key: Value] = [:]
 
-    @Environment(Router.self) private var router
-
-    init(scope: RouteScope, providesNavigation: Bool = false) {
-        self.scope = scope
-        self.providesNavigation = providesNavigation
+    var keys: [Key] {
+        orderedKeys
     }
 
-    public var body: some View {
-        content
-            .routeScopeEnvironment(scope, router: router)
-            .onLifecycleEvent { event in
-                switch event {
-                case .updated:
-                    break
+    var values: [Value] {
+        orderedKeys.compactMap { valuesByKey[$0] }
+    }
 
-                case .installedInWindow:
-                    router.routeScopeDidInstallInView(scope)
+    subscript(key: Key) -> Value? {
+        get {
+            valuesByKey[key]
+        }
 
-                case .dismantled, .deinitialized:
-                    router.routeScopeDidLeaveView(scope)
+        set {
+            if let newValue {
+                if valuesByKey[key] == nil {
+                    orderedKeys.append(key)
                 }
-            }
-    }
 
-    @ViewBuilder
-    private var content: some View {
-        let destination = (scope.route?.destination()).map(AnyView.init)
-
-        if providesNavigation {
-            NavigationStack {
-                destination
+                valuesByKey[key] = newValue
+            } else {
+                valuesByKey[key] = nil
+                orderedKeys.removeAll { $0 == key }
             }
-        } else {
-            destination
         }
     }
 
+    mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
+        orderedKeys.removeAll(keepingCapacity: keepCapacity)
+        valuesByKey.removeAll(keepingCapacity: keepCapacity)
+    }
 }
