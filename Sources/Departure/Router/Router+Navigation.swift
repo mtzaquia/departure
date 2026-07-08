@@ -253,7 +253,8 @@ extension Router {
             for: sourceScope,
             payload: payload,
             in: targetScope,
-            plan: plan
+            plan: plan,
+            preservesSnapshot: false
         )
 
         return true

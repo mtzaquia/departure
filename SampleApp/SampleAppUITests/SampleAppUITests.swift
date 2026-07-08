@@ -203,9 +203,6 @@ final class SampleAppUITests: XCTestCase {
             .firstMatch
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         app.swipeUp()
-        let loginCancelCoordinate = app.buttons[A11y.loginCancelButton]
-            .firstMatch
-            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
 
         tap(A11y.loginPresentCriticalButton)
         assertExists(A11y.criticalText)
@@ -218,7 +215,7 @@ final class SampleAppUITests: XCTestCase {
         assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
         assertExists(A11y.criticalText)
 
-        loginCancelCoordinate.tap()
+        tap(A11y.criticalDismissButton)
         assertGone(A11y.criticalText)
         assertExists(A11y.loginTitle)
 
