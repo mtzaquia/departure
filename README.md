@@ -1,6 +1,6 @@
 # 🛫 Departure
 
-`Departure` is a lightweight, expressive routing framework for SwiftUI.
+`Departure` is a robust, expressive routing framework for SwiftUI.
 
 It lets views declare the routes they can handle and the presentation style for each route. The router then presents the closest matching route. Triggered actions run against the active route scope, can be intercepted by route-scoped hooks, and can request a reroute before execution is retried.
 
