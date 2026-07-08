@@ -31,11 +31,37 @@ struct RouteForest {
         }
     }
 
-    struct RootUnwindPlan {
+    struct UnwindPlan {
+        struct PathTrim {
+            let path: RoutePath
+            let keepThrough: RoutePath.Position
+        }
+
         let removedScopes: [RouteScope]
-        let branchPaths: [RoutePath]
-        let inactiveBranchModalTrims: [(path: RoutePath, keepThrough: RoutePath.Position)]
+        let pathTrims: [PathTrim]
         let preservedPaths: [PreservedRoutePath]
+        let clearsElevatedTrees: Bool
+
+        init(
+            pathTrims: [PathTrim],
+            clearsElevatedTrees: Bool = false
+        ) {
+            self.pathTrims = pathTrims.uniquedByPath()
+            self.removedScopes = self.pathTrims.flatMap {
+                $0.path.scopesRemovedAfter($0.keepThrough)
+            }
+            self.preservedPaths = self.pathTrims.map {
+                PreservedRoutePath($0.path, after: $0.keepThrough)
+            }.filter { $0.scopes.isEmpty == false }
+            self.clearsElevatedTrees = clearsElevatedTrees
+        }
+    }
+
+    indirect enum UnwindPlanRequest {
+        case root
+        case scoped(routePath: RoutePath, after: RoutePath.Position)
+        case pathTrims([UnwindPlan.PathTrim])
+        case combined([UnwindPlanRequest])
     }
 
     let normalTree: RouteTree
@@ -111,11 +137,54 @@ struct RouteForest {
         }
     }
 
-    func rootUnwindPlan() -> RootUnwindPlan {
+    func unwindPlan(for request: UnwindPlanRequest) -> UnwindPlan {
+        switch request {
+        case .root:
+            return UnwindPlan(
+                pathTrims: pathTrims(for: request),
+                clearsElevatedTrees: true
+            )
+
+        case .scoped, .pathTrims:
+            return UnwindPlan(pathTrims: pathTrims(for: request))
+
+        case .combined:
+            let plans = combinedRequests(for: request).map { unwindPlan(for: $0) }
+            return UnwindPlan(
+                pathTrims: plans.flatMap(\.pathTrims),
+                clearsElevatedTrees: plans.contains(where: \.clearsElevatedTrees)
+            )
+        }
+    }
+
+    private func pathTrims(for request: UnwindPlanRequest) -> [UnwindPlan.PathTrim] {
+        switch request {
+        case .root:
+            return rootPathTrims()
+
+        case let .scoped(routePath, position):
+            return scopedPathTrims(from: routePath, after: position)
+
+        case let .pathTrims(pathTrims):
+            return pathTrims
+
+        case .combined:
+            return combinedRequests(for: request).flatMap { pathTrims(for: $0) }
+        }
+    }
+
+    private func combinedRequests(for request: UnwindPlanRequest) -> [UnwindPlanRequest] {
+        guard case let .combined(requests) = request else {
+            return [request]
+        }
+
+        return requests
+    }
+
+    private func rootPathTrims() -> [UnwindPlan.PathTrim] {
         let rootPath = normalTree.rootPath
-        let rootRemovedScopes = rootPath.scopesRemovedAfter(.owner)
         var branchPaths = normalTree.activeBranchPaths()
-        branchPaths.appendUnique(contentsOf: rootRemovedScopes.flatMap {
+        branchPaths.appendUnique(contentsOf: rootPath.scopesRemovedAfter(.owner).flatMap {
             normalTree.allBranchPaths(under: $0)
         })
 
@@ -124,27 +193,46 @@ struct RouteForest {
             branchPaths.appendUnique(contentsOf: elevatedTree.allBranchPaths())
         }
 
-        let branchRemovedScopes = branchPaths.flatMap {
-            $0.scopesRemovedAfter(.owner)
-        }
         let inactiveBranchModalTrims = inactiveBranchModalTrims(excluding: branchPaths)
-        let inactiveBranchRemovedScopes = inactiveBranchModalTrims.flatMap {
-            $0.path.scopesRemovedAfter($0.keepThrough)
+        return [UnwindPlan.PathTrim(path: rootPath, keepThrough: .owner)]
+        + branchPaths.map {
+            UnwindPlan.PathTrim(path: $0, keepThrough: .owner)
         }
-        let removedScopes = rootRemovedScopes + branchRemovedScopes + inactiveBranchRemovedScopes
+        + inactiveBranchModalTrims.map {
+            UnwindPlan.PathTrim(path: $0.path, keepThrough: $0.keepThrough)
+        }
+    }
 
-        let preservedPaths = (
-            [PreservedRoutePath(rootPath, after: .owner)]
-            + branchPaths.map { PreservedRoutePath($0, after: .owner) }
-            + inactiveBranchModalTrims.map { PreservedRoutePath($0.path, after: $0.keepThrough) }
-        ).filter { $0.scopes.isEmpty == false }
+    private func scopedPathTrims(
+        from routePath: RoutePath,
+        after position: RoutePath.Position
+    ) -> [UnwindPlan.PathTrim] {
+        let directlyRemovedScopes = routePath.scopesRemovedAfter(position)
+        var ownedPaths: [RoutePath] = []
 
-        return RootUnwindPlan(
-            removedScopes: removedScopes,
-            branchPaths: branchPaths,
-            inactiveBranchModalTrims: inactiveBranchModalTrims,
-            preservedPaths: preservedPaths
-        )
+        for removedScope in directlyRemovedScopes {
+            for tree in allTrees {
+                ownedPaths.appendUnique(contentsOf: tree.allBranchPaths(under: removedScope))
+            }
+        }
+
+        for elevatedTree in elevatedTrees {
+            guard let anchorScope = elevatedTree.anchor?.routeScope else {
+                continue
+            }
+
+            guard directlyRemovedScopes.contains(where: { $0 === anchorScope }) else {
+                continue
+            }
+
+            ownedPaths.appendUnique(contentsOf: [elevatedTree.rootPath])
+            ownedPaths.appendUnique(contentsOf: elevatedTree.allBranchPaths())
+        }
+
+        return [UnwindPlan.PathTrim(path: routePath, keepThrough: position)]
+        + ownedPaths.map {
+            UnwindPlan.PathTrim(path: $0, keepThrough: .owner)
+        }
     }
 
     func ancestorUnwindResolution(
@@ -211,6 +299,18 @@ private extension [RoutePath] {
         for routePath in routePaths where contains(where: { $0 === routePath }) == false {
             append(routePath)
         }
+    }
+}
+
+private extension [RouteForest.UnwindPlan.PathTrim] {
+    func uniquedByPath() -> [RouteForest.UnwindPlan.PathTrim] {
+        var trims: [RouteForest.UnwindPlan.PathTrim] = []
+
+        for trim in self where trims.contains(where: { $0.path === trim.path }) == false {
+            trims.append(trim)
+        }
+
+        return trims
     }
 }
 

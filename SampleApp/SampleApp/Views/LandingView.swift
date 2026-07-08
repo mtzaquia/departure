@@ -30,6 +30,7 @@ struct LandingView: View {
     }
 
     @State private var tab: TabItem = .home
+    @Environment(\.unwindRoute) private var unwindRoute
 
     var body: some View {
         TabView(selection: $tab) {
@@ -86,6 +87,9 @@ struct LandingView: View {
 
                 Storage.shared.landingContainerUnwindHookCount += 1
             }
+        }
+        .onAppear {
+            Storage.shared.landingUnwindRoute = unwindRoute
         }
         .environment(\.samplePresentationSource, "top-level branched scope")
     }

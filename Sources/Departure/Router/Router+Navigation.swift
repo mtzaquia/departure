@@ -80,22 +80,6 @@ extension Router {
         let routeForest: RouteForest
 
         init(
-            routePath: RoutePath,
-            preservedPath: [RouteScope],
-            routeForest: RouteForest
-        ) {
-            self.init(
-                preservedPaths: [
-                    PreservedRoutePath(
-                        routePath: routePath,
-                        scopes: preservedPath
-                    ),
-                ],
-                routeForest: routeForest
-            )
-        }
-
-        init(
             preservedPaths: [PreservedRoutePath],
             routeForest: RouteForest
         ) {
@@ -146,7 +130,19 @@ extension Router {
         let sourceScope = currentRouteScope
 
         if case .root = target {
-            return await unwindRootAndWait(sourceScope: sourceScope, payload: payload)
+            let plan = routeForest.unwindPlan(for: .root)
+            log.departureDebug(.unwindAccepted(
+                keepThrough: .owner,
+                removing: plan.removedScopes.count
+            ))
+
+            await performPlannedUnwind(
+                for: sourceScope,
+                payload: payload,
+                in: root,
+                plan: plan
+            )
+            return true
         }
 
         // Non-root targets differ only by which path they clear. `.nearestBranch` resolves against
@@ -180,47 +176,30 @@ extension Router {
                 return false
             }
 
-            let removedScopes = routePath.scopesRemovedAfter(.owner)
-            + ancestorResolution.path.scopesRemovedAfter(ancestorResolution.position)
+            let plan = routeForest.unwindPlan(for: .combined([
+                .scoped(routePath: routePath, after: .owner),
+                .scoped(routePath: ancestorResolution.path, after: ancestorResolution.position),
+            ]))
             log.departureDebug(.unwindAcceptedAncestorTarget(
                 keepThrough: ancestorResolution.position,
-                removing: removedScopes.count
+                removing: plan.removedScopes.count
             ))
 
             let targetScope = ancestorResolution.path.scope(at: ancestorResolution.position)
-            await performAcceptedUnwind(
+            await performPlannedUnwind(
                 for: sourceScope,
                 payload: payload,
                 in: targetScope,
-                removing: removedScopes,
-                afterScopesLeave: {
-                    unwindPresentationSnapshot = nil
-                }
-            ) {
-                unwindPresentationSnapshot = UnwindPresentationSnapshot(
-                    preservedPaths: [
-                        UnwindPresentationSnapshot.PreservedRoutePath(
-                            routePath: routePath,
-                            scopes: routePath.scopesRemovedAfter(.owner)
-                        ),
-                        UnwindPresentationSnapshot.PreservedRoutePath(
-                            routePath: ancestorResolution.path,
-                            scopes: ancestorResolution.path.scopesRemovedAfter(ancestorResolution.position)
-                        ),
-                    ].filter { $0.scopes.isEmpty == false },
-                    routeForest: routeForest
-                )
-                keepPathThrough(.owner, in: routePath)
-                keepPathThrough(ancestorResolution.position, in: ancestorResolution.path)
-            }
+                plan: plan
+            )
 
             return true
 
         case let .keepPathThrough(targetPosition):
-            let removedScopes = routePath.scopesRemovedAfter(targetPosition)
+            let plan = routeForest.unwindPlan(for: .scoped(routePath: routePath, after: targetPosition))
             log.departureDebug(.unwindAccepted(
                 keepThrough: targetPosition,
-                removing: removedScopes.count
+                removing: plan.removedScopes.count
             ))
 
             let targetScope = unwindHandlerScope(
@@ -229,74 +208,53 @@ extension Router {
                 keepThrough: targetPosition
             )
 
-            await performAcceptedUnwind(
+            await performPlannedUnwind(
                 for: sourceScope,
                 payload: payload,
                 in: targetScope,
-                removing: removedScopes,
-                afterScopesLeave: {
-                    unwindPresentationSnapshot = nil
-                }
-            ) {
-                if target != nil {
-                    unwindPresentationSnapshot = UnwindPresentationSnapshot(
-                        routePath: routePath,
-                        preservedPath: removedScopes,
-                        routeForest: routeForest
-                    )
-                }
-                keepPathThrough(targetPosition, in: routePath)
-                if case .root = target {
-                    // A high-priority tree may live on a branch path that clearing the root path
-                    // doesn't touch; `.root` tears the whole app down, so drop it explicitly.
-                    mutateRouteGraph {
-                        routeForest.clearElevatedTrees()
-                    }
-                }
-            }
+                plan: plan,
+                preservesSnapshot: target != nil
+            )
 
             return true
         }
     }
 
-    func unwindRootAndWait(sourceScope: RouteScope?, payload: Any?) async -> Bool {
-        let plan = routeForest.rootUnwindPlan()
+    @discardableResult
+    func unwindRoute(from sourceScope: RouteScope, payload: Any? = nil) async -> Bool {
+        log.departureDebug(.unwindRequested(target: nil))
+
+        guard
+            let routePath = routeForest.routePath(containing: sourceScope),
+            let targetPosition = routePath.positionBefore(sourceScope)
+        else {
+            log.departureDebug(.unwindSkippedNoRoute)
+            return true
+        }
+
+        let plan = routeForest.unwindPlan(for: .scoped(routePath: routePath, after: targetPosition))
+        guard plan.removedScopes.isEmpty == false else {
+            log.departureDebug(.unwindSkippedNoRoute)
+            return true
+        }
 
         log.departureDebug(.unwindAccepted(
-            keepThrough: .owner,
+            keepThrough: targetPosition,
             removing: plan.removedScopes.count
         ))
 
-        await performAcceptedUnwind(
+        let targetScope = unwindHandlerScope(
+            for: nil,
+            in: routePath,
+            keepThrough: targetPosition
+        )
+
+        await performPlannedUnwind(
             for: sourceScope,
             payload: payload,
-            in: root,
-            removing: plan.removedScopes,
-            afterScopesLeave: {
-                unwindPresentationSnapshot = nil
-            }
-        ) {
-            unwindPresentationSnapshot = UnwindPresentationSnapshot(
-                preservedPaths: plan.preservedPaths.map {
-                    UnwindPresentationSnapshot.PreservedRoutePath(
-                        routePath: $0.routePath,
-                        scopes: $0.scopes
-                    )
-                },
-                routeForest: routeForest
-            )
-
-            for branchPath in plan.branchPaths {
-                keepPathThrough(.owner, in: branchPath)
-            }
-            for trim in plan.inactiveBranchModalTrims {
-                keepPathThrough(trim.keepThrough, in: trim.path)
-            }
-            keepPathThrough(.owner, in: normalTree.rootPath)
-            mutateRouteGraph {
-                routeForest.clearElevatedTrees()
-            }
-        }
+            in: targetScope,
+            plan: plan
+        )
 
         return true
     }
@@ -910,6 +868,48 @@ extension Router {
             }
 
             return routePath.scope(at: position)
+        }
+    }
+
+    func performPlannedUnwind(
+        for sourceScope: RouteScope?,
+        payload: Any?,
+        in targetScope: RouteScope?,
+        plan: RouteForest.UnwindPlan,
+        preservesSnapshot: Bool = true,
+        logsCompletion: Bool = true
+    ) async {
+        await performAcceptedUnwind(
+            for: sourceScope,
+            payload: payload,
+            in: targetScope,
+            removing: plan.removedScopes,
+            logsCompletion: logsCompletion,
+            afterScopesLeave: {
+                unwindPresentationSnapshot = nil
+            }
+        ) {
+            if preservesSnapshot {
+                unwindPresentationSnapshot = UnwindPresentationSnapshot(
+                    preservedPaths: plan.preservedPaths.map {
+                        UnwindPresentationSnapshot.PreservedRoutePath(
+                            routePath: $0.routePath,
+                            scopes: $0.scopes
+                        )
+                    },
+                    routeForest: routeForest
+                )
+            }
+
+            for trim in plan.pathTrims {
+                keepPathThrough(trim.keepThrough, in: trim.path)
+            }
+
+            if plan.clearsElevatedTrees {
+                mutateRouteGraph {
+                    routeForest.clearElevatedTrees()
+                }
+            }
         }
     }
 

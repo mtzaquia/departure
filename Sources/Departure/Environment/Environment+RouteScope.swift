@@ -20,7 +20,71 @@
 //  SOFTWARE.
 //
 
+import Foundation
 import SwiftUI
+
+/// Unwinds the local route scope from SwiftUI views.
+///
+/// ```swift
+/// @Environment(\.unwindRoute) private var unwindRoute
+///
+/// Button("Done") {
+///     Task {
+///         await unwindRoute()
+///     }
+/// }
+/// ```
+public struct UnwindRouteAction: Equatable {
+    private enum Identity: Equatable {
+        case inactive
+        case routeScope(routerID: UUID, routeScopeID: ObjectIdentifier)
+    }
+
+    private let identity: Identity
+    private let handle: @MainActor (Any?) async -> Bool
+
+    /// Creates an inactive unwind action.
+    public init() {
+        self.identity = .inactive
+        self.handle = { _ in true }
+    }
+
+    init(router: Router, routeScope: RouteScope) {
+        self.identity = .routeScope(
+            routerID: router.id,
+            routeScopeID: ObjectIdentifier(routeScope)
+        )
+        self.handle = { [weak routeScope] payload in
+            guard let routeScope else {
+                return true
+            }
+
+            return await router.unwindRoute(from: routeScope, payload: payload)
+        }
+    }
+
+    /// Unwinds this view's local route scope.
+    ///
+    /// This method returns after the unwind request has resolved, the router path has been updated,
+    /// and any removed installed route scopes have left the view hierarchy.
+    @discardableResult
+    public func callAsFunction() async -> Bool {
+        await handle(nil)
+    }
+
+    /// Unwinds this view's local route scope and delivers a payload to a matching ``UnwindHandler``.
+    ///
+    /// This method returns after the unwind request has resolved, the router path has been updated,
+    /// and any removed installed route scopes have left the view hierarchy.
+    @discardableResult
+    public func callAsFunction<Payload>(payload: Payload) async -> Bool {
+        await handle(payload)
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.identity == rhs.identity
+    }
+}
 
 /// The current routing phase for a view's local route scope.
 public enum RoutePhase: Equatable, Sendable {
@@ -36,6 +100,9 @@ extension EnvironmentValues {
 }
 
 public extension EnvironmentValues {
+    /// Unwinds this view's local route scope.
+    @Entry var unwindRoute = UnwindRouteAction()
+
     /// The current routing phase for this view's local route scope.
     ///
     /// This value is local to the view hierarchy it is read from. The current route destination,
@@ -53,6 +120,7 @@ extension View {
         self
             .environment(\.routeScope, routeScope)
             .environment(\.routePhase, router.routePhase(for: routeScope))
+            .environment(\.unwindRoute, UnwindRouteAction(router: router, routeScope: routeScope))
     }
 }
 

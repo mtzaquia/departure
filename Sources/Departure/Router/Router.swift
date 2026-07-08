@@ -104,29 +104,57 @@ public final class Router: Identifiable, Equatable {
         await requestRouteWhenReady(route)
     }
 
-    /// Dismisses route scopes.  If no parameter is provided, it dismisses the current route.
+    /// Dismisses the current route scope.
+    ///
+    /// Use ``UnwindRouteAction`` from `@Environment(\.unwindRoute)` in SwiftUI views to unwind
+    /// the local route scope, or use ``Router/unwind(to:)`` with an explicit target for
+    /// router-level unwind orchestration.
+    ///
+    /// This method returns after the unwind request has resolved, the router path has been updated,
+    /// and any removed installed route scopes have left the view hierarchy.
+    @available(*, deprecated, message: "Use @Environment(\\.unwindRoute) to unwind the local route scope, or pass an explicit target to Router.unwind(to:).")
+    @discardableResult
+    public func unwind() async -> Bool {
+        await unwind(to: nil)
+    }
+
+    /// Dismisses route scopes to an explicit target.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
     /// and any removed installed route scopes have left the view hierarchy.
     ///
-    /// - Parameter target: The target to unwind to, or `nil` for the route to just dismiss itself.
+    /// - Parameter target: The target to unwind to.
     /// - Returns: `false` when an explicit target was requested but not found.
     @discardableResult
-    public func unwind(to target: UnwindTarget? = nil) async -> Bool {
+    public func unwind(to target: UnwindTarget?) async -> Bool {
         await unwindAndWait(to: target)
     }
 
-    /// Dismisses route scopes, delivering a payload to a matching ``UnwindHandler``.
+    /// Dismisses the current route scope, delivering a payload to a matching ``UnwindHandler``.
+    ///
+    /// Use ``UnwindRouteAction`` from `@Environment(\.unwindRoute)` in SwiftUI views to unwind
+    /// the local route scope with a payload, or use ``Router/unwind(to:payload:)`` with an explicit
+    /// target for router-level unwind orchestration.
+    ///
+    /// This method returns after the unwind request has resolved, the router path has been updated,
+    /// and any removed installed route scopes have left the view hierarchy.
+    @available(*, deprecated, message: "Use @Environment(\\.unwindRoute) to unwind the local route scope with a payload, or pass an explicit target to Router.unwind(to:payload:).")
+    @discardableResult
+    public func unwind<Payload>(payload: Payload) async -> Bool {
+        await unwind(to: nil, payload: payload)
+    }
+
+    /// Dismisses route scopes to an explicit target, delivering a payload to a matching ``UnwindHandler``.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
     /// and any removed installed route scopes have left the view hierarchy.
     ///
     /// - Parameters:
-    ///   - target: The target to unwind to, or `nil` for the route to just dismiss itself.
+    ///   - target: The target to unwind to.
     ///   - payload: A value delivered to a matching ``UnwindHandler``.
     /// - Returns: `false` when an explicit target was requested but not found.
     @discardableResult
-    public func unwind<Payload>(to target: UnwindTarget? = nil, payload: Payload) async -> Bool {
+    public func unwind<Payload>(to target: UnwindTarget?, payload: Payload) async -> Bool {
         await unwindAndWait(to: target, payload: payload)
     }
 
