@@ -24,8 +24,8 @@ import Departure
 import SwiftUI
 
 struct MessageView: View {
-    @Environment(Router.self) private var router
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.unwindRoute) private var unwindRoute
     @Environment(\.samplePresentationSource) private var samplePresentationSource
 
     var body: some View {
@@ -42,7 +42,7 @@ struct MessageView: View {
 
                 Button("Dismiss with unwind") {
                     Task {
-                        await router.unwind()
+                        await unwindRoute()
                     }
                 }
                 .bold()
@@ -50,7 +50,7 @@ struct MessageView: View {
 
                 Button("Dismiss with payload") {
                     Task {
-                        await router.unwind(payload: "message delivered")
+                        await unwindRoute(payload: "message delivered")
                     }
                 }
                 .bold()
@@ -58,7 +58,7 @@ struct MessageView: View {
                 
                 Button("Dismiss with mismatched payload") {
                     Task {
-                        await router.unwind(payload: 42)
+                        await unwindRoute(payload: 42)
                     }
                 }
                 .bold()

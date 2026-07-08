@@ -56,7 +56,7 @@ struct UnwindHookTests {
         #expect(router.routeForest.criticalTree?.rootPath.scopes.count == 1)
         #expect(router.routeForest.criticalTree?.rootPath.scopes.last?.route is LockRoute)
 
-        await router.unwind(payload: "unlocked")
+        await router.unwind(to: nil, payload: "unlocked")
 
         #expect(recorder.payloads == ["unlocked"])
         #expect(router.routeForest.criticalTree == nil)
@@ -198,7 +198,7 @@ struct UnwindHookTests {
         landingScope.registerBranchScope(homeScope, for: AppTab.home)
         landingScope.registerBranchScope(walletScope, for: AppTab.wallet)
 
-        await router.unwind()
+        await router.unwind(to: nil)
 
         #expect(recorder.events == ["home"])
         #expect(homeScope.path.isEmpty)
@@ -267,7 +267,7 @@ struct UnwindHookTests {
         )
         router.normalTree.rootPath.scopes = [parentScope, childScope]
 
-        await router.unwind(payload: "done")
+        await router.unwind(to: nil, payload: "done")
 
         #expect(recorder.payloads == ["done"])
         #expect(router.normalTree.rootPath.count == 1)
@@ -288,7 +288,7 @@ struct UnwindHookTests {
         )
         router.normalTree.rootPath.scopes = [parentScope, childScope]
 
-        await router.unwind(payload: "wrong")
+        await router.unwind(to: nil, payload: "wrong")
 
         #expect(recorder.ints.isEmpty)
         #expect(router.normalTree.rootPath.count == 1)
@@ -577,7 +577,7 @@ struct UnwindHookTests {
         )
         router.normalTree.rootPath.scopes = [parentScope, childScope]
 
-        await router.unwind(payload: "done")
+        await router.unwind(to: nil, payload: "done")
 
         #expect(recorder.payloads == ["done"])
         #expect(recorder.events == ["handler"])
@@ -602,7 +602,7 @@ struct UnwindHookTests {
         router.normalTree.rootPath.scopes = [parentScope, childScope]
 
         let unwindTask = Task {
-            await router.unwind()
+            await router.unwind(to: nil)
             recorder.events.append("unwind-returned")
         }
         await recorder.waitForEventCount(1)
@@ -643,7 +643,7 @@ struct UnwindHookTests {
         router.routeScopeDidInstallInView(childScope)
 
         let unwindTask = Task {
-            await router.unwind()
+            await router.unwind(to: nil)
         }
         await recorder.waitForEventCount(1)
         await waitUntil {
@@ -842,7 +842,7 @@ struct UnwindHookTests {
         router.routeScopeDidInstallInView(dismissedScope)
 
         let unwindTask = Task {
-            await router.unwind()
+            await router.unwind(to: nil)
         }
         await waitUntil {
             router.routeForest.highTree == nil

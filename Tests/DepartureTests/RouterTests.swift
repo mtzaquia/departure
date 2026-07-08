@@ -65,7 +65,7 @@ struct RouterTests {
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last?.route is HomeDetailRoute)
 
-        await router.unwind()
+        await router.unwind(to: nil)
 
         #expect(router.normalTree.rootPath.isEmpty)
 
@@ -1974,7 +1974,7 @@ struct RouterTests {
         await router.requestRoute(MessageRoute())
         #expect(homeScope.path.count == 1)
 
-        await router.unwind()
+        await router.unwind(to: nil)
 
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last === landingScope)
@@ -2035,7 +2035,7 @@ struct RouterTests {
         #expect(router.routeForest.highTree?.rootPath.last?.route is LoginRoute)
         #expect(router.routeForest.highTree?.currentRoutePath === router.routeForest.highTree?.rootPath)
 
-        await router.unwind()
+        await router.unwind(to: nil)
 
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last === landingScope)

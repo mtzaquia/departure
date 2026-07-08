@@ -30,6 +30,7 @@ struct LoginView: View {
     @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.unwindRoute) private var unwindRoute
     @State private var presentationProbeCount = 0
 
     var body: some View {
@@ -74,7 +75,7 @@ struct LoginView: View {
             Button("Log in") {
                 Storage.shared.isLoggedIn = true
                 Task {
-                    await router.unwind()
+                    await unwindRoute()
 
                     if let nextRoute {
                         await router.present(nextRoute)
@@ -123,7 +124,7 @@ struct LoginView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {
                     Task {
-                        await router.unwind()
+                        await unwindRoute()
                     }
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.loginCancelButton)
@@ -142,10 +143,10 @@ struct LoginView: View {
 }
 
 struct LoginReplacementView: View {
-    @Environment(Router.self) private var router
     @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.unwindRoute) private var unwindRoute
 
     var body: some View {
         List {
@@ -166,7 +167,7 @@ struct LoginReplacementView: View {
 
             Button("Dismiss replacement") {
                 Task {
-                    await router.unwind()
+                    await unwindRoute()
                 }
             }
             .bold()
@@ -182,6 +183,7 @@ struct CriticalView: View {
     @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.unwindRoute) private var unwindRoute
 
     var body: some View {
         VStack(spacing: 16) {
@@ -206,7 +208,7 @@ struct CriticalView: View {
 
             Button("Dismiss critical") {
                 Task {
-                    await router.unwind()
+                    await unwindRoute()
                 }
             }
             .buttonStyle(.bordered)
@@ -230,8 +232,8 @@ private extension CriticalView {
 }
 
 struct CriticalReplacementView: View {
-    @Environment(Router.self) private var router
     @Environment(\.isPresented) private var isPresented
+    @Environment(\.unwindRoute) private var unwindRoute
 
     var body: some View {
         VStack(spacing: 16) {
@@ -242,7 +244,7 @@ struct CriticalReplacementView: View {
 
             Button("Dismiss critical replacement") {
                 Task {
-                    await router.unwind()
+                    await unwindRoute()
                 }
             }
             .buttonStyle(.borderedProminent)

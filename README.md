@@ -323,13 +323,8 @@ branch roots, including destinations presented in elevated-priority windows.
 
 ### `.unwind(...)`
 
-Unwind is the counterpart to presentation: it allows scopes to dismiss themselves or return to a known route scope.
-
-```swift
-await router.unwind()
-```
-
-Use an explicit target when you want to dismiss more than one route:
+Use router unwind calls when you want to return to a known route scope or coordinate broader routing
+state. Prefer `@Environment(\.unwindRoute)` for local dismiss buttons and callbacks.
 
 ```swift
 await router.unwind(to: .root)
@@ -339,7 +334,6 @@ await router.unwind(to: .id("settings-flow"))
 
 | API | Behavior |
 | --- | --- |
-| `await router.unwind()` | Dismisses the current route. |
 | `await router.unwind(to: .root)` | Returns to the app root, clearing presented routes and any branch containers owned by those routes. |
 | `await router.unwind(to: .nearestBranch)` | Clears the nearest enclosing branch path back to that branch's root without unwinding to the app root. |
 | `await router.unwind(to: .id(id))` | Keeps the matching route scope and dismisses everything after it. |
@@ -360,9 +354,6 @@ SettingsFlowView()
 Unwinding is a suspending operation. Once it finishes, it is safe to present a new route.
 
 ```swift
-await router.unwind()
-await router.present(ProfileRoute())
-
 if await router.unwind(to: .id("settings-flow")) {
   await router.present(LoginRoute(nextRoute: ProfileRoute()))
 }
@@ -372,6 +363,11 @@ await router.unwind(to: .id("documents"), payload: SaveResult.saved)
 
 > [!NOTE]
 > `unwind(to:)` returns `false` when an explicit target is not found. Check the return value before presenting a continuation route if your flow requires it.
+
+> [!IMPORTANT]
+> Parameterless `router.unwind()` and `router.unwind(payload:)` are deprecated. In SwiftUI views,
+> use `@Environment(\.unwindRoute)` to unwind the local route scope. Use `router.unwind(to:)` only
+> when the target is explicit.
 
 ### `@Environment(\.unwindRoute)`
 
@@ -416,7 +412,7 @@ struct EditorView: View {
 All unwind rules still apply: owned branch paths and elevated presentations are cleared when the
 originating scope is removed, presentation snapshots are preserved while removed scopes leave the
 view hierarchy, and `UnwindHandler` lookup starts from the scope where the unwind lands. Payloads are
-delivered to matching typed `UnwindHandler` declarations just like `router.unwind(payload:)`.
+delivered to matching typed `UnwindHandler` declarations just like `router.unwind(to:payload:)`.
 
 ## Branches
 

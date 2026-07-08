@@ -24,8 +24,8 @@ import Departure
 import SwiftUI
 
 struct AlertView: View {
-    @Environment(Router.self) private var router
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.unwindRoute) private var unwindRoute
 
     var body: some View {
         ZStack {
@@ -38,7 +38,7 @@ struct AlertView: View {
 
                 Button("Dismiss with unwind") {
                     Task {
-                        await router.unwind()
+                        await unwindRoute()
                     }
                 }
                 .bold()

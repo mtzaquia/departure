@@ -22,6 +22,10 @@
 
 /// Handles a matching route when it unwinds to this scope.
 ///
+/// Unwinds can be requested with ``UnwindRouteAction`` from `@Environment(\.unwindRoute)` for
+/// local route-scope dismissal, or with ``Router/unwind(to:)`` and
+/// ``Router/unwind(to:payload:)`` for explicit router-level targets.
+///
 /// The handler runs after the unwind request is accepted. The router does not wait for the handler
 /// body to finish before continuing the unwind. If the handler presents another route, that request
 /// is deferred until the active navigation has finished.
@@ -38,8 +42,9 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
 
     /// Creates an unwind handler.
     ///
-    /// If this handler matches a ``Router/unwind(to:payload:)`` request, `handle` is scheduled when
-    /// the unwind is accepted. The router does not wait for `handle` to return.
+    /// If this handler matches an ``UnwindRouteAction/callAsFunction(payload:)`` or
+    /// ``Router/unwind(to:payload:)`` request, `handle` is scheduled when the unwind is accepted.
+    /// The router does not wait for `handle` to return.
     public init<Payload>(
         _ routeType: R.Type,
         expecting payloadType: Payload.Type,
@@ -67,8 +72,8 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
 
     /// Creates an unwind handler that ignores any payload sent with the unwind request.
     ///
-    /// If this handler matches a ``Router/unwind(to:)`` request, `handle` is scheduled when the
-    /// unwind is accepted.
+    /// If this handler matches an ``UnwindRouteAction/callAsFunction()`` or
+    /// ``Router/unwind(to:)`` request, `handle` is scheduled when the unwind is accepted.
     public init(
         _ routeType: R.Type,
         handle: @escaping @MainActor @Sendable () async -> Void
