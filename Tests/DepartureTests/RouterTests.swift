@@ -2894,7 +2894,7 @@ struct RouterTests {
         #expect(criticalPresentation?.declaration.priority == .critical)
     }
 
-    @Test func unwindingHighPriorityRouteClearsCriticalTreeAnchoredToIt() async throws {
+    @Test func unwindingHighPriorityRoutePreservesCriticalTreeAnchoredToAncestor() async throws {
         let router = Router()
 
         router.root.installRouteDeclarations(
@@ -2916,8 +2916,8 @@ struct RouterTests {
 
         #expect(didUnwind)
         #expect(router.routeForest.highTree == nil)
-        #expect(router.routeForest.criticalTree == nil)
-        #expect(router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.fade)).wrappedValue == nil)
+        #expect(router.routeForest.criticalTree != nil)
+        #expect(router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.fade)).wrappedValue != nil)
     }
 
     @Test func criticalPriorityReplacementPreservesUnderlyingHighPriorityPresentation() async {
