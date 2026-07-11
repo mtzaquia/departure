@@ -40,6 +40,7 @@ extension Router {
             }
         }
 
+        let id: UUID
         let route: any Route
         let state: State
 
@@ -48,7 +49,12 @@ extension Router {
             case append(Append)
         }
 
-        init(route: any Route, state: State) {
+        init(
+            id: UUID = UUID(),
+            route: any Route,
+            state: State
+        ) {
+            self.id = id
             self.route = route
             self.state = state
         }
@@ -71,16 +77,11 @@ extension Router {
     }
 
     struct UnwindPresentationSnapshot {
-        struct PreservedRoutePath {
-            let routePath: RoutePath
-            let scopes: [RouteScope]
-        }
-
-        let preservedPaths: [PreservedRoutePath]
+        let preservedPaths: [RouteForest.PreservedRoutePath]
         let routeForest: RouteForest
 
         init(
-            preservedPaths: [PreservedRoutePath],
+            preservedPaths: [RouteForest.PreservedRoutePath],
             routeForest: RouteForest
         ) {
             self.preservedPaths = preservedPaths
@@ -115,12 +116,22 @@ extension Router {
         case append
         case startElevatedTree(RoutePriority)
 
-        var startsElevatedTree: Bool {
-            if case .startElevatedTree = self {
-                return true
+        var elevatedPriority: RoutePriority? {
+            if case .startElevatedTree(let priority) = self {
+                return priority
             }
 
-            return false
+            return nil
+        }
+    }
+
+    struct RouteAppendPlan {
+        let pathTrims: [RoutePathTrim]
+
+        var removedScopes: [RouteScope] {
+            pathTrims
+                .flatMap(\.removedScopes)
+                .uniquedByIdentity()
         }
     }
 
@@ -270,7 +281,7 @@ extension Router {
         }
 
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
-        let removedScopes = prepareNormalAppendPath(after: match)
+        let removedScopes = prepareRouteAppendPath(after: match)
 
         if removedScopes.isEmpty == false {
             log.departureDebug(.routeAppendWaitingReplacingScopes(removedScopes: removedScopes.count))
@@ -313,11 +324,11 @@ extension Router {
         }
 
         let targetPosition = equivalentRouteMatch.position
-        let removedScopes = match.path.scopesRemovedAfter(targetPosition)
+        let removedScopes = match.presentationLocation.path.scopesRemovedAfter(targetPosition)
         let sourceScope = removedScopes.last
-        let targetScope = match.path.scope(at: targetPosition)
+        let targetScope = match.presentationLocation.path.scope(at: targetPosition)
         guard removedScopes.isEmpty == false else {
-            if let existingRoute = match.path.scope(at: targetPosition)?.route {
+            if let existingRoute = match.presentationLocation.path.scope(at: targetPosition)?.route {
                 log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: existingRoute))
             }
             return true
@@ -330,7 +341,7 @@ extension Router {
             removing: removedScopes,
             logsCompletion: false
         ) {
-            keepPathThrough(targetPosition, in: match.path)
+            keepPathThrough(targetPosition, in: match.presentationLocation.path)
         }
         return true
     }
@@ -373,7 +384,11 @@ extension Router {
         to route: any Route,
         after match: DeclarationMatch
     ) -> EquivalentRouteMatch? {
-        equivalentRouteMatch(to: route, in: match.path, startingAt: match.position)
+        equivalentRouteMatch(
+            to: route,
+            in: match.presentationLocation.path,
+            startingAt: match.presentationLocation.position
+        )
     }
 
     func equivalentRouteMatch(
@@ -405,7 +420,7 @@ extension Router {
             return false
         }
 
-        return match.declaringPath.scope(at: match.declaringPosition)?.activeBranch != branchID
+        return match.declarationLocation.scope?.activeBranch != branchID
     }
 
     func activateBranch(for match: DeclarationMatch) -> Bool {
@@ -413,8 +428,8 @@ extension Router {
             return true
         }
 
-        guard let scope = match.declaringPath.scope(at: match.declaringPosition) else {
-            log.departureDebug(.branchActivationFailed(position: match.declaringPosition))
+        guard let scope = match.declarationLocation.scope else {
+            log.departureDebug(.branchActivationFailed(position: match.declarationLocation.position))
             return false
         }
 
@@ -443,7 +458,7 @@ extension Router {
         with route: any Route,
         after match: DeclarationMatch
     ) {
-        log.departureDebug(.highPriorityReplacePreparing(route: route, match: match))
+        log.departureDebug(.elevatedPriorityReplacePreparing(route: route, match: match))
 
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
 
@@ -492,38 +507,45 @@ extension Router {
 
         replacePendingRoute(nil)
 
-        // Resolve the host once, at write time, so the SwiftUI bindings read it directly instead of
-        // re-deriving the closest declaring scope on every read. The presenter is not always the
-        // declarer: when the route is placed into a different path than the one it was discovered
-        // in (a branch adopting a top-level/branch declaration), the branch scope that owns the
-        // target path is the presenter. Otherwise the declaring scope within the path hosts it.
-        let hostScope = match.path === match.declaringPath
-            ? match.path.scope(at: match.position)
-            : match.path.owner
+        // Resolve the presentation origin once, at write time, so SwiftUI bindings read it directly
+        // instead of re-deriving the closest declaring scope on every read. The presenter is not
+        // always the declarer: when the route is placed into a different path than the one it was
+        // discovered in (a branch adopting a top-level/branch declaration), the branch scope that
+        // owns the target path is the presenter. Otherwise the declaring scope within the path
+        // hosts it.
+        let presentationOrigin = match.presentationLocation.path === match.declarationLocation.path
+            ? match.presentationLocation.scope
+            : match.presentationLocation.path.owner
 
-        if behavior.startsElevatedTree, hostScope == nil {
+        if behavior.elevatedPriority != nil, presentationOrigin == nil {
             return
         }
 
         mutateRouteGraph {
             if case .startElevatedTree(let priority) = behavior {
                 trimExistingElevatedTreeForReplacement(priority)
-                guard let presentationScope = hostScope else {
+                guard let presentationScope = presentationOrigin else {
                     return
                 }
 
                 let rootScope = RouteScope(id: UUID(), route: nil)
                 let routePath = RoutePath(owner: rootScope)
-                let hostDeclaration = drivingDeclaration(for: match, hostedBy: presentationScope)
+                let presentationDeclaration = match.declaration.drivingPresentation(true)
                 let tree = RouteTree(
                     priority: priority,
                     root: rootScope,
                     rootPath: routePath,
-                    anchor: .init(routeScope: presentationScope, declaration: hostDeclaration)
+                    elevatedOrigin: .init(
+                        scope: presentationScope,
+                        declaration: presentationDeclaration,
+                        sourceEnvironment: presentationScope.sourceEnvironmentReference
+                    )
                 )
                 let appendedScope = RouteScope(id: route.id, route: route)
-                appendedScope.hostScope = presentationScope
-                appendedScope.hostDeclaration = hostDeclaration
+                appendedScope.attachPresentation(
+                    to: presentationScope,
+                    declaration: presentationDeclaration
+                )
                 routePath.append(appendedScope)
                 routeForest.setElevatedTree(tree, for: priority)
                 log.departureDebug(.elevatedTreeStarted)
@@ -531,27 +553,19 @@ extension Router {
             }
 
             let appendedScope = RouteScope(id: route.id, route: route)
-            appendedScope.hostScope = hostScope
-            appendedScope.hostDeclaration = hostScope.map {
-                drivingDeclaration(for: match, hostedBy: $0)
-            } ?? match.declaration
-
-            if match.declaration.presentationKind == .push {
-                hostScope?.pushChild = appendedScope
-            } else {
-                hostScope?.modalChild = appendedScope
+            if let presentationOrigin {
+                appendedScope.attachPresentation(
+                    to: presentationOrigin,
+                    declaration: match.declaration.drivingPresentation(true)
+                )
             }
-            match.path.append(appendedScope)
-        }
-        log.departureDebug(.routeAppended(route: route, pathCount: match.path.count))
-    }
 
-    func drivingDeclaration(for match: DeclarationMatch, hostedBy hostScope: RouteScope) -> AnyRouteDeclaration {
-        hostScope.routeAttachments.first(where: {
-            $0.routeType == match.declaration.routeType
-            && $0.presentationKind == match.declaration.presentationKind
-            && $0.drivesPresentation
-        }) ?? match.declaration
+            match.presentationLocation.path.append(appendedScope)
+        }
+        log.departureDebug(.routeAppended(
+            route: route,
+            pathCount: match.presentationLocation.path.count
+        ))
     }
 
     func resumePendingRoute(for branch: AnyHashable, in declaringScope: RouteScope) {
@@ -561,7 +575,7 @@ extension Router {
             let pendingRoute,
             let append = pendingRoute.append,
             append.match.branchID == branch,
-            append.match.declaringPath.scope(at: append.match.declaringPosition) === declaringScope
+            append.match.declarationLocation.scope === declaringScope
         else {
             log.departureDebug(.pendingResumeSkipped)
             return
@@ -584,7 +598,7 @@ extension Router {
         )
         switch appendBehavior {
         case .append:
-            prepareNormalAppendPath(after: match)
+            prepareRouteAppendPath(after: match)
 
         case .startElevatedTree:
             break
@@ -604,7 +618,7 @@ extension Router {
         }
 
         guard
-            let declaringScope = match.declaringPath.scope(at: match.declaringPosition),
+            let declaringScope = match.declarationLocation.scope,
             declaringScope.activeBranch == branchID
         else {
             log.departureDebug(.routeCannotPresentDiscoveryBranchInactive(branch: branchID))
@@ -623,28 +637,44 @@ extension Router {
     }
 
     @discardableResult
-    func prepareNormalAppendPath(after match: DeclarationMatch) -> [RouteScope] {
-        var removedScopes: [RouteScope] = []
+    func prepareRouteAppendPath(after match: DeclarationMatch) -> [RouteScope] {
+        let plan = routeAppendPlan(after: match)
+        let removedScopes = plan.removedScopes
 
-        guard preservesCurrentPath(for: match) == false else {
-            return prepareDeclaringPathForAppend(after: match)
+        for trim in plan.pathTrims {
+            keepPathThrough(trim.keepThrough, in: trim.path)
         }
 
-        let trimPosition = positionToKeepBeforeAppending(after: match)
-        removedScopes.append(contentsOf: match.path.scopesRemovedAfter(trimPosition))
-        keepPathThrough(trimPosition, in: match.path)
-        removedScopes.append(contentsOf: prepareDeclaringPathForAppend(after: match))
         return removedScopes
     }
 
-    func prepareDeclaringPathForAppend(after match: DeclarationMatch) -> [RouteScope] {
-        guard match.path !== match.declaringPath else {
-            return []
+    func routeAppendPlan(after match: DeclarationMatch) -> RouteAppendPlan {
+        var pathTrims: [RoutePathTrim] = []
+
+        if match.declaration.presentationKind == .push {
+            pathTrims.append(.init(
+                path: match.presentationLocation.path,
+                keepThrough: match.presentationLocation.position
+            ))
+        } else if let presentationOrigin = match.presentationLocation.scope {
+            let targetModalDepth = match.tree.modalDepth(of: presentationOrigin) + 1
+
+            for existing in match.tree.modalScopes(atDepth: targetModalDepth) {
+                pathTrims.append(.init(
+                    path: existing.path,
+                    keepThrough: existing.path.positionBefore(existing.scope) ?? .owner
+                ))
+            }
         }
 
-        let removedScopes = match.declaringPath.scopesRemovedAfter(match.declaringPosition)
-        keepPathThrough(match.declaringPosition, in: match.declaringPath)
-        return removedScopes
+        if match.presentationLocation.path !== match.declarationLocation.path {
+            pathTrims.append(.init(
+                path: match.declarationLocation.path,
+                keepThrough: match.declarationLocation.position
+            ))
+        }
+
+        return RouteAppendPlan(pathTrims: pathTrims)
     }
 
     func keepPathThrough(_ position: RoutePath.Position, in routePath: RoutePath) {
@@ -658,7 +688,6 @@ extension Router {
         }
 
         mutateRouteGraph {
-            releaseHostSlots(for: removedScopes)
             routePath.keepThrough(position)
             removeEmptyElevatedTreesIfNeeded(in: routePath)
         }
@@ -667,55 +696,6 @@ extension Router {
         } else {
             log.departureDebug(.pathTrimmed(keepThrough: position, removedCount: removedScopes.count))
         }
-    }
-
-    func releaseHostSlots(for routeScopes: [RouteScope]) {
-        for removed in routeScopes {
-            if removed.hostScope?.pushChild === removed {
-                removed.hostScope?.pushChild = nil
-            }
-            if removed.hostScope?.modalChild === removed {
-                removed.hostScope?.modalChild = nil
-            }
-        }
-    }
-
-    func preservesCurrentPath(for match: DeclarationMatch) -> Bool {
-        guard match.declaration.presentationKind != .push else {
-            return false
-        }
-
-        guard let declaringScope = match.declaringPath.scope(at: match.declaringPosition) else {
-            return false
-        }
-
-        if let branchID = match.branchID, declaringScope.activeBranch != branchID {
-            return false
-        }
-
-        return firstModalPositionAfterPresentationPoint(for: match) == nil
-    }
-
-    func positionToKeepBeforeAppending(after match: DeclarationMatch) -> RoutePath.Position {
-        guard match.declaration.presentationKind != .push else {
-            return match.position
-        }
-
-        guard let modalPosition = firstModalPositionAfterPresentationPoint(for: match),
-              let modalScope = match.path.scope(at: modalPosition)
-        else {
-            return match.position
-        }
-
-        return match.path.positionBefore(modalScope) ?? .owner
-    }
-
-    func firstModalPositionAfterPresentationPoint(for match: DeclarationMatch) -> RoutePath.Position? {
-        guard match.declaration.presentationKind != .push else {
-            return nil
-        }
-
-        return match.path.firstModalPosition(after: match.position)
     }
 
     func removeFromPath(_ routeScope: RouteScope) {
@@ -758,7 +738,7 @@ extension Router {
     }
 
     func routeScopeDidInstallInView(_ routeScope: RouteScope) {
-        routeScope.installInView()
+        routeScope.viewLifecycle.install()
         log.departureDebug(.scopeInstalledInView(scope: routeScope))
     }
 
@@ -766,7 +746,7 @@ extension Router {
         guard routeScope.isInstalledInView else { return }
 
         mutateRouteGraph {
-            routeScope.uninstallFromView()
+            routeScope.viewLifecycle.uninstall()
             clearElevatedTreeIfNeeded(forRemovedViewScope: routeScope)
         }
         log.departureDebug(.scopeUninstalledFromView(scope: routeScope))
@@ -789,19 +769,11 @@ extension Router {
         }
 
         log.departureDebug(.viewExitWaitStarted(installed: installedRouteScopes.count))
-        await withCheckedContinuation { continuation in
-            var remainingCount = installedRouteScopes.count
-
-            for routeScope in installedRouteScopes {
-                routeScope.onUninstallFromView {
-                    remainingCount -= 1
-                    log.departureDebug(.viewExitWaitProgress(remaining: remainingCount))
-
-                    if remainingCount == 0 {
-                        continuation.resume()
-                    }
-                }
-            }
+        for (index, routeScope) in installedRouteScopes.enumerated() {
+            await routeScope.viewLifecycle.waitUntilUninstalled()
+            log.departureDebug(.viewExitWaitProgress(
+                remaining: installedRouteScopes.count - index - 1
+            ))
         }
     }
 
@@ -865,7 +837,7 @@ extension Router {
             if position == .owner,
                let tree = routeForest.tree(containing: routePath),
                tree.priority != .normal {
-                return tree.anchor?.routeScope
+                return tree.elevatedOrigin?.scope
             }
 
             return routePath.scope(at: position)
@@ -892,12 +864,7 @@ extension Router {
         ) {
             if preservesSnapshot {
                 unwindPresentationSnapshot = UnwindPresentationSnapshot(
-                    preservedPaths: plan.preservedPaths.map {
-                        UnwindPresentationSnapshot.PreservedRoutePath(
-                            routePath: $0.routePath,
-                            scopes: $0.scopes
-                        )
-                    },
+                    preservedPaths: plan.preservedPaths,
                     routeForest: routeForest
                 )
             }
@@ -923,7 +890,7 @@ extension Router {
         afterScopesLeave: () -> Void = {},
         updatePath: () -> Void
     ) async {
-        isNavigationInProgress = true
+        let transaction = beginNavigationTransaction()
         await deliverUnwindHandlers(
             for: sourceScope,
             payload: payload,
@@ -936,7 +903,7 @@ extension Router {
         if logsCompletion {
             log.departureDebug(.unwindCompleted)
         }
-        await finishNavigationTransaction()
+        await finishNavigationTransaction(transaction)
     }
 
     func deliverUnwindHandlers(
@@ -976,8 +943,19 @@ extension Router {
         await Task.yield()
     }
 
-    func finishNavigationTransaction() async {
-        isNavigationInProgress = false
+    func beginNavigationTransaction() -> NavigationTransaction.Token {
+        navigationTransaction.begin()
+    }
+
+    func finishNavigationTransaction(_ token: NavigationTransaction.Token) async {
+        guard navigationTransaction.finish(token) else {
+            return
+        }
+
+        guard navigationTransaction.isInProgress == false else {
+            return
+        }
+
         await drainPendingRouteRequests()
     }
 
@@ -999,17 +977,41 @@ extension Router {
     }
 
     func requestRouteWhenReady(_ route: any Route) async {
-        guard isNavigationInProgress == false else {
-            await withCheckedContinuation { continuation in
-                replacePendingRoute(PendingRoute(
-                    route: route,
-                    state: .request(continuation)
-                ))
+        guard navigationTransaction.isInProgress == false else {
+            let requestID = UUID()
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { continuation in
+                    guard Task.isCancelled == false else {
+                        continuation.resume()
+                        return
+                    }
+
+                    replacePendingRoute(PendingRoute(
+                        id: requestID,
+                        route: route,
+                        state: .request(continuation)
+                    ))
+                }
+            } onCancel: {
+                Task { @MainActor [weak self] in
+                    self?.cancelPendingRequest(id: requestID)
+                }
             }
             return
         }
 
         await requestRoute(route)
+    }
+
+    func cancelPendingRequest(id: UUID) {
+        guard let pendingRoute,
+              pendingRoute.id == id,
+              case .request = pendingRoute.state
+        else {
+            return
+        }
+
+        replacePendingRoute(nil)
     }
 
     func performPresentationDismissalUnwind(
@@ -1019,7 +1021,7 @@ extension Router {
         updatePath: () -> Void
     ) {
         if removedScopes.isEmpty == false {
-            isNavigationInProgress = true
+            let transaction = beginNavigationTransaction()
             Task { @MainActor in
                 await deliverUnwindHandlers(
                     for: sourceScope,
@@ -1028,10 +1030,22 @@ extension Router {
                     removing: removedScopes
                 )
                 await waitForRouteScopesToLeaveView(removedScopes)
-                await finishNavigationTransaction()
+                await finishNavigationTransaction(transaction)
             }
         }
         updatePath()
+    }
+}
+
+private extension [RouteScope] {
+    func uniquedByIdentity() -> [RouteScope] {
+        var result: [RouteScope] = []
+
+        for scope in self where result.contains(where: { $0 === scope }) == false {
+            result.append(scope)
+        }
+
+        return result
     }
 }
 

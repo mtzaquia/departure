@@ -23,42 +23,45 @@
 import Foundation
 
 final class RouteTree {
-    struct Anchor {
-        weak var routeScope: RouteScope?
+    struct ElevatedOrigin {
+        weak var scope: RouteScope?
         let declaration: AnyRouteDeclaration
+        let sourceEnvironment: RouteSourceEnvironment
     }
 
     let priority: RoutePriority
     let root: RouteScope
     let rootPath: RoutePath
-    let anchor: Anchor?
+    let elevatedOrigin: ElevatedOrigin?
 
     init(
         priority: RoutePriority,
         root: RouteScope,
         rootPath: RoutePath? = nil,
-        anchor: Anchor? = nil
+        elevatedOrigin: ElevatedOrigin? = nil
     ) {
         self.priority = priority
         self.root = root
         self.rootPath = rootPath ?? RoutePath(owner: root)
-        self.anchor = anchor
+        self.elevatedOrigin = elevatedOrigin
     }
 
     var currentRoutePath: RoutePath {
-        if let activeTopLevelPath = rootPath.last?.activeLocalScope.owningPath {
-            return activeTopLevelPath
+        let activeScope = rootPath.last?.activeLocalScope ?? root.activeLocalScope
+
+        // A branch root owns its navigation path rather than appearing inside it. Once that path
+        // contains a presented scope, the active scope's `owningPath` identifies the same path.
+        if activeScope.branchID != nil {
+            return activeScope.path
         }
 
-        if let activeRootPath = root.activeLocalScope.owningPath {
-            return activeRootPath
-        }
-
-        return rootPath
+        return activeScope.owningPath ?? rootPath
     }
 
     var currentRouteScope: RouteScope {
-        currentRoutePath.last?.activeLocalScope ?? root.activeLocalScope
+        currentRoutePath.last?.activeLocalScope
+        ?? currentRoutePath.owner?.activeLocalScope
+        ?? root.activeLocalScope
     }
 
     var elevatedRouteScope: RouteScope? {
@@ -69,16 +72,8 @@ final class RouteTree {
         return rootPath.first
     }
 
-    var activeRouteScopeIDs: Set<ObjectIdentifier> {
-        var ids = Set<ObjectIdentifier>()
-        var scope: RouteScope? = currentRouteScope
-
-        while let current = scope {
-            ids.insert(ObjectIdentifier(current))
-            scope = current.previousScopeInTree
-        }
-
-        return ids
+    var activeRouteScopeID: ObjectIdentifier {
+        ObjectIdentifier(currentRouteScope)
     }
 
     func contains(_ routePath: RoutePath) -> Bool {
@@ -123,6 +118,41 @@ final class RouteTree {
 
     func allBranchPaths() -> [RoutePath] {
         allBranchPaths(under: root)
+    }
+
+    var allRoutePaths: [RoutePath] {
+        [rootPath] + allBranchPaths()
+    }
+
+    func modalDepth(of routeScope: RouteScope) -> Int {
+        var depth = 0
+        var scope: RouteScope? = routeScope
+
+        while let current = scope, current !== root {
+            if let declaration = current.presentationDeclaration,
+               declaration.presentationKind != .push {
+                depth += 1
+            }
+
+            scope = current.previousScopeInTree
+        }
+
+        return depth
+    }
+
+    func modalScopes(atDepth depth: Int) -> [(path: RoutePath, scope: RouteScope)] {
+        allRoutePaths.flatMap { path in
+            path.scopes.compactMap { scope in
+                guard let declaration = scope.presentationDeclaration,
+                      declaration.presentationKind != .push,
+                      modalDepth(of: scope) == depth
+                else {
+                    return nil
+                }
+
+                return (path, scope)
+            }
+        }
     }
 
     func allBranchPaths(under owner: RouteScope) -> [RoutePath] {
@@ -206,7 +236,7 @@ final class RouteTree {
     }
 }
 
-private extension RouteScope {
+extension RouteScope {
     var previousScopeInTree: RouteScope? {
         if let owningPath,
            let index = owningPath.scopes.firstIndex(where: { $0 === self }) {

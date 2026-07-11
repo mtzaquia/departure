@@ -126,6 +126,14 @@ struct HighPriorityBlockingSheetRoute: Route {
     }
 }
 
+struct PendingPriorityRoute: Route {
+    func destination() -> some View {
+        Text("Pending high-priority route")
+            .font(.headline)
+            .accessibilityIdentifier(SampleAppAccessibility.pendingPriorityText)
+    }
+}
+
 struct NavigationBarFadeOcclusionRoute: Route {
     func destination() -> some View {
         NavigationBarFadeOcclusionView()
@@ -363,8 +371,47 @@ struct DismissProbeRoute: Route {
     }
 }
 
+struct NestedModalRoute: Route {
+    func destination() -> some View {
+        NestedModalView()
+    }
+}
+
+struct SettingsModalRoute: Route {
+    func destination() -> some View {
+        SettingsModalView()
+    }
+}
+
+struct RerouteChainStartRoute: Route {
+    func resolveRoute() async -> RouteResolution {
+        .reroute(RerouteChainIntermediateRoute())
+    }
+
+    func destination() -> some View {
+        EmptyView()
+    }
+}
+
+struct RerouteChainIntermediateRoute: Route {
+    func resolveRoute() async -> RouteResolution {
+        .reroute(RerouteChainFinalRoute())
+    }
+
+    func destination() -> some View {
+        EmptyView()
+    }
+}
+
+struct RerouteChainFinalRoute: Route {
+    func destination() -> some View {
+        RerouteChainFinalView()
+    }
+}
+
 struct DismissProbeView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(Router.self) private var router
 
     var body: some View {
         VStack(spacing: 16) {
@@ -372,11 +419,87 @@ struct DismissProbeView: View {
                 .font(.headline)
                 .accessibilityIdentifier(SampleAppAccessibility.dismissProbeText)
 
+            Button("Present nested modal") {
+                Task {
+                    await router.present(NestedModalRoute())
+                }
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier(SampleAppAccessibility.dismissProbePresentNestedButton)
+
+            Button("Present settings modal") {
+                Task {
+                    await router.present(SettingsModalRoute())
+                }
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier(SampleAppAccessibility.dismissProbePresentSettingsModalButton)
+
             Button("Dismiss") {
                 dismiss()
             }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier(SampleAppAccessibility.dismissProbeDismissButton)
+        }
+        .padding()
+        .routes {
+            Sheet(NestedModalRoute.self, providesNavigation: false)
+        }
+    }
+}
+
+struct NestedModalView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Nested modal")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.nestedModalText)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.nestedModalDismissButton)
+        }
+        .padding()
+    }
+}
+
+struct SettingsModalView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Settings modal")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.settingsModalText)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.settingsModalDismissButton)
+        }
+        .padding()
+    }
+}
+
+struct RerouteChainFinalView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Reroute chain resolved")
+                .font(.headline)
+                .accessibilityIdentifier(SampleAppAccessibility.rerouteChainFinalText)
+
+            Button("Dismiss") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .accessibilityIdentifier(SampleAppAccessibility.rerouteChainFinalDismissButton)
         }
         .padding()
     }

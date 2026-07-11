@@ -32,24 +32,17 @@ struct RouteForest {
     }
 
     struct UnwindPlan {
-        struct PathTrim {
-            let path: RoutePath
-            let keepThrough: RoutePath.Position
-        }
-
         let removedScopes: [RouteScope]
-        let pathTrims: [PathTrim]
+        let pathTrims: [RoutePathTrim]
         let preservedPaths: [PreservedRoutePath]
         let clearsElevatedTrees: Bool
 
         init(
-            pathTrims: [PathTrim],
+            pathTrims: [RoutePathTrim],
             clearsElevatedTrees: Bool = false
         ) {
-            self.pathTrims = pathTrims.uniquedByPath()
-            self.removedScopes = self.pathTrims.flatMap {
-                $0.path.scopesRemovedAfter($0.keepThrough)
-            }
+            self.pathTrims = pathTrims.mergingByPath()
+            self.removedScopes = self.pathTrims.flatMap(\.removedScopes)
             self.preservedPaths = self.pathTrims.map {
                 PreservedRoutePath($0.path, after: $0.keepThrough)
             }.filter { $0.scopes.isEmpty == false }
@@ -60,7 +53,6 @@ struct RouteForest {
     indirect enum UnwindPlanRequest {
         case root
         case scoped(routePath: RoutePath, after: RoutePath.Position)
-        case pathTrims([UnwindPlan.PathTrim])
         case combined([UnwindPlanRequest])
     }
 
@@ -125,7 +117,7 @@ struct RouteForest {
             }
 
             guard let modalScope = branchPath.scopes.first(where: {
-                $0.hostDeclaration?.presentationKind != .push
+                $0.presentationDeclaration?.presentationKind != .push
             }) else {
                 return nil
             }
@@ -145,7 +137,7 @@ struct RouteForest {
                 clearsElevatedTrees: true
             )
 
-        case .scoped, .pathTrims:
+        case .scoped:
             return UnwindPlan(pathTrims: pathTrims(for: request))
 
         case .combined:
@@ -157,16 +149,13 @@ struct RouteForest {
         }
     }
 
-    private func pathTrims(for request: UnwindPlanRequest) -> [UnwindPlan.PathTrim] {
+    private func pathTrims(for request: UnwindPlanRequest) -> [RoutePathTrim] {
         switch request {
         case .root:
             return rootPathTrims()
 
         case let .scoped(routePath, position):
             return scopedPathTrims(from: routePath, after: position)
-
-        case let .pathTrims(pathTrims):
-            return pathTrims
 
         case .combined:
             return combinedRequests(for: request).flatMap { pathTrims(for: $0) }
@@ -181,7 +170,7 @@ struct RouteForest {
         return requests
     }
 
-    private func rootPathTrims() -> [UnwindPlan.PathTrim] {
+    private func rootPathTrims() -> [RoutePathTrim] {
         let rootPath = normalTree.rootPath
         var branchPaths = normalTree.activeBranchPaths()
         branchPaths.appendUnique(contentsOf: rootPath.scopesRemovedAfter(.owner).flatMap {
@@ -194,19 +183,19 @@ struct RouteForest {
         }
 
         let inactiveBranchModalTrims = inactiveBranchModalTrims(excluding: branchPaths)
-        return [UnwindPlan.PathTrim(path: rootPath, keepThrough: .owner)]
+        return [RoutePathTrim(path: rootPath, keepThrough: .owner)]
         + branchPaths.map {
-            UnwindPlan.PathTrim(path: $0, keepThrough: .owner)
+            RoutePathTrim(path: $0, keepThrough: .owner)
         }
         + inactiveBranchModalTrims.map {
-            UnwindPlan.PathTrim(path: $0.path, keepThrough: $0.keepThrough)
+            RoutePathTrim(path: $0.path, keepThrough: $0.keepThrough)
         }
     }
 
     private func scopedPathTrims(
         from routePath: RoutePath,
         after position: RoutePath.Position
-    ) -> [UnwindPlan.PathTrim] {
+    ) -> [RoutePathTrim] {
         let directlyRemovedScopes = routePath.scopesRemovedAfter(position)
         var ownedPaths: [RoutePath] = []
 
@@ -227,11 +216,11 @@ struct RouteForest {
         }
 
         for elevatedTree in elevatedTrees {
-            guard let anchorScope = elevatedTree.anchor?.routeScope else {
+            guard let originScope = elevatedTree.elevatedOrigin?.scope else {
                 continue
             }
 
-            guard directlyRemovedScopes.contains(where: { $0 === anchorScope }) else {
+            guard directlyRemovedScopes.contains(where: { $0 === originScope }) else {
                 continue
             }
 
@@ -239,9 +228,9 @@ struct RouteForest {
             ownedPaths.appendUnique(contentsOf: elevatedTree.allBranchPaths())
         }
 
-        return [UnwindPlan.PathTrim(path: routePath, keepThrough: position)]
+        return [RoutePathTrim(path: routePath, keepThrough: position)]
         + ownedPaths.map {
-            UnwindPlan.PathTrim(path: $0, keepThrough: .owner)
+            RoutePathTrim(path: $0, keepThrough: .owner)
         }
     }
 
@@ -302,6 +291,79 @@ struct RouteForest {
         highTree = nil
         criticalTree = nil
     }
+
+    #if DEBUG
+    func validateInvariants() {
+        var globallyLocatedScopes = Set<ObjectIdentifier>()
+
+        for tree in allTrees {
+            var modalScopesByDepth: [Int: RouteScope] = [:]
+            precondition(
+                tree.rootPath.owner === tree.root,
+                "A route tree's root path must be owned by that tree's root scope."
+            )
+            precondition(
+                globallyLocatedScopes.insert(ObjectIdentifier(tree.root)).inserted,
+                "A route tree root cannot occupy another structural location."
+            )
+
+            for path in tree.allRoutePaths {
+                var scopesInPath = Set<ObjectIdentifier>()
+
+                if path !== tree.rootPath {
+                    guard let branchScope = path.owner,
+                          let branchID = branchScope.branchID,
+                          let parent = branchScope.parent
+                    else {
+                        preconditionFailure("Every non-root path must be owned by a registered branch scope.")
+                    }
+
+                    precondition(
+                        path === branchScope.path,
+                        "A branch path must be the path owned by its branch scope."
+                    )
+                    precondition(
+                        parent.branchScopes[branchID] === branchScope,
+                        "A branch scope's parent registration must match its branch identity."
+                    )
+                    precondition(
+                        globallyLocatedScopes.insert(ObjectIdentifier(branchScope)).inserted,
+                        "A branch scope cannot occupy another structural location."
+                    )
+                }
+
+                for scope in path.scopes {
+                    let scopeID = ObjectIdentifier(scope)
+                    precondition(
+                        scopesInPath.insert(scopeID).inserted,
+                        "A route scope cannot appear more than once in the same route path."
+                    )
+                    precondition(
+                        globallyLocatedScopes.insert(scopeID).inserted,
+                        "A route scope cannot belong to multiple structural locations."
+                    )
+                    precondition(
+                        scope.owningPath === path,
+                        "A route scope's owning path must match the path that contains it."
+                    )
+
+                    guard let declaration = scope.presentationDeclaration,
+                          declaration.presentationKind != .push
+                    else {
+                        continue
+                    }
+
+                    let depth = tree.modalDepth(of: scope)
+                    precondition(
+                        modalScopesByDepth[depth] == nil,
+                        "Only one modal may occupy a modal depth in a route tree."
+                    )
+                    modalScopesByDepth[depth] = scope
+                }
+            }
+        }
+    }
+    #endif
 }
 
 private extension [RoutePath] {
@@ -312,12 +374,21 @@ private extension [RoutePath] {
     }
 }
 
-private extension [RouteForest.UnwindPlan.PathTrim] {
-    func uniquedByPath() -> [RouteForest.UnwindPlan.PathTrim] {
-        var trims: [RouteForest.UnwindPlan.PathTrim] = []
+private extension [RoutePathTrim] {
+    func mergingByPath() -> [RoutePathTrim] {
+        var trims: [RoutePathTrim] = []
 
-        for trim in self where trims.contains(where: { $0.path === trim.path }) == false {
-            trims.append(trim)
+        for trim in self {
+            guard let existingIndex = trims.firstIndex(where: { $0.path === trim.path }) else {
+                trims.append(trim)
+                continue
+            }
+
+            let existing = trims[existingIndex]
+            trims[existingIndex] = .init(
+                path: existing.path,
+                keepThrough: existing.path.shallower(existing.keepThrough, trim.keepThrough)
+            )
         }
 
         return trims

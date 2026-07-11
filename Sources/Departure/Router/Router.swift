@@ -56,12 +56,6 @@ public final class Router: Identifiable, Equatable {
     /// Stable identity for this router instance.
     @ObservationIgnored public let id = UUID()
 
-    @ObservationIgnored
-    let root: RouteScope
-
-    @ObservationIgnored
-    let normalTree: RouteTree
-
     var routeForest: RouteForest
 
     @ObservationIgnored
@@ -71,7 +65,7 @@ public final class Router: Identifiable, Equatable {
     var unwindPresentationSnapshot: UnwindPresentationSnapshot?
 
     @ObservationIgnored
-    var isNavigationInProgress = false
+    var navigationTransaction = NavigationTransaction()
 
     @ObservationIgnored
     var deliveredUnwindHandlers: [UnwindHandlerDeliveryKey: DeliveredUnwindHandler] = [:]
@@ -79,7 +73,15 @@ public final class Router: Identifiable, Equatable {
     @ObservationIgnored
     var routeGraphMutationDepth = 0
 
-    var activeRouteScopeIDs: Set<ObjectIdentifier>
+    var activeRouteScopeID: ObjectIdentifier
+
+    var root: RouteScope {
+        routeForest.normalTree.root
+    }
+
+    var normalTree: RouteTree {
+        routeForest.normalTree
+    }
 
     var currentRouteScope: RouteScope {
         routeForest.activeTree.currentRouteScope
@@ -89,11 +91,9 @@ public final class Router: Identifiable, Equatable {
     public init() {
         let root = RouteScope(id: UUID(), route: nil)
         let rootPath = RoutePath(owner: root)
-        self.root = root
         let normalTree = RouteTree(priority: .normal, root: root, rootPath: rootPath)
-        self.normalTree = normalTree
         self.routeForest = RouteForest(normalTree: normalTree)
-        self.activeRouteScopeIDs = normalTree.activeRouteScopeIDs
+        self.activeRouteScopeID = normalTree.activeRouteScopeID
     }
 
     /// Requests a route presentation.
@@ -169,6 +169,37 @@ public final class Router: Identifiable, Equatable {
 }
 
 extension Router {
+    struct NavigationTransaction {
+        struct Token: Hashable {
+            let id = UUID()
+
+            static func == (lhs: Self, rhs: Self) -> Bool {
+                lhs.id == rhs.id
+            }
+
+            func hash(into hasher: inout Hasher) {
+                hasher.combine(id)
+            }
+        }
+
+        private var activeTokens: Set<Token> = []
+
+        var isInProgress: Bool {
+            activeTokens.isEmpty == false
+        }
+
+        mutating func begin() -> Token {
+            let token = Token()
+            activeTokens.insert(token)
+            return token
+        }
+
+        @discardableResult
+        mutating func finish(_ token: Token) -> Bool {
+            activeTokens.remove(token) != nil
+        }
+    }
+
     func mutateRouteGraph(_ mutation: () -> Void) {
         routeGraphMutationDepth += 1
         mutation()
@@ -176,13 +207,16 @@ extension Router {
 
         if routeGraphMutationDepth == 0 {
             reconcileActiveRouteScopeID()
+            #if DEBUG
+            routeForest.validateInvariants()
+            #endif
         }
     }
 
     private func reconcileActiveRouteScopeID() {
-        let routeScopeIDs = routeForest.activeTree.activeRouteScopeIDs
-        if activeRouteScopeIDs != routeScopeIDs {
-            activeRouteScopeIDs = routeScopeIDs
+        let routeScopeID = routeForest.activeTree.activeRouteScopeID
+        if activeRouteScopeID != routeScopeID {
+            activeRouteScopeID = routeScopeID
         }
     }
 }

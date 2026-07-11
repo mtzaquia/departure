@@ -26,83 +26,131 @@ extension Router {
     func requestRoute(_ route: some Route) async {
         log.departureDebug(.routeRequested(route: route))
 
-        let resolvedRoute: (any Route)?
-
-        let resolutionResult: RouteResolution = await route.resolveRoute()
-        switch resolutionResult {
-        case .allow:
-            resolvedRoute = route
-
-        case .reroute(let newRoute):
-            log.departureDebug(.routeRerouted(from: route, to: newRoute))
-            resolvedRoute = newRoute
-
-        case .drop:
-            log.departureDebug(.routeDroppedResolution)
-            resolvedRoute = nil
-        }
-
+        let resolvedRoute = await resolveRouteChain(startingWith: route)
         guard let resolvedRoute else { return }
-        if let currentRoute = currentRouteScope.route, currentRoute._isEqual(to: resolvedRoute) {
+
+        switch transitionPlan(for: resolvedRoute) {
+        case .noOp(let currentRoute):
             log.departureDebug(.routeNoOpEquivalent(route: resolvedRoute, currentRoute: currentRoute))
             return
-        }
 
-        let resolvedRouteType = type(of: resolvedRoute)
-        guard let matchedDeclaration = routeForest.firstDeclaration(including: resolvedRouteType) else {
-            log.departureDebug(.routeDroppedNoDeclaration(routeType: resolvedRouteType))
-            return // Cannot find matching route, dropped.
-        }
-
-        log.departureDebug(.routeMatched(
-            route: resolvedRoute,
-            match: matchedDeclaration
-        ))
-
-        switch routeRequestDecision(for: matchedDeclaration) {
-        case .drop:
-            log.departureDebug(.routeBlockedByElevatedTree(route: resolvedRoute))
-            return // Lower-priority route attached before an existing elevated tree is dropped.
-
-        case .append:
-            log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
-            await appendRoute(resolvedRoute, after: matchedDeclaration)
+        case .dropNoDeclaration(let routeType):
+            log.departureDebug(.routeDroppedNoDeclaration(routeType: routeType))
             return
 
-        case .replaceElevatedTree(let priority):
+        case .dropBlockedByElevatedPriority(let match):
+            logMatchedRoute(resolvedRoute, to: match)
+            log.departureDebug(.routeBlockedByElevatedPriority(route: resolvedRoute))
+            return
+
+        case .append(let match):
+            logMatchedRoute(resolvedRoute, to: match)
+            log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
+            await appendRoute(resolvedRoute, after: match)
+            return
+
+        case .replaceElevatedTree(let priority, let match):
+            logMatchedRoute(resolvedRoute, to: match)
             if await unwindToExistingEquivalentRouteInPriorityTreeIfNeeded(resolvedRoute, priority: priority) {
                 return
             }
 
-            if await unwindToExistingEquivalentRouteIfNeeded(resolvedRoute, after: matchedDeclaration) {
+            if await unwindToExistingEquivalentRouteIfNeeded(resolvedRoute, after: match) {
                 return
             }
 
-            log.departureDebug(.routeAcceptedReplaceHighPriority(route: resolvedRoute))
-            replaceElevatedTree(priority, with: resolvedRoute, after: matchedDeclaration)
+            log.departureDebug(.routeAcceptedReplaceElevatedPriority(route: resolvedRoute))
+            replaceElevatedTree(priority, with: resolvedRoute, after: match)
             return
         }
+    }
+
+    private func resolveRouteChain(startingWith route: any Route) async -> (any Route)? {
+        var candidate = route
+
+        while true {
+            let resolution: RouteResolution = await candidate.resolveRoute()
+            switch resolution {
+            case .allow:
+                return candidate
+
+            case .reroute(let rerouted):
+                log.departureDebug(.routeRerouted(from: candidate, to: rerouted))
+                candidate = rerouted
+
+            case .drop:
+                log.departureDebug(.routeDroppedResolution)
+                return nil
+            }
+        }
+    }
+
+    private func transitionPlan(for route: any Route) -> RouteTransitionPlan {
+        if let currentRoute = currentRouteScope.route,
+           currentRoute._isEqual(to: route) {
+            return .noOp(currentRoute: currentRoute)
+        }
+
+        let routeType = type(of: route)
+        guard let match = routeForest.firstDeclaration(including: routeType) else {
+            return .dropNoDeclaration(routeType: routeType)
+        }
+
+        return switch priorityDecision(for: match) {
+        case .drop:
+            .dropBlockedByElevatedPriority(match: match)
+
+        case .append:
+            .append(match: match)
+
+        case .replaceElevatedTree(let priority):
+            .replaceElevatedTree(priority: priority, match: match)
+        }
+    }
+
+    private func logMatchedRoute(_ route: any Route, to match: DeclarationMatch) {
+        log.departureDebug(.routeMatched(route: route, match: match))
     }
 }
 
 extension Router {
-    enum RouteRequestDecision {
+    enum RouteTransitionPlan {
+        case noOp(currentRoute: any Route)
+        case dropNoDeclaration(routeType: any Route.Type)
+        case dropBlockedByElevatedPriority(match: DeclarationMatch)
+        case append(match: DeclarationMatch)
+        case replaceElevatedTree(priority: RoutePriority, match: DeclarationMatch)
+    }
+
+    enum PriorityDecision {
         case append
         case replaceElevatedTree(RoutePriority)
         case drop
     }
 
     struct DeclarationMatch {
-        var path: RoutePath
-        var position: RoutePath.Position
-        var tree: RouteTree
-        var declaringPath: RoutePath
-        var declaringPosition: RoutePath.Position
-        var branchID: AnyHashable?
-        var declaration: AnyRouteDeclaration
+        struct Location {
+            let path: RoutePath
+            let position: RoutePath.Position
+
+            var scope: RouteScope? {
+                path.scope(at: position)
+            }
+        }
+
+        let presentationLocation: Location
+        let tree: RouteTree
+        let declarationLocation: Location
+        let branchID: AnyHashable?
+        let declaration: AnyRouteDeclaration
     }
 
-    func routeRequestDecision(for match: DeclarationMatch) -> RouteRequestDecision {
+    func priorityDecision(for match: DeclarationMatch) -> PriorityDecision {
+        if let pendingPriority = pendingElevatedPriority,
+           match.declaration.priority < pendingPriority {
+            return .drop
+        }
+
         if match.tree === routeForest.activeTree, match.tree.priority >= match.declaration.priority {
             return .append
         }
@@ -116,6 +164,10 @@ extension Router {
         }
 
         return .replaceElevatedTree(match.declaration.priority)
+    }
+
+    private var pendingElevatedPriority: RoutePriority? {
+        pendingRoute?.append?.behavior.elevatedPriority
     }
 
     /// The path owned by the branch nearest to the current position, or `nil` when the current
@@ -144,11 +196,9 @@ extension Router.DeclarationMatch {
         attachment: RouteScope.RouteAttachmentMatch
     ) {
         self.init(
-            path: routePath.path,
-            position: routePath.position,
+            presentationLocation: .init(path: routePath.path, position: routePath.position),
             tree: tree,
-            declaringPath: declaringPath,
-            declaringPosition: declaringPosition,
+            declarationLocation: .init(path: declaringPath, position: declaringPosition),
             branchID: attachment.branchID,
             declaration: attachment.declaration
         )
@@ -158,11 +208,9 @@ extension Router.DeclarationMatch {
         _ routePath: (path: RoutePath, position: RoutePath.Position)
     ) -> Self {
         .init(
-            path: routePath.path,
-            position: routePath.position,
+            presentationLocation: .init(path: routePath.path, position: routePath.position),
             tree: tree,
-            declaringPath: declaringPath,
-            declaringPosition: declaringPosition,
+            declarationLocation: declarationLocation,
             branchID: branchID,
             declaration: declaration
         )

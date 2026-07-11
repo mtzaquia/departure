@@ -68,15 +68,7 @@ extension Router {
 
 private extension Router {
     func waitForRouteScopeToInstall(_ routeScope: RouteScope) async {
-        guard routeScope.isInstalledInView == false else {
-            return
-        }
-
-        await withCheckedContinuation { continuation in
-            routeScope.onInstallInView {
-                continuation.resume()
-            }
-        }
+        await routeScope.viewLifecycle.waitUntilInstalled()
     }
 
     func performAction<A: Action>(_ action: A, hasRerouted: Bool) async {

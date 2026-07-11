@@ -55,6 +55,14 @@ struct HomeView: View {
                     }
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.homeShowNavigationBarFadeButton)
+
+                Button("Race pending priority against normal sheet") {
+                    Task {
+                        await router.present(PendingPriorityRoute())
+                        await router.present(TopLevelSheetRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.homePresentPendingPriorityRaceButton)
             }
 
             Button("Show high-priority passthrough sheet") {

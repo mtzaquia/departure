@@ -4,6 +4,34 @@
 
 It lets views declare the routes they can handle and the presentation style for each route. The router then presents the closest matching route. Triggered actions run against the active route scope, can be intercepted by route-scoped hooks, and can request a reroute before execution is retried.
 
+## Mental model
+
+A route tree can be understood as a three-dimensional navigation model:
+
+- **X is routing depth.** A push, modal, or branch root advances the active navigation by one level.
+- **Y is modal depth.** Presenting a modal advances both X and Y. A route inside that modal may present another modal at the next Y level.
+- **Z is branching.** Branches preserve independent push paths, but share the tree's modal layers. Only one modal can occupy a given Y level across all branches.
+- **Priority creates another tree.** Normal, high, and critical contexts have separate route trees. High and critical trees render from router-level windows and retain the scope where they originated so lower-priority requests can be admitted, blocked, or replaced correctly.
+
+`router.present(...)` always begins lookup from the top-most active scope. The elevated origin is the presentation scope selected by route lookup; it is not the view that happened to call `present`.
+
+Navigation mutations are serialized. If several presentation requests arrive while an unwind or replacement is waiting for SwiftUI to remove old scopes, the latest pending request wins.
+A pending presentation is discarded if its calling task is cancelled before the active navigation mutation finishes.
+
+### Engine rules
+
+- Route lookup starts at the top-most active scope and crawls toward the root. A matching declaration deeper in that crawl wins over a shallower one.
+- A declaration in an inactive branch activates that branch before presentation. The request waits when necessary for the selected branch scope to enter the view hierarchy.
+- Encountering an equivalent route on the target path stops presentation. If the equivalent route is an ancestor, the path unwinds to it instead of creating another instance.
+- Pushes, sheets, covers, and branch roots each add one X level. Sheets and covers also add one Y level.
+- A tree has one modal lane per Y depth, shared by all of its branches. Presenting a sheet or cover replaces any existing modal at that depth; a modal may present another modal at the next depth.
+- Branches keep independent push paths on Z. Switching branches preserves inactive push state, but never preserves a modal that was replaced in the shared Y lane.
+- The router always has a normal tree. A request above the active priority starts or replaces a separate high or critical tree whose root renders in a router-level window. A declaration matched inside an active tree whose priority is equal or higher appends locally to that tree.
+- An elevated request records the presentation scope selected before its tree starts; it is not the view that called `present`. While that request waits for its scope to mount, it reserves its priority: lower-priority requests are dropped, while equal or higher priorities may replace it.
+- Rerouted values are resolved repeatedly until a route returns `.allow` or `.drop`, then declaration lookup begins for that final route.
+- While an unwind or modal replacement is waiting for removed views to leave, presentation requests are serialized and only the latest pending request is retained.
+- Only the top-most current route scope reads `routePhase == .active`. Its branch root, container, and other ancestors remain installed but read `.inactive` while a descendant push or modal is current.
+
 ```swift
 await router.present(SettingsRoute())
 ```
@@ -98,7 +126,7 @@ struct ProtectedSettingsRoute: Route {
 ```
 
 > [!IMPORTANT]
-> On `.reroute(route)`, `Departure` evaluates the new route before matching it to an owner. Keep resolution quick and avoid recursive reroutes.
+> On `.reroute(route)`, `Departure` continues evaluating rerouted values until one returns `.allow` or `.drop`. Keep resolution quick and avoid recursive reroutes; cycle prevention is the route's responsibility.
 
 ### Actions
 
@@ -489,8 +517,8 @@ flowchart TD
 ```
 
 > [!NOTE]
-> Each branch on a branched scope has its own path for pushed presentations. Modal presentations are
-> mutually exclusive within the branched scope.
+> Each branch on a branched scope has its own path for pushed presentations. All branches in the
+> same route tree share modal depth: only one modal may occupy a given Y level across those branches.
 
 ## Elevated-priority presentations
 

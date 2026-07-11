@@ -122,12 +122,6 @@ extension Router {
         )
     }
 
-    func highPriorityRoutePresentationBinding(
-        matching presentationKind: RoutePresentationKind
-    ) -> Binding<RoutePresentation?> {
-        elevatedRoutePresentationBinding(priority: .high, matching: presentationKind)
-    }
-
     func elevatedRoutePresentationBinding(
         priority: RoutePriority,
         matching presentationKind: RoutePresentationKind
@@ -165,11 +159,12 @@ private extension Router {
             return nil
         }
 
-        let candidate = presentationKind == .push ? host.pushChild : host.modalChild
         guard
-            let presentedScope = candidate,
-            let declaration = presentedScope.hostDeclaration,
-            declaration.presentationKind == presentationKind,
+            let presentedScope = routePath.scopes.first(where: {
+                $0.presentationOrigin === host
+                && $0.presentationDeclaration?.presentationKind == presentationKind
+            }),
+            let declaration = presentedScope.presentationDeclaration,
             declaration.drivesPresentation
         else {
             return nil
@@ -198,7 +193,7 @@ private extension Router {
     func hostedPresentation(
         by host: RouteScope,
         matching presentationKind: RoutePresentationKind,
-        inPreservedPaths paths: [UnwindPresentationSnapshot.PreservedRoutePath],
+        inPreservedPaths paths: [RouteForest.PreservedRoutePath],
         snapshot: UnwindPresentationSnapshot
     ) -> RoutePresentation? {
         for path in paths {
@@ -218,7 +213,7 @@ private extension Router {
     func hostedPresentation(
         by host: RouteScope,
         matching presentationKind: RoutePresentationKind,
-        inPreservedPath path: UnwindPresentationSnapshot.PreservedRoutePath,
+        inPreservedPath path: RouteForest.PreservedRoutePath,
         snapshot: UnwindPresentationSnapshot
     ) -> RoutePresentation? {
         guard host.canDrivePresentation(matching: presentationKind) else {
@@ -229,8 +224,8 @@ private extension Router {
 
         for presentedScope in path.scopes {
             guard
-                presentedScope.hostScope === host,
-                let declaration = presentedScope.hostDeclaration,
+                presentedScope.presentationOrigin === host,
+                let declaration = presentedScope.presentationDeclaration,
                 declaration.presentationKind == presentationKind,
                 declaration.drivesPresentation,
                 shouldHostLocally(
@@ -328,17 +323,17 @@ private extension Router {
         guard
             let tree = routeForest.tree(for: priority),
             let routeScope = tree.elevatedRouteScope,
-            let anchor = tree.anchor,
-            anchor.declaration.presentationKind == presentationKind,
-            anchor.declaration.drivesPresentation
+            let origin = tree.elevatedOrigin,
+            origin.declaration.presentationKind == presentationKind,
+            origin.declaration.drivesPresentation
         else {
             return nil
         }
 
         return RoutePresentation(
             scope: routeScope,
-            declaration: anchor.declaration,
-            sourceEnvironment: anchor.routeScope?.sourceEnvironment ?? EnvironmentValues()
+            declaration: origin.declaration,
+            sourceEnvironment: origin.sourceEnvironment.values
         )
     }
 
@@ -355,7 +350,7 @@ private extension Router {
         }
 
         let removedScopes = tree.rootPath.scopesRemovedAfter(.owner)
-        let targetScope = tree.anchor?.routeScope
+        let targetScope = tree.elevatedOrigin?.scope
         performPresentationDismissalUnwind(
             for: presentation.scope,
             in: targetScope,

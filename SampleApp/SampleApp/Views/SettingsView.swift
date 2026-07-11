@@ -95,6 +95,13 @@ struct SettingsView: View {
                     }
                     .accessibilityIdentifier(SampleAppAccessibility.settingsPresentUndeclaredRouteButton)
 
+                    Button("Present reroute chain") {
+                        Task {
+                            await router.present(RerouteChainStartRoute())
+                        }
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.settingsPresentRerouteChainButton)
+
                     Button("Attempt missing unwind") {
                         Task {
                             storage.missingUnwindResult = await router.unwind(to: .id("missing"))
