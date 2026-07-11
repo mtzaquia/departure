@@ -64,7 +64,7 @@ struct RouterTests {
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last?.route is HomeDetailRoute)
 
-        await router.unwind(to: .previous)
+        await router.unwind(to: .topmostAncestor)
 
         #expect(router.normalTree.rootPath.isEmpty)
 
@@ -215,7 +215,7 @@ struct RouterTests {
         let router = Router()
 
         #expect(await router.unwind(to: .root) == false)
-        #expect(await router.unwind(to: .previous) == false)
+        #expect(await router.unwind(to: .topmostAncestor) == false)
         #expect(router.normalTree.rootPath.isEmpty)
     }
 
@@ -1901,7 +1901,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(loginScope)
 
         let unwindTask = Task {
-            guard await router.unwind(to: .previous) else {
+            guard await router.unwind(to: .topmostAncestor) else {
                 return
             }
 
@@ -2241,7 +2241,7 @@ struct RouterTests {
         await router.requestRoute(MessageRoute())
         #expect(homeScope.path.count == 1)
 
-        await router.unwind(to: .previous)
+        await router.unwind(to: .topmostAncestor)
 
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last === landingScope)
@@ -2302,7 +2302,7 @@ struct RouterTests {
         #expect(router.routeForest.highTree?.rootPath.last?.route is LoginRoute)
         #expect(router.routeForest.highTree?.currentRoutePath === router.routeForest.highTree?.rootPath)
 
-        await router.unwind(to: .previous)
+        await router.unwind(to: .topmostAncestor)
 
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last === landingScope)

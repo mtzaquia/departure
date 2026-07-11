@@ -214,7 +214,7 @@ final class RoutePath: Identifiable {
             // Clearing an already-empty branch path is the `.nearestBranch` no-op.
             return .keepPathThrough(.owner)
 
-        case .previous:
+        case .topmostAncestor:
             guard let currentScope = scopes.last else {
                 return .noRouteToUnwind
             }

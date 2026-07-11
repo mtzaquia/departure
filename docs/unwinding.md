@@ -4,9 +4,11 @@ Use the router to return to a known point in a flow.
 
 ```swift
 await router.unwind(to: .root)
-await router.unwind(to: .previous)
+await router.unwind(to: .topmostAncestor)
 await router.unwind(to: .id("settings-flow"))
 ```
+
+`.topmostAncestor` is resolved from the router’s topmost route scope, not the view hierarchy that calls it. Use `unwindRoute()` for a dismissal captured from a specific view.
 
 Tag a scope to make it a stable target.
 

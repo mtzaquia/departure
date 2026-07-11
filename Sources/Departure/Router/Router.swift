@@ -50,8 +50,11 @@ public final class Router: Identifiable, Equatable {
         /// the unwind request returns `false`.
         case nearestBranch
 
-        /// Unwinds to the scope immediately before the current, top-most scope.
-        case previous
+        /// Unwinds to the nearest ancestor of the router's top-most route scope.
+        ///
+        /// Unlike ``UnwindRouteAction``, this target is resolved from the router's current
+        /// route scope rather than the view hierarchy where the call originates.
+        case topmostAncestor
 
         /// Unwinds to the scope that was declared with a matching ``SwiftUICore/View/routes(id:_:)`` ID.
         case id(AnyHashable)

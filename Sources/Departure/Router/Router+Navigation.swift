@@ -184,7 +184,7 @@ extension Router {
             }
             routePath = branchPath
 
-        case nil, .previous, .id:
+        case nil, .topmostAncestor, .id:
             routePath = routeForest.activeTree.currentRoutePath
         }
 
@@ -245,7 +245,7 @@ extension Router {
 
     @discardableResult
     func unwindPrevious(from sourceScope: RouteScope, payload: Any? = nil) async -> Bool {
-        log.departureDebug(.unwindRequested(target: .previous))
+        log.departureDebug(.unwindRequested(target: .topmostAncestor))
 
         guard
             let routePath = routeForest.routePath(containing: sourceScope),
@@ -267,7 +267,7 @@ extension Router {
         ))
 
         let targetScope = unwindHandlerScope(
-            for: .previous,
+            for: .topmostAncestor,
             in: routePath,
             keepThrough: targetPosition
         )
