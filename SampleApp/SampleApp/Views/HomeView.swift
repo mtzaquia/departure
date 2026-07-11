@@ -114,6 +114,7 @@ struct HomeView: View {
         }
         .navigationTitle("Home")
         .toolbar {
+#if os(iOS)
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Profile", systemImage: "person") {
                     Task {
@@ -122,6 +123,16 @@ struct HomeView: View {
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.homeProfileButton)
             }
+#else
+            ToolbarItem(placement: .secondaryAction) {
+                Button("Profile", systemImage: "person") {
+                    Task {
+                        await router.present(ProfileRoute())
+                    }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.homeProfileButton)
+            }
+#endif
         }
         .hooks {
             UnwindHandler(DismissProbeRoute.self) {
