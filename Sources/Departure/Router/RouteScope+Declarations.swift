@@ -26,6 +26,11 @@ import SwiftUI
 // MARK: - Route Attachment Lookup
 
 extension RouteScope {
+    struct RouteAttachmentMatch {
+        let branchID: AnyHashable?
+        let declaration: AnyRouteDeclaration
+    }
+
     var routeAttachments: [AnyRouteDeclaration] {
         let visible = branchContainer == nil
             ? declarations.local.routeAttachments

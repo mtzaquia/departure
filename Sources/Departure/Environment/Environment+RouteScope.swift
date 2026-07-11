@@ -126,6 +126,6 @@ extension View {
 
 extension Router {
     func routePhase(for routeScope: RouteScope) -> RoutePhase {
-        activeRouteScopeIDs.contains(ObjectIdentifier(routeScope)) ? .active : .inactive
+        activeRouteScopeID == ObjectIdentifier(routeScope) ? .active : .inactive
     }
 }

@@ -23,6 +23,15 @@
 import Foundation
 import Observation
 
+struct RoutePathTrim {
+    let path: RoutePath
+    let keepThrough: RoutePath.Position
+
+    var removedScopes: [RouteScope] {
+        path.scopesRemovedAfter(keepThrough)
+    }
+}
+
 @Observable
 final class RoutePath: Identifiable {
     enum Position: Equatable, CustomStringConvertible {
@@ -164,30 +173,29 @@ final class RoutePath: Identifiable {
         return .scope(scopes[scopes.index(before: index)])
     }
 
-    func firstModalPosition(after position: Position) -> Position? {
-        guard let searchStartIndex = index(after: position) else {
-            return nil
-        }
-
-        guard searchStartIndex < scopes.endIndex else {
-            return nil
-        }
-
-        guard let index = scopes[searchStartIndex...].firstIndex(where: {
-            $0.hostDeclaration?.presentationKind != .push
-        }) else {
-            return nil
-        }
-
-        return .scope(scopes[index])
-    }
-
     var lastPosition: Position {
         guard let last else {
             return .owner
         }
 
         return .scope(last)
+    }
+
+    func shallower(_ lhs: Position, _ rhs: Position) -> Position {
+        if lhs == .owner || rhs == .owner {
+            return .owner
+        }
+
+        guard case let .scope(lhsScope) = lhs,
+              case let .scope(rhsScope) = rhs,
+              let lhsIndex = scopes.firstIndex(where: { $0 === lhsScope }),
+              let rhsIndex = scopes.firstIndex(where: { $0 === rhsScope })
+        else {
+            assertionFailure("Route trim positions must belong to their route path.")
+            return lhs
+        }
+
+        return lhsIndex <= rhsIndex ? lhs : rhs
     }
 
     func unwindResolution(to target: Router.UnwindTarget?) -> UnwindResolution {

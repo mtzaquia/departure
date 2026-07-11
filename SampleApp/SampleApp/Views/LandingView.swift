@@ -77,6 +77,9 @@ struct LandingView: View {
             Branch(.settings) {
                 Push(AppearanceSettingsRoute.self)
                 Push(AuthenticationSettingsRoute.self)
+                Cover(PendingPriorityRoute.self, priority: .high, providesNavigation: false)
+                Sheet(SettingsModalRoute.self, providesNavigation: false)
+                Sheet(RerouteChainFinalRoute.self, providesNavigation: false)
             }
         }
         .hooks {

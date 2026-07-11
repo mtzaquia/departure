@@ -57,7 +57,7 @@ enum DepartureLogEvent {
     case branchRegistered(branch: AnyHashable, parent: RouteScope, scope: RouteScope)
     case branchUnregistered(branch: AnyHashable, scope: RouteScope)
     case branchUnregisterSkipped(branch: AnyHashable, scope: RouteScope)
-    case highPriorityReplacePreparing(route: any Route, match: Router.DeclarationMatch)
+    case elevatedPriorityReplacePreparing(route: any Route, match: Router.DeclarationMatch)
     case elevatedTreeCleared
     case elevatedTreeStarted
     case hookDeclarationsUninstalled(scope: RouteScope)
@@ -71,12 +71,12 @@ enum DepartureLogEvent {
     case pendingResumeSkipped
     case pendingRouteResuming(route: any Route)
     case routeAcceptedAppend(route: any Route)
-    case routeAcceptedReplaceHighPriority(route: any Route)
+    case routeAcceptedReplaceElevatedPriority(route: any Route)
     case routeAppendSuperseded(route: any Route)
     case routeAppendPreparing(route: any Route, match: Router.DeclarationMatch)
     case routeAppendWaitingReplacingScopes(removedScopes: Int)
     case routeAppended(route: any Route, pathCount: Int)
-    case routeBlockedByElevatedTree(route: any Route)
+    case routeBlockedByElevatedPriority(route: any Route)
     case routeCanPresentActiveLocalScope(branch: AnyHashable)
     case routeCanPresentDeclarationDrivesPresentation
     case routeCannotPresentDiscoveryBranchInactive(branch: AnyHashable)
@@ -159,7 +159,7 @@ extension DepartureLogEvent {
             "branch unregistered | branch=\(branch.departureDebugDescription) | scope=\(scope.departureDebugDescription)"
         case let .branchUnregisterSkipped(branch, scope):
             "branch unregister skipped | branch=\(branch.departureDebugDescription) | reason=scope mismatch | scope=\(scope.departureDebugDescription)"
-        case let .highPriorityReplacePreparing(route, match):
+        case let .elevatedPriorityReplacePreparing(route, match):
             "elevated-priority replace preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
         case .elevatedTreeCleared:
             "elevated-priority tree cleared"
@@ -187,7 +187,7 @@ extension DepartureLogEvent {
             "pending route resuming | route=\(route.departureDebugDescription)"
         case let .routeAcceptedAppend(route):
             "route accepted | action=append | route=\(route.departureDebugDescription)"
-        case let .routeAcceptedReplaceHighPriority(route):
+        case let .routeAcceptedReplaceElevatedPriority(route):
             "route accepted | action=replace elevated-priority tree | route=\(route.departureDebugDescription)"
         case let .routeAppendSuperseded(route):
             "route append dropped | reason=superseded while waiting for replaced scopes | route=\(route.departureDebugDescription)"
@@ -197,8 +197,8 @@ extension DepartureLogEvent {
             "route append waiting | reason=replacing scopes | removedScopes=\(removedScopes)"
         case let .routeAppended(route, pathCount):
             "route appended | route=\(route.departureDebugDescription) | pathCount=\(pathCount)"
-        case let .routeBlockedByElevatedTree(route):
-            "route blocked | route=\(route.departureDebugDescription) | reason=lower priority before active elevated-priority tree"
+        case let .routeBlockedByElevatedPriority(route):
+            "route blocked | route=\(route.departureDebugDescription) | reason=lower than active or pending elevated priority"
         case let .routeCanPresentActiveLocalScope(branch):
             "route can present | branch=\(branch.departureDebugDescription) | reason=active local scope"
         case .routeCanPresentDeclarationDrivesPresentation:
@@ -263,7 +263,7 @@ extension Router.DeclarationMatch {
             "branch=\($0.departureDebugDescription)"
         } ?? "scope"
 
-        return "match=declaration | position=\(position) | declaringPosition=\(declaringPosition) | \(placementDescription) | declaration=\(declaration.departureDebugDescription)"
+        return "match=declaration | position=\(presentationLocation.position) | declaringPosition=\(declarationLocation.position) | \(placementDescription) | declaration=\(declaration.departureDebugDescription)"
     }
 }
 #endif

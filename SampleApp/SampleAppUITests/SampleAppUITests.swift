@@ -158,6 +158,19 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.startButton)
     }
 
+    func testPresentedProfileIsTheOnlyActiveRoutePhase() {
+        openLanding()
+        assertLabel(A11y.homeRoutePhase, contains: "Home route phase: active")
+
+        tap(A11y.homeProfileButton)
+        assertExists(A11y.loginTitle)
+        tap(A11y.loginButton)
+
+        assertExists(A11y.profileTitle)
+        assertLabel(A11y.profileRoutePhase, contains: "Profile route phase: active")
+        assertLabel(A11y.homeRoutePhase, contains: "Home route phase: inactive")
+    }
+
     func testRoutesFromHighPriorityTreeBehaveAsNormalNavigationAndModal() {
         openLanding()
 
@@ -445,6 +458,54 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.appearancePresentAuthenticationButton)
         assertExists(A11y.authenticationTitle)
     }
+
+    func testNestedAndSharedBranchModalLayers() {
+        openLanding()
+
+        tap(A11y.homeShowDismissProbeButton)
+        assertExists(A11y.dismissProbeText)
+
+        tap(A11y.dismissProbePresentNestedButton)
+        assertExists(A11y.nestedModalText)
+        assertExists(A11y.dismissProbeText)
+
+        tap(A11y.nestedModalDismissButton)
+        assertGone(A11y.nestedModalText)
+        assertExists(A11y.dismissProbeText)
+
+        tap(A11y.dismissProbePresentSettingsModalButton)
+        assertExists(A11y.settingsModalText)
+        assertGone(A11y.dismissProbeText)
+
+        tap(A11y.settingsModalDismissButton)
+        assertGone(A11y.settingsModalText)
+        assertExists(A11y.settingsAuthenticationButton)
+
+        tapHomeTab()
+        assertGone(A11y.dismissProbeText)
+        assertExists(A11y.homeWelcome)
+    }
+
+    func testRerouteChainResolvesEveryIntermediateRoute() {
+        openLanding()
+        tapSettingsTab()
+
+        tap(A11y.settingsPresentRerouteChainButton)
+        assertExists(A11y.rerouteChainFinalText)
+
+        tap(A11y.rerouteChainFinalDismissButton)
+        assertGone(A11y.rerouteChainFinalText)
+        assertExists(A11y.settingsAuthenticationButton)
+    }
+
+    func testPendingElevatedBranchRequestBlocksNormalPresentationBeforeWindowStarts() {
+        openLanding()
+
+        tap(A11y.homePresentPendingPriorityRaceButton)
+
+        assertExists(A11y.pendingPriorityText)
+        assertGone(A11y.topLevelSheetText)
+    }
 }
 
 private extension SampleAppUITests {
@@ -562,6 +623,7 @@ private enum A11y {
     static let homeShowMessageButton = "sample.home.show-message"
     static let homeProfileButton = "sample.home.profile"
     static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
+    static let homePresentPendingPriorityRaceButton = "sample.home.present-pending-priority-race"
     static let homePresentHighPriorityPassthroughSheetButton = "sample.home.present-high-priority-passthrough-sheet"
     static let homePresentHighPriorityBlockingSheetButton = "sample.home.present-high-priority-blocking-sheet"
     static let homeShowNavigationBarFadeButton = "sample.home.show-navigation-bar-fade"
@@ -580,6 +642,7 @@ private enum A11y {
     static let settingsPresentHomeMessageButton = "sample.settings.present-home-message"
     static let settingsPresentDroppedRouteButton = "sample.settings.present-dropped-route"
     static let settingsPresentUndeclaredRouteButton = "sample.settings.present-undeclared-route"
+    static let settingsPresentRerouteChainButton = "sample.settings.present-reroute-chain"
     static let settingsMissingUnwindButton = "sample.settings.missing-unwind"
     static let settingsMissingUnwindResult = "sample.settings.missing-unwind-result"
     static let settingsBranchHookStatus = "sample.settings.branch-hook-status"
@@ -628,6 +691,15 @@ private enum A11y {
 
     static let dismissProbeText = "sample.dismiss-probe.text"
     static let dismissProbeDismissButton = "sample.dismiss-probe.dismiss"
+    static let dismissProbePresentNestedButton = "sample.dismiss-probe.present-nested"
+    static let dismissProbePresentSettingsModalButton = "sample.dismiss-probe.present-settings-modal"
+    static let nestedModalText = "sample.nested-modal.text"
+    static let nestedModalDismissButton = "sample.nested-modal.dismiss"
+    static let settingsModalText = "sample.settings-modal.text"
+    static let settingsModalDismissButton = "sample.settings-modal.dismiss"
+    static let rerouteChainFinalText = "sample.reroute-chain-final.text"
+    static let rerouteChainFinalDismissButton = "sample.reroute-chain-final.dismiss"
+    static let pendingPriorityText = "sample.pending-priority.text"
 
     static let alertText = "sample.alert.text"
     static let alertDismissUnwindButton = "sample.alert.dismiss-unwind"
@@ -665,6 +737,7 @@ private enum A11y {
     static let criticalReplacementDismissButton = "sample.critical-replacement.dismiss"
 
     static let profileTitle = "sample.profile.title"
+    static let profileRoutePhase = "sample.profile.route-phase"
     static let profileSignOutButton = "sample.profile.sign-out"
     static let profilePresentTopLevelSheetButton = "sample.profile.present-top-level-sheet"
 

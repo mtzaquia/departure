@@ -881,7 +881,7 @@ struct UnwindHookTests {
         let dismissedScope = try #require(router.routeForest.highTree?.rootPath.last)
         router.routeScopeDidInstallInView(dismissedScope)
 
-        router.highPriorityRoutePresentationBinding(matching: .cover(.slide)).wrappedValue = nil
+        router.elevatedRoutePresentationBinding(priority: .high, matching: .cover(.slide)).wrappedValue = nil
         await Task.yield()
 
         #expect(router.routeForest.highTree == nil)

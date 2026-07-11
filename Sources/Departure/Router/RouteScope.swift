@@ -24,11 +24,6 @@ import Foundation
 import SwiftUI
 
 final class RouteScope: Identifiable {
-    struct RouteAttachmentMatch {
-        let branchID: AnyHashable?
-        let declaration: AnyRouteDeclaration
-    }
-
     var id: AnyHashable {
         declarationInstallation.id
     }
@@ -41,32 +36,41 @@ final class RouteScope: Identifiable {
     var branchContainer: BranchContainerState?
     var branchScopes: [AnyHashable: RouteScope] = [:]
 
-    let declarationInstallation: DeclarationInstallationState
-    private var installObservers: [@MainActor () -> Void] = []
-    private var uninstallObservers: [@MainActor () -> Void] = []
+    let declarationInstallation: RouteScopeDeclarationInstallation
+    let viewLifecycle = RouteScopeViewLifecycle()
 
     lazy var path = RoutePath(owner: self)
     weak var owningPath: RoutePath?
 
-    weak var hostScope: RouteScope?
-    var hostDeclaration: AnyRouteDeclaration?
-
-    weak var pushChild: RouteScope?
-    weak var modalChild: RouteScope?
+    private(set) var presentation: RouteScopePresentation?
 
     #if DEBUG
     var debugKind = DebugKind.root
     #endif
 
-    private(set) var isInstalledInView = false
+    var isInstalledInView: Bool {
+        viewLifecycle.isInstalled
+    }
     var sourceEnvironment: EnvironmentValues {
+        sourceEnvironmentReference.values
+    }
+
+    var sourceEnvironmentReference: RouteSourceEnvironment {
         declarationInstallation.sourceEnvironment
+    }
+
+    var presentationOrigin: RouteScope? {
+        presentation?.origin
+    }
+
+    var presentationDeclaration: AnyRouteDeclaration? {
+        presentation?.declaration
     }
 
     init(id: AnyHashable, route: (any Route)?, parent: RouteScope? = nil) {
         self.route = route
         self.parent = parent
-        self.declarationInstallation = DeclarationInstallationState(initialID: id)
+        self.declarationInstallation = RouteScopeDeclarationInstallation(initialID: id)
     }
 }
 
@@ -75,6 +79,16 @@ final class RouteScope: Identifiable {
 extension RouteScope {
     var currentRoute: (any Route)? {
         route ?? parent?.currentRoute
+    }
+
+    func attachPresentation(
+        to origin: RouteScope,
+        declaration: AnyRouteDeclaration
+    ) {
+        presentation = RouteScopePresentation(
+            origin: origin,
+            declaration: declaration
+        )
     }
 }
 
@@ -92,46 +106,6 @@ extension RouteScope {
     }
 }
 
-// MARK: - Lifecycle
-
-extension RouteScope {
-    func installInView() {
-        guard isInstalledInView == false else {
-            return
-        }
-
-        isInstalledInView = true
-
-        installObservers.forEach { $0() }
-        installObservers.removeAll()
-    }
-
-    func uninstallFromView() {
-        isInstalledInView = false
-
-        uninstallObservers.forEach { $0() }
-        uninstallObservers.removeAll()
-    }
-
-    func onUninstallFromView(_ observer: @escaping @MainActor () -> Void) {
-        guard isInstalledInView else {
-            observer()
-            return
-        }
-
-        uninstallObservers.append(observer)
-    }
-
-    func onInstallInView(_ observer: @escaping @MainActor () -> Void) {
-        guard isInstalledInView == false else {
-            observer()
-            return
-        }
-
-        installObservers.append(observer)
-    }
-}
-
 #if DEBUG
 extension RouteScope {
     enum DebugKind {
@@ -140,58 +114,3 @@ extension RouteScope {
     }
 }
 #endif
-
-final class DeclarationInstallationState {
-    let initialID: AnyHashable
-    private(set) var id: AnyHashable
-    private(set) var sourceEnvironment = EnvironmentValues()
-
-    private var routeSourceID: AnyHashable?
-    private var hookSourceID: AnyHashable?
-
-    fileprivate init(initialID: AnyHashable) {
-        self.initialID = initialID
-        self.id = initialID
-    }
-
-    func installRouteSource(
-        sourceID: AnyHashable,
-        id: AnyHashable?,
-        sourceEnvironment: EnvironmentValues
-    ) {
-        routeSourceID = sourceID
-        updateSourceEnvironment(sourceEnvironment)
-
-        if let id {
-            self.id = id
-        }
-    }
-
-    func uninstallRouteSource(sourceID: AnyHashable) -> Bool {
-        guard routeSourceID == sourceID else {
-            return false
-        }
-
-        routeSourceID = nil
-        id = initialID
-        updateSourceEnvironment(EnvironmentValues())
-        return true
-    }
-
-    func installHookSource(sourceID: AnyHashable) {
-        hookSourceID = sourceID
-    }
-
-    func uninstallHookSource(sourceID: AnyHashable) -> Bool {
-        guard hookSourceID == sourceID else {
-            return false
-        }
-
-        hookSourceID = nil
-        return true
-    }
-
-    func updateSourceEnvironment(_ sourceEnvironment: EnvironmentValues) {
-        self.sourceEnvironment = sourceEnvironment
-    }
-}

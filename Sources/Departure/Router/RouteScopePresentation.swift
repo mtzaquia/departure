@@ -20,34 +20,12 @@
 //  SOFTWARE.
 //
 
-import Departure
-import SwiftUI
+final class RouteScopePresentation {
+    weak var origin: RouteScope?
+    let declaration: AnyRouteDeclaration
 
-struct ProfileView: View {
-    @Environment(Router.self) private var router
-    @Environment(\.routePhase) private var routePhase
-
-    var body: some View {
-        List {
-            Text("Profile route phase: \(routePhase == .active ? "active" : "inactive")")
-                .accessibilityIdentifier(SampleAppAccessibility.profileRoutePhase)
-
-            Button("Sign out", role: .destructive) {
-                Storage.shared.isLoggedIn = false
-                Task {
-                    await router.unwind(to: .root)
-                }
-            }
-            .accessibilityIdentifier(SampleAppAccessibility.profileSignOutButton)
-
-            Button("Present top-level sheet") {
-                Task {
-                    await router.present(TopLevelSheetRoute())
-                }
-            }
-            .accessibilityIdentifier(SampleAppAccessibility.profilePresentTopLevelSheetButton)
-        }
-        .navigationTitle("Profile")
-        .accessibilityIdentifier(SampleAppAccessibility.profileTitle)
+    init(origin: RouteScope, declaration: AnyRouteDeclaration) {
+        self.origin = origin
+        self.declaration = declaration
     }
 }

@@ -97,7 +97,8 @@ struct WindowDestinationBuilderTests {
         )
 
         await router.requestRoute(LoginRoute())
-        let presentation = try #require(router.highPriorityRoutePresentationBinding(
+        let presentation = try #require(router.elevatedRoutePresentationBinding(
+            priority: .high,
             matching: .cover(.slide)
         ).wrappedValue)
         var environment = EnvironmentValues()
@@ -142,11 +143,49 @@ struct WindowDestinationBuilderTests {
         )
 
         await router.requestRoute(LoginRoute())
-        let presentation = try #require(router.highPriorityRoutePresentationBinding(
+        let presentation = try #require(router.elevatedRoutePresentationBinding(
+            priority: .high,
             matching: .cover(.slide)
         ).wrappedValue)
 
         #expect(presentation.sourceEnvironment.windowDestinationTestValue == "installed")
+    }
+
+    @Test func elevatedPresentationRetainsSourceEnvironmentAfterOriginScopeIsReleased() throws {
+        let router = Router()
+        let declaration = Cover(LoginRoute.self, priority: .high)._routeDeclarations[0]
+        let elevatedRoot = RouteScope(id: UUID(), route: nil)
+        let elevatedPath = RoutePath(owner: elevatedRoot)
+        let presentedScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        weak var releasedOrigin: RouteScope?
+
+        do {
+            let origin = RouteScope(id: RootRoute().id, route: RootRoute())
+            var environment = EnvironmentValues()
+            environment.windowDestinationTestValue = "retained"
+            origin.updateSourceEnvironment(environment)
+            releasedOrigin = origin
+
+            presentedScope.attachPresentation(to: origin, declaration: declaration)
+            elevatedPath.append(presentedScope)
+            router.routeForest.highTree = RouteTree(
+                priority: .high,
+                root: elevatedRoot,
+                rootPath: elevatedPath,
+                elevatedOrigin: .init(
+                    scope: origin,
+                    declaration: declaration,
+                    sourceEnvironment: origin.sourceEnvironmentReference
+                )
+            )
+        }
+
+        #expect(releasedOrigin == nil)
+        let presentation = try #require(router.elevatedRoutePresentationBinding(
+            priority: .high,
+            matching: .cover(.slide)
+        ).wrappedValue)
+        #expect(presentation.sourceEnvironment.windowDestinationTestValue == "retained")
     }
 
     @Test func existingWindowDestinationSnapshotKeepsCapturedSourceEnvironment() async throws {
@@ -172,7 +211,8 @@ struct WindowDestinationBuilderTests {
         )
 
         await router.requestRoute(LoginRoute())
-        let initialPresentation = try #require(router.highPriorityRoutePresentationBinding(
+        let initialPresentation = try #require(router.elevatedRoutePresentationBinding(
+            priority: .high,
             matching: .cover(.slide)
         ).wrappedValue)
 
@@ -192,7 +232,8 @@ struct WindowDestinationBuilderTests {
             sourceEnvironment: updatedEnvironment
         )
 
-        let updatedPresentation = try #require(router.highPriorityRoutePresentationBinding(
+        let updatedPresentation = try #require(router.elevatedRoutePresentationBinding(
+            priority: .high,
             matching: .cover(.slide)
         ).wrappedValue)
 
@@ -228,7 +269,8 @@ struct WindowDestinationBuilderTests {
         )
 
         await router.requestRoute(LoginRoute())
-        let initialPresentation = try #require(router.highPriorityRoutePresentationBinding(
+        let initialPresentation = try #require(router.elevatedRoutePresentationBinding(
+            priority: .high,
             matching: .cover(.slide)
         ).wrappedValue)
 
@@ -247,7 +289,8 @@ struct WindowDestinationBuilderTests {
         )
 
         await router.requestRoute(AlertRoute())
-        let replacementPresentation = try #require(router.highPriorityRoutePresentationBinding(
+        let replacementPresentation = try #require(router.elevatedRoutePresentationBinding(
+            priority: .high,
             matching: .cover(.slide)
         ).wrappedValue)
 

@@ -153,11 +153,31 @@ struct DroppedRoute: Route {
 
 struct ReroutingRoute: Route {
     func resolveRoute() async -> RouteResolution {
-        .reroute(LoginRoute())
+        .reroute(IntermediateReroutingRoute())
     }
 
     func destination() -> some View {
         Text("Rerouting")
+    }
+}
+
+struct IntermediateReroutingRoute: Route {
+    func resolveRoute() async -> RouteResolution {
+        .reroute(LoginRoute())
+    }
+
+    func destination() -> some View {
+        Text("Intermediate rerouting")
+    }
+}
+
+struct ReroutingToDroppedRoute: Route {
+    func resolveRoute() async -> RouteResolution {
+        .reroute(DroppedRoute())
+    }
+
+    func destination() -> some View {
+        Text("Rerouting to dropped")
     }
 }
 
