@@ -77,15 +77,22 @@ extension Router {
     }
 
     struct UnwindPresentationSnapshot {
+        let id = UUID()
         let preservedPaths: [RouteForest.PreservedRoutePath]
         let routeForest: RouteForest
+        let preservesModalPresentationBindings: Bool
+        let preservesPushPresentationBindings: Bool
 
         init(
             preservedPaths: [RouteForest.PreservedRoutePath],
-            routeForest: RouteForest
+            routeForest: RouteForest,
+            preservesModalPresentationBindings: Bool,
+            preservesPushPresentationBindings: Bool
         ) {
             self.preservedPaths = preservedPaths
             self.routeForest = routeForest
+            self.preservesModalPresentationBindings = preservesModalPresentationBindings
+            self.preservesPushPresentationBindings = preservesPushPresentationBindings
         }
     }
 
@@ -122,16 +129,6 @@ extension Router {
             }
 
             return nil
-        }
-    }
-
-    struct RouteAppendPlan {
-        let pathTrims: [RoutePathTrim]
-
-        var removedScopes: [RouteScope] {
-            pathTrims
-                .flatMap(\.removedScopes)
-                .uniquedByIdentity()
         }
     }
 
@@ -293,15 +290,19 @@ extension Router {
         }
 
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
-        let removedScopes = prepareRouteAppendPath(after: match)
+        let unwindPlan = routeAppendUnwindPlan(after: match)
+        let snapshotID = installRouteAppendPresentationSnapshot(for: unwindPlan)
+        let removedScopes = prepareRouteAppendPath(unwindPlan)
 
         if removedScopes.isEmpty == false {
             log.departureDebug(.routeAppendWaitingReplacingScopes(removedScopes: removedScopes.count))
             if await deferRouteAppend(route, after: match, until: removedScopes) {
+                clearUnwindPresentationSnapshot(id: snapshotID)
                 return
             }
         }
 
+        clearUnwindPresentationSnapshot(id: snapshotID)
         appendPreparedRoute(route, after: match)
     }
 
@@ -650,7 +651,11 @@ extension Router {
 
     @discardableResult
     func prepareRouteAppendPath(after match: DeclarationMatch) -> [RouteScope] {
-        let plan = routeAppendPlan(after: match)
+        prepareRouteAppendPath(routeAppendUnwindPlan(after: match))
+    }
+
+    @discardableResult
+    func prepareRouteAppendPath(_ plan: RouteForest.UnwindPlan) -> [RouteScope] {
         let removedScopes = plan.removedScopes
 
         for trim in plan.pathTrims {
@@ -660,33 +665,33 @@ extension Router {
         return removedScopes
     }
 
-    func routeAppendPlan(after match: DeclarationMatch) -> RouteAppendPlan {
-        var pathTrims: [RoutePathTrim] = []
+    func routeAppendUnwindPlan(after match: DeclarationMatch) -> RouteForest.UnwindPlan {
+        var requests: [RouteForest.UnwindPlanRequest] = []
 
         if match.declaration.presentationKind == .push {
-            pathTrims.append(.init(
-                path: match.presentationLocation.path,
-                keepThrough: match.presentationLocation.position
+            requests.append(.scoped(
+                routePath: match.presentationLocation.path,
+                after: match.presentationLocation.position
             ))
         } else if let presentationOrigin = match.presentationLocation.scope {
             let targetModalDepth = match.tree.modalDepth(of: presentationOrigin) + 1
 
             for existing in match.tree.modalScopes(atDepth: targetModalDepth) {
-                pathTrims.append(.init(
-                    path: existing.path,
-                    keepThrough: existing.path.positionBefore(existing.scope) ?? .owner
+                requests.append(.scoped(
+                    routePath: existing.path,
+                    after: existing.path.positionBefore(existing.scope) ?? .owner
                 ))
             }
         }
 
         if match.presentationLocation.path !== match.declarationLocation.path {
-            pathTrims.append(.init(
-                path: match.declarationLocation.path,
-                keepThrough: match.declarationLocation.position
+            requests.append(.scoped(
+                routePath: match.declarationLocation.path,
+                after: match.declarationLocation.position
             ))
         }
 
-        return RouteAppendPlan(pathTrims: pathTrims)
+        return routeForest.unwindPlan(for: .combined(requests))
     }
 
     func keepPathThrough(_ position: RoutePath.Position, in routePath: RoutePath) {
@@ -864,6 +869,7 @@ extension Router {
         preservesSnapshot: Bool = true,
         logsCompletion: Bool = true
     ) async {
+        var snapshotID: UUID?
         await performAcceptedUnwind(
             for: sourceScope,
             payload: payload,
@@ -871,14 +877,13 @@ extension Router {
             removing: plan.removedScopes,
             logsCompletion: logsCompletion,
             afterScopesLeave: {
-                unwindPresentationSnapshot = nil
+                clearUnwindPresentationSnapshot(id: snapshotID)
             }
         ) {
             if preservesSnapshot {
-                unwindPresentationSnapshot = UnwindPresentationSnapshot(
-                    preservedPaths: plan.preservedPaths,
-                    routeForest: routeForest
-                )
+                let snapshot = makeUnwindPresentationSnapshot(for: plan)
+                unwindPresentationSnapshot = snapshot
+                snapshotID = snapshot.id
             }
 
             for trim in plan.pathTrims {
@@ -891,6 +896,51 @@ extension Router {
                 }
             }
         }
+    }
+
+    func installRouteAppendPresentationSnapshot(for plan: RouteForest.UnwindPlan) -> UUID? {
+        let snapshot = makeUnwindPresentationSnapshot(
+            for: plan,
+            preservesModalPresentationBindings: false
+        )
+
+        guard snapshot.preservesPushPresentationBindings else {
+            return nil
+        }
+
+        unwindPresentationSnapshot = snapshot
+        return snapshot.id
+    }
+
+    func makeUnwindPresentationSnapshot(
+        for plan: RouteForest.UnwindPlan,
+        preservesModalPresentationBindings: Bool = true
+    ) -> UnwindPresentationSnapshot {
+        // A departing modal tears down its nested NavigationStack as part of the same
+        // transition. Keep that stack bound until the modal has left; a push-only unwind
+        // must still clear its binding immediately.
+        let preservesPushPresentationBindings = plan.removedScopes.contains {
+            guard let presentationKind = $0.presentationDeclaration?.presentationKind else {
+                return false
+            }
+
+            return presentationKind != .push
+        }
+
+        return UnwindPresentationSnapshot(
+            preservedPaths: plan.preservedPaths,
+            routeForest: routeForest,
+            preservesModalPresentationBindings: preservesModalPresentationBindings,
+            preservesPushPresentationBindings: preservesPushPresentationBindings
+        )
+    }
+
+    func clearUnwindPresentationSnapshot(id: UUID?) {
+        guard unwindPresentationSnapshot?.id == id else {
+            return
+        }
+
+        unwindPresentationSnapshot = nil
     }
 
     func performAcceptedUnwind(

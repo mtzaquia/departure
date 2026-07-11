@@ -101,15 +101,23 @@ extension Router {
             return presentation
         }
 
-        guard presentationKind != .push else {
-            return nil
-        }
-
         guard
             routeScope !== root,
             let unwindPresentationSnapshot
         else {
             return nil
+        }
+
+        switch presentationKind {
+        case .push:
+            guard unwindPresentationSnapshot.preservesPushPresentationBindings else {
+                return nil
+            }
+
+        case .sheet, .cover:
+            guard unwindPresentationSnapshot.preservesModalPresentationBindings else {
+                return nil
+            }
         }
 
         // Snapshot read: the preserved scopes have already left the live path (and released their

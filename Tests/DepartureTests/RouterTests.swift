@@ -2532,7 +2532,156 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }
 
-    @Test func unwindSnapshotDoesNotPreservePushPresentationBinding() async throws {
+    @Test func rootUnwindPreservesDeepBranchPushStackWhileLandingCoverDismisses() async throws {
+        let router = Router()
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let settingsScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        let authenticationScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let detailScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(RootRoute.self)._routeDeclarations),
+            ]
+        )
+        landingScope.attachPresentation(
+            to: router.root,
+            declaration: try #require(router.root.routeAttachments.first { $0.presentationKind == .cover(.slide) })
+        )
+        landingScope.setActiveBranch(AnyHashable(AppTab.wallet))
+        settingsScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.wallet),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(LoginRoute.self)._routeDeclarations),
+            ]
+        )
+        landingScope.registerBranchScope(settingsScope, for: AppTab.wallet)
+
+        authenticationScope.installRouteDeclarations(
+            id: LoginRoute().id,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+        authenticationScope.attachPresentation(
+            to: settingsScope,
+            declaration: try #require(settingsScope.routeAttachments.first { $0.presentationKind == .push })
+        )
+        detailScope.attachPresentation(
+            to: authenticationScope,
+            declaration: try #require(authenticationScope.routeAttachments.first { $0.presentationKind == .push })
+        )
+        settingsScope.path.scopes = [authenticationScope, detailScope]
+        router.normalTree.rootPath.scopes = [landingScope]
+
+        router.routeScopeDidInstallInView(landingScope)
+        router.routeScopeDidInstallInView(authenticationScope)
+        router.routeScopeDidInstallInView(detailScope)
+
+        let unwindTask = Task {
+            await router.unwindAndWait(to: .root)
+        }
+
+        for _ in 0..<10 {
+            if router.unwindPresentationSnapshot != nil {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(settingsScope.path.isEmpty)
+        #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue == nil)
+        #expect(router.routePresentationBinding(from: settingsScope, matching: .push).wrappedValue?.scope === authenticationScope)
+        #expect(router.routePresentationBinding(from: authenticationScope, matching: .push).wrappedValue?.scope === detailScope)
+
+        router.routeScopeDidLeaveView(landingScope)
+        router.routeScopeDidLeaveView(authenticationScope)
+        router.routeScopeDidLeaveView(detailScope)
+        _ = await unwindTask.value
+
+        #expect(router.routePresentationBinding(from: settingsScope, matching: .push).wrappedValue == nil)
+        #expect(router.routePresentationBinding(from: authenticationScope, matching: .push).wrappedValue == nil)
+    }
+
+    @Test func routeAppendPreservesDeepBranchPushStackWhileReplacingAncestorModal() async throws {
+        let router = Router()
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let settingsScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        let appearanceScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let authenticationScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Cover(RootRoute.self)._routeDeclarations
+                    + Sheet(MessageRoute.self)._routeDeclarations
+                ),
+            ]
+        )
+        landingScope.attachPresentation(
+            to: router.root,
+            declaration: try #require(router.root.routeAttachments.first { $0.presentationKind == .cover(.slide) })
+        )
+        landingScope.setActiveBranch(AnyHashable(AppTab.wallet))
+        settingsScope.installRouteDeclarations(
+            id: AnyHashable(AppTab.wallet),
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(LoginRoute.self)._routeDeclarations),
+            ]
+        )
+        landingScope.registerBranchScope(settingsScope, for: AppTab.wallet)
+
+        appearanceScope.installRouteDeclarations(
+            id: LoginRoute().id,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+        appearanceScope.attachPresentation(
+            to: settingsScope,
+            declaration: try #require(settingsScope.routeAttachments.first { $0.presentationKind == .push })
+        )
+        authenticationScope.attachPresentation(
+            to: appearanceScope,
+            declaration: try #require(appearanceScope.routeAttachments.first { $0.presentationKind == .push })
+        )
+        settingsScope.path.scopes = [appearanceScope, authenticationScope]
+        router.normalTree.rootPath.scopes = [landingScope]
+        router.routeScopeDidInstallInView(landingScope)
+
+        let requestTask = Task {
+            await router.requestRoute(MessageRoute())
+        }
+
+        for _ in 0..<10 {
+            if router.unwindPresentationSnapshot != nil {
+                break
+            }
+            await Task.yield()
+        }
+
+        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue == nil)
+        #expect(router.routePresentationBinding(from: settingsScope, matching: .push).wrappedValue?.scope === appearanceScope)
+        #expect(router.routePresentationBinding(from: appearanceScope, matching: .push).wrappedValue?.scope === authenticationScope)
+
+        router.routeScopeDidLeaveView(landingScope)
+        await requestTask.value
+
+        #expect(router.unwindPresentationSnapshot == nil)
+        #expect(router.normalTree.rootPath.last?.route is MessageRoute)
+        #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue?.scope === router.normalTree.rootPath.last)
+    }
+
+    @Test func unwindSnapshotDoesNotPreservePushPresentationBindingWithoutDepartingModal() async throws {
         let router = Router()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let settingsScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
