@@ -324,6 +324,7 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.messageDismissUnwindButton)
         assertGone(A11y.messageText)
+        app.swipeUp()
         assertLabel(A11y.homeDismissProbeHookStatus, contains: "Dismiss probe hooks: 1")
     }
 
