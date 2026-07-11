@@ -20,7 +20,6 @@
 //  SOFTWARE.
 //
 
-#if DEBUG
 import Foundation
 
 extension AnyHashable {
@@ -59,6 +58,13 @@ extension Route {
     }
 }
 
+extension RoutePath {
+    var departureDebugPathDescription: String {
+        let routes = scopes.compactMap(\.route).map(\.departureDebugDescription)
+        return routes.isEmpty ? "root" : routes.joined(separator: " › ")
+    }
+}
+
 extension AnyRouteDeclaration {
     var departureDebugDescription: String {
         let presentationDescription: String
@@ -87,9 +93,11 @@ extension RouteScope {
             return "routeScope#\(id.departureDebugDescription)(\(route.departureDebugDescription))"
         }
 
+        #if DEBUG
         if debugKind == .branch {
             return "branchScope#\(id.departureDebugDescription)"
         }
+        #endif
 
         let branchDescription = isFlatScope ? "" : ", active=\(activeBranch.departureDebugDescription)"
         return "rootScope#\(id.departureDebugDescription)\(branchDescription)"
@@ -108,4 +116,3 @@ extension RouteScope {
         || declarations.branchIDs == [activeBranch]
     }
 }
-#endif

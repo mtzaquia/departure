@@ -36,6 +36,10 @@ struct ScopeDeclarations {
         + Array(unwindHandlersByRouteType.values)
     }
 
+    var hookIdentities: Set<HookDeclarationIdentity> {
+        Set(hookAttachments.map(\.identity))
+    }
+
     mutating func appendRoute(_ route: AnyRouteDeclaration) -> Bool {
         let key = ObjectIdentifier(route.routeType)
         guard routesByType[key] == nil else {

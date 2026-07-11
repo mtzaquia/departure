@@ -24,6 +24,15 @@ import Foundation
 
 extension Router {
     func requestRoute(_ route: some Route) async {
+        #if DEBUG
+        guard DepartureLogTrace.id != nil else {
+            await DepartureLogTrace.$id.withValue("r:\(route.id.departureDebugDescription)") {
+                await requestRoute(route)
+            }
+            return
+        }
+        #endif
+
         log.departureDebug(.routeRequested(route: route))
 
         let resolvedRoute = await resolveRouteChain(startingWith: route)

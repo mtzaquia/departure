@@ -24,6 +24,15 @@ import Foundation
 
 extension Router {
     func performAction<A: Action>(_ action: A) async {
+        #if DEBUG
+        guard DepartureLogTrace.id != nil else {
+            await DepartureLogTrace.$id.withValue("a:\(action.id.departureDebugDescription)") {
+                await performAction(action)
+            }
+            return
+        }
+        #endif
+
         log.departureDebug(.actionRequested(action: action))
         await performAction(action, hasRerouted: false)
     }

@@ -82,7 +82,7 @@ extension EnvironmentValues {
 @main
 struct DepartureSampleApp: App {
     init() {
-        Departure.debug = true
+        Departure.debug = .trace
         SampleAppUITesting.configure()
     }
 

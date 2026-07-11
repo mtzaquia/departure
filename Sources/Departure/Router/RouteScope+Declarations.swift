@@ -149,10 +149,11 @@ extension RouteScope {
         log.departureDebug(.routeDeclarationsUninstalled(scope: self))
     }
 
+    @discardableResult
     func installHookDeclarations(
         sourceID: AnyHashable = AnyHashable("default"),
         hookDeclarations: [AnyHookDeclaration]
-    ) {
+    ) -> Bool {
         declarationInstallation.installHookSource(sourceID: sourceID)
         var scopeDeclarations = ScopeDeclarations()
 
@@ -165,12 +166,20 @@ extension RouteScope {
             logDuplicateHookDeclaration(hookDeclaration, branchID: activeBranch)
         }
 
+        let didChangeDeclarations: Bool
         if branchContainer != nil {
+            didChangeDeclarations = declarations.declarations(forBranch: activeBranch).hookIdentities
+                != scopeDeclarations.hookIdentities
             declarations.setHooks(scopeDeclarations.hookAttachments, forBranch: activeBranch)
         } else {
+            didChangeDeclarations = declarations.local.hookIdentities != scopeDeclarations.hookIdentities
             declarations.local.setHooks(scopeDeclarations.hookAttachments)
         }
-        log.departureDebug(.hookDeclarationsInstalled(scope: self, hookCount: hookDeclarations.count))
+
+        if didChangeDeclarations {
+            log.departureDebug(.hookDeclarationsInstalled(scope: self, hookCount: hookDeclarations.count))
+        }
+        return didChangeDeclarations
     }
 
     func uninstallHookDeclarations(sourceID: AnyHashable) {

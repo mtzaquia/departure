@@ -137,6 +137,14 @@ extension Router {
 
     @discardableResult
     func unwindAndWait(to target: UnwindTarget?, payload: Any? = nil) async -> Bool {
+        #if DEBUG
+        guard DepartureLogTrace.id != nil else {
+            return await DepartureLogTrace.$id.withValue("u:\(UUID().uuidString.prefix(6))") {
+                await unwindAndWait(to: target, payload: payload)
+            }
+        }
+        #endif
+
         log.departureDebug(.unwindRequested(target: target))
         let sourceScope = currentRouteScope
 
@@ -525,6 +533,7 @@ extension Router {
             return
         }
 
+        var appendedPath: RoutePath?
         mutateRouteGraph {
             if case .startElevatedTree(let priority) = behavior {
                 trimExistingElevatedTreeForReplacement(priority)
@@ -552,6 +561,7 @@ extension Router {
                 )
                 routePath.append(appendedScope)
                 routeForest.setElevatedTree(tree, for: priority)
+                appendedPath = routePath
                 log.departureDebug(.elevatedTreeStarted)
                 return
             }
@@ -565,23 +575,21 @@ extension Router {
             }
 
             match.presentationLocation.path.append(appendedScope)
+            appendedPath = match.presentationLocation.path
         }
         log.departureDebug(.routeAppended(
             route: route,
-            pathCount: match.presentationLocation.path.count
+            path: appendedPath?.departureDebugPathDescription ?? "root"
         ))
     }
 
     func resumePendingRoute(for branch: AnyHashable, in declaringScope: RouteScope) {
-        log.departureDebug(.pendingResumeCheck(branch: branch, declaringScope: declaringScope))
-
         guard
             let pendingRoute,
             let append = pendingRoute.append,
             append.match.branchID == branch,
             append.match.declarationLocation.scope === declaringScope
         else {
-            log.departureDebug(.pendingResumeSkipped)
             return
         }
 
@@ -905,7 +913,9 @@ extension Router {
         await waitForRouteScopesToLeaveView(removedScopes)
         afterScopesLeave()
         if logsCompletion {
-            log.departureDebug(.unwindCompleted)
+            log.departureDebug(.unwindCompleted(
+                path: routeForest.activeTree.currentRoutePath.departureDebugPathDescription
+            ))
         }
         await finishNavigationTransaction(transaction)
     }
