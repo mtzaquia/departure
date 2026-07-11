@@ -38,10 +38,16 @@ extension Router {
     }
 
     @discardableResult
-    func runAction<A: Action>(_ action: A, hasRerouted: Bool) async throws -> A.Output {
+    func runAction<A: Action>(
+        _ action: A,
+        hasRerouted: Bool,
+        logsStart: Bool = true
+    ) async throws -> A.Output {
         do {
             let currentRoute: (any Route.Type)? = currentRouteScope.currentRoute.map { type(of: $0) }
-            log.departureDebug(.actionRunning(action: action, currentRoute: currentRoute))
+            if logsStart {
+                log.departureDebug(.actionRunning(action: action, currentRoute: currentRoute))
+            }
             let output = try await action.attemptAction(in: ActionContext(currentRoute: currentRoute))
             log.departureDebug(.actionCompleted(action: action))
             return output
@@ -88,12 +94,17 @@ private extension Router {
             return
         }
 
-        log.departureDebug(.actionNoInterceptor(action: action, scope: currentRouteScope))
+        let currentRoute: (any Route.Type)? = currentRouteScope.currentRoute.map { type(of: $0) }
+        log.departureDebug(.actionNoInterceptor(
+            action: action,
+            scope: currentRouteScope,
+            currentRoute: currentRoute
+        ))
 
         // A top-level action dispatch is fire-and-forget. Interceptors can
         // capture invocation failures by catching errors from `invocation()`.
         do {
-            _ = try await runAction(action, hasRerouted: hasRerouted)
+            _ = try await runAction(action, hasRerouted: hasRerouted, logsStart: false)
         } catch {
             log.departureDebug(.actionDirectInvocationEnded(action: action, error: error))
         }

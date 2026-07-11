@@ -59,7 +59,7 @@ enum DepartureLogEvent {
     case actionFailed(action: any Action, error: any Error)
     case actionIntercepted(action: any Action, scope: RouteScope)
     case actionInterceptorFinished(action: any Action)
-    case actionNoInterceptor(action: any Action, scope: RouteScope)
+    case actionNoInterceptor(action: any Action, scope: RouteScope, currentRoute: (any Route.Type)?)
     case actionRequested(action: any Action)
     case actionRerouteDropped(action: any Action)
     case actionRerouteRequested(action: any Action, route: any Route)
@@ -306,8 +306,8 @@ extension DepartureLogEvent {
             "intercepted \(action.departureDebugDescription) in \(scope.departureDebugDescription)"
         case let .actionInterceptorFinished(action):
             "interceptor finished \(action.departureDebugDescription)"
-        case let .actionNoInterceptor(action, scope):
-            "running \(action.departureDebugDescription) directly from \(scope.departureDebugDescription)"
+        case let .actionNoInterceptor(action, scope, currentRoute):
+            "no interceptor in \(scope.departureDebugDescription) — running \(action.departureDebugDescription) from \(currentRoute.map { String(reflecting: $0) } ?? "root")"
         case let .actionRequested(action):
             "requested \(action.departureDebugDescription)"
         case let .actionRerouteDropped(action):
