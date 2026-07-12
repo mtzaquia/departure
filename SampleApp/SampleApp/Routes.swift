@@ -128,9 +128,7 @@ struct HighPriorityBlockingSheetRoute: SampleDeepLinkRoute {
 
 struct PendingPriorityRoute: SampleDeepLinkRoute {
     func destination() -> some View {
-        Text("Pending high-priority route")
-            .font(.headline)
-            .accessibilityIdentifier(SampleAppAccessibility.pendingPriorityText)
+        PendingPriorityView()
     }
 }
 
@@ -140,35 +138,49 @@ struct NavigationBarFadeOcclusionRoute: SampleDeepLinkRoute {
     }
 }
 
+struct PendingPriorityView: View {
+    @Environment(\.unwindRoute) var unwindRoute
+
+    var body: some View {
+        ZStack {
+            LabBackground()
+            LabModalCard("Priority won", subtitle: "The pending elevated request blocked the normal sheet before its window started.", symbol: "flag.checkered", color: LabPalette.coral) {
+                Text("Pending high-priority route")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier(SampleAppAccessibility.pendingPriorityText)
+
+                Button("Dismiss") { Task { await unwindRoute() } }
+                    .labPrimaryButton(color: LabPalette.coral)
+            }
+        }
+    }
+}
+
 struct TopLevelSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.samplePresentationSource) private var samplePresentationSource
     @Environment(Router.self) private var router
 
     var body: some View {
-        VStack(spacing: 16) {
+        LabModalCard("Top-level sheet", subtitle: "The nearest matching declaration decides which scope owns this presentation.", symbol: "rectangle.bottomhalf.inset.filled", color: LabPalette.blue) {
             Text("Top-level sheet")
-                .font(.headline)
+                .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetText)
 
             Text("Presented from: \(samplePresentationSource)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
                 .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetPresentationSource)
 
-            Button("Present cover") {
-                Task {
-                    await router.present(TopLevelCoverRoute())
-                }
+            HStack {
+                Button("Dismiss") { dismiss() }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetDismissButton)
+                Button("Chain cover") { Task { await router.present(TopLevelCoverRoute()) } }
+                    .labPrimaryButton(color: LabPalette.blue)
+                    .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetPresentCoverButton)
             }
-            .buttonStyle(.bordered)
-            .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetPresentCoverButton)
-
-            Button("Dismiss") {
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier(SampleAppAccessibility.topLevelSheetDismissButton)
         }
-        .padding()
     }
 }
 
@@ -176,20 +188,20 @@ struct TopLevelCoverView: View {
     @Environment(Router.self) private var router
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Top-level cover")
-                .font(.headline)
-                .accessibilityIdentifier(SampleAppAccessibility.topLevelCoverText)
+        ZStack {
+            LabBackground()
+            LabModalCard("Top-level cover", subtitle: "A normal full-screen cover can replace the sheet that requested it.", symbol: "rectangle.fill") {
+                Text("Top-level cover")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier(SampleAppAccessibility.topLevelCoverText)
 
-            Button("Present replacement cover") {
-                Task {
-                    await router.present(TopLevelReplacementCoverRoute())
+                Button("Present replacement cover") {
+                    Task { await router.present(TopLevelReplacementCoverRoute()) }
                 }
+                .labPrimaryButton()
+                .accessibilityIdentifier(SampleAppAccessibility.topLevelCoverPresentReplacementButton)
             }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier(SampleAppAccessibility.topLevelCoverPresentReplacementButton)
         }
-        .padding()
     }
 }
 
@@ -197,18 +209,18 @@ struct TopLevelReplacementCoverView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Top-level replacement cover")
-                .font(.headline)
-                .accessibilityIdentifier(SampleAppAccessibility.topLevelReplacementCoverText)
+        ZStack {
+            LabBackground()
+            LabModalCard("Replacement cover", subtitle: "The previous cover was replaced rather than stacked.", symbol: "arrow.triangle.2.circlepath", color: LabPalette.coral) {
+                Text("Top-level replacement cover")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier(SampleAppAccessibility.topLevelReplacementCoverText)
 
-            Button("Dismiss") {
-                dismiss()
+                Button("Dismiss") { dismiss() }
+                    .labPrimaryButton(color: LabPalette.coral)
+                    .accessibilityIdentifier(SampleAppAccessibility.topLevelReplacementCoverDismissButton)
             }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier(SampleAppAccessibility.topLevelReplacementCoverDismissButton)
         }
-        .padding()
     }
 }
 
@@ -218,25 +230,22 @@ struct HighPriorityPassthroughSheetView: View {
     @Environment(\.routePhase) private var routePhase
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("High-priority passthrough sheet")
-                .font(.headline)
-                .accessibilityLabel(presentationLabel("High-priority passthrough sheet"))
+        LabModalCard("Passthrough sheet", subtitle: "Background interaction is enabled while this high-priority route stays active.", symbol: "hand.tap.fill", color: LabPalette.blue) {
+            Text("High-priority passthrough sheet · SwiftUI isPresented: \(String(isPresented))")
+                .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetText)
 
             Text("Route phase: \(routePhaseLabel)")
+                .font(.caption)
                 .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetRoutePhase)
 
-            Button("Dismiss") {
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
+            Button("Dismiss") { dismiss() }
+            .labPrimaryButton(color: LabPalette.blue)
             .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetDismissButton)
         }
         .frame(maxWidth: .infinity)
-        .padding()
-        .presentationDetents([.height(220)])
-        .presentationBackgroundInteraction(.enabled(upThrough: .height(220)))
+        .presentationDetents([.height(310)])
+        .presentationBackgroundInteraction(.enabled(upThrough: .height(310)))
         .samplePresentationSizing()
     }
 
@@ -250,13 +259,6 @@ struct HighPriorityPassthroughSheetView: View {
         }
     }
 
-    private func presentationLabel(_ label: String) -> String {
-        guard SampleAppUITesting.isEnabled else {
-            return label
-        }
-
-        return label + " SwiftUI isPresented: " + String(isPresented)
-    }
 }
 
 struct HighPriorityBlockingSheetView: View {
@@ -264,53 +266,39 @@ struct HighPriorityBlockingSheetView: View {
     @Environment(\.isPresented) private var isPresented
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("High-priority blocking sheet")
-                .font(.headline)
-                .accessibilityLabel(presentationLabel("High-priority blocking sheet"))
+        LabModalCard("Blocking sheet", subtitle: "The scrim deliberately intercepts interaction with the route underneath.", symbol: "hand.raised.fill", color: LabPalette.amber) {
+            Text("High-priority blocking sheet · SwiftUI isPresented: \(String(isPresented))")
+                .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.highPriorityBlockingSheetText)
 
-            Button("Dismiss") {
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
+            Button("Dismiss") { dismiss() }
+            .labPrimaryButton(color: LabPalette.amber)
             .accessibilityIdentifier(SampleAppAccessibility.highPriorityBlockingSheetDismissButton)
         }
         .frame(maxWidth: .infinity)
-        .padding()
-        .presentationDetents([.height(220)])
+        .presentationDetents([.height(310)])
         .samplePresentationSizing()
     }
 
-    private func presentationLabel(_ label: String) -> String {
-        guard SampleAppUITesting.isEnabled else {
-            return label
-        }
-
-        return label + " SwiftUI isPresented: " + String(isPresented)
-    }
 }
 
 struct NavigationBarFadeOcclusionView: View {
-    @Environment(Router.self) private var router
     @State private var toolbarTapCount = 0
 
     var body: some View {
-        ZStack {
-            Color.white
-                .ignoresSafeArea()
-
-            List {
+        LabScreen("Fade chrome", eyebrow: "Navigation host", symbol: "menubar.rectangle") {
+            LabPanel("Detached cover diagnostics") {
                 Text("Navigation bar fade probe")
+                    .font(.headline)
                     .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeText)
 
-                Text("Toolbar taps: \(toolbarTapCount)")
+                LabStatus(label: "Toolbar interaction", value: "Toolbar taps: \(toolbarTapCount)", color: LabPalette.blue, symbol: "hand.tap.fill")
                     .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeToolbarTapCount)
-
             }
-            .scrollContentBackground(.hidden)
+            Spacer()
         }
         .navigationTitle("Fade Chrome")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Tap toolbar") {
@@ -414,34 +402,23 @@ struct DismissProbeView: View {
     @Environment(Router.self) private var router
 
     var body: some View {
-        VStack(spacing: 16) {
+        LabModalCard("Dismiss probe", subtitle: "Compare nested and shared branch modal ownership, then observe the unwind hook.", symbol: "square.stack.3d.up.fill") {
             Text("Dismiss probe")
-                .font(.headline)
+                .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.dismissProbeText)
 
-            Button("Present nested modal") {
-                Task {
-                    await router.present(NestedModalRoute())
-                }
-            }
+            Button("Present nested modal") { Task { await router.present(NestedModalRoute()) } }
             .buttonStyle(.bordered)
             .accessibilityIdentifier(SampleAppAccessibility.dismissProbePresentNestedButton)
 
-            Button("Present settings modal") {
-                Task {
-                    await router.present(SettingsModalRoute())
-                }
-            }
-            .buttonStyle(.bordered)
+            Button("Present settings modal") { Task { await router.present(SettingsModalRoute()) } }
+            .labPrimaryButton()
             .accessibilityIdentifier(SampleAppAccessibility.dismissProbePresentSettingsModalButton)
 
-            Button("Dismiss") {
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
+            Button("Dismiss & trigger hook") { dismiss() }
+            .buttonStyle(.bordered)
             .accessibilityIdentifier(SampleAppAccessibility.dismissProbeDismissButton)
         }
-        .padding()
         .routes {
             Sheet(NestedModalRoute.self, providesNavigation: false)
         }
@@ -452,18 +429,15 @@ struct NestedModalView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 16) {
+        LabModalCard("Nested modal", subtitle: "Owned by the dismiss probe's local route scope.", symbol: "square.stack.3d.up.fill", color: LabPalette.blue) {
             Text("Nested modal")
-                .font(.headline)
+                .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.nestedModalText)
 
-            Button("Dismiss") {
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
+            Button("Dismiss") { dismiss() }
+            .labPrimaryButton(color: LabPalette.blue)
             .accessibilityIdentifier(SampleAppAccessibility.nestedModalDismissButton)
         }
-        .padding()
     }
 }
 
@@ -471,18 +445,15 @@ struct SettingsModalView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 16) {
+        LabModalCard("Settings modal", subtitle: "Owned by another branch, so it replaces the current shared modal layer.", symbol: "gearshape.2.fill", color: LabPalette.amber) {
             Text("Settings modal")
-                .font(.headline)
+                .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.settingsModalText)
 
-            Button("Dismiss") {
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
+            Button("Dismiss") { dismiss() }
+            .labPrimaryButton(color: LabPalette.amber)
             .accessibilityIdentifier(SampleAppAccessibility.settingsModalDismissButton)
         }
-        .padding()
     }
 }
 
@@ -490,18 +461,15 @@ struct RerouteChainFinalView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 16) {
+        LabModalCard("Reroute chain resolved", subtitle: "Every intermediate resolution ran before this declared destination appeared.", symbol: "point.3.filled.connected.trianglepath.dotted", color: LabPalette.mint) {
             Text("Reroute chain resolved")
-                .font(.headline)
+                .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.rerouteChainFinalText)
 
-            Button("Dismiss") {
-                dismiss()
-            }
-            .buttonStyle(.borderedProminent)
+            Button("Dismiss") { dismiss() }
+            .labPrimaryButton(color: LabPalette.mint)
             .accessibilityIdentifier(SampleAppAccessibility.rerouteChainFinalDismissButton)
         }
-        .padding()
     }
 }
 

@@ -30,50 +30,29 @@ struct MessageView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.2)
-                .ignoresSafeArea()
-
-            VStack(spacing: 12) {
+            Color.black.opacity(0.24).ignoresSafeArea()
+            LabModalCard("Fade cover", subtitle: "A custom cover transition with three equivalent dismissal paths.", symbol: "envelope.open.fill", color: LabPalette.indigo) {
                 Text("This is a message.")
+                    .font(.caption.weight(.semibold))
                     .accessibilityIdentifier(SampleAppAccessibility.messageText)
-
                 Text("Presented from: \(samplePresentationSource)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     .accessibilityIdentifier(SampleAppAccessibility.messagePresentationSource)
-
-                Button("Dismiss with unwind") {
-                    Task {
-                        await unwindRoute()
-                    }
+                Button("Unwind with payload") { Task { await unwindRoute(payload: "message delivered") } }
+                    .labPrimaryButton()
+                    .accessibilityIdentifier(SampleAppAccessibility.messageDismissPayloadButton)
+                Button("Unwind mismatched payload") { Task { await unwindRoute(payload: 42) } }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier(SampleAppAccessibility.messageDismissMismatchedPayloadButton)
+                HStack {
+                    Button("unwindRoute()") { Task { await unwindRoute() } }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier(SampleAppAccessibility.messageDismissUnwindButton)
+                    Button("dismiss()") { dismiss() }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier(SampleAppAccessibility.messageDismissSwiftUIButton)
                 }
-                .bold()
-                .accessibilityIdentifier(SampleAppAccessibility.messageDismissUnwindButton)
-
-                Button("Dismiss with payload") {
-                    Task {
-                        await unwindRoute(payload: "message delivered")
-                    }
-                }
-                .bold()
-                .accessibilityIdentifier(SampleAppAccessibility.messageDismissPayloadButton)
-                
-                Button("Dismiss with mismatched payload") {
-                    Task {
-                        await unwindRoute(payload: 42)
-                    }
-                }
-                .bold()
-                .accessibilityIdentifier(SampleAppAccessibility.messageDismissMismatchedPayloadButton)
-
-                Button("Dismiss with dismiss()") {
-                    dismiss()
-                }
-                .bold()
-                .accessibilityIdentifier(SampleAppAccessibility.messageDismissSwiftUIButton)
-            }
-            .padding(32)
-            .background {
-                Color.white
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
             }
         }
     }

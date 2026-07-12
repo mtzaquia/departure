@@ -27,102 +27,57 @@ struct SettingsView: View {
     @Environment(Router.self) private var router
     @State private var storage = Storage.shared
 
+    private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+
     var body: some View {
-        List {
-            Button("Appearance") {
-                Task {
-                    await router.present(AppearanceSettingsRoute(value: nil))
-                }
-            }
-            .accessibilityIdentifier(SampleAppAccessibility.settingsAppearanceButton)
-
-            Button("Authentication") {
-                Task {
-                    await router.present(AuthenticationSettingsRoute())
-                }
-            }
-            .accessibilityIdentifier(SampleAppAccessibility.settingsAuthenticationButton)
-
-            Button("Profile") {
-                Task {
-                    await router.present(ProfileRoute())
-                }
-            }
-            .accessibilityIdentifier(SampleAppAccessibility.settingsProfileButton)
-
-            Section("Actions") {
-                Button("Save appearance") {
-                    Task {
-                        await router.perform(SaveAppearanceSettingsAction())
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.settingsSaveAppearanceButton)
-
-                Button("New emoji") {
-                    Task {
-                        await router.perform(RandomizeEmojiAction())
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.settingsNewEmojiButton)
-            }
-
-            if SampleAppUITesting.isEnabled {
-                Section("UI Tests") {
-                    Text("Container unwind hooks: \(storage.landingContainerUnwindHookCount)")
+        LabScreen("Routing catalog", eyebrow: "Settings branch", symbol: "switch.2") {
+            LabPanel("Branch telemetry") {
+                LazyVGrid(columns: columns, spacing: 7) {
+                    LabStatus(label: "Container handler", value: "Container unwind hooks: \(storage.landingContainerUnwindHookCount)", symbol: "rectangle.3.group.fill")
                         .accessibilityIdentifier(SampleAppAccessibility.landingContainerHookStatus)
-
-                    Text("Branch unwind hooks: \(storage.settingsBranchUnwindHookCount)")
+                    LabStatus(label: "Branch handler", value: "Branch unwind hooks: \(storage.settingsBranchUnwindHookCount)", color: LabPalette.blue, symbol: "arrow.triangle.branch")
                         .accessibilityIdentifier(SampleAppAccessibility.settingsBranchHookStatus)
-
-                    Button("Present home message") {
-                        Task {
-                            await router.present(MessageRoute())
-                        }
-                    }
-                    .accessibilityIdentifier(SampleAppAccessibility.settingsPresentHomeMessageButton)
-
-                    Button("Present dropped route") {
-                        Task {
-                            await router.present(DroppedRoute())
-                        }
-                    }
-                    .accessibilityIdentifier(SampleAppAccessibility.settingsPresentDroppedRouteButton)
-
-                    Button("Present undeclared route") {
-                        Task {
-                            await router.present(UndeclaredRoute())
-                        }
-                    }
-                    .accessibilityIdentifier(SampleAppAccessibility.settingsPresentUndeclaredRouteButton)
-
-                    Button("Present reroute chain") {
-                        Task {
-                            await router.present(RerouteChainStartRoute())
-                        }
-                    }
-                    .accessibilityIdentifier(SampleAppAccessibility.settingsPresentRerouteChainButton)
-
-                    Button("Attempt missing unwind") {
-                        Task {
-                            storage.missingUnwindResult = await router.unwind(to: .id("missing"))
-                        }
-                    }
-                    .accessibilityIdentifier(SampleAppAccessibility.settingsMissingUnwindButton)
-
-                    Text("Missing unwind: \(storage.missingUnwindResult.map(String.init) ?? "none")")
+                    LabStatus(label: "Missing target", value: "Missing unwind: \(storage.missingUnwindResult.map(String.init) ?? "none")", color: LabPalette.amber, symbol: "questionmark.diamond.fill")
                         .accessibilityIdentifier(SampleAppAccessibility.settingsMissingUnwindResult)
                 }
             }
+
+            LabPanel("Routes & actions") {
+                LazyVGrid(columns: columns, spacing: 8) {
+                    action("Appearance push", symbol: "paintpalette.fill", id: SampleAppAccessibility.settingsAppearanceButton) { await router.present(AppearanceSettingsRoute(value: nil)) }
+                    action("Authentication push", symbol: "lock.shield.fill", id: SampleAppAccessibility.settingsAuthenticationButton) { await router.present(AuthenticationSettingsRoute()) }
+                    action("Protected profile", symbol: "person.crop.circle", id: SampleAppAccessibility.settingsProfileButton) { await router.present(ProfileRoute()) }
+                    action("Rerouting action", symbol: "arrow.triangle.2.circlepath", color: LabPalette.blue, id: SampleAppAccessibility.settingsSaveAppearanceButton) { await router.perform(SaveAppearanceSettingsAction()) }
+                    action("Local action", symbol: "sparkles", color: LabPalette.mint, id: SampleAppAccessibility.settingsNewEmojiButton) { await router.perform(RandomizeEmojiAction()) }
+                    action("Cross-branch route", symbol: "arrow.left.arrow.right", color: LabPalette.blue, id: SampleAppAccessibility.settingsPresentHomeMessageButton) { await router.present(MessageRoute()) }
+                    action("Dropped resolution", symbol: "nosign", color: LabPalette.coral, id: SampleAppAccessibility.settingsPresentDroppedRouteButton) { await router.present(DroppedRoute()) }
+                    action("Undeclared route", symbol: "questionmark.folder", color: LabPalette.coral, id: SampleAppAccessibility.settingsPresentUndeclaredRouteButton) { await router.present(UndeclaredRoute()) }
+                    action("Reroute chain", symbol: "point.3.filled.connected.trianglepath.dotted", color: LabPalette.amber, id: SampleAppAccessibility.settingsPresentRerouteChainButton) { await router.present(RerouteChainStartRoute()) }
+                    action("Missing unwind", symbol: "scope", color: LabPalette.amber, id: SampleAppAccessibility.settingsMissingUnwindButton) {
+                        storage.missingUnwindResult = await router.unwind(to: .id("missing"))
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
         }
         .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.inline)
         .hooks {
             UnwindHandler(AuthenticationSettingsRoute.self) {
-                guard SampleAppUITesting.isEnabled else {
-                    return
-                }
-
                 Storage.shared.settingsBranchUnwindHookCount += 1
             }
         }
+    }
+
+    private func action(
+        _ title: String,
+        symbol: String,
+        color: Color = LabPalette.indigo,
+        id: String,
+        operation: @escaping @MainActor () async -> Void
+    ) -> some View {
+        LabAction(title: title, symbol: symbol, color: color) { Task { await operation() } }
+            .accessibilityIdentifier(id)
     }
 }

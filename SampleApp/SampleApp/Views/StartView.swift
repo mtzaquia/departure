@@ -29,26 +29,69 @@ struct StartView: View {
 
     var body: some View {
         ZStack {
-            VStack(spacing: 16) {
-                if SampleAppUITesting.isEnabled {
-                    Text("Root unwind hooks: \(storage.rootUnwindHookCount)")
-                        .accessibilityIdentifier(SampleAppAccessibility.rootHookStatus)
+            LabBackground()
+
+            VStack(spacing: 24) {
+                Spacer()
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 32)
+                        .fill(LabPalette.indigo.gradient)
+                        .frame(width: 112, height: 112)
+                        .rotationEffect(.degrees(8))
+                        .shadow(color: LabPalette.indigo.opacity(0.3), radius: 24, y: 14)
+
+                    Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                        .font(.system(size: 46, weight: .semibold))
+                        .foregroundStyle(.white)
                 }
 
-                Button("Start", action: {
-                    Task {
-                        await router.present(LandingRoute())
-                    }
-                })
-                .accessibilityIdentifier(SampleAppAccessibility.startButton)
-
-                Button("Show info") {
-                    Task {
-                        await router.present(StartInfoRoute())
-                    }
+                VStack(spacing: 8) {
+                    Text("DEPARTURE LAB")
+                        .font(.caption.weight(.bold))
+                        .tracking(2.4)
+                        .foregroundStyle(LabPalette.indigo)
+                    Text("Every route. One cockpit.")
+                        .font(.largeTitle.bold())
+                        .multilineTextAlignment(.center)
+                    Text("Explore pushes, sheets, covers, branches, priorities, actions, and unwinds—with live routing diagnostics always in view.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 340)
                 }
-                .accessibilityIdentifier(SampleAppAccessibility.startShowInfoButton)
+
+                LabPanel("Live telemetry") {
+                    LabStatus(
+                        label: "Root unwind handlers",
+                        value: "Root unwind hooks: \(storage.rootUnwindHookCount)",
+                        symbol: "arrow.uturn.backward.circle.fill"
+                    )
+                    .accessibilityIdentifier(SampleAppAccessibility.rootHookStatus)
+                }
+                .frame(maxWidth: 360)
+
+                VStack(spacing: 10) {
+                    Button("Launch route lab") {
+                        Task { await router.present(LandingRoute()) }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .controlSize(.large)
+                    .labPrimaryButton()
+                    .accessibilityIdentifier(SampleAppAccessibility.startButton)
+
+                    Button("About this sample", systemImage: "info.circle") {
+                        Task { await router.present(StartInfoRoute()) }
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.roundedRectangle(radius: 12))
+                    .accessibilityIdentifier(SampleAppAccessibility.startShowInfoButton)
+                }
+                .frame(maxWidth: 360)
+
+                Spacer()
             }
+            .padding(24)
         }
         .routes(id: SampleAppAccessibility.startScopeID) {
             Cover(LandingRoute.self, providesNavigation: false)
@@ -56,10 +99,6 @@ struct StartView: View {
         }
         .hooks {
             UnwindHandler(AuthenticationSettingsRoute.self) {
-                guard SampleAppUITesting.isEnabled else {
-                    return
-                }
-
                 Storage.shared.rootUnwindHookCount += 1
             }
         }
@@ -70,17 +109,24 @@ struct StartInfoView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Start info")
-                .font(.headline)
-                .accessibilityIdentifier(SampleAppAccessibility.startInfoText)
+        ZStack {
+            LabBackground()
+            LabModalCard(
+                "A living routing spec",
+                subtitle: "Everything used by automation is visible and useful here too.",
+                symbol: "sparkles"
+            ) {
+                Text("Each action demonstrates a public Departure capability. Status cards expose the active route phase, presentation environment, payloads, and hook delivery in real time.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .accessibilityIdentifier(SampleAppAccessibility.startInfoText)
 
-            Button("Dismiss") {
-                dismiss()
+                Button("Done") { dismiss() }
+                    .frame(maxWidth: .infinity)
+                    .labPrimaryButton()
+                    .accessibilityIdentifier(SampleAppAccessibility.startInfoDismissButton)
             }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier(SampleAppAccessibility.startInfoDismissButton)
         }
-        .padding()
     }
 }

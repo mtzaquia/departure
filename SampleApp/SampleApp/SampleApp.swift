@@ -54,12 +54,9 @@ final class Storage {
 
 struct RandomizeEmojiAction: Action {
     func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
-        if SampleAppUITesting.isEnabled {
-            Storage.shared.emoji = "⚡️"
-            return
-        }
-
-        Storage.shared.emoji = ["⚡️", "🎸", "✈️", "🇮🇹", "🎉", "👀"].randomElement() ?? ""
+        let values = ["🎉", "⚡️", "🎸", "✈️", "🇮🇹", "👀"]
+        let currentIndex = values.firstIndex(of: Storage.shared.emoji) ?? 0
+        Storage.shared.emoji = values[(currentIndex + 1) % values.count]
     }
 }
 
@@ -85,7 +82,6 @@ struct DepartureSampleApp: App {
 
     init() {
         Departure.debug = .trace
-        SampleAppUITesting.configure()
     }
 
     var body: some Scene {
@@ -99,13 +95,6 @@ struct DepartureSampleApp: App {
                 destination
                     .environment(\.sampleWindowBadge, environment.sampleWindowBadge)
                     .environment(\.samplePresentationSource, environment.samplePresentationSource)
-            }
-            .transaction { transaction in
-                guard SampleAppUITesting.isEnabled else {
-                    return
-                }
-
-                transaction.animation = nil
             }
             .onOpenURL { url in
                 guard let route = SampleDeepLink(url: url)?.route else {

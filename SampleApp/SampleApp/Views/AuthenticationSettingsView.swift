@@ -25,88 +25,76 @@ import SwiftUI
 
 struct AuthenticationSettingsView: View {
     @Environment(Router.self) private var router
+    @State private var storage = Storage.shared
 
     let state: AuthenticationSettingsRouteState
 
+    private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+
     var body: some View {
-        List {
-            Toggle(
-                "Logged in",
-                isOn: .init(
-                    get: { Storage.shared.isLoggedIn },
-                    set: { Storage.shared.isLoggedIn = $0 }
-                )
-            )
-            .accessibilityIdentifier(SampleAppAccessibility.authenticationLoggedInToggle)
+        LabScreen("Scope targeting", eyebrow: "Authentication", symbol: "scope") {
+            Text("Authentication route active")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier(SampleAppAccessibility.authenticationTitle)
 
-            Section("Sheet") {
-                Toggle(
-                    "Attach local route",
-                    isOn: .init(
-                        get: { state.attachesLocalRoute },
-                        set: { state.attachesLocalRoute = $0 }
-                    )
-                )
+            LabPanel("Runtime configuration") {
+                Toggle(isOn: $storage.isLoggedIn) {
+                    Label("Authenticated", systemImage: "person.badge.key.fill")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .tint(LabPalette.mint)
+                .accessibilityIdentifier(SampleAppAccessibility.authenticationLoggedInToggle)
+
+                Divider()
+
+                @Bindable var routeState = state
+                Toggle(isOn: $routeState.attachesLocalRoute) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Label("Attach local sheet declaration", systemImage: "paperclip")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Shows nearest-declaration routing")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .tint(LabPalette.blue)
                 .accessibilityIdentifier(SampleAppAccessibility.authenticationAttachLocalRouteToggle)
+            }
 
-                Button("Present top-level sheet") {
-                    Task {
-                        await router.present(TopLevelSheetRoute())
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.authenticationPresentTopLevelSheetButton)
-
-                Button("Present top-level cover") {
-                    Task {
-                        await router.present(TopLevelCoverRoute())
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.authenticationPresentTopLevelCoverButton)
-
-                Button("Present info from Start") {
-                    Task {
-                        await router.present(StartInfoRoute())
-                    }
-                }
-
-                Button("Unwind to root") {
-                    Task {
-                        await router.unwind(to: .root)
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToRootButton)
-
-                Button("Unwind to nearest branch") {
-                    Task {
-                        await router.unwind(to: .nearestBranch)
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToNearestBranchButton)
-
-                if SampleAppUITesting.isEnabled {
-                    Button("Unwind to branch ID") {
-                        Task {
-                            await router.unwind(to: .id(LandingView.TabItem.settings))
-                        }
-                    }
-                    .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToBranchIDButton)
-
-                    Button("Unwind stored route action") {
-                        Task {
-                            await Storage.shared.landingUnwindRoute()
-                        }
-                    }
-                    .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindStoredActionButton)
+            LabPanel("Presentation & unwind targets") {
+                LazyVGrid(columns: columns, spacing: 8) {
+                    action("Top-level sheet", symbol: "rectangle.bottomhalf.inset.filled", id: SampleAppAccessibility.authenticationPresentTopLevelSheetButton) { await router.present(TopLevelSheetRoute()) }
+                    action("Top-level cover", symbol: "rectangle.fill", id: SampleAppAccessibility.authenticationPresentTopLevelCoverButton) { await router.present(TopLevelCoverRoute()) }
+                    action("Declaration crawl", symbol: "arrow.up.left.and.arrow.down.right", color: LabPalette.blue) { await router.present(StartInfoRoute()) }
+                    action("Root", symbol: "house.fill", color: LabPalette.coral, id: SampleAppAccessibility.authenticationUnwindToRootButton) { await router.unwind(to: .root) }
+                    action("Topmost ancestor", symbol: "arrow.up.to.line", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindToTopmostAncestorButton) { await router.unwind(to: .topmostAncestor) }
+                    action("Nearest branch", symbol: "arrow.uturn.backward", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindToNearestBranchButton) { await router.unwind(to: .nearestBranch) }
+                    action("Branch ID", symbol: "number.square.fill", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindToBranchIDButton) { await router.unwind(to: .id(LandingView.TabItem.settings)) }
+                    action("Stored unwind", symbol: "bookmark.fill", color: LabPalette.coral, id: SampleAppAccessibility.authenticationUnwindStoredActionButton) { await storage.landingUnwindRoute() }
                 }
             }
+
+            Spacer(minLength: 0)
         }
         .navigationTitle("Authentication")
-        .accessibilityIdentifier(SampleAppAccessibility.authenticationTitle)
+        .navigationBarTitleDisplayMode(.inline)
         .routes {
             if state.attachesLocalRoute {
                 Sheet(TopLevelSheetRoute.self, providesNavigation: false)
             }
         }
         .environment(\.samplePresentationSource, "authentication settings scope")
+    }
+
+    private func action(
+        _ title: String,
+        symbol: String,
+        color: Color = LabPalette.indigo,
+        id: String? = nil,
+        operation: @escaping @MainActor () async -> Void
+    ) -> some View {
+        LabAction(title: title, symbol: symbol, color: color) { Task { await operation() } }
+            .accessibilityIdentifier(id ?? "sample.authentication.declaration-crawl")
     }
 }

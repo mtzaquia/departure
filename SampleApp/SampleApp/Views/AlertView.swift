@@ -28,33 +28,17 @@ struct AlertView: View {
     @Environment(\.unwindRoute) private var unwindRoute
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.2)
-                .ignoresSafeArea()
-
-            VStack(spacing: 12) {
-                Text("This is an alert!")
-                    .accessibilityIdentifier(SampleAppAccessibility.alertText)
-
-                Button("Dismiss with unwind") {
-                    Task {
-                        await unwindRoute()
-                    }
-                }
-                .bold()
-                .accessibilityIdentifier(SampleAppAccessibility.alertDismissUnwindButton)
-
-                Button("Dismiss with dismiss()") {
-                    dismiss()
-                }
-                .bold()
-                .accessibilityIdentifier(SampleAppAccessibility.alertDismissSwiftUIButton)
-            }
-            .foregroundStyle(.white)
-            .padding(32)
-            .background {
-                Color.red
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
+        LabModalCard("Ancestor alert", subtitle: "This high-priority fade cover was declared above login and replaces it.", symbol: "exclamationmark.bubble.fill", color: LabPalette.coral) {
+            Text("This is an alert!")
+                .font(.caption.weight(.semibold))
+                .accessibilityIdentifier(SampleAppAccessibility.alertText)
+            HStack {
+                Button("unwindRoute()") { Task { await unwindRoute() } }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier(SampleAppAccessibility.alertDismissUnwindButton)
+                Button("dismiss()") { dismiss() }
+                    .labPrimaryButton(color: LabPalette.coral)
+                    .accessibilityIdentifier(SampleAppAccessibility.alertDismissSwiftUIButton)
             }
         }
     }
