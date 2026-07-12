@@ -471,7 +471,7 @@ extension Router {
         with route: any Route,
         after match: DeclarationMatch
     ) {
-        log.departureDebug(.elevatedPriorityReplacePreparing(route: route, match: match))
+        log.departureDebug(.elevatedPriorityReplacePreparing(route: route))
 
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
 

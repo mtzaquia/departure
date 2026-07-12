@@ -71,7 +71,7 @@ enum DepartureLogEvent {
     case branchRegistered(branch: AnyHashable, parent: RouteScope, scope: RouteScope)
     case branchUnregistered(branch: AnyHashable, scope: RouteScope)
     case branchUnregisterSkipped(branch: AnyHashable, scope: RouteScope)
-    case elevatedPriorityReplacePreparing(route: any Route, match: Router.DeclarationMatch)
+    case elevatedPriorityReplacePreparing(route: any Route)
     case elevatedTreeCleared
     case elevatedTreeStarted
     case hookDeclarationsUninstalled(scope: RouteScope)
@@ -330,8 +330,8 @@ extension DepartureLogEvent {
             "branch unregistered | branch=\(branch.departureDebugDescription) | scope=\(scope.departureDebugDescription)"
         case let .branchUnregisterSkipped(branch, scope):
             "branch unregister skipped | branch=\(branch.departureDebugDescription) | reason=scope mismatch | scope=\(scope.departureDebugDescription)"
-        case let .elevatedPriorityReplacePreparing(route, match):
-            "preparing elevated-priority presentation for \(route.departureDebugDescription) — \(match.departureDebugDescription)"
+        case let .elevatedPriorityReplacePreparing(route):
+            "preparing elevated-priority presentation for \(route.departureDebugDescription)"
         case .elevatedTreeCleared:
             "cleared elevated-priority route tree"
         case .elevatedTreeStarted:
@@ -358,8 +358,8 @@ extension DepartureLogEvent {
             "will replace the elevated-priority tree with \(route.departureDebugDescription)"
         case let .routeAppendSuperseded(route):
             "dropped \(route.departureDebugDescription) — superseded while waiting for replaced scopes"
-        case let .routeAppendPreparing(route, match):
-            "route append preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
+        case let .routeAppendPreparing(route, _):
+            "preparing append for \(route.departureDebugDescription)"
         case let .routeAppendWaitingReplacingScopes(removedScopes):
             "route append waiting | reason=replacing scopes | removedScopes=\(removedScopes)"
         case let .routeAppended(route, path):
@@ -430,7 +430,14 @@ extension Router.DeclarationMatch {
             "branch \($0.departureDebugDescription)"
         } ?? "local scope"
 
-        return "\(declaration.departureDebugDescription) • \(placementDescription) • present at \(presentationLocation.position) • declared at \(declarationLocation.position)"
+        let description = "\(declaration.departureDebugDescription) • \(placementDescription)"
+        guard presentationLocation.path !== declarationLocation.path
+            || presentationLocation.position != declarationLocation.position
+        else {
+            return description
+        }
+
+        return "\(description) • declared at \(declarationLocation.position) • presents at \(presentationLocation.position)"
     }
 }
 #endif
