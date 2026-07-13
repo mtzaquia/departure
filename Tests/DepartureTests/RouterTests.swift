@@ -2995,6 +2995,21 @@ struct RouterTests {
     }
 
     #if DEBUG
+    @Test func unwindRequestLogMessagesDescribeTheirActualTargets() {
+        #expect(
+            DepartureLogEvent.unwindRequested(target: nil).message
+                == "requested to previous route"
+        )
+        #expect(
+            DepartureLogEvent.unwindRequested(target: .topmostAncestor).message
+                == "requested to topmostAncestor"
+        )
+        #expect(
+            DepartureLogEvent.unwindPreviousRequested.message
+                == "requested to previous route (scope-anchored)"
+        )
+    }
+
     @Test func branchScopeRegistrationIsIdempotentAndKeepsDebugIdentityAfterUnregister() {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let branchScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)

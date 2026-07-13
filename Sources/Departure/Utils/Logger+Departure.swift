@@ -113,6 +113,7 @@ enum DepartureLogEvent {
     case unwindAcceptedAncestorTarget(keepThrough: RoutePath.Position, removing: Int)
     case unwindCompleted(path: String)
     case unwindDroppedTargetNotFound(target: Router.UnwindTarget?)
+    case unwindPreviousRequested
     case unwindRequested(target: Router.UnwindTarget?)
     case unwindSkippedNoRoute
     case unwindSkippedNotInsideBranch
@@ -226,6 +227,7 @@ extension DepartureLogEvent {
              .unwindAcceptedAncestorTarget,
              .unwindCompleted,
              .unwindDroppedTargetNotFound,
+             .unwindPreviousRequested,
              .unwindRequested,
              .unwindSkippedNoRoute,
              .unwindSkippedNotInsideBranch:
@@ -246,7 +248,7 @@ extension DepartureLogEvent {
 
     private var marker: String {
         switch self {
-        case .actionRequested, .routeRequested, .unwindRequested:
+        case .actionRequested, .routeRequested, .unwindPreviousRequested, .unwindRequested:
             "⇢"
 
         case .actionCompleted,
@@ -414,8 +416,10 @@ extension DepartureLogEvent {
             "completed\n  path: \(path)"
         case let .unwindDroppedTargetNotFound(target):
             "could not find unwind target \(String(describing: target))"
+        case .unwindPreviousRequested:
+            "requested to previous route (scope-anchored)"
         case let .unwindRequested(target):
-            "requested to \(String(describing: target))"
+            "requested to \(target.map { String(describing: $0) } ?? "previous route")"
         case .unwindSkippedNoRoute:
             "skipped — no route to remove"
         case .unwindSkippedNotInsideBranch:
