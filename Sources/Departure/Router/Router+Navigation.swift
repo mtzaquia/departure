@@ -281,6 +281,14 @@ extension Router {
     }
 
     func appendRoute(_ route: any Route, after match: DeclarationMatch) async {
+        // A branch declaration can be discovered before SwiftUI has mounted its host. Do not
+        // prepare the append path until that host exists: the fallback path points at the
+        // declaring tree and trimming it would remove routes unrelated to the pending request.
+        if requiresBranchHostRegistration(for: match) {
+            appendPreparedRoute(route, after: match)
+            return
+        }
+
         if await deferRouteAppendIfNeeded(route, after: match) {
             return
         }
@@ -436,6 +444,17 @@ extension Router {
         return match.declarationLocation.scope?.activeBranch != branchID
     }
 
+    func requiresBranchHostRegistration(for match: DeclarationMatch) -> Bool {
+        guard
+            let branchID = match.branchID,
+            let declaringScope = match.declarationLocation.scope
+        else {
+            return false
+        }
+
+        return declaringScope.branchScopes[branchID] == nil
+    }
+
     func activateBranch(for match: DeclarationMatch) -> Bool {
         guard let branchID = match.branchID else {
             return true
@@ -464,6 +483,28 @@ extension Router {
         }
 
         return didActivate
+    }
+
+    /// Gives an already-mounted branch host a turn to observe the selection update before resuming
+    /// the request. A missing host resumes from its registration path instead.
+    func schedulePendingRouteResume(for match: DeclarationMatch) {
+        guard
+            let branch = match.branchID,
+            let declaringScope = match.declarationLocation.scope,
+            declaringScope.branchScopes[branch] != nil
+        else {
+            return
+        }
+
+        Task { @MainActor [weak self, weak declaringScope] in
+            await Task.yield()
+
+            guard let self, let declaringScope, declaringScope.activeBranch == branch else {
+                return
+            }
+
+            resumePendingRoute(for: branch, in: declaringScope)
+        }
     }
 
     func replaceElevatedTree(
@@ -504,6 +545,7 @@ extension Router {
                 route: route,
                 state: .append(.init(match: match, behavior: behavior))
             ))
+            schedulePendingRouteResume(for: match)
             return
         }
 
@@ -589,7 +631,8 @@ extension Router {
             let pendingRoute,
             let append = pendingRoute.append,
             append.match.branchID == branch,
-            append.match.declarationLocation.scope === declaringScope
+            append.match.declarationLocation.scope === declaringScope,
+            declaringScope.branchScopes[branch] != nil
         else {
             return
         }
@@ -1098,18 +1141,6 @@ extension Router {
             }
         }
         updatePath()
-    }
-}
-
-private extension [RouteScope] {
-    func uniquedByIdentity() -> [RouteScope] {
-        var result: [RouteScope] = []
-
-        for scope in self where result.contains(where: { $0 === scope }) == false {
-            result.append(scope)
-        }
-
-        return result
     }
 }
 

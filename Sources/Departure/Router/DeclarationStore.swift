@@ -22,6 +22,21 @@
 
 import Foundation
 
+struct RouteAttachmentIdentity: Hashable {
+    let branch: AnyHashable?
+    let declaration: AnyRouteDeclaration
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.branch == rhs.branch
+        && lhs.declaration == rhs.declaration
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(branch)
+        hasher.combine(declaration)
+    }
+}
+
 struct ScopeDeclarations {
     private var routesByType = OrderedStorage<ObjectIdentifier, AnyRouteDeclaration>()
     private var actionInterceptorsByType = OrderedStorage<ObjectIdentifier, AnyHookDeclaration>()
@@ -29,6 +44,10 @@ struct ScopeDeclarations {
 
     var routeAttachments: [AnyRouteDeclaration] {
         Array(routesByType.values)
+    }
+
+    var routeAttachmentIdentities: Set<AnyRouteDeclaration> {
+        Set(routeAttachments)
     }
 
     var hookAttachments: [AnyHookDeclaration] {
@@ -48,6 +67,13 @@ struct ScopeDeclarations {
 
         routesByType[key] = route
         return true
+    }
+
+    mutating func setRoutes(_ routes: [AnyRouteDeclaration]) {
+        routesByType.removeAll(keepingCapacity: true)
+        for route in routes {
+            _ = appendRoute(route)
+        }
     }
 
     func routeAttachment(for routeType: any Route.Type) -> AnyRouteDeclaration? {
@@ -90,6 +116,8 @@ struct ScopeDeclarations {
 }
 
 struct DeclarationStore {
+    let identity = UUID()
+
     var local = ScopeDeclarations()
 
     private var branches = OrderedStorage<AnyHashable, ScopeDeclarations>()
@@ -108,6 +136,24 @@ struct DeclarationStore {
         local.hookAttachments + branches.values.flatMap(\.hookAttachments)
     }
 
+    var routeAttachmentIdentities: Set<RouteAttachmentIdentity> {
+        var identities = Set(
+            local.routeAttachmentIdentities.map {
+                RouteAttachmentIdentity(branch: nil, declaration: $0)
+            }
+        )
+
+        for branchID in branchIDs {
+            identities.formUnion(
+                declarations(forBranch: branchID).routeAttachmentIdentities.map {
+                    RouteAttachmentIdentity(branch: branchID, declaration: $0)
+                }
+            )
+        }
+
+        return identities
+    }
+
     func declarations(forBranch branchID: AnyHashable) -> ScopeDeclarations {
         branches[branchID] ?? ScopeDeclarations()
     }
@@ -121,6 +167,53 @@ struct DeclarationStore {
         let inserted = declarations.appendRoute(route)
         branches[branchID] = declarations
         return inserted
+    }
+
+    mutating func refreshRouteAttachments(
+        from routeDeclarations: [RouteScopeDeclaration],
+        activeBranch: AnyHashable,
+        usesBranches: Bool
+    ) {
+        var localRoutes: [AnyRouteDeclaration] = []
+        var routesByBranch: [AnyHashable: [AnyRouteDeclaration]] = [:]
+
+        for declaration in routeDeclarations {
+            if usesBranches, let branchID = declaration.branch {
+                routesByBranch[branchID, default: []].append(contentsOf: declaration.routes)
+            } else {
+                localRoutes.append(contentsOf: declaration.routes)
+            }
+        }
+
+        local.setRoutes(localRoutes)
+        guard usesBranches else {
+            return
+        }
+
+        var refreshedBranches = OrderedStorage<AnyHashable, ScopeDeclarations>()
+        let refreshedBranchIDs = [activeBranch] + routeDeclarations.compactMap(\.branch)
+        for branchID in refreshedBranchIDs where refreshedBranches[branchID] == nil {
+            var scopeDeclarations = declarations(forBranch: branchID)
+            scopeDeclarations.setRoutes(routesByBranch[branchID] ?? [])
+            refreshedBranches[branchID] = scopeDeclarations
+        }
+        branches = refreshedBranches
+    }
+
+    mutating func refreshHookAttachments(
+        _ hooks: [AnyHookDeclaration],
+        activeBranch: AnyHashable,
+        usesBranches: Bool
+    ) {
+        guard usesBranches else {
+            local.setHooks(hooks)
+            return
+        }
+
+        for branchID in branchIDs {
+            removeHooks(forBranch: branchID)
+        }
+        setHooks(hooks, forBranch: activeBranch)
     }
 
     mutating func setHooks(_ hooks: [AnyHookDeclaration], forBranch branchID: AnyHashable) {

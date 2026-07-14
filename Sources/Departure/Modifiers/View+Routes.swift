@@ -125,17 +125,30 @@ private struct RoutesModifier: ViewModifier {
     }
 
     private func installScopeDeclarations() {
+        guard let routeScope else {
+            return
+        }
+
+        let requiresCommit = routeScope.prepareRouteDeclarationInstallation(
+            sourceID: sourceID,
+            id: explicitScopeID,
+            branchSelection: selection,
+            routeDeclarations: declarations,
+            sourceEnvironment: sourceEnvironment
+        )
+
+        guard requiresCommit else {
+            return
+        }
+
         router.mutateRouteGraph {
-            routeScope?.installRouteDeclarations(
-                sourceID: sourceID,
-                id: explicitScopeID,
+            routeScope.commitRouteDeclarationInstallation(
                 branchSelection: selection,
-                routeDeclarations: declarations,
-                sourceEnvironment: sourceEnvironment
+                routeDeclarations: declarations
             )
         }
 
-        guard let routeScope, let parentScope = routeScope.parent else {
+        guard let parentScope = routeScope.parent else {
             return
         }
 

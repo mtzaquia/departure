@@ -249,6 +249,11 @@ struct RouterTests {
 
         await router.requestRoute(HomeDetailRoute())
 
+        // An unmounted host has no scheduled resume. Extra turns must leave the request pending
+        // for the host's registration path to resume.
+        await Task.yield()
+        await Task.yield()
+
         #expect(selectedTab() == .home)
         #expect(router.normalTree.rootPath.isEmpty)
         #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
@@ -266,6 +271,47 @@ struct RouterTests {
 
         #expect(router.normalTree.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
+        #expect(homeScope.path.last?.route is HomeDetailRoute)
+        #expect(router.pendingRoute == nil)
+    }
+
+    @Test func routeRequestDoesNotTrimDeclaringPathWhileActiveBranchHostIsMissing() async {
+        let router = Router()
+        let (selection, _) = tabSelection(.home)
+        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        router.normalTree.rootPath.scopes = [landingScope]
+
+        landingScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.home) {
+                        Push(HomeDetailRoute.self)
+                    }
+                )
+            )
+        )
+
+        await router.requestRoute(HomeDetailRoute())
+
+        #expect(router.normalTree.rootPath.count == 1)
+        #expect(router.normalTree.rootPath.last === landingScope)
+        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
+
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        homeScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+            ]
+        )
+        landingScope.registerBranchScope(homeScope, for: AppTab.home)
+        router.resumePendingRoute(for: AppTab.home, in: landingScope)
+
+        #expect(router.normalTree.rootPath.count == 1)
+        #expect(router.normalTree.rootPath.last === landingScope)
         #expect(homeScope.path.last?.route is HomeDetailRoute)
         #expect(router.pendingRoute == nil)
     }
@@ -290,6 +336,83 @@ struct RouterTests {
         #expect(scope.id == AnyHashable("initial"))
         #expect(scope.activeBranch == AnyHashable("initial"))
         #expect(scope.firstRouteAttachment(for: HomeDetailRoute.self) == nil)
+    }
+
+    @Test func unchangedBranchedDeclarationRefreshesSelectionAndMovesHooksInPlace() async {
+        let router = Router()
+        let (initialSelection, initialTab) = tabSelection(.home)
+        let declarations = BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+            BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                Branch(.home) {
+                    Push(HomeDetailRoute.self)
+                }
+            )
+        )
+        let recorder = ActionRecorder()
+
+        router.root.installRouteDeclarations(
+            sourceID: "routes",
+            id: nil,
+            branchSelection: AnyRouteBranchSelection(initialSelection),
+            routeDeclarations: declarations
+        )
+        router.root.installHookDeclarations(
+            sourceID: "hooks",
+            hookDeclarations: [
+                ActionInterceptor(ContextProbeAction.self) { _ in
+                    recorder.labels.append("refreshed")
+                }.declaration,
+            ]
+        )
+
+        let declarationStoreIdentity = router.root.declarations.identity
+        let (replacementSelection, replacementTab) = tabSelection(.wallet)
+        #expect(
+            router.root.prepareRouteDeclarationInstallation(
+                sourceID: "routes",
+                id: nil,
+                branchSelection: AnyRouteBranchSelection(replacementSelection),
+                routeDeclarations: declarations,
+                sourceEnvironment: EnvironmentValues()
+            ) == false
+        )
+
+        #expect(router.root.declarations.identity == declarationStoreIdentity)
+        #expect(router.root.activeBranch == AnyHashable(AppTab.wallet))
+        #expect(router.root.declarations.branchIDs == [AnyHashable(AppTab.wallet), AnyHashable(AppTab.home)])
+
+        await router.performAction(ContextProbeAction())
+        router.root.setActiveBranch(AppTab.home)
+
+        #expect(recorder.labels == ["refreshed"])
+        #expect(initialTab() == .home)
+        #expect(replacementTab() == .home)
+    }
+
+    @Test func repeatedDuplicateRouteDeclarationsAreIdempotent() {
+        let scope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let declarations = [
+            RouteScopeDeclaration(
+                routes: Sheet(SettingsRoute.self)._routeDeclarations
+                + Push(SettingsRoute.self)._routeDeclarations
+            ),
+        ]
+
+        #expect(
+            scope.installRouteDeclarations(
+                id: nil,
+                branchSelection: nil,
+                routeDeclarations: declarations
+            )
+        )
+        #expect(
+            scope.installRouteDeclarations(
+                id: nil,
+                branchSelection: nil,
+                routeDeclarations: declarations
+            ) == false
+        )
+        #expect(scope.firstRouteAttachment(for: SettingsRoute.self)?.declaration.presentationKind == .sheet)
     }
 
     @Test func branchScopeChecksLocalDeclarationsBeforeAdoptedDeclarations() async {
@@ -388,6 +511,47 @@ struct RouterTests {
 
         #expect(router.normalTree.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
+        #expect(homeScope.path.last?.route is HomeDetailRoute)
+        #expect(router.pendingRoute == nil)
+    }
+
+    @Test func inactiveBranchRequestResumesAfterMountedHostObservesSelection() async {
+        let router = Router()
+        let (selection, selectedTab) = tabSelection(.wallet)
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.home) {
+                        Push(HomeDetailRoute.self)
+                    }
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.wallet) {
+                        Push(TransactionRoute.self)
+                    }
+                )
+            )
+        )
+
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+        homeScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+            ]
+        )
+        router.root.registerBranchScope(homeScope, for: AppTab.home)
+
+        await router.requestRoute(HomeDetailRoute())
+        for _ in 0..<10 where router.pendingRoute != nil {
+            await Task.yield()
+        }
+
+        #expect(selectedTab() == .home)
         #expect(homeScope.path.last?.route is HomeDetailRoute)
         #expect(router.pendingRoute == nil)
     }
@@ -3591,6 +3755,79 @@ struct RouterTests {
         #expect(router.routeForest.criticalTree?.elevatedRouteScope === router.routeForest.criticalTree?.rootPath.last)
         #expect(router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.fade)).wrappedValue?.scope === router.routeForest.criticalTree?.rootPath.last)
         #expect(router.routePresentationBinding(from: loginScope, matching: .cover(.fade)).wrappedValue == nil)
+    }
+
+    @Test func repeatedRouteDeclarationRefreshesInsideCriticalCoverKeepTheStoreStable() async throws {
+        let router = Router()
+        let sourceID = AnyHashable("critical-cover-routes")
+        let recorder = ActionRecorder()
+        let declarations = [
+            RouteScopeDeclaration(routes: Sheet(SettingsRoute.self)._routeDeclarations),
+        ]
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: .critical)._routeDeclarations),
+            ]
+        )
+        await router.requestRoute(LoginRoute())
+
+        let coverScope = try #require(router.routeForest.criticalTree?.rootPath.last)
+        coverScope.installHookDeclarations(
+            sourceID: "critical-cover-hooks",
+            hookDeclarations: [
+                ActionInterceptor(ContextProbeAction.self) { _ in
+                    recorder.labels.append("stale")
+                }.declaration,
+            ]
+        )
+        #expect(
+            coverScope.prepareRouteDeclarationInstallation(
+                sourceID: sourceID,
+                id: nil,
+                branchSelection: nil,
+                routeDeclarations: declarations,
+                sourceEnvironment: EnvironmentValues()
+            )
+        )
+        router.mutateRouteGraph {
+            coverScope.commitRouteDeclarationInstallation(
+                branchSelection: nil,
+                routeDeclarations: declarations
+            )
+        }
+
+        coverScope.installHookDeclarations(
+            sourceID: "critical-cover-hooks",
+            hookDeclarations: [
+                ActionInterceptor(ContextProbeAction.self) { _ in
+                    recorder.labels.append("fresh")
+                }.declaration,
+            ]
+        )
+
+        let declarationStoreIdentity = coverScope.declarations.identity
+        for _ in 0..<5 {
+            #expect(
+                coverScope.prepareRouteDeclarationInstallation(
+                    sourceID: sourceID,
+                    id: nil,
+                    branchSelection: nil,
+                    routeDeclarations: declarations,
+                    sourceEnvironment: EnvironmentValues()
+                ) == false
+            )
+            #expect(coverScope.declarations.identity == declarationStoreIdentity)
+        }
+
+        await router.performAction(ContextProbeAction())
+        await router.requestRoute(SettingsRoute())
+
+        #expect(recorder.labels == ["fresh"])
+        #expect(router.routeForest.criticalTree?.rootPath.count == 2)
+        #expect(router.routeForest.criticalTree?.rootPath.last?.route is SettingsRoute)
     }
 }
 
