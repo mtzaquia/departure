@@ -1165,6 +1165,82 @@ struct RouterTests {
         #expect(router.normalTree.rootPath.isEmpty)
     }
 
+    @Test func undeclaredRouteWarnsWhenItsDeclarationScopeIsDetachedFromTheRouteForest() {
+        let router = Router()
+        let detachedScope = RouteScope(id: UUID(), route: nil)
+        let declarations = [
+            RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+        ]
+
+        router.routeDeclarationScopeRegistry.install(
+            detachedScope,
+            sourceID: "test",
+            declarations: declarations
+        )
+
+        let warning = try! #require(router.noDeclarationDropWarning(for: SettingsRoute.self))
+        #expect(warning.contains(String(reflecting: SettingsRoute.self)))
+        #expect(warning.contains(detachedScope.departureDebugDescription))
+        #expect(warning.contains("not attached to the active Departure route forest"))
+        #expect(warning.contains(".sheet, .fullScreenCover, or .popover"))
+    }
+
+    @Test func undeclaredRouteDoesNotWarnForADeclarationInAnInactiveBranch() {
+        let router = Router()
+        let inactiveBranchScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        let declarations = [
+            RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+        ]
+
+        router.root.setActiveBranch(AnyHashable(AppTab.home))
+        router.root.registerBranchScope(inactiveBranchScope, for: AppTab.wallet)
+        router.routeDeclarationScopeRegistry.install(
+            inactiveBranchScope,
+            sourceID: "test",
+            declarations: declarations
+        )
+
+        #expect(router.noDeclarationDropWarning(for: SettingsRoute.self) == nil)
+    }
+
+    @Test func declarationScopeRegistryRemovesScopesWhenTheirDeclarationsUninstall() {
+        let router = Router()
+        let detachedScope = RouteScope(id: UUID(), route: nil)
+        let sourceID = AnyHashable("test")
+        let declarations = [
+            RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+        ]
+
+        router.routeDeclarationScopeRegistry.install(
+            detachedScope,
+            sourceID: sourceID,
+            declarations: declarations
+        )
+        router.routeDeclarationScopeRegistry.uninstall(detachedScope, sourceID: sourceID)
+
+        #expect(router.noDeclarationDropWarning(for: SettingsRoute.self) == nil)
+    }
+
+    @Test func declarationScopeRegistryPrunesReleasedScopes() {
+        let router = Router()
+        weak var releasedScope: RouteScope?
+
+        do {
+            let detachedScope = RouteScope(id: UUID(), route: nil)
+            releasedScope = detachedScope
+            router.routeDeclarationScopeRegistry.install(
+                detachedScope,
+                sourceID: "test",
+                declarations: [
+                    RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+                ]
+            )
+        }
+
+        #expect(releasedScope == nil)
+        #expect(router.noDeclarationDropWarning(for: SettingsRoute.self) == nil)
+    }
+
     @Test func routeResolutionReroutePresentsResolvedRoute() async {
         let router = Router()
 

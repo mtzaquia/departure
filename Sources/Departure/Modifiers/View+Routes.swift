@@ -126,12 +126,21 @@ private struct RoutesModifier: ViewModifier {
 
     private func installScopeDeclarations() {
         router.mutateRouteGraph {
-            routeScope?.installRouteDeclarations(
+            guard let routeScope else {
+                return
+            }
+
+            routeScope.installRouteDeclarations(
                 sourceID: sourceID,
                 id: explicitScopeID,
                 branchSelection: selection,
                 routeDeclarations: declarations,
                 sourceEnvironment: sourceEnvironment
+            )
+            router.routeDeclarationScopeRegistry.install(
+                routeScope,
+                sourceID: sourceID,
+                declarations: declarations
             )
         }
 
@@ -144,7 +153,13 @@ private struct RoutesModifier: ViewModifier {
 
     private func uninstallScopeDeclarations() {
         router.mutateRouteGraph {
-            routeScope?.uninstallRouteDeclarations(sourceID: sourceID)
+            guard let routeScope,
+                  routeScope.uninstallRouteDeclarations(sourceID: sourceID)
+            else {
+                return
+            }
+
+            router.routeDeclarationScopeRegistry.uninstall(routeScope, sourceID: sourceID)
         }
     }
 

@@ -78,6 +78,9 @@ public final class Router: Identifiable, Equatable {
     var deliveredUnwindHandlers: [UnwindHandlerDeliveryKey: DeliveredUnwindHandler] = [:]
 
     @ObservationIgnored
+    let routeDeclarationScopeRegistry = RouteDeclarationScopeRegistry()
+
+    @ObservationIgnored
     var routeGraphMutationDepth = 0
 
     var activeRouteScopeID: ObjectIdentifier

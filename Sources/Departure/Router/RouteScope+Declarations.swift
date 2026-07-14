@@ -139,14 +139,16 @@ extension RouteScope {
         log.departureDebug(.routeDeclarationsInstalled(scope: self, declarationCount: routeDeclarations.count))
     }
 
-    func uninstallRouteDeclarations(sourceID: AnyHashable) {
+    @discardableResult
+    func uninstallRouteDeclarations(sourceID: AnyHashable) -> Bool {
         guard declarationInstallation.uninstallRouteSource(sourceID: sourceID) else {
-            return
+            return false
         }
 
         branchContainer = nil
         declarations = DeclarationStore()
         log.departureDebug(.routeDeclarationsUninstalled(scope: self))
+        return true
     }
 
     @discardableResult

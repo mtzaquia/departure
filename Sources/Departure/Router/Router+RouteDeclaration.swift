@@ -44,7 +44,7 @@ extension Router {
             return
 
         case .dropNoDeclaration(let routeType):
-            log.departureDebug(.routeDroppedNoDeclaration(routeType: routeType))
+            logDropNoDeclaration(for: routeType)
             return
 
         case .dropBlockedByElevatedPriority(let match):
@@ -119,6 +119,28 @@ extension Router {
 
     private func logMatchedRoute(_ route: any Route, to match: DeclarationMatch) {
         log.departureDebug(.routeMatched(route: route, match: match))
+    }
+
+    private func logDropNoDeclaration(for routeType: any Route.Type) {
+        guard let warning = noDeclarationDropWarning(for: routeType) else {
+            log.departureDebug(.routeDroppedNoDeclaration(routeType: routeType))
+            return
+        }
+
+        log.departureWarning(warning)
+    }
+
+    func noDeclarationDropWarning(for routeType: any Route.Type) -> String? {
+        guard let scope = routeDeclarationScopeRegistry.firstScope(
+            declaring: routeType,
+            outside: routeForest
+        ) else {
+            return nil
+        }
+
+        return """
+        Route declaration for \(String(reflecting: routeType)) was found on \(scope.departureDebugDescription), but that scope is not attached to the active Departure route forest. Its host was likely presented outside Departure (using SwiftUI .sheet, .fullScreenCover, or .popover), so the declaration cannot be resolved.
+        """
     }
 }
 
