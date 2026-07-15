@@ -26,7 +26,7 @@ extension Router {
     func requestRoute(_ route: some Route) async {
         #if DEBUG
         guard DepartureLogTrace.id != nil else {
-            await DepartureLogTrace.$id.withValue("r:\(route.id.departureDebugDescription)") {
+            await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "r")) {
                 await requestRoute(route)
             }
             return

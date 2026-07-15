@@ -136,7 +136,7 @@ extension Router {
     func unwindAndWait(to target: UnwindTarget?, payload: Any? = nil) async -> Bool {
         #if DEBUG
         guard DepartureLogTrace.id != nil else {
-            return await DepartureLogTrace.$id.withValue("u:\(UUID().uuidString.prefix(6))") {
+            return await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "u")) {
                 await unwindAndWait(to: target, payload: payload)
             }
         }

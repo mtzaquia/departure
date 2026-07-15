@@ -20,6 +20,7 @@
 //  SOFTWARE.
 //
 
+import Foundation
 import os
 
 /// Global Departure configuration.
@@ -51,6 +52,10 @@ nonisolated let log = Logger(subsystem: "eu.lelfe.departure", category: "Departu
 
 enum DepartureLogTrace {
     @TaskLocal static var id: String?
+
+    static func nextID(prefix: String) -> String {
+        "\(prefix):\(UUID().uuidString.prefix(8))"
+    }
 }
 
 enum DepartureLogEvent {

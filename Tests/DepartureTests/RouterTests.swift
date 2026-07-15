@@ -3198,6 +3198,20 @@ struct RouterTests {
         )
     }
 
+    @Test func presentationAndUnwindTraceCodesUseUniqueUUIDPrefixes() {
+        let firstPresentation = DepartureLogTrace.nextID(prefix: "r")
+        let secondPresentation = DepartureLogTrace.nextID(prefix: "r")
+        let unwind = DepartureLogTrace.nextID(prefix: "u")
+
+        #expect(firstPresentation.hasPrefix("r:"))
+        #expect(secondPresentation.hasPrefix("r:"))
+        #expect(unwind.hasPrefix("u:"))
+        #expect(firstPresentation.count == 10)
+        #expect(secondPresentation.count == 10)
+        #expect(unwind.count == 10)
+        #expect(Set([firstPresentation, secondPresentation, unwind]).count == 3)
+    }
+
     @Test func branchScopeRegistrationIsIdempotentAndKeepsDebugIdentityAfterUnregister() {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let branchScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
