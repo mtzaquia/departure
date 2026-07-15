@@ -80,6 +80,10 @@ public final class Router: Identifiable, Equatable {
     @ObservationIgnored
     var routeGraphMutationDepth = 0
 
+    @ObservationIgnored
+    var ios17NavigationStackPushWorkaround: (any IOS17NavigationStackPushWorkaroundHandling)? =
+        IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform()
+
     var activeRouteScopeID: ObjectIdentifier
 
     var root: RouteScope {
@@ -185,6 +189,7 @@ extension Router {
         routeGraphMutationDepth -= 1
 
         if routeGraphMutationDepth == 0 {
+            ios17NavigationStackPushWorkaround?.routeGraphDidMutate(in: self)
             reconcileActiveRouteScopeID()
             #if DEBUG
             routeForest.validateInvariants()

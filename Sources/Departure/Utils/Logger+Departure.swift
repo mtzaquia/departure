@@ -82,6 +82,9 @@ enum DepartureLogEvent {
     case pathTrimmed(keepThrough: RoutePath.Position, removedCount: Int)
     case pathUnchanged(keepThrough: RoutePath.Position)
     case pendingRouteResuming(route: any Route)
+    case ios17PushDismissalDeferred(scope: RouteScope)
+    case ios17PushDismissalDropped(scope: RouteScope)
+    case ios17PushDismissalResumed(scope: RouteScope)
     case routeAcceptedAppend(route: any Route)
     case routeAcceptedReplaceElevatedPriority(route: any Route)
     case routeAppendSuperseded(route: any Route)
@@ -109,6 +112,7 @@ enum DepartureLogEvent {
     case viewExitWaitProgress(remaining: Int)
     case viewExitWaitSkipped
     case viewExitWaitStarted(installed: Int)
+    case ios17ViewExitWaitTimedOut(scope: RouteScope)
     case unwindAccepted(keepThrough: RoutePath.Position, removing: Int)
     case unwindAcceptedAncestorTarget(keepThrough: RoutePath.Position, removing: Int)
     case unwindCompleted(path: String)
@@ -168,6 +172,9 @@ extension DepartureLogEvent {
              .pathRemovalSkipped,
              .pathTrimmed,
              .pathUnchanged,
+             .ios17PushDismissalDeferred,
+             .ios17PushDismissalDropped,
+             .ios17PushDismissalResumed,
              .routeAppendPreparing,
              .routeAppendWaitingReplacingScopes,
              .routeCanPresentActiveLocalScope,
@@ -180,7 +187,8 @@ extension DepartureLogEvent {
              .scopeUninstalledFromView,
              .viewExitWaitProgress,
              .viewExitWaitSkipped,
-             .viewExitWaitStarted:
+             .viewExitWaitStarted,
+             .ios17ViewExitWaitTimedOut:
             .trace
 
         default:
@@ -230,7 +238,10 @@ extension DepartureLogEvent {
              .unwindPreviousRequested,
              .unwindRequested,
              .unwindSkippedNoRoute,
-             .unwindSkippedNotInsideBranch:
+             .unwindSkippedNotInsideBranch,
+             .ios17PushDismissalDeferred,
+             .ios17PushDismissalDropped,
+             .ios17PushDismissalResumed:
             "unwind"
 
         case .hookDeclarationsUninstalled,
@@ -269,7 +280,8 @@ extension DepartureLogEvent {
              .routePendingWaitingForActivatedBranchHost,
              .routePendingWaitingForLocalPresentationScope,
              .viewExitWaitProgress,
-             .viewExitWaitStarted:
+             .viewExitWaitStarted,
+             .ios17PushDismissalDeferred:
             "⏳"
 
         case .actionDirectInvocationEnded,
@@ -286,9 +298,11 @@ extension DepartureLogEvent {
              .routeDroppedNoDeclaration,
              .routeDroppedResolution,
              .routeNoOpEquivalent,
+             .ios17PushDismissalDropped,
              .unwindDroppedTargetNotFound,
              .unwindSkippedNoRoute,
-             .unwindSkippedNotInsideBranch:
+             .unwindSkippedNotInsideBranch,
+             .ios17ViewExitWaitTimedOut:
             "⊘"
 
         default:
@@ -354,6 +368,12 @@ extension DepartureLogEvent {
             "path unchanged | keepThrough=\(keepThrough)"
         case let .pendingRouteResuming(route):
             "resuming pending \(route.departureDebugDescription)"
+        case let .ios17PushDismissalDeferred(scope):
+            "iOS 17 push dismissal deferred until view exit | scope=\(scope.departureDebugDescription)"
+        case let .ios17PushDismissalDropped(scope):
+            "iOS 17 push dismissal write-back dropped | reason=pending plan invalidated | scope=\(scope.departureDebugDescription)"
+        case let .ios17PushDismissalResumed(scope):
+            "iOS 17 push dismissal resumed after view exit | scope=\(scope.departureDebugDescription)"
         case let .routeAcceptedAppend(route):
             "will append \(route.departureDebugDescription)"
         case let .routeAcceptedReplaceElevatedPriority(route):
@@ -408,6 +428,8 @@ extension DepartureLogEvent {
             "view exit wait skipped | reason=no installed scopes"
         case let .viewExitWaitStarted(installed):
             "view exit wait started | installed=\(installed)"
+        case let .ios17ViewExitWaitTimedOut(scope):
+            "iOS 17 view exit wait timed out — forcing reconciliation | scope=\(scope.departureDebugDescription)"
         case let .unwindAccepted(keepThrough, removing):
             "removing \(removing) route scope\(removing == 1 ? "" : "s") through \(String(describing: keepThrough))"
         case let .unwindAcceptedAncestorTarget(keepThrough, removing):

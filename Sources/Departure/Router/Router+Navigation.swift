@@ -700,12 +700,20 @@ extension Router {
     @discardableResult
     func prepareRouteAppendPath(_ plan: RouteForest.UnwindPlan) -> [RouteScope] {
         let removedScopes = plan.removedScopes
+        applyUnwindPlan(plan)
+        return removedScopes
+    }
 
+    func applyUnwindPlan(_ plan: RouteForest.UnwindPlan) {
         for trim in plan.pathTrims {
             keepPathThrough(trim.keepThrough, in: trim.path)
         }
 
-        return removedScopes
+        if plan.clearsElevatedTrees {
+            mutateRouteGraph {
+                routeForest.clearElevatedTrees()
+            }
+        }
     }
 
     func routeAppendUnwindPlan(after match: DeclarationMatch) -> RouteForest.UnwindPlan {
@@ -798,18 +806,30 @@ extension Router {
     }
 
     func routeScopeDidInstallInView(_ routeScope: RouteScope) {
+        let wasInstalled = routeScope.isInstalledInView
         routeScope.viewLifecycle.install()
         log.departureDebug(.scopeInstalledInView(scope: routeScope))
+
+        guard wasInstalled == false else {
+            return
+        }
+
+        ios17NavigationStackPushWorkaround?.routeScopeDidInstall(routeScope)
     }
 
     func routeScopeDidLeaveView(_ routeScope: RouteScope) {
         guard routeScope.isInstalledInView else { return }
 
+        routeScope.viewLifecycle.uninstall()
+        log.departureDebug(.scopeUninstalledFromView(scope: routeScope))
+
+        if ios17NavigationStackPushWorkaround?.routeScopeDidLeave(routeScope, in: self) == true {
+            return
+        }
+
         mutateRouteGraph {
-            routeScope.viewLifecycle.uninstall()
             clearElevatedTreeIfNeeded(forRemovedViewScope: routeScope)
         }
-        log.departureDebug(.scopeUninstalledFromView(scope: routeScope))
     }
 
     func clearElevatedTreeIfNeeded(forRemovedViewScope routeScope: RouteScope) {
@@ -829,6 +849,11 @@ extension Router {
         }
 
         log.departureDebug(.viewExitWaitStarted(installed: installedRouteScopes.count))
+        ios17NavigationStackPushWorkaround?.startViewExitWatchdogs(
+            for: installedRouteScopes,
+            in: self
+        )
+
         for (index, routeScope) in installedRouteScopes.enumerated() {
             await routeScope.viewLifecycle.waitUntilUninstalled()
             log.departureDebug(.viewExitWaitProgress(
@@ -929,15 +954,7 @@ extension Router {
                 snapshotID = snapshot.id
             }
 
-            for trim in plan.pathTrims {
-                keepPathThrough(trim.keepThrough, in: trim.path)
-            }
-
-            if plan.clearsElevatedTrees {
-                mutateRouteGraph {
-                    routeForest.clearElevatedTrees()
-                }
-            }
+            applyUnwindPlan(plan)
         }
     }
 

@@ -1656,6 +1656,30 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue != nil)
     }
 
+    @Test func installedModalDismissalRetainsImmediateGraphSemantics() async throws {
+        let router = Router()
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Sheet(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+
+        await router.requestRoute(SettingsRoute())
+        let sheetScope = try #require(router.normalTree.rootPath.last)
+        router.routeScopeDidInstallInView(sheetScope)
+
+        let presentation = router.routePresentationBinding(from: router.root, matching: .sheet)
+        presentation.wrappedValue = nil
+
+        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(presentation.wrappedValue == nil)
+
+        router.routeScopeDidLeaveView(sheetScope)
+    }
+
     @Test func routeScopeViewLifecycleResumesEveryWaiterForEachTransition() async {
         let router = Router()
         let scope = RouteScope(id: RootRoute().id, route: RootRoute())

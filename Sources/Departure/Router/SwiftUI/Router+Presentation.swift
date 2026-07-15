@@ -264,6 +264,14 @@ private extension Router {
             return
         }
 
+        if ios17NavigationStackPushWorkaround?.interceptDismissal(
+            of: presentation,
+            matching: presentationKind,
+            in: self
+        ) == true {
+            return
+        }
+
         let routePath = routeForest.routePath(containing: presentation.scope) ?? normalTree.rootPath
 
         guard let targetPosition = routePath.positionBefore(presentation.scope) else {
@@ -370,5 +378,4 @@ private extension Router {
             }
         }
     }
-
 }
