@@ -433,9 +433,10 @@ extension RouteForest {
             let position = RoutePath.Position.scope(scope)
 
             if let match = scope.firstBranchScopeRouteAttachment(for: routeType, in: scope.activeBranch) {
-                let routePath = routePath(
+                let routePath = routePathForActiveBranchScopeMatch(
                     for: match,
                     under: scope,
+                    tree: tree,
                     fallbackPath: searchPath,
                     fallbackPosition: position
                 )
@@ -474,6 +475,32 @@ extension RouteForest {
         }
 
         return nil
+    }
+
+    private func routePathForActiveBranchScopeMatch(
+        for match: RouteScope.RouteAttachmentMatch,
+        under routeScope: RouteScope,
+        tree: RouteTree,
+        fallbackPath: RoutePath,
+        fallbackPosition: RoutePath.Position
+    ) -> (path: RoutePath, position: RoutePath.Position) {
+        guard
+            let branchID = match.branchID,
+            let activeLocalScope = routeScope.branchScopes[branchID]?.activeLocalScope,
+            let activeLocalPath = tree.routePath(containing: activeLocalScope)
+        else {
+            return routePath(
+                for: match,
+                under: routeScope,
+                fallbackPath: fallbackPath,
+                fallbackPosition: fallbackPosition
+            )
+        }
+
+        return (
+            path: activeLocalPath,
+            position: activeLocalPath.position(of: activeLocalScope) ?? .owner
+        )
     }
 
     private func routePath(

@@ -304,7 +304,12 @@ extension Router {
 
         if removedScopes.isEmpty == false {
             log.departureDebug(.routeAppendWaitingReplacingScopes(removedScopes: removedScopes.count))
-            if await deferRouteAppend(route, after: match, until: removedScopes) {
+            if await deferRouteAppend(
+                route,
+                after: match,
+                until: removedScopes,
+                presentationSnapshotID: snapshotID
+            ) {
                 clearUnwindPresentationSnapshot(id: snapshotID)
                 return
             }
@@ -345,7 +350,11 @@ extension Router {
         }
 
         let targetPosition = equivalentRouteMatch.position
-        let removedScopes = match.presentationLocation.path.scopesRemovedAfter(targetPosition)
+        let unwindPlan = equivalentRouteUnwindPlan(
+            after: match,
+            keepingThrough: targetPosition
+        )
+        let removedScopes = unwindPlan.removedScopes
         let sourceScope = removedScopes.last
         let targetScope = match.presentationLocation.path.scope(at: targetPosition)
         guard removedScopes.isEmpty == false else {
@@ -355,16 +364,43 @@ extension Router {
             return true
         }
 
+        let snapshotID = installRouteAppendPresentationSnapshot(for: unwindPlan)
         await performAcceptedUnwind(
             for: sourceScope,
             payload: nil,
             in: targetScope,
             removing: removedScopes,
-            logsCompletion: false
+            logsCompletion: false,
+            afterScopesLeave: {
+                clearUnwindPresentationSnapshot(id: snapshotID)
+            }
         ) {
-            keepPathThrough(targetPosition, in: match.presentationLocation.path)
+            applyUnwindPlan(unwindPlan)
         }
         return true
+    }
+
+    func equivalentRouteUnwindPlan(
+        after match: DeclarationMatch,
+        keepingThrough targetPosition: RoutePath.Position
+    ) -> RouteForest.UnwindPlan {
+        var requests: [RouteForest.UnwindPlanRequest] = [
+            .scoped(
+                routePath: match.presentationLocation.path,
+                after: targetPosition
+            ),
+        ]
+
+        // Keeping the equivalent scope replaces the normal append trim on its path, but a route
+        // discovered in a branch can still have a modal blocking its separate declaring path.
+        if match.presentationLocation.path !== match.declarationLocation.path {
+            requests.append(.scoped(
+                routePath: match.declarationLocation.path,
+                after: match.declarationLocation.position
+            ))
+        }
+
+        return routeForest.unwindPlan(for: .combined(requests))
     }
 
     func unwindToExistingEquivalentRouteInPriorityTreeIfNeeded(
@@ -563,12 +599,12 @@ extension Router {
         replacePendingRoute(nil)
 
         // Resolve the presentation origin once, at write time, so SwiftUI bindings read it directly
-        // instead of re-deriving the closest declaring scope on every read. The presenter is not
-        // always the declarer: when the route is placed into a different path than the one it was
-        // discovered in (a branch adopting a top-level/branch declaration), the branch scope that
-        // owns the target path is the presenter. Otherwise the declaring scope within the path
-        // hosts it.
+        // instead of re-deriving the closest declaring scope on every read. A driving declaration
+        // discovered through an ancestor branch keeps its matched local scope as presenter. For a
+        // discovery-only declaration placed into a different path, the branch scope that owns the
+        // target path hosts it.
         let presentationOrigin = match.presentationLocation.path === match.declarationLocation.path
+            || match.declaration.drivesPresentation
             ? match.presentationLocation.scope
             : match.presentationLocation.path.owner
 
@@ -878,7 +914,12 @@ extension Router {
         return true
     }
 
-    func deferRouteAppend(_ route: any Route, after match: DeclarationMatch, until routeScopes: [RouteScope]) async -> Bool {
+    func deferRouteAppend(
+        _ route: any Route,
+        after match: DeclarationMatch,
+        until routeScopes: [RouteScope],
+        presentationSnapshotID: UUID? = nil
+    ) async -> Bool {
         let installedRouteScopes = routeScopes.filter(\.isInstalledInView)
         guard installedRouteScopes.isEmpty == false else {
             await waitForRouteScopesToLeaveView(routeScopes)
@@ -894,6 +935,27 @@ extension Router {
             ))
         )
         replacePendingRoute(pendingAppend)
+
+        if let presentationSnapshotID {
+            // The snapshot keeps pushes stable while their enclosing modal dismisses. Release it
+            // as soon as every removed modal has left; otherwise a removed push is kept alive by
+            // the same snapshot this append is waiting for it to invalidate.
+            let installedModalScopes = installedRouteScopes.filter {
+                guard let presentationKind = $0.presentationDeclaration?.presentationKind else {
+                    return false
+                }
+
+                return presentationKind != .push
+            }
+
+            await waitForRouteScopesToLeaveView(installedModalScopes)
+            clearUnwindPresentationSnapshot(id: presentationSnapshotID)
+
+            guard pendingRoute === pendingAppend else {
+                log.departureDebug(.routeAppendSuperseded(route: route))
+                return true
+            }
+        }
 
         await waitForRouteScopesToLeaveView(installedRouteScopes)
 

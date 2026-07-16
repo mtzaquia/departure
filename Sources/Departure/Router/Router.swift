@@ -68,7 +68,6 @@ public final class Router: Identifiable, Equatable {
     @ObservationIgnored
     var pendingRoute: PendingRoute?
 
-    @ObservationIgnored
     var unwindPresentationSnapshot: UnwindPresentationSnapshot?
 
     @ObservationIgnored

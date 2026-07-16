@@ -81,6 +81,8 @@ extension EnvironmentValues {
 
 @main
 struct DepartureSampleApp: App {
+    @State private var router = Router()
+
     init() {
         Departure.debug = .trace
         SampleAppUITesting.configure()
@@ -88,7 +90,7 @@ struct DepartureSampleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WithRouter {
+            WithRouter(router: router) {
                 NavigationStack {
                     StartView()
                 }
@@ -104,6 +106,17 @@ struct DepartureSampleApp: App {
                 }
 
                 transaction.animation = nil
+            }
+            .onOpenURL { url in
+                guard let route = SampleDeepLink(url: url)?.route else {
+                    print("[deeplink] dropped | reason=unmatched | \(url)")
+                    return
+                }
+
+                print("[deeplink] accepted | \(url) → \(route)")
+                Task {
+                    await router.present(route)
+                }
             }
         }
     }
