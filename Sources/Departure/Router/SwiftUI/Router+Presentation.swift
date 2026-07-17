@@ -101,15 +101,23 @@ extension Router {
             return presentation
         }
 
-        guard presentationKind != .push else {
-            return nil
-        }
-
         guard
             routeScope !== root,
             let unwindPresentationSnapshot
         else {
             return nil
+        }
+
+        switch presentationKind {
+        case .push:
+            guard unwindPresentationSnapshot.preservesPushPresentationBindings else {
+                return nil
+            }
+
+        case .sheet, .cover:
+            guard unwindPresentationSnapshot.preservesModalPresentationBindings else {
+                return nil
+            }
         }
 
         // Snapshot read: the preserved scopes have already left the live path (and released their
@@ -256,6 +264,14 @@ private extension Router {
             return
         }
 
+        if ios17NavigationStackPushWorkaround?.interceptDismissal(
+            of: presentation,
+            matching: presentationKind,
+            in: self
+        ) == true {
+            return
+        }
+
         let routePath = routeForest.routePath(containing: presentation.scope) ?? normalTree.rootPath
 
         guard let targetPosition = routePath.positionBefore(presentation.scope) else {
@@ -362,5 +378,4 @@ private extension Router {
             }
         }
     }
-
 }

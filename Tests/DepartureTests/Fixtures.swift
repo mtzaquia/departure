@@ -35,7 +35,7 @@ struct RootRoute: Route {
     }
 }
 
-struct HomeDetailRoute: Route {
+struct HomeDetailRoute: Route, Equatable {
     func destination() -> some View {
         Text("Home Detail")
     }
@@ -46,10 +46,6 @@ struct NumberedRoute: Route, Equatable {
 
     func destination() -> some View {
         Text("Number \(number)")
-    }
-
-    func isEqual(to route: NumberedRoute) -> Bool {
-        number == route.number
     }
 }
 
@@ -63,21 +59,13 @@ struct EquatableOnlyRoute: Route, Equatable {
     static func == (lhs: EquatableOnlyRoute, rhs: EquatableOnlyRoute) -> Bool {
         lhs.value == rhs.value
     }
-
-    func isEqual(to route: EquatableOnlyRoute) -> Bool {
-        true
-    }
 }
 
-struct ProtocolEqualOnlyRoute: Route {
+struct NonEquatableRoute: Route {
     let value: Int
 
     func destination() -> some View {
-        Text("Protocol \(value)")
-    }
-
-    func isEqual(to route: ProtocolEqualOnlyRoute) -> Bool {
-        value == route.value
+        Text("Non-equatable \(value)")
     }
 }
 
@@ -93,7 +81,7 @@ struct SettingsRoute: Route {
     }
 }
 
-struct LoginRoute: Route {
+struct LoginRoute: Route, Equatable {
     func destination() -> some View {
         Text("Login")
     }

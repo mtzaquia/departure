@@ -8,5 +8,4 @@
   - Avoid internal-only details such as helper conformances, ordering used only by router internals, file renames, or test/sample-only changes unless they affect public usage.
   - Merge closely related API-surface changes into one entry instead of listing every type separately.
   - Be precise about API names and deprecation status; do not call an API deprecated unless that exact overload or symbol is deprecated.
-  - Include a short apologetic note for source-breaking changes.
   - Classify behavior corrections as fixes, even when they were implemented by adding infrastructure.

@@ -39,7 +39,22 @@ public protocol HookDeclaration {
 
 // MARK: - Internal helpers
 
+enum HookDeclarationIdentity: Hashable {
+    case actionInterceptor(ObjectIdentifier)
+    case unwindHandler(ObjectIdentifier)
+}
+
 extension AnyHookDeclaration {
+    var identity: HookDeclarationIdentity {
+        switch kind {
+        case let .actionInterceptor(actionType, _):
+            .actionInterceptor(ObjectIdentifier(actionType))
+
+        case let .unwindHandler(routeType, _):
+            .unwindHandler(ObjectIdentifier(routeType))
+        }
+    }
+
     func interceptor(for actionType: (some Action).Type) -> AnyActionInterceptor? {
         switch kind {
         case let .actionInterceptor(candidateActionType, actionInterceptor) where candidateActionType == actionType:

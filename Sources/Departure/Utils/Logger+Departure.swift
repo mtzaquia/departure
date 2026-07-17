@@ -20,18 +20,29 @@
 //  SOFTWARE.
 //
 
+import Foundation
 import os
 
 /// Global Departure configuration.
 public enum Departure {
-    private nonisolated static let debugLock = OSAllocatedUnfairLock(initialState: false)
+    /// The amount of diagnostic detail emitted by Departure in debug builds.
+    public enum DebugLogLevel: Sendable {
+        /// Disables Departure engine logs.
+        case off
+        /// Shows requests, routing decisions, outcomes, and resulting route paths.
+        case normal
+        /// Includes declaration, lifecycle, and waiting details in addition to normal logs.
+        case trace
+    }
 
-    /// Enables Departure engine logs in debug builds.
+    private nonisolated static let debugLock = OSAllocatedUnfairLock(initialState: DebugLogLevel.off)
+
+    /// Controls the amount of Departure engine logging emitted in debug builds.
     ///
     /// ```swift
-    /// Departure.debug = true
+    /// Departure.debug = .trace
     /// ```
-    public nonisolated static var debug: Bool {
+    public nonisolated static var debug: DebugLogLevel {
         get { debugLock.withLock { $0 } }
         set { debugLock.withLock { $0 = newValue } }
     }
@@ -39,13 +50,21 @@ public enum Departure {
 
 nonisolated let log = Logger(subsystem: "eu.lelfe.departure", category: "Departure")
 
+enum DepartureLogTrace {
+    @TaskLocal static var id: String?
+
+    static func nextID(prefix: String) -> String {
+        "\(prefix):\(UUID().uuidString.prefix(8))"
+    }
+}
+
 enum DepartureLogEvent {
     case actionCompleted(action: any Action)
     case actionDirectInvocationEnded(action: any Action, error: any Error)
     case actionFailed(action: any Action, error: any Error)
     case actionIntercepted(action: any Action, scope: RouteScope)
     case actionInterceptorFinished(action: any Action)
-    case actionNoInterceptor(action: any Action, scope: RouteScope)
+    case actionNoInterceptor(action: any Action, scope: RouteScope, currentRoute: (any Route.Type)?)
     case actionRequested(action: any Action)
     case actionRerouteDropped(action: any Action)
     case actionRerouteRequested(action: any Action, route: any Route)
@@ -57,7 +76,7 @@ enum DepartureLogEvent {
     case branchRegistered(branch: AnyHashable, parent: RouteScope, scope: RouteScope)
     case branchUnregistered(branch: AnyHashable, scope: RouteScope)
     case branchUnregisterSkipped(branch: AnyHashable, scope: RouteScope)
-    case elevatedPriorityReplacePreparing(route: any Route, match: Router.DeclarationMatch)
+    case elevatedPriorityReplacePreparing(route: any Route)
     case elevatedTreeCleared
     case elevatedTreeStarted
     case hookDeclarationsUninstalled(scope: RouteScope)
@@ -67,15 +86,16 @@ enum DepartureLogEvent {
     case pathRemovalSkipped(scope: RouteScope)
     case pathTrimmed(keepThrough: RoutePath.Position, removedCount: Int)
     case pathUnchanged(keepThrough: RoutePath.Position)
-    case pendingResumeCheck(branch: AnyHashable, declaringScope: RouteScope)
-    case pendingResumeSkipped
     case pendingRouteResuming(route: any Route)
+    case ios17PushDismissalDeferred(scope: RouteScope)
+    case ios17PushDismissalDropped(scope: RouteScope)
+    case ios17PushDismissalResumed(scope: RouteScope)
     case routeAcceptedAppend(route: any Route)
     case routeAcceptedReplaceElevatedPriority(route: any Route)
     case routeAppendSuperseded(route: any Route)
     case routeAppendPreparing(route: any Route, match: Router.DeclarationMatch)
     case routeAppendWaitingReplacingScopes(removedScopes: Int)
-    case routeAppended(route: any Route, pathCount: Int)
+    case routeAppended(route: any Route, path: String)
     case routeBlockedByElevatedPriority(route: any Route)
     case routeCanPresentActiveLocalScope(branch: AnyHashable)
     case routeCanPresentDeclarationDrivesPresentation
@@ -97,10 +117,12 @@ enum DepartureLogEvent {
     case viewExitWaitProgress(remaining: Int)
     case viewExitWaitSkipped
     case viewExitWaitStarted(installed: Int)
+    case ios17ViewExitWaitTimedOut(scope: RouteScope)
     case unwindAccepted(keepThrough: RoutePath.Position, removing: Int)
     case unwindAcceptedAncestorTarget(keepThrough: RoutePath.Position, removing: Int)
-    case unwindCompleted
+    case unwindCompleted(path: String)
     case unwindDroppedTargetNotFound(target: Router.UnwindTarget?)
+    case unwindPreviousRequested
     case unwindRequested(target: Router.UnwindTarget?)
     case unwindSkippedNoRoute
     case unwindSkippedNotInsideBranch
@@ -109,8 +131,15 @@ enum DepartureLogEvent {
 extension Logger {
     func departureDebug(_ event: @autoclosure () -> DepartureLogEvent) {
 #if DEBUG
-        guard Departure.debug else { return }
-        let message = event().message
+        let logLevel = Departure.debug
+        if case .off = logLevel {
+            return
+        }
+
+        let event = event()
+        guard logLevel.includes(event.logLevel) else { return }
+
+        let message = event.renderedMessage
         debug("\(message, privacy: .public)")
 #endif
     }
@@ -121,50 +150,213 @@ extension Logger {
     }
 }
 
+private extension Departure.DebugLogLevel {
+    func includes(_ eventLevel: Departure.DebugLogLevel) -> Bool {
+        switch (self, eventLevel) {
+        case (.trace, _), (.normal, .normal), (.off, .off):
+            true
+        default:
+            false
+        }
+    }
+}
+
 #if DEBUG
 extension DepartureLogEvent {
+    var logLevel: Departure.DebugLogLevel {
+        switch self {
+        case .actionRunning,
+             .actionNoInterceptor,
+             .branchRegistered,
+             .branchUnregistered,
+             .branchUnregisterSkipped,
+             .hookDeclarationsUninstalled,
+             .hookDeclarationsInstalled,
+             .pathCleared,
+             .pathRemovalRequested,
+             .pathRemovalSkipped,
+             .pathTrimmed,
+             .pathUnchanged,
+             .ios17PushDismissalDeferred,
+             .ios17PushDismissalDropped,
+             .ios17PushDismissalResumed,
+             .routeAppendPreparing,
+             .routeAppendWaitingReplacingScopes,
+             .routeCanPresentActiveLocalScope,
+             .routeCanPresentDeclarationDrivesPresentation,
+             .routeCannotPresentDiscoveryBranchInactive,
+             .routeCannotPresentNoActiveLocalScope,
+             .routeDeclarationsUninstalled,
+             .routeDeclarationsInstalled,
+             .scopeInstalledInView,
+             .scopeUninstalledFromView,
+             .viewExitWaitProgress,
+             .viewExitWaitSkipped,
+             .viewExitWaitStarted,
+             .ios17ViewExitWaitTimedOut:
+            .trace
+
+        default:
+            .normal
+        }
+    }
+
+    var renderedMessage: String {
+        let trace = DepartureLogTrace.id.map { "[\($0)]" } ?? ""
+        return "[\(category)]\(trace) \(marker) \(message)"
+    }
+
+    private var category: String {
+        switch self {
+        case .actionCompleted,
+             .actionDirectInvocationEnded,
+             .actionFailed,
+             .actionIntercepted,
+             .actionInterceptorFinished,
+             .actionNoInterceptor,
+             .actionRequested,
+             .actionRerouteDropped,
+             .actionRerouteRequested,
+             .actionRunning:
+            "action"
+
+        case .branchActivated,
+             .branchActivationFailed,
+             .branchActivationRejected,
+             .branchActivationSkipped,
+             .branchRegistered,
+             .branchUnregistered,
+             .branchUnregisterSkipped:
+            "branch"
+
+        case .pathCleared,
+             .pathRemovalRequested,
+             .pathRemovalSkipped,
+             .pathTrimmed,
+             .pathUnchanged:
+            "path"
+
+        case .unwindAccepted,
+             .unwindAcceptedAncestorTarget,
+             .unwindCompleted,
+             .unwindDroppedTargetNotFound,
+             .unwindPreviousRequested,
+             .unwindRequested,
+             .unwindSkippedNoRoute,
+             .unwindSkippedNotInsideBranch,
+             .ios17PushDismissalDeferred,
+             .ios17PushDismissalDropped,
+             .ios17PushDismissalResumed:
+            "unwind"
+
+        case .hookDeclarationsUninstalled,
+             .hookDeclarationsInstalled,
+             .routeDeclarationsUninstalled,
+             .routeDeclarationsInstalled,
+             .scopeInstalledInView,
+             .scopeUninstalledFromView:
+            "scope"
+
+        default:
+            "route"
+        }
+    }
+
+    private var marker: String {
+        switch self {
+        case .actionRequested, .routeRequested, .unwindPreviousRequested, .unwindRequested:
+            "⇢"
+
+        case .actionCompleted,
+             .actionInterceptorFinished,
+             .branchActivated,
+             .elevatedTreeStarted,
+             .pendingRouteResuming,
+             .routeAcceptedAppend,
+             .routeAcceptedReplaceElevatedPriority,
+             .routeAppended,
+             .unwindCompleted:
+            "✓"
+
+        case .actionRerouteRequested, .routeRerouted:
+            "↪"
+
+        case .routeAppendWaitingReplacingScopes,
+             .routePendingWaitingForActivatedBranchHost,
+             .routePendingWaitingForLocalPresentationScope,
+             .viewExitWaitProgress,
+             .viewExitWaitStarted,
+             .ios17PushDismissalDeferred:
+            "⏳"
+
+        case .actionDirectInvocationEnded,
+             .actionFailed,
+             .actionRerouteDropped,
+             .branchActivationFailed,
+             .branchActivationRejected,
+             .branchActivationSkipped,
+             .branchUnregisterSkipped,
+             .pathRemovalSkipped,
+             .routeAppendSuperseded,
+             .routeBlockedByElevatedPriority,
+             .routeDroppedBranchActivationFailed,
+             .routeDroppedNoDeclaration,
+             .routeDroppedResolution,
+             .routeNoOpEquivalent,
+             .ios17PushDismissalDropped,
+             .unwindDroppedTargetNotFound,
+             .unwindSkippedNoRoute,
+             .unwindSkippedNotInsideBranch,
+             .ios17ViewExitWaitTimedOut:
+            "⊘"
+
+        default:
+            "•"
+        }
+    }
+
     var message: String {
         switch self {
         case let .actionCompleted(action):
-            "Action completed: \(action.departureDebugDescription)."
+            "completed \(action.departureDebugDescription)"
         case let .actionDirectInvocationEnded(action, error):
-            "Action direct invocation ended without delivery: \(action.departureDebugDescription), error: \(String(describing: error))."
+            "ended without delivery \(action.departureDebugDescription) — \(String(describing: error))"
         case let .actionFailed(action, error):
-            "Action failed: \(action.departureDebugDescription) error: \(String(describing: error))."
+            "failed \(action.departureDebugDescription) — \(String(describing: error))"
         case let .actionIntercepted(action, scope):
-            "Action intercepted: \(action.departureDebugDescription) by \(scope.departureDebugDescription)."
+            "intercepted \(action.departureDebugDescription) in \(scope.departureDebugDescription)"
         case let .actionInterceptorFinished(action):
-            "Action interceptor finished: \(action.departureDebugDescription)."
-        case let .actionNoInterceptor(action, scope):
-            "Action has no interceptor: \(action.departureDebugDescription). Running directly from \(scope.departureDebugDescription)."
+            "interceptor finished \(action.departureDebugDescription)"
+        case let .actionNoInterceptor(action, scope, currentRoute):
+            "no interceptor in \(scope.departureDebugDescription) — running \(action.departureDebugDescription) from \(currentRoute.map { String(reflecting: $0) } ?? "root")"
         case let .actionRequested(action):
-            "Action requested: \(action.departureDebugDescription)."
+            "requested \(action.departureDebugDescription)"
         case let .actionRerouteDropped(action):
-            "Action reroute dropped: \(action.departureDebugDescription) already rerouted once."
+            "reroute dropped — \(action.departureDebugDescription) already rerouted once"
         case let .actionRerouteRequested(action, route):
-            "Action reroute requested: \(action.departureDebugDescription) -> \(route.departureDebugDescription)."
+            "\(action.departureDebugDescription) rerouted to \(route.departureDebugDescription)"
         case let .actionRunning(action, currentRoute):
-            "Action running: \(action.departureDebugDescription) in currentRoute: \(currentRoute.map { String(reflecting: $0) } ?? "nil")."
+            "running \(action.departureDebugDescription) from \(currentRoute.map { String(reflecting: $0) } ?? "root")"
         case let .branchActivated(previousBranch, branch, scope):
-            "branch activated | from=\(previousBranch.departureDebugDescription) | to=\(branch.departureDebugDescription) | scope=\(scope.departureDebugDescription)"
+            "switched from \(previousBranch.departureDebugDescription) to \(branch.departureDebugDescription) in \(scope.departureDebugDescription)"
         case let .branchActivationFailed(position):
-            "branch activation failed | reason=no scope | position=\(position)"
+            "could not activate branch — no scope at \(position)"
         case let .branchActivationRejected(previousBranch, branch, scope):
-            "branch activation rejected | from=\(previousBranch.departureDebugDescription) | to=\(branch.departureDebugDescription) | scope=\(scope.departureDebugDescription)"
+            "kept \(previousBranch.departureDebugDescription); \(branch.departureDebugDescription) was rejected by \(scope.departureDebugDescription)"
         case let .branchActivationSkipped(branch, scope):
-            "branch activation skipped | branch=\(branch.departureDebugDescription) | reason=already active | scope=\(scope.departureDebugDescription)"
+            "kept \(branch.departureDebugDescription) active in \(scope.departureDebugDescription)"
         case let .branchRegistered(branch, parent, scope):
             "branch registered | branch=\(branch.departureDebugDescription) | parent=\(parent.departureDebugDescription) | scope=\(scope.departureDebugDescription)"
         case let .branchUnregistered(branch, scope):
             "branch unregistered | branch=\(branch.departureDebugDescription) | scope=\(scope.departureDebugDescription)"
         case let .branchUnregisterSkipped(branch, scope):
             "branch unregister skipped | branch=\(branch.departureDebugDescription) | reason=scope mismatch | scope=\(scope.departureDebugDescription)"
-        case let .elevatedPriorityReplacePreparing(route, match):
-            "elevated-priority replace preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
+        case let .elevatedPriorityReplacePreparing(route):
+            "preparing elevated-priority presentation for \(route.departureDebugDescription)"
         case .elevatedTreeCleared:
-            "elevated-priority tree cleared"
+            "cleared elevated-priority route tree"
         case .elevatedTreeStarted:
-            "elevated-priority tree started"
+            "started elevated-priority route tree"
         case let .hookDeclarationsUninstalled(scope):
             "hook declarations uninstalled | scope=\(scope.departureDebugDescription)"
         case let .hookDeclarationsInstalled(scope, hookCount):
@@ -179,26 +371,28 @@ extension DepartureLogEvent {
             "path trimmed | keepThrough=\(keepThrough) | removed=\(removedCount)"
         case let .pathUnchanged(keepThrough):
             "path unchanged | keepThrough=\(keepThrough)"
-        case let .pendingResumeCheck(branch, declaringScope):
-            "pending resume check | branch=\(branch.departureDebugDescription) | declaringScope=\(declaringScope.departureDebugDescription)"
-        case .pendingResumeSkipped:
-            "pending resume skipped | reason=no matching pending route"
         case let .pendingRouteResuming(route):
-            "pending route resuming | route=\(route.departureDebugDescription)"
+            "resuming pending \(route.departureDebugDescription)"
+        case let .ios17PushDismissalDeferred(scope):
+            "iOS 17 push dismissal deferred until view exit | scope=\(scope.departureDebugDescription)"
+        case let .ios17PushDismissalDropped(scope):
+            "iOS 17 push dismissal write-back dropped | reason=pending plan invalidated | scope=\(scope.departureDebugDescription)"
+        case let .ios17PushDismissalResumed(scope):
+            "iOS 17 push dismissal resumed after view exit | scope=\(scope.departureDebugDescription)"
         case let .routeAcceptedAppend(route):
-            "route accepted | action=append | route=\(route.departureDebugDescription)"
+            "will append \(route.departureDebugDescription)"
         case let .routeAcceptedReplaceElevatedPriority(route):
-            "route accepted | action=replace elevated-priority tree | route=\(route.departureDebugDescription)"
+            "will replace the elevated-priority tree with \(route.departureDebugDescription)"
         case let .routeAppendSuperseded(route):
-            "route append dropped | reason=superseded while waiting for replaced scopes | route=\(route.departureDebugDescription)"
-        case let .routeAppendPreparing(route, match):
-            "route append preparing | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
+            "dropped \(route.departureDebugDescription) — superseded while waiting for replaced scopes"
+        case let .routeAppendPreparing(route, _):
+            "preparing append for \(route.departureDebugDescription)"
         case let .routeAppendWaitingReplacingScopes(removedScopes):
             "route append waiting | reason=replacing scopes | removedScopes=\(removedScopes)"
-        case let .routeAppended(route, pathCount):
-            "route appended | route=\(route.departureDebugDescription) | pathCount=\(pathCount)"
+        case let .routeAppended(route, path):
+            "presented \(route.departureDebugDescription)\n  path: \(path)"
         case let .routeBlockedByElevatedPriority(route):
-            "route blocked | route=\(route.departureDebugDescription) | reason=lower than active or pending elevated priority"
+            "blocked \(route.departureDebugDescription) — a higher-priority route is active or pending"
         case let .routeCanPresentActiveLocalScope(branch):
             "route can present | branch=\(branch.departureDebugDescription) | reason=active local scope"
         case .routeCanPresentDeclarationDrivesPresentation:
@@ -208,23 +402,23 @@ extension DepartureLogEvent {
         case let .routeCannotPresentNoActiveLocalScope(branch):
             "route cannot present | branch=\(branch.departureDebugDescription) | reason=no active local scope"
         case let .routeDroppedBranchActivationFailed(branch):
-            "route dropped | reason=branch activation failed | branch=\(branch.departureDebugDescription)"
+            "dropped route — could not activate branch \(branch.departureDebugDescription)"
         case let .routeDroppedNoDeclaration(routeType):
-            "route dropped | reason=no declaration | type=\(String(reflecting: routeType))"
+            "dropped \(String(reflecting: routeType)) — no declaration found"
         case .routeDroppedResolution:
-            "route dropped | reason=resolution"
+            "dropped by route resolution"
         case let .routeNoOpEquivalent(route, currentRoute):
-            "route no-op | reason=equivalent to current route | route=\(route.departureDebugDescription) | currentRoute=\(currentRoute.departureDebugDescription)"
+            "kept \(currentRoute.departureDebugDescription) — already equivalent to \(route.departureDebugDescription)"
         case let .routeMatched(route, match):
-            "route matched | route=\(route.departureDebugDescription) | \(match.departureDebugDescription)"
+            "matched \(route.departureDebugDescription) — \(match.departureDebugDescription)"
         case let .routePendingWaitingForActivatedBranchHost(route, branch):
-            "route pending | route=\(route.departureDebugDescription) | branch=\(branch.departureDebugDescription) | reason=waiting for activated branch host"
+            "waiting to present \(route.departureDebugDescription) until branch \(branch.departureDebugDescription) mounts"
         case let .routePendingWaitingForLocalPresentationScope(route, branch):
-            "route pending | route=\(route.departureDebugDescription) | branch=\(branch.departureDebugDescription) | reason=waiting for local presentation scope"
+            "waiting to present \(route.departureDebugDescription) for a local scope in branch \(branch.departureDebugDescription)"
         case let .routeRequested(route):
-            "route requested | route=\(route.departureDebugDescription)"
+            "requested \(route.departureDebugDescription)"
         case let .routeRerouted(route, newRoute):
-            "route rerouted | from=\(route.departureDebugDescription) | to=\(newRoute.departureDebugDescription)"
+            "\(route.departureDebugDescription) rerouted to \(newRoute.departureDebugDescription)"
         case let .routeDeclarationsUninstalled(scope):
             "route declarations uninstalled | scope=\(scope.departureDebugDescription)"
         case let .routeDeclarationsInstalled(scope, declarationCount):
@@ -239,20 +433,24 @@ extension DepartureLogEvent {
             "view exit wait skipped | reason=no installed scopes"
         case let .viewExitWaitStarted(installed):
             "view exit wait started | installed=\(installed)"
+        case let .ios17ViewExitWaitTimedOut(scope):
+            "iOS 17 view exit wait timed out — forcing reconciliation | scope=\(scope.departureDebugDescription)"
         case let .unwindAccepted(keepThrough, removing):
-            "unwind accepted | keepThrough=\(String(describing: keepThrough)) | removing=\(removing)"
+            "removing \(removing) route scope\(removing == 1 ? "" : "s") through \(String(describing: keepThrough))"
         case let .unwindAcceptedAncestorTarget(keepThrough, removing):
-            "unwind accepted | reason=ancestor target | keepThrough=\(String(describing: keepThrough)) | removing=\(removing)"
-        case .unwindCompleted:
-            "unwind completed | removed scopes left view"
+            "removing \(removing) route scope\(removing == 1 ? "" : "s") to ancestor target \(String(describing: keepThrough))"
+        case let .unwindCompleted(path):
+            "completed\n  path: \(path)"
         case let .unwindDroppedTargetNotFound(target):
-            "unwind dropped | reason=target not found | target=\(String(describing: target))"
+            "could not find unwind target \(String(describing: target))"
+        case .unwindPreviousRequested:
+            "requested to previous route (scope-anchored)"
         case let .unwindRequested(target):
-            "unwind requested | target=\(String(describing: target))"
+            "requested to \(target.map { String(describing: $0) } ?? "previous route")"
         case .unwindSkippedNoRoute:
-            "unwind skipped | reason=no route"
+            "skipped — no route to remove"
         case .unwindSkippedNotInsideBranch:
-            "unwind skipped | reason=not inside a branch"
+            "skipped — not inside a branch"
         }
     }
 }
@@ -260,10 +458,17 @@ extension DepartureLogEvent {
 extension Router.DeclarationMatch {
     var departureDebugDescription: String {
         let placementDescription = branchID.map {
-            "branch=\($0.departureDebugDescription)"
-        } ?? "scope"
+            "branch \($0.departureDebugDescription)"
+        } ?? "local scope"
 
-        return "match=declaration | position=\(presentationLocation.position) | declaringPosition=\(declarationLocation.position) | \(placementDescription) | declaration=\(declaration.departureDebugDescription)"
+        let description = "\(declaration.departureDebugDescription) • \(placementDescription)"
+        guard presentationLocation.path !== declarationLocation.path
+            || presentationLocation.position != declarationLocation.position
+        else {
+            return description
+        }
+
+        return "\(description) • declared at \(declarationLocation.position) • presents at \(presentationLocation.position)"
     }
 }
 #endif

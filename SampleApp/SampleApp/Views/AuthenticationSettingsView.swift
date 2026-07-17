@@ -91,12 +91,12 @@ struct AuthenticationSettingsView: View {
                     }
                     .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindToBranchIDButton)
 
-                    Button("Unwind captured Landing route") {
+                    Button("Unwind stored route action") {
                         Task {
                             await Storage.shared.landingUnwindRoute()
                         }
                     }
-                    .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindCapturedLandingButton)
+                    .accessibilityIdentifier(SampleAppAccessibility.authenticationUnwindStoredActionButton)
                 }
             }
         }

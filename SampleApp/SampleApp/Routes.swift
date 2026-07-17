@@ -23,19 +23,19 @@
 import Departure
 import SwiftUI
 
-struct LandingRoute: Route {
+struct LandingRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         LandingView()
     }
 }
 
-struct StartInfoRoute: Route {
+struct StartInfoRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         StartInfoView()
     }
 }
 
-struct LoginRoute: Route {
+struct LoginRoute: SampleDeepLinkRoute, Equatable {
     let nextRoute: (any Route)?
 
     func destination() -> some View {
@@ -47,25 +47,25 @@ struct LoginRoute: Route {
     }
 }
 
-struct LoginReplacementRoute: Route {
+struct LoginReplacementRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         LoginReplacementView()
     }
 }
 
-struct LoginDetailRoute: Route {
+struct LoginDetailRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         LoginDetailView()
     }
 }
 
-struct LoginNoticeRoute: Route {
+struct LoginNoticeRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         LoginNoticeView()
     }
 }
 
-struct ProfileRoute: Route {
+struct ProfileRoute: SampleDeepLinkRoute {
     func resolveRoute() async -> RouteResolution {
         Storage.shared.isLoggedIn ? .allow : .reroute(LoginRoute(nextRoute: ProfileRoute()))
     }
@@ -84,7 +84,7 @@ final class AuthenticationSettingsRouteState: Equatable {
     }
 }
 
-struct AuthenticationSettingsRoute: Route {
+struct AuthenticationSettingsRoute: SampleDeepLinkRoute {
     let state: AuthenticationSettingsRouteState
 
     init(state: AuthenticationSettingsRouteState = AuthenticationSettingsRouteState()) {
@@ -96,37 +96,37 @@ struct AuthenticationSettingsRoute: Route {
     }
 }
 
-struct TopLevelSheetRoute: Route {
+struct TopLevelSheetRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         TopLevelSheetView()
     }
 }
 
-struct TopLevelCoverRoute: Route {
+struct TopLevelCoverRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         TopLevelCoverView()
     }
 }
 
-struct TopLevelReplacementCoverRoute: Route {
+struct TopLevelReplacementCoverRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         TopLevelReplacementCoverView()
     }
 }
 
-struct HighPriorityPassthroughSheetRoute: Route {
+struct HighPriorityPassthroughSheetRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         HighPriorityPassthroughSheetView()
     }
 }
 
-struct HighPriorityBlockingSheetRoute: Route {
+struct HighPriorityBlockingSheetRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         HighPriorityBlockingSheetView()
     }
 }
 
-struct PendingPriorityRoute: Route {
+struct PendingPriorityRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         Text("Pending high-priority route")
             .font(.headline)
@@ -134,7 +134,7 @@ struct PendingPriorityRoute: Route {
     }
 }
 
-struct NavigationBarFadeOcclusionRoute: Route {
+struct NavigationBarFadeOcclusionRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         NavigationBarFadeOcclusionView()
     }
@@ -333,7 +333,7 @@ private extension View {
     }
 }
 
-struct AppearanceSettingsRoute: Route, Equatable {
+struct AppearanceSettingsRoute: SampleDeepLinkRoute, Equatable {
     let value: UUID?
 
     func destination() -> some View {
@@ -341,49 +341,49 @@ struct AppearanceSettingsRoute: Route, Equatable {
     }
 }
 
-struct AlertRoute: Route {
+struct AlertRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         AlertView()
     }
 }
 
-struct CriticalRoute: Route {
+struct CriticalRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         CriticalView()
     }
 }
 
-struct CriticalReplacementRoute: Route {
+struct CriticalReplacementRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         CriticalReplacementView()
     }
 }
 
-struct MessageRoute: Route {
+struct MessageRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         MessageView()
     }
 }
 
-struct DismissProbeRoute: Route {
+struct DismissProbeRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         DismissProbeView()
     }
 }
 
-struct NestedModalRoute: Route {
+struct NestedModalRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         NestedModalView()
     }
 }
 
-struct SettingsModalRoute: Route {
+struct SettingsModalRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         SettingsModalView()
     }
 }
 
-struct RerouteChainStartRoute: Route {
+struct RerouteChainStartRoute: SampleDeepLinkRoute {
     func resolveRoute() async -> RouteResolution {
         .reroute(RerouteChainIntermediateRoute())
     }
@@ -393,7 +393,7 @@ struct RerouteChainStartRoute: Route {
     }
 }
 
-struct RerouteChainIntermediateRoute: Route {
+struct RerouteChainIntermediateRoute: SampleDeepLinkRoute {
     func resolveRoute() async -> RouteResolution {
         .reroute(RerouteChainFinalRoute())
     }
@@ -403,7 +403,7 @@ struct RerouteChainIntermediateRoute: Route {
     }
 }
 
-struct RerouteChainFinalRoute: Route {
+struct RerouteChainFinalRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         RerouteChainFinalView()
     }
@@ -505,7 +505,7 @@ struct RerouteChainFinalView: View {
     }
 }
 
-struct DroppedRoute: Route {
+struct DroppedRoute: SampleDeepLinkRoute {
     func resolveRoute() async -> RouteResolution {
         .drop
     }
@@ -516,7 +516,7 @@ struct DroppedRoute: Route {
     }
 }
 
-struct UndeclaredRoute: Route {
+struct UndeclaredRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         Text("Undeclared route should not appear.")
             .accessibilityIdentifier(SampleAppAccessibility.undeclaredRouteText)

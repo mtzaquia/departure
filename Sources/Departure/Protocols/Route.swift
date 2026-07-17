@@ -51,25 +51,6 @@ public protocol Route: Identifiable where ID == ObjectIdentifier {
     /// - Returns: A route evaluation resolution.
     func resolveRoute() async -> RouteResolution
 
-    /// Resolves the final route that should be used.
-    ///
-    /// - Important: this function is deprecated, prefer  ``Route/resolveRoute()-56snl`` returning ``RouteResolution`` instead.
-    ///
-    /// - Returns: The route to be used, or `nil` to drop the request.
-    @available(*, deprecated, message: "Use `resolveRoute()` returning `RouteResolution`.")
-    func resolveRoute() async -> (any Route)?
-    
-    /// **If the ``Route`` doesn't conform to `Equatable`**, this function is used to determine whether two routes of the same type are equivalent.
-    /// The default implementation returns `true` if the two routes are of the same type.
-    ///
-    /// - Important: This method is meant as a temporary workaround to ensure backwards-compatibility.
-    /// Prefer conforming your ``Route`` to `Equatable instead`.
-    ///
-    /// - Parameter route: The other route to be compared against this one.
-    /// - Returns: Whether the two routes are equivalent.
-    @available(*, deprecated, message: "Prefer conforming your `Route` to `Equatable` instead.")
-    func isEqual(to route: Self) -> Bool
-
     /// The view shown for this route.
     associatedtype Destination: View
 
@@ -86,29 +67,14 @@ public extension Route {
         ObjectIdentifier(Self.self)
     }
 
-    @available(*, deprecated, message: "Use `resolveRoute()` returning `RouteResolution`.")
-    func resolveRoute() async -> (any Route)? {
-        self
-    }
-
     func resolveRoute() async -> RouteResolution {
-        let result: (any Route)? = await resolveRoute()
-        
-        return switch result {
-        case .some(let route) where self._isEqual(to: route): .allow
-        case .some(let route): .reroute(route)
-        case .none: .drop
-        }
-    }
-
-    func isEqual(to route: Self) -> Bool {
-        true
+        .allow
     }
 }
 
 // MARK: - Supporting types
 
-/// The result of a ``Route/resolveRoute()-56snl`` evaluation.
+/// The result of a ``Route/resolveRoute()`` evaluation.
 public enum RouteResolution {
     /// The router is allowed to present the requested route.
     case allow

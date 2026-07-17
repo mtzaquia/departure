@@ -10,13 +10,11 @@ let package = Package(
         .library(name: "Departure", targets: ["Departure"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-collections.git", from: "1.3.0"),
     ],
     targets: [
         .target(
             name: "Departure",
             dependencies: [
-                .product(name: "OrderedCollections", package: "swift-collections"),
             ],
             swiftSettings: [
                 .defaultIsolation(MainActor.self)

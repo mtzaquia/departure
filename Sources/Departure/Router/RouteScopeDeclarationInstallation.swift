@@ -35,6 +35,10 @@ final class RouteScopeDeclarationInstallation {
         self.id = initialID
     }
 
+    func hasRouteSource(_ sourceID: AnyHashable) -> Bool {
+        routeSourceID == sourceID
+    }
+
     func installRouteSource(
         sourceID: AnyHashable,
         id: AnyHashable?,

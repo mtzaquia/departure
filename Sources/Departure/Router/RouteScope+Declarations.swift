@@ -113,20 +113,85 @@ extension RouteScope {
 // MARK: - Declaration Installation
 
 extension RouteScope {
+    @discardableResult
     func installRouteDeclarations(
         sourceID: AnyHashable = AnyHashable("default"),
         id: AnyHashable?,
         branchSelection: AnyRouteBranchSelection?,
         routeDeclarations: [RouteScopeDeclaration],
         sourceEnvironment: EnvironmentValues? = nil
-    ) {
-        let hookDeclarations = declarations.allHookAttachments
-        declarationInstallation.installRouteSource(
+    ) -> Bool {
+        let requiresCommit = prepareRouteDeclarationInstallation(
             sourceID: sourceID,
             id: id,
+            branchSelection: branchSelection,
+            routeDeclarations: routeDeclarations,
             sourceEnvironment: sourceEnvironment ?? EnvironmentValues()
         )
 
+        guard requiresCommit else {
+            return false
+        }
+
+        commitRouteDeclarationInstallation(
+            branchSelection: branchSelection,
+            routeDeclarations: routeDeclarations
+        )
+        return true
+    }
+
+    /// Refreshes non-observable installation values without changing the route graph.
+    ///
+    /// Returns `true` when the caller must rebuild the declaration structure by calling
+    /// `commitRouteDeclarationInstallation` inside a graph mutation. Otherwise, the source
+    /// environment, branch selection, route attachments, and hooks are refreshed in place.
+    func prepareRouteDeclarationInstallation(
+        sourceID: AnyHashable,
+        id: AnyHashable?,
+        branchSelection: AnyRouteBranchSelection?,
+        routeDeclarations: [RouteScopeDeclaration],
+        sourceEnvironment: EnvironmentValues
+    ) -> Bool {
+        let usesBranches = branchSelection != nil || routeDeclarations.contains { $0.branch != nil }
+        let desiredIdentities = routeAttachmentIdentities(
+            from: routeDeclarations,
+            usesBranches: usesBranches
+        )
+        let didChangeDeclarations = declarationInstallation.hasRouteSource(sourceID) == false
+            || (id != nil && id != self.id)
+            || (branchContainer != nil) != usesBranches
+            || declarations.routeAttachmentIdentities != desiredIdentities
+
+        declarationInstallation.installRouteSource(
+            sourceID: sourceID,
+            id: id,
+            sourceEnvironment: sourceEnvironment
+        )
+
+        guard didChangeDeclarations else {
+            let hookDeclarations = declarations.allHookAttachments
+            refreshBranchSelection(branchSelection)
+            declarations.refreshRouteAttachments(
+                from: routeDeclarations,
+                activeBranch: activeBranch,
+                usesBranches: usesBranches
+            )
+            declarations.refreshHookAttachments(
+                hookDeclarations,
+                activeBranch: activeBranch,
+                usesBranches: usesBranches
+            )
+            return false
+        }
+
+        return true
+    }
+
+    func commitRouteDeclarationInstallation(
+        branchSelection: AnyRouteBranchSelection?,
+        routeDeclarations: [RouteScopeDeclaration]
+    ) {
+        let hookDeclarations = declarations.allHookAttachments
         configureBranchContainer(
             branchSelection: branchSelection,
             routeDeclarations: routeDeclarations
@@ -149,10 +214,11 @@ extension RouteScope {
         log.departureDebug(.routeDeclarationsUninstalled(scope: self))
     }
 
+    @discardableResult
     func installHookDeclarations(
         sourceID: AnyHashable = AnyHashable("default"),
         hookDeclarations: [AnyHookDeclaration]
-    ) {
+    ) -> Bool {
         declarationInstallation.installHookSource(sourceID: sourceID)
         var scopeDeclarations = ScopeDeclarations()
 
@@ -165,12 +231,20 @@ extension RouteScope {
             logDuplicateHookDeclaration(hookDeclaration, branchID: activeBranch)
         }
 
+        let didChangeDeclarations: Bool
         if branchContainer != nil {
+            didChangeDeclarations = declarations.declarations(forBranch: activeBranch).hookIdentities
+                != scopeDeclarations.hookIdentities
             declarations.setHooks(scopeDeclarations.hookAttachments, forBranch: activeBranch)
         } else {
+            didChangeDeclarations = declarations.local.hookIdentities != scopeDeclarations.hookIdentities
             declarations.local.setHooks(scopeDeclarations.hookAttachments)
         }
-        log.departureDebug(.hookDeclarationsInstalled(scope: self, hookCount: hookDeclarations.count))
+
+        if didChangeDeclarations {
+            log.departureDebug(.hookDeclarationsInstalled(scope: self, hookCount: hookDeclarations.count))
+        }
+        return didChangeDeclarations
     }
 
     func uninstallHookDeclarations(sourceID: AnyHashable) {
@@ -190,6 +264,36 @@ extension RouteScope {
 // MARK: - Private Helpers
 
 private extension RouteScope {
+    func refreshBranchSelection(_ branchSelection: AnyRouteBranchSelection?) {
+        guard var branchContainer else {
+            return
+        }
+
+        branchContainer.selection = branchSelection
+        self.branchContainer = branchContainer
+    }
+
+    func routeAttachmentIdentities(
+        from routeDeclarations: [RouteScopeDeclaration],
+        usesBranches: Bool
+    ) -> Set<RouteAttachmentIdentity> {
+        let branchIDs = usesBranches ? routeDeclarations.compactMap(\.branch) : []
+        var declarationStore = DeclarationStore(branchIDs: branchIDs)
+
+        for declaration in routeDeclarations {
+            let branchID = usesBranches ? declaration.branch : nil
+            for route in declaration.routes {
+                if let branchID {
+                    _ = declarationStore.appendRoute(route, toBranch: branchID)
+                } else {
+                    _ = declarationStore.local.appendRoute(route)
+                }
+            }
+        }
+
+        return declarationStore.routeAttachmentIdentities
+    }
+
     func configureBranchContainer(
         branchSelection: AnyRouteBranchSelection?,
         routeDeclarations: [RouteScopeDeclaration]

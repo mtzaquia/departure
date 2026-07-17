@@ -26,6 +26,23 @@ import Testing
 @MainActor
 @Suite
 struct ActionHookTests {
+    @Test func duplicateHookInstallationDoesNotReportChange() {
+        let scope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let sourceID = AnyHashable("hooks")
+        let declarations = [
+            ActionInterceptor(ContextProbeAction.self) { _ in }.declaration,
+        ]
+
+        #expect(scope.installHookDeclarations(sourceID: sourceID, hookDeclarations: declarations))
+        #expect(scope.installHookDeclarations(sourceID: sourceID, hookDeclarations: declarations) == false)
+        #expect(scope.installHookDeclarations(sourceID: AnyHashable("replacement"), hookDeclarations: declarations) == false)
+
+        let changedDeclarations = declarations + [
+            UnwindHandler(SettingsRoute.self) {}.declaration,
+        ]
+        #expect(scope.installHookDeclarations(sourceID: sourceID, hookDeclarations: changedDeclarations))
+    }
+
     @Test func currentScopeInterceptorWinsOverAncestorInterceptor() async {
         let router = Router()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())

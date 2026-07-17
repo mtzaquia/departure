@@ -46,8 +46,15 @@ public final class Router: Identifiable, Equatable {
         /// Unwinds to the first scope of the nearest enclosing branch.
         ///
         /// Brings the user to the branch's root regardless of how deep the current route is. If the
-        /// user is already at the branch root — or is not inside a branch — this is a no-op.
+        /// user is already at the branch root, this is a no-op. If the user is not inside a branch,
+        /// the unwind request returns `false`.
         case nearestBranch
+
+        /// Unwinds to the nearest ancestor of the router's top-most route scope.
+        ///
+        /// Unlike ``UnwindRouteAction``, this target is resolved from the router's current
+        /// route scope rather than the view hierarchy where the call originates.
+        case topmostAncestor
 
         /// Unwinds to the scope that was declared with a matching ``SwiftUICore/View/routes(id:_:)`` ID.
         case id(AnyHashable)
@@ -61,7 +68,6 @@ public final class Router: Identifiable, Equatable {
     @ObservationIgnored
     var pendingRoute: PendingRoute?
 
-    @ObservationIgnored
     var unwindPresentationSnapshot: UnwindPresentationSnapshot?
 
     @ObservationIgnored
@@ -72,6 +78,10 @@ public final class Router: Identifiable, Equatable {
 
     @ObservationIgnored
     var routeGraphMutationDepth = 0
+
+    @ObservationIgnored
+    var ios17NavigationStackPushWorkaround: (any IOS17NavigationStackPushWorkaroundHandling)? =
+        IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform()
 
     var activeRouteScopeID: ObjectIdentifier
 
@@ -104,44 +114,16 @@ public final class Router: Identifiable, Equatable {
         await requestRouteWhenReady(route)
     }
 
-    /// Dismisses the current route scope.
-    ///
-    /// Use ``UnwindRouteAction`` from `@Environment(\.unwindRoute)` in SwiftUI views to unwind
-    /// the local route scope, or use ``Router/unwind(to:)`` with an explicit target for
-    /// router-level unwind orchestration.
-    ///
-    /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed installed route scopes have left the view hierarchy.
-    @available(*, deprecated, message: "Use @Environment(\\.unwindRoute) to unwind the local route scope, or pass an explicit target to Router.unwind(to:).")
-    @discardableResult
-    public func unwind() async -> Bool {
-        await unwind(to: nil)
-    }
-
     /// Dismisses route scopes to an explicit target.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
     /// and any removed installed route scopes have left the view hierarchy.
     ///
     /// - Parameter target: The target to unwind to.
-    /// - Returns: `false` when an explicit target was requested but not found.
+    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
     @discardableResult
-    public func unwind(to target: UnwindTarget?) async -> Bool {
+    public func unwind(to target: UnwindTarget) async -> Bool {
         await unwindAndWait(to: target)
-    }
-
-    /// Dismisses the current route scope, delivering a payload to a matching ``UnwindHandler``.
-    ///
-    /// Use ``UnwindRouteAction`` from `@Environment(\.unwindRoute)` in SwiftUI views to unwind
-    /// the local route scope with a payload, or use ``Router/unwind(to:payload:)`` with an explicit
-    /// target for router-level unwind orchestration.
-    ///
-    /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed installed route scopes have left the view hierarchy.
-    @available(*, deprecated, message: "Use @Environment(\\.unwindRoute) to unwind the local route scope with a payload, or pass an explicit target to Router.unwind(to:payload:).")
-    @discardableResult
-    public func unwind<Payload>(payload: Payload) async -> Bool {
-        await unwind(to: nil, payload: payload)
     }
 
     /// Dismisses route scopes to an explicit target, delivering a payload to a matching ``UnwindHandler``.
@@ -152,9 +134,9 @@ public final class Router: Identifiable, Equatable {
     /// - Parameters:
     ///   - target: The target to unwind to.
     ///   - payload: A value delivered to a matching ``UnwindHandler``.
-    /// - Returns: `false` when an explicit target was requested but not found.
+    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
     @discardableResult
-    public func unwind<Payload>(to target: UnwindTarget?, payload: Payload) async -> Bool {
+    public func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {
         await unwindAndWait(to: target, payload: payload)
     }
 
@@ -206,6 +188,7 @@ extension Router {
         routeGraphMutationDepth -= 1
 
         if routeGraphMutationDepth == 0 {
+            ios17NavigationStackPushWorkaround?.routeGraphDidMutate(in: self)
             reconcileActiveRouteScopeID()
             #if DEBUG
             routeForest.validateInvariants()

@@ -280,7 +280,6 @@ private struct CoverFadeModalPresenter: View {
     private func destination(for presentation: RouteDestinationSnapshot) -> some View {
         presentation.destination
             .environment(router)
-            .environment(\.routing, RoutingAction(router: router))
             .environment(\.scenePhase, scenePhase)
     }
 
@@ -477,7 +476,6 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
             AnyView(
                 destination
                     .environment(router)
-                    .environment(\.routing, RoutingAction(router: router))
                     .environment(\.scenePhase, sourceScenePhase)
             )
         }
@@ -530,7 +528,6 @@ private struct CrossDissolveModalPresenter: View {
         if let presentation {
             presentation.destination
                 .environment(router)
-                .environment(\.routing, RoutingAction(router: router))
         }
     }
 }
