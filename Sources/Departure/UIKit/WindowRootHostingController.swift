@@ -28,6 +28,10 @@ import UIKit
 final class WindowRootHostingController<Content: View>: UIHostingController<Content> {
     var onDismiss: (@MainActor () -> Void)?
 
+    // Work around swiftlang/swift#90385.
+    @_optimize(none)
+    deinit {}
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
 

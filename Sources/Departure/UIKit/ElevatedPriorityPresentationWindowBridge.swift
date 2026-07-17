@@ -96,6 +96,10 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
             super.init(nibName: nil, bundle: nil)
         }
 
+        // Work around swiftlang/swift#90385.
+        @_optimize(none)
+        deinit {}
+
         @available(*, unavailable)
         required init?(coder: NSCoder) { fatalError() }
 
