@@ -23,17 +23,52 @@
 import SwiftUI
 
 struct WindowDestinationBuilder {
-    let build: (RouteView, EnvironmentValues) -> AnyView
+    let hasWindowDestination: Bool
+    private let buildDestination: (RouteView, EnvironmentValues) -> AnyView
 
     init<Wrapped: View>(@ViewBuilder _ build: @escaping (RouteView, EnvironmentValues) -> Wrapped) {
-        self.build = { destination, environment in
+        self.init(isProvided: true, build)
+    }
+
+    private init<Wrapped: View>(
+        isProvided: Bool,
+        @ViewBuilder _ build: @escaping (RouteView, EnvironmentValues) -> Wrapped
+    ) {
+        self.hasWindowDestination = isProvided
+        self.buildDestination = { destination, environment in
             AnyView(build(destination, environment))
         }
+    }
+
+    func build(_ destination: RouteView, _ environment: EnvironmentValues) -> AnyView {
+        if hasWindowDestination == false {
+            MissingWindowDestinationWarning.emitIfNeeded()
+        }
+
+        return buildDestination(destination, environment)
+    }
+
+    static let passthrough = WindowDestinationBuilder(isProvided: false) { destination, _ in
+        destination
     }
 }
 
 extension EnvironmentValues {
-    @Entry var windowDestinationBuilder = WindowDestinationBuilder { destination, _ in
-        destination
+    @Entry var windowDestinationBuilder = WindowDestinationBuilder.passthrough
+}
+
+private enum MissingWindowDestinationWarning {
+    private static var wasEmitted = false
+
+    static func emitIfNeeded() {
+        guard wasEmitted == false else {
+            return
+        }
+
+        wasEmitted = true
+        log.departureWarning(
+            "Detached route presentation is missing a `windowDestination` closure on `WithRouter`. "
+                + "Add one to forward custom environment values."
+        )
     }
 }

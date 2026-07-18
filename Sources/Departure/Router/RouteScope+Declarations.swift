@@ -361,9 +361,9 @@ private extension RouteScope {
         branchID: AnyHashable
     ) {
         log.departureWarning(
-            """
-            Duplicate route declaration for \(String(reflecting: routeType)) in scope \(String(describing: id)), branch \(String(describing: branchID)). The first declaration will be used.
-            """
+            "Duplicate route declaration for `\(String(reflecting: routeType))` in scope "
+                + "`\(String(describing: id))` on branch `\(String(describing: branchID))`. "
+                + "The first declaration will be used."
         )
     }
 
@@ -374,16 +374,16 @@ private extension RouteScope {
         switch hookDeclaration.kind {
         case let .actionInterceptor(actionType, _):
             log.departureWarning(
-                """
-                Duplicate action interceptor for \(String(reflecting: actionType)) in scope \(String(describing: id)), branch \(String(describing: branchID)). The first interceptor will be used.
-                """
+                "Duplicate action interceptor for `\(String(reflecting: actionType))` in scope "
+                    + "`\(String(describing: id))` on branch `\(String(describing: branchID))`. "
+                    + "The first interceptor will be used."
             )
 
         case let .unwindHandler(routeType, _):
             log.departureWarning(
-                """
-                Duplicate unwind handler for \(String(reflecting: routeType)) in scope \(String(describing: id)), branch \(String(describing: branchID)). The first handler will be used.
-                """
+                "Duplicate unwind handler for `\(String(reflecting: routeType))` in scope "
+                    + "`\(String(describing: id))` on branch `\(String(describing: branchID))`. "
+                    + "The first handler will be used."
             )
         }
     }
