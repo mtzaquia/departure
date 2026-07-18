@@ -65,6 +65,8 @@ struct WindowDestinationBuilderTests {
             Text("Root")
         }
 
+        #expect(host.windowDestinationBuilder.hasWindowDestination == false)
+
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "source"
 
@@ -388,6 +390,8 @@ struct WindowDestinationBuilderTests {
                 recorder: recorder
             )
         }
+
+        #expect(host.windowDestinationBuilder.hasWindowDestination)
 
         router.root.installRouteDeclarations(
             id: nil,

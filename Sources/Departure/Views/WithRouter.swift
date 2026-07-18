@@ -55,9 +55,7 @@ public struct WithRouter<Content: View>: View {
     public init(router: Router? = nil, @ViewBuilder content: () -> Content) {
         self._router = State(wrappedValue: router ?? Router())
         self.content = content()
-        self.windowDestinationBuilder = WindowDestinationBuilder { destination, _ in
-            destination
-        }
+        self.windowDestinationBuilder = .passthrough
     }
 
     /// Creates a router host with a detached presentation customizer.

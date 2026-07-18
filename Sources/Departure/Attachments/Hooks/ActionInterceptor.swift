@@ -45,10 +45,9 @@ public struct ActionInterceptor<A: Action>: HookDeclaration, Sendable {
                 AnyActionInterceptor { router, action, hasRerouted async in
                     guard let action = action as? A else {
                         log.departureWarning(
-                            """
-                            Action invocation type mismatch for \(String(describing: actionType)):
-                            expected \(A.self), got \(type(of: action)).
-                            """
+                            "Action interceptor for `\(String(reflecting: actionType))` received "
+                                + "`\(String(reflecting: type(of: action)))`; expected "
+                                + "`\(String(reflecting: A.self))`. The action was ignored."
                         )
                         return
                     }
