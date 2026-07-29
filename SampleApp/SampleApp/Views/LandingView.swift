@@ -55,6 +55,7 @@ struct LandingView: View {
             .tag(TabItem.settings)
         }
         .accessibilityIdentifier(SampleAppAccessibility.landing)
+        .tint(LabPalette.indigo)
         .routes(branch: $tab) {
             Cover(LoginRoute.self, priority: .high)
             Cover(LoginReplacementRoute.self, priority: .high)
@@ -84,10 +85,6 @@ struct LandingView: View {
         }
         .hooks {
             UnwindHandler(AuthenticationSettingsRoute.self) {
-                guard SampleAppUITesting.isEnabled else {
-                    return
-                }
-
                 Storage.shared.landingContainerUnwindHookCount += 1
             }
         }

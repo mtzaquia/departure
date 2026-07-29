@@ -29,68 +29,55 @@ struct AppearanceSettingsView: View {
     @State private var storage = Storage.shared
     @Environment(Router.self) private var router
 
+    private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+
     var body: some View {
-        List {
-            Section {
-                Text("Route value: \(value.map(\.uuidString) ?? "nil")")
+        LabScreen("Route identity", eyebrow: "Equatable push", symbol: "equal.circle.fill") {
+            Text("Appearance route active")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier(SampleAppAccessibility.appearanceTitle)
+
+            LabPanel("Current destination") {
+                LabStatus(label: "Route value", value: "Route value: \(value.map(\.uuidString) ?? "nil")", color: LabPalette.blue, symbol: "number.circle.fill")
                     .accessibilityIdentifier(SampleAppAccessibility.appearanceValue)
-
-                Button("Re-present this (equal, no-op)") {
-                    Task {
-                        await router.present(AppearanceSettingsRoute(value: value))
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.appearanceRePresentButton)
-
-                Button("Re-present this (not equal, pop+push)") {
-                    Task {
-                        await router.present(AppearanceSettingsRoute(value: UUID()))
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.appearanceRePresentDifferentButton)
-
-                Button("Present authentication settings") {
-                    Task {
-                        await router.present(AuthenticationSettingsRoute())
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.appearancePresentAuthenticationButton)
-
-                if SampleAppUITesting.isEnabled {
-                    Button("Unwind to landing, present home message") {
-                        Task {
-                            guard await router.unwind(to: .id(LandingRoute().id)) else {
-                                return
-                            }
-
-                            await router.present(MessageRoute())
-                        }
-                    }
-                    .accessibilityIdentifier(SampleAppAccessibility.appearanceUnwindToLandingPresentMessageButton)
-                }
-            }
-
-            Section("Actions") {
-                Button("Save appearance") {
-                    Task {
-                        await router.perform(SaveAppearanceSettingsAction())
-                    }
-                }
-                .accessibilityIdentifier(SampleAppAccessibility.appearanceSaveButton)
-
-                Text("Saved \(storage.appearanceSaveCount) time(s)")
+                LabStatus(label: "Action interceptor", value: "Saved \(storage.appearanceSaveCount) time(s)", color: LabPalette.mint, symbol: "checkmark.seal.fill")
                     .accessibilityIdentifier(SampleAppAccessibility.appearanceSavedCount)
             }
+
+            LabPanel("Identity & scope scenarios") {
+                LazyVGrid(columns: columns, spacing: 8) {
+                    action("Equal route · no-op", symbol: "equal", id: SampleAppAccessibility.appearanceRePresentButton) { await router.present(AppearanceSettingsRoute(value: value)) }
+                    action("New value · replace", symbol: "arrow.triangle.2.circlepath", color: LabPalette.blue, id: SampleAppAccessibility.appearanceRePresentDifferentButton) { await router.present(AppearanceSettingsRoute(value: UUID())) }
+                    action("Nested push", symbol: "arrow.right.square.fill", id: SampleAppAccessibility.appearancePresentAuthenticationButton) { await router.present(AuthenticationSettingsRoute()) }
+                    action("Unwind then route", symbol: "arrow.uturn.backward.square.fill", color: LabPalette.amber, id: SampleAppAccessibility.appearanceUnwindToLandingPresentMessageButton) {
+                        guard await router.unwind(to: .id(LandingRoute().id)) else { return }
+                        await router.present(MessageRoute())
+                    }
+                    action("Intercepted save", symbol: "tray.and.arrow.down.fill", color: LabPalette.mint, id: SampleAppAccessibility.appearanceSaveButton) { await router.perform(SaveAppearanceSettingsAction()) }
+                }
+            }
+
+            Spacer(minLength: 0)
         }
         .navigationTitle("Appearance")
-        .accessibilityIdentifier(SampleAppAccessibility.appearanceTitle)
-        .routes {
-            Push(AuthenticationSettingsRoute.self)
-        }
+        .navigationBarTitleDisplayMode(.inline)
+        .routes { Push(AuthenticationSettingsRoute.self) }
         .hooks {
             ActionInterceptor(SaveAppearanceSettingsAction.self) { invocation in
                 try? await invocation()
             }
         }
+    }
+
+    private func action(
+        _ title: String,
+        symbol: String,
+        color: Color = LabPalette.indigo,
+        id: String,
+        operation: @escaping @MainActor () async -> Void
+    ) -> some View {
+        LabAction(title: title, symbol: symbol, color: color) { Task { await operation() } }
+            .accessibilityIdentifier(id)
     }
 }

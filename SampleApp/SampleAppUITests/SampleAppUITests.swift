@@ -29,12 +29,11 @@ final class SampleAppUITests: XCTestCase {
         continueAfterFailure = false
 
         app = XCUIApplication()
-        app.launchArguments = ["UI_TESTING"]
-        app.launchEnvironment = ["UITEST_DISABLE_ANIMATIONS": "1"]
         app.launch()
     }
 
     override func tearDownWithError() throws {
+        app.terminate()
         app = nil
     }
 
@@ -215,8 +214,6 @@ final class SampleAppUITests: XCTestCase {
         let loginProbeCoordinate = app.buttons[A11y.loginToolbarIncrementPresentationProbeButton]
             .firstMatch
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        app.swipeUp()
-
         tap(A11y.loginPresentCriticalButton)
         assertExists(A11y.criticalText)
         assertLabel(A11y.criticalText, contains: "true")
@@ -232,7 +229,6 @@ final class SampleAppUITests: XCTestCase {
         assertGone(A11y.criticalText)
         assertExists(A11y.loginTitle)
 
-        app.swipeUp()
         tap(A11y.loginPresentCriticalButton)
         assertExists(A11y.criticalText)
         assertLabel(A11y.criticalText, contains: "true")
@@ -324,7 +320,6 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.messageDismissUnwindButton)
         assertGone(A11y.messageText)
-        app.swipeUp()
         assertLabel(A11y.homeDismissProbeHookStatus, contains: "Dismiss probe hooks: 1")
     }
 
@@ -507,6 +502,77 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.pendingPriorityText)
         assertGone(A11y.topLevelSheetText)
     }
+
+    func testPayloadDeliveryAndMismatchAreVisible() {
+        openLanding()
+
+        tap(A11y.homeShowMessageButton)
+        tap(A11y.messageDismissMismatchedPayloadButton)
+        assertGone(A11y.messageText)
+        assertLabel(A11y.homeUnwindPayloadStatus, contains: "Payload hooks:")
+        XCTAssertFalse(label(A11y.homeUnwindPayloadStatus).contains("42"))
+
+        tap(A11y.homeShowMessageButton)
+        tap(A11y.messageDismissPayloadButton)
+        assertGone(A11y.messageText)
+        assertLabel(A11y.homeUnwindPayloadStatus, contains: "message delivered")
+    }
+
+    func testDirectCoverTopmostAncestorAndProtectedSettingsRoute() {
+        openLanding()
+        tapSettingsTab()
+
+        tap(A11y.settingsAppearanceButton)
+        tap(A11y.appearancePresentAuthenticationButton)
+        tap(A11y.authenticationUnwindToTopmostAncestorButton)
+        assertGone(A11y.authenticationTitle)
+        assertExists(A11y.appearanceTitle)
+
+        tap(A11y.appearancePresentAuthenticationButton)
+        tap(A11y.authenticationPresentTopLevelCoverButton)
+        assertExists(A11y.topLevelCoverText)
+        tap(A11y.topLevelCoverPresentReplacementButton)
+        tap(A11y.topLevelReplacementCoverDismissButton)
+        assertExists(A11y.authenticationTitle)
+
+        setSwitch(A11y.authenticationLoggedInToggle, on: true)
+        tap(A11y.authenticationUnwindToNearestBranchButton)
+        tap(A11y.settingsProfileButton)
+        assertExists(A11y.profileTitle)
+    }
+
+    func testAppearanceContinuationAndLoginCancellation() {
+        openLanding()
+        tapSettingsTab()
+        tap(A11y.settingsAppearanceButton)
+        tap(A11y.appearanceUnwindToLandingPresentMessageButton)
+        assertExists(A11y.homeWelcome)
+        assertExists(A11y.messageText)
+        tap(A11y.messageDismissSwiftUIButton)
+
+        tap(A11y.homeProfileButton)
+        assertExists(A11y.loginTitle)
+        tap(A11y.loginCancelButton)
+        assertGone(A11y.loginTitle)
+        assertExists(A11y.homeWelcome)
+    }
+
+    func testAncestorAlertSupportsBothDismissalPaths() {
+        openLanding()
+        tap(A11y.homeProfileButton)
+
+        tap(A11y.loginPresentAlertButton)
+        assertExists(A11y.alertText)
+        tap(A11y.alertDismissSwiftUIButton)
+        assertGone(A11y.alertText)
+
+        tap(A11y.homeProfileButton)
+        tap(A11y.loginPresentAlertButton)
+        assertExists(A11y.alertText)
+        tap(A11y.alertDismissUnwindButton)
+        assertGone(A11y.alertText)
+        assertExists(A11y.homeWelcome)
+    }
 }
 
 private extension SampleAppUITests {
@@ -538,12 +604,9 @@ private extension SampleAppUITests {
     func tap(_ identifier: String) {
         let target = element(identifier)
         XCTAssertTrue(target.waitForExistence(timeout: 5), "Expected \(identifier) to exist")
-
-        for _ in 0..<4 where target.isHittable == false {
-            app.swipeUp()
-        }
-
-        XCTAssertTrue(target.isHittable, "Expected \(identifier) to be hittable")
+        let hittable = NSPredicate(format: "hittable == true")
+        let ready = expectation(for: hittable, evaluatedWith: target)
+        wait(for: [ready], timeout: 5)
         target.tap()
     }
 
@@ -658,10 +721,12 @@ private enum A11y {
     static let appearanceSavedCount = "sample.appearance.saved-count"
 
     static let authenticationTitle = "sample.authentication.title"
+    static let authenticationLoggedInToggle = "sample.authentication.logged-in"
     static let authenticationAttachLocalRouteToggle = "sample.authentication.attach-local-route"
     static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
     static let authenticationPresentTopLevelCoverButton = "sample.authentication.present-top-level-cover"
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
+    static let authenticationUnwindToTopmostAncestorButton = "sample.authentication.unwind-to-topmost-ancestor"
     static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
     static let authenticationUnwindToBranchIDButton = "sample.authentication.unwind-to-branch-id"
     static let authenticationUnwindStoredActionButton = "sample.authentication.unwind-stored-action"

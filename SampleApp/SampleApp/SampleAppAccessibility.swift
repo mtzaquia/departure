@@ -20,29 +20,6 @@
 //  SOFTWARE.
 //
 
-import SwiftUI
-
-#if canImport(UIKit)
-import UIKit
-#endif
-
-enum SampleAppUITesting {
-    static let isEnabled = ProcessInfo.processInfo.arguments.contains("UI_TESTING")
-
-    @MainActor
-    static func configure() {
-        guard isEnabled else {
-            return
-        }
-
-        Storage.shared.reset()
-
-        #if canImport(UIKit)
-        UIView.setAnimationsEnabled(false)
-        #endif
-    }
-}
-
 enum SampleAppAccessibility {
     static let startButton = "sample.start.button"
     static let startShowInfoButton = "sample.start.show-info"
@@ -97,6 +74,7 @@ enum SampleAppAccessibility {
     static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
     static let authenticationPresentTopLevelCoverButton = "sample.authentication.present-top-level-cover"
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
+    static let authenticationUnwindToTopmostAncestorButton = "sample.authentication.unwind-to-topmost-ancestor"
     static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
     static let authenticationUnwindToBranchIDButton = "sample.authentication.unwind-to-branch-id"
     static let authenticationUnwindStoredActionButton = "sample.authentication.unwind-stored-action"
@@ -147,8 +125,6 @@ enum SampleAppAccessibility {
     static let loginPresentationProbeCount = "sample.login.presentation-probe-count"
     static let loginIncrementPresentationProbeButton = "sample.login.increment-presentation-probe"
     static let loginToolbarIncrementPresentationProbeButton = "sample.login.toolbar-increment-presentation-probe"
-    static let loginEmailField = "sample.login.email"
-    static let loginPasswordField = "sample.login.password"
     static let loginButton = "sample.login.button"
     static let loginCancelButton = "sample.login.cancel"
     static let loginReplaceHighPriorityButton = "sample.login.replace-high-priority"

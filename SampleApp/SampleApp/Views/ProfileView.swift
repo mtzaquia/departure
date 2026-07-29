@@ -28,26 +28,32 @@ struct ProfileView: View {
     @Environment(\.routePhase) private var routePhase
 
     var body: some View {
-        List {
-            Text("Profile route phase: \(routePhase == .active ? "active" : "inactive")")
-                .accessibilityIdentifier(SampleAppAccessibility.profileRoutePhase)
+        LabScreen("Protected destination", eyebrow: "Resolved profile", symbol: "person.crop.circle.fill") {
+            Text("Profile route active")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier(SampleAppAccessibility.profileTitle)
 
-            Button("Sign out", role: .destructive) {
-                Storage.shared.isLoggedIn = false
-                Task {
-                    await router.unwind(to: .root)
-                }
+            LabPanel("Route telemetry") {
+                LabStatus(label: "Route phase", value: "Profile route phase: \(routePhase == .active ? "active" : "inactive")", color: routePhase == .active ? LabPalette.mint : LabPalette.amber, symbol: "bolt.fill")
+                    .accessibilityIdentifier(SampleAppAccessibility.profileRoutePhase)
             }
-            .accessibilityIdentifier(SampleAppAccessibility.profileSignOutButton)
 
-            Button("Present top-level sheet") {
-                Task {
-                    await router.present(TopLevelSheetRoute())
+            LabPanel("Continuation scenarios") {
+                LabAction(title: "Present container sheet", symbol: "rectangle.bottomhalf.inset.filled", color: LabPalette.blue) {
+                    Task { await router.present(TopLevelSheetRoute()) }
                 }
+                .accessibilityIdentifier(SampleAppAccessibility.profilePresentTopLevelSheetButton)
+
+                LabAction(title: "Sign out to root", symbol: "rectangle.portrait.and.arrow.right", color: LabPalette.coral, role: .destructive) {
+                    Storage.shared.isLoggedIn = false
+                    Task { await router.unwind(to: .root) }
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.profileSignOutButton)
             }
-            .accessibilityIdentifier(SampleAppAccessibility.profilePresentTopLevelSheetButton)
+            Spacer()
         }
         .navigationTitle("Profile")
-        .accessibilityIdentifier(SampleAppAccessibility.profileTitle)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
