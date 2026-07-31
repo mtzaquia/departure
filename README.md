@@ -1,5 +1,9 @@
 # 🛫 Departure
 
+[![Tests](https://github.com/mtzaquia/departure/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/mtzaquia/departure/actions/workflows/tests.yml)
+[![Swift 6.2](https://img.shields.io/badge/Swift-6.2-orange.svg)](https://www.swift.org/)
+[![iOS 17+](https://img.shields.io/badge/iOS-17%2B-blue.svg)](https://github.com/mtzaquia/departure/blob/main/Package.swift)
+
 `Departure` is a robust, expressive routing framework for SwiftUI.
 
 Declare the destinations a screen owns. Request them from wherever the user’s intent starts. Departure finds the closest eligible owner, presents with the right style, and gives actions a route-aware place to run.

@@ -1,0 +1,34 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "Sources/**/*.swift"
+      - "Tests/**/*.swift"
+      - "Package.swift"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Swift 6.2
+        uses: swift-actions/setup-swift@v3
+        with:
+          swift-version: "6.2"
+
+      - name: Run tests
+        run: swift test
