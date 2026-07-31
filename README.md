@@ -23,7 +23,7 @@ Departure supports iOS 17+ and macOS 14+ and is available through Swift Package 
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/mtzaquia/departure.git", from: "2.0.0"),
+  .package(url: "https://github.com/mtzaquia/departure.git", from: "2.0.1"),
 ],
 ```
 
