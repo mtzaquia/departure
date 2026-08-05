@@ -55,7 +55,7 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
                 routeType,
                 AnyUnwindHandler { route, payload, declaringScopeID in
                     guard let payload = payload as? Payload else {
-                        log.departureWarning(
+                        log.departureInfo(
                             "Unwind handler for `\(String(reflecting: routeType))` in scope "
                                 + "`\(String(describing: declaringScopeID))` received payload "
                                 + "`\(payload.map { String(reflecting: type(of: $0)) } ?? "nil")`; "

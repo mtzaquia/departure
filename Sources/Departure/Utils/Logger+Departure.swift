@@ -148,6 +148,11 @@ extension Logger {
         let message = message()
         warning("\(message, privacy: .public)")
     }
+
+    func departureInfo(_ message: @autoclosure () -> String) {
+        let message = message()
+        info("\(message, privacy: .public)")
+    }
 }
 
 private extension Departure.DebugLogLevel {
