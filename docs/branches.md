@@ -1,6 +1,6 @@
 # Branches
 
-Use branches for selection-based containers such as `TabView`. Each branch keeps its own push path while the container supplies the complete route map, including lazy tabs that have not been built yet.
+Use branches for selection-based containers such as `TabView`. Each branch keeps its own push path, and the container can make routes discoverable before their branch has been built.
 
 ```swift
 enum AppTab: Hashable, Sendable {
@@ -30,7 +30,13 @@ struct RootView: View {
 
 When a route belongs to another branch, Departure selects that branch before presenting it.
 
-Declarations outside `Branch(...)` belong to the container, making them useful for flows such as login that are available above every tab. `Branch(...)` declarations are its discovery map. Explicit `.routes { ... }` declarations on a `.routeBranch(...)` view take precedence, so the same view can declare its own routes and also be reused outside a branched container.
+## Choose where to declare a route
+
+- Declare a route with `.routes { ... }` inside a feature when it only needs to be found while that feature is active.
+- Put it in the container's `Branch(...)` map when a request should select an inactive branch or the branch may not have been built yet. The matching `.routeBranch(...)` host adopts the declaration and presents it.
+- Declare the same route in both places only deliberately. A local declaration takes precedence, which supports a feature-specific presentation or a view reused outside the branched container. Ordinary branch routing does not require duplicate declarations.
+
+Declarations outside `Branch(...)` belong to the container, making them useful for flows such as login that are available above every tab.
 
 Branches keep independent push paths, but share modal presentations. A sheet or cover from one branch replaces a current modal from another branch.
 
