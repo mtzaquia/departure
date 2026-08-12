@@ -20,6 +20,7 @@
 //  SOFTWARE.
 //
 
+import Foundation
 import SwiftUI
 
 #if canImport(UIKit)
@@ -32,9 +33,70 @@ typealias PlatformView = NSView
 
 extension View {
     func onLifecycleEvent(_ handler: @escaping @MainActor (ViewLifecycleBridge.Event) -> Void) -> some View {
-        background {
-            ViewLifecycleBridge(onEvent: handler)
-                .frame(width: 0, height: 0)
+        modifier(ViewLifecycleEventModifier(handler: handler))
+    }
+}
+
+private struct ViewLifecycleEventModifier: ViewModifier {
+    let handler: @MainActor (ViewLifecycleBridge.Event) -> Void
+
+    @State private var teardownDelivery = ViewLifecycleTeardownDelivery()
+
+    func body(content: Content) -> some View {
+        content.background {
+            ViewLifecycleBridge(onIdentifiedEvent: { lifecycleView, event in
+                let lifecycleID = lifecycleView.id
+
+                switch event {
+                case .installedInWindow, .updated(isInstalledInWindow: true):
+                    teardownDelivery.install(lifecycleID)
+                    handler(event)
+
+                case .updated(isInstalledInWindow: false):
+                    handler(event)
+
+                case .dismantled, .deinitialized:
+                    teardownDelivery.schedule(for: lifecycleID) {
+                        handler(event)
+                    }
+                }
+            })
+            .frame(width: 0, height: 0)
+        }
+    }
+}
+
+/// Moves teardown work out of SwiftUI's representable dismantle stack. A later installation
+/// invalidates pending work so transient bridge replacement cannot uninstall a live source.
+final class ViewLifecycleTeardownDelivery {
+    private var installedLifecycleID: UUID?
+    private var generation = 0
+
+    func install(_ lifecycleID: UUID) {
+        installedLifecycleID = lifecycleID
+        generation &+= 1
+    }
+
+    @discardableResult
+    func schedule(
+        for lifecycleID: UUID,
+        _ action: @escaping @MainActor () -> Void
+    ) -> Task<Void, Never> {
+        generation &+= 1
+        let scheduledGeneration = generation
+
+        return Task { @MainActor [self] in
+            await Task.yield()
+
+            guard
+                generation == scheduledGeneration,
+                installedLifecycleID == lifecycleID
+            else {
+                return
+            }
+
+            installedLifecycleID = nil
+            action()
         }
     }
 }
@@ -47,15 +109,25 @@ struct ViewLifecycleBridge {
         case deinitialized
     }
 
-    let onEvent: @MainActor (Event) -> Void
+    let onEvent: @MainActor (LifecycleView, Event) -> Void
+
+    init(onEvent: @escaping @MainActor (Event) -> Void) {
+        self.onEvent = { _, event in
+            onEvent(event)
+        }
+    }
+
+    init(onIdentifiedEvent: @escaping @MainActor (LifecycleView, Event) -> Void) {
+        self.onEvent = onIdentifiedEvent
+    }
 
     fileprivate func makeView() -> LifecycleView {
-        LifecycleView(onEvent: onEvent)
+        LifecycleView(onIdentifiedEvent: onEvent)
     }
 
     fileprivate func updateView(_ view: LifecycleView) {
         view.onEvent = onEvent
-        view.onEvent(.updated(isInstalledInWindow: view.window != nil))
+        view.onEvent(view, .updated(isInstalledInWindow: view.window != nil))
     }
 }
 
@@ -75,13 +147,24 @@ extension ViewLifecycleBridge: NSViewRepresentable {
 
 extension ViewLifecycleBridge {
     final class LifecycleView: PlatformView {
-        var onEvent: @MainActor (Event) -> Void
+        let id = UUID()
+        var onEvent: @MainActor (LifecycleView, Event) -> Void
         private var hasInstalledInWindow = false
         private var hasDismantled = false
         private var hasDeinitialized = false
 
         init(onEvent: @escaping @MainActor (Event) -> Void) {
-            self.onEvent = onEvent
+            self.onEvent = { _, event in
+                onEvent(event)
+            }
+            super.init(frame: .zero)
+            #if canImport(UIKit)
+            isUserInteractionEnabled = false
+            #endif
+        }
+
+        init(onIdentifiedEvent: @escaping @MainActor (LifecycleView, Event) -> Void) {
+            self.onEvent = onIdentifiedEvent
             super.init(frame: .zero)
             #if canImport(UIKit)
             isUserInteractionEnabled = false
@@ -108,14 +191,14 @@ extension ViewLifecycleBridge {
         private func handleMoveToWindow() {
             guard window != nil else {
                 if hasInstalledInWindow {
-                    onEvent(.updated(isInstalledInWindow: false))
+                    onEvent(self, .updated(isInstalledInWindow: false))
                 }
                 return
             }
 
             let isInitial = hasInstalledInWindow == false
             hasInstalledInWindow = true
-            onEvent(.installedInWindow(isInitial: isInitial))
+            onEvent(self, .installedInWindow(isInitial: isInitial))
         }
 
         func notifyDismantled() {
@@ -124,7 +207,7 @@ extension ViewLifecycleBridge {
             }
 
             hasDismantled = true
-            onEvent(.dismantled)
+            onEvent(self, .dismantled)
         }
 
         func notifyDeinitialized() {
@@ -133,7 +216,7 @@ extension ViewLifecycleBridge {
             }
 
             hasDeinitialized = true
-            onEvent(.deinitialized)
+            onEvent(self, .deinitialized)
         }
 
         isolated deinit {

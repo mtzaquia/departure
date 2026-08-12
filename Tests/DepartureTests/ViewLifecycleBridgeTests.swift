@@ -85,6 +85,61 @@ struct ViewLifecycleBridgeTests {
 
         #expect(events.dismantledCount == 1)
     }
+
+    @Test func teardownDeliveryDefersWorkUntilAfterTheCurrentMainActorTurn() async {
+        let delivery = ViewLifecycleTeardownDelivery()
+        let lifecycleID = UUID()
+        var didRun = false
+        delivery.install(lifecycleID)
+
+        let task = delivery.schedule(for: lifecycleID) {
+            didRun = true
+        }
+
+        #expect(didRun == false)
+        await task.value
+        #expect(didRun)
+    }
+
+    @Test func teardownDeliveryCoalescesRepeatedEvents() async {
+        let delivery = ViewLifecycleTeardownDelivery()
+        let lifecycleID = UUID()
+        var deliveredValues: [Int] = []
+        delivery.install(lifecycleID)
+
+        let firstTask = delivery.schedule(for: lifecycleID) {
+            deliveredValues.append(1)
+        }
+        let secondTask = delivery.schedule(for: lifecycleID) {
+            deliveredValues.append(2)
+        }
+        await firstTask.value
+        await secondTask.value
+
+        #expect(deliveredValues == [2])
+    }
+
+    @Test func installationCancelsDeferredTeardown() async {
+        let delivery = ViewLifecycleTeardownDelivery()
+        let removedLifecycleID = UUID()
+        let installedLifecycleID = UUID()
+        var didRun = false
+        delivery.install(removedLifecycleID)
+
+        let task = delivery.schedule(for: removedLifecycleID) {
+            didRun = true
+        }
+        delivery.install(installedLifecycleID)
+
+        await task.value
+        #expect(didRun == false)
+
+        let staleTask = delivery.schedule(for: removedLifecycleID) {
+            didRun = true
+        }
+        await staleTask.value
+        #expect(didRun == false)
+    }
 }
 
 private extension [ViewLifecycleBridge.Event] {

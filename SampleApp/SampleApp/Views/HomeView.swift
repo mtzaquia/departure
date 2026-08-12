@@ -60,6 +60,7 @@ struct HomeView: View {
                     action("Fade cover", symbol: "rectangle.inset.filled.and.person.filled", id: SampleAppAccessibility.homeShowMessageButton) { await router.present(MessageRoute()) }
                     action("Nested sheets", symbol: "square.stack.3d.up.fill", id: SampleAppAccessibility.homeShowDismissProbeButton) { await router.present(DismissProbeRoute()) }
                     action("Fade navigation", symbol: "menubar.rectangle", id: SampleAppAccessibility.homeShowNavigationBarFadeButton) { await router.present(NavigationBarFadeOcclusionRoute()) }
+                    action("Lifecycle teardown", symbol: "arrow.triangle.2.circlepath", color: LabPalette.mint, id: SampleAppAccessibility.homeShowLifecycleTeardownButton) { await router.present(LifecycleTeardownRoute()) }
                     action("Priority race", symbol: "flag.checkered", color: LabPalette.coral, id: SampleAppAccessibility.homePresentPendingPriorityRaceButton) {
                         await router.present(PendingPriorityRoute())
                         await router.present(TopLevelSheetRoute())

@@ -55,6 +55,7 @@ struct SampleDeepLink {
         "high-priority-blocking-sheet",
         "pending-priority",
         "navigation-bar-fade-occlusion",
+        "lifecycle-teardown",
         "appearance-settings",
         "alert",
         "critical",
@@ -131,6 +132,8 @@ struct SampleDeepLink {
             PendingPriorityRoute()
         case "navigation-bar-fade-occlusion":
             NavigationBarFadeOcclusionRoute()
+        case "lifecycle-teardown":
+            LifecycleTeardownRoute()
         case "appearance-settings":
             appearanceSettingsRoute(from: components)
         case "alert":

@@ -69,6 +69,7 @@ struct LandingView: View {
             Cover(TopLevelReplacementCoverRoute.self, providesNavigation: false)
 
             Branch(.home) {
+                Push(LifecycleTeardownRoute.self)
                 Sheet(ProfileRoute.self)
                 Sheet(DismissProbeRoute.self, providesNavigation: false)
                 Cover(MessageRoute.self, transition: .fade, providesNavigation: false)

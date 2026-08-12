@@ -39,12 +39,18 @@ enum SampleAppAccessibility {
     static let homePresentHighPriorityPassthroughSheetButton = "sample.home.present-high-priority-passthrough-sheet"
     static let homePresentHighPriorityBlockingSheetButton = "sample.home.present-high-priority-blocking-sheet"
     static let homeShowNavigationBarFadeButton = "sample.home.show-navigation-bar-fade"
+    static let homeShowLifecycleTeardownButton = "sample.home.show-lifecycle-teardown"
     static let homePassthroughBehindButton = "sample.home.passthrough-behind"
     static let homePassthroughTapCount = "sample.home.passthrough-tap-count"
     static let homeRoutePhase = "sample.home.route-phase"
     static let homeEmojiValue = "sample.home.emoji-value"
     static let homeUnwindPayloadStatus = "sample.home.unwind-payload-status"
     static let homeDismissProbeHookStatus = "sample.home.dismiss-probe-hook-status"
+
+    static let lifecycleTeardownReplaceButton = "sample.lifecycle-teardown.replace"
+    static let lifecycleTeardownGeneration = "sample.lifecycle-teardown.generation"
+    static let lifecycleTeardownRoutePhase = "sample.lifecycle-teardown.route-phase"
+    static let lifecycleTeardownBackgroundCount = "sample.lifecycle-teardown.background-count"
 
     static let settingsAppearanceButton = "sample.settings.appearance"
     static let settingsAuthenticationButton = "sample.settings.authentication"

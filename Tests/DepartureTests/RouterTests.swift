@@ -89,6 +89,49 @@ struct RouterTests {
         #expect(router.routePhase(for: routeScope) == .active)
     }
 
+    @Test func deferredBranchedDeclarationTeardownReconcilesRoutePhaseAfterTheCurrentTurn() async {
+        let router = Router()
+        let sourceID = AnyHashable("routed-scroll")
+        let (selection, _) = tabSelection(.home)
+        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
+
+        router.mutateRouteGraph {
+            router.root.installRouteDeclarations(
+                sourceID: sourceID,
+                id: nil,
+                branchSelection: AnyRouteBranchSelection(selection),
+                routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                    BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                        Branch(.home) {
+                            Push(HomeDetailRoute.self)
+                        }
+                    )
+                )
+            )
+            router.root.registerBranchScope(homeScope, for: AppTab.home)
+        }
+
+        #expect(router.routePhase(for: homeScope) == .active)
+
+        let teardownDelivery = ViewLifecycleTeardownDelivery()
+        let lifecycleID = UUID()
+        teardownDelivery.install(lifecycleID)
+        let teardownTask = teardownDelivery.schedule(for: lifecycleID) {
+            router.mutateRouteGraph {
+                router.root.uninstallRouteDeclarations(sourceID: sourceID)
+            }
+        }
+
+        #expect(router.routePhase(for: homeScope) == .active)
+        #expect(router.root.firstRouteAttachment(for: HomeDetailRoute.self) != nil)
+        await teardownTask.value
+
+        #expect(router.routePhase(for: router.root) == .active)
+        #expect(router.routePhase(for: homeScope) == .inactive)
+        #expect(router.root.firstRouteAttachment(for: HomeDetailRoute.self) == nil)
+        #expect(router.pendingRoute == nil)
+    }
+
     @Test func activeEmptyBranchIsTheCurrentRoutePath() async {
         let router = Router()
         let (selection, _) = tabSelection(.home)

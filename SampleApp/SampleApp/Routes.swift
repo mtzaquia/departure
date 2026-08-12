@@ -138,6 +138,12 @@ struct NavigationBarFadeOcclusionRoute: SampleDeepLinkRoute {
     }
 }
 
+struct LifecycleTeardownRoute: SampleDeepLinkRoute {
+    func destination() -> some View {
+        LifecycleTeardownView()
+    }
+}
+
 struct PendingPriorityView: View {
     @Environment(\.unwindRoute) var unwindRoute
 

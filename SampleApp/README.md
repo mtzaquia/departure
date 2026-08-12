@@ -36,6 +36,7 @@ let route = MessageRoute(url: url)
 | `HighPriorityBlockingSheetRoute` | `departure-sample://route/high-priority-blocking-sheet` | Landing; blocking high-priority sheet |
 | `PendingPriorityRoute` | `departure-sample://route/pending-priority` | Settings branch; high-priority cover |
 | `NavigationBarFadeOcclusionRoute` | `departure-sample://route/navigation-bar-fade-occlusion` | Home branch; fade cover |
+| `LifecycleTeardownRoute` | `departure-sample://route/lifecycle-teardown` | Home branch; routed `ScrollView` lifecycle regression fixture |
 | `AppearanceSettingsRoute` | `departure-sample://route/appearance-settings` | Settings branch; push |
 | `AlertRoute` | `departure-sample://route/alert` | Landing; high-priority fade cover |
 | `CriticalRoute` | `departure-sample://route/critical` | Landing; critical fade cover |
@@ -57,3 +58,12 @@ let route = MessageRoute(url: url)
 - `departure-sample://route/appearance-settings?value=01234567-89AB-CDEF-0123-456789ABCDEF` supplies the route's optional UUID value.
 
 Invalid schemes, hosts, paths, UUIDs, and Boolean parameter values are ignored.
+
+## Routed scroll lifecycle regression
+
+Open **Lifecycle teardown** from the Home branch. The fixture replaces a visible `ScrollView`
+that owns branched `.routes` declarations, forcing its lifecycle representable to dismantle while
+`routePhase` is observed. Repeatedly tap **Replace routed scroll**, then send the simulator Home and
+bring Departure back to the foreground between replacements. The generation must advance, the
+nested route phase must return to `active`, the background-transition counter must advance, and
+the app must remain running without a Swift exclusivity trap.
