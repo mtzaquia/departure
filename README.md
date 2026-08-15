@@ -5,6 +5,8 @@
 [![iOS 17+](https://img.shields.io/badge/iOS-17%2B-blue.svg)](https://github.com/mtzaquia/departure/blob/main/Package.swift)
 ![Class A](https://img.shields.io/badge/class-A-gold)
 
+<a href="https://www.buymeacoffee.com/mtzaquia" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" style="height: 30px !important;" ></a>
+
 `Departure` is a robust, expressive routing framework for SwiftUI.
 
 Declare the destinations a screen owns. Request them from wherever the user’s intent starts. Departure finds the closest eligible owner, presents with the right style, and gives actions a route-aware place to run.
