@@ -56,7 +56,7 @@ struct EquatableOnlyRoute: Route, Equatable {
         Text("Equatable \(value)")
     }
 
-    static func == (lhs: EquatableOnlyRoute, rhs: EquatableOnlyRoute) -> Bool {
+    nonisolated static func == (lhs: EquatableOnlyRoute, rhs: EquatableOnlyRoute) -> Bool {
         lhs.value == rhs.value
     }
 }
