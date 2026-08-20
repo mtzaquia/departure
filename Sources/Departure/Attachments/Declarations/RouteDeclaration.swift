@@ -22,6 +22,11 @@
 
 import Foundation
 
+/// Identifies one SwiftUI presentation-host installation independently of declaration value equality.
+struct RoutePresentationHostID: Hashable, Sendable {
+    private let value = UUID()
+}
+
 /// Type-erased route presentation metadata.
 public struct AnyRouteDeclaration: Sendable, Hashable {
     enum Kind: Hashable, Sendable {
@@ -33,15 +38,19 @@ public struct AnyRouteDeclaration: Sendable, Hashable {
     let routeType: any Route.Type
     let kind: Kind
     let drivesPresentation: Bool
+    /// Internal presentation provenance; deliberately excluded from public value equality and hashing.
+    let presentationHostID: RoutePresentationHostID?
 
     init(
         routeType: any Route.Type,
         kind: Kind,
-        drivesPresentation: Bool = true
+        drivesPresentation: Bool = true,
+        presentationHostID: RoutePresentationHostID? = nil
     ) {
         self.routeType = routeType
         self.kind = kind
         self.drivesPresentation = drivesPresentation
+        self.presentationHostID = presentationHostID
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -88,13 +97,31 @@ extension AnyRouteDeclaration {
     }
 
     func drivingPresentation(_ value: Bool) -> Self {
-        .init(routeType: routeType, kind: kind, drivesPresentation: value)
+        .init(
+            routeType: routeType,
+            kind: kind,
+            drivesPresentation: value,
+            presentationHostID: presentationHostID
+        )
+    }
+
+    func hosted(by presentationHostID: RoutePresentationHostID) -> Self {
+        .init(
+            routeType: routeType,
+            kind: kind,
+            drivesPresentation: drivesPresentation,
+            presentationHostID: presentationHostID
+        )
     }
 }
 
 extension [AnyRouteDeclaration] {
     func drivingPresentation(_ value: Bool) -> Self {
         map { $0.drivingPresentation(value) }
+    }
+
+    func hosted(by presentationHostID: RoutePresentationHostID) -> Self {
+        map { $0.hosted(by: presentationHostID) }
     }
 }
 
@@ -108,6 +135,11 @@ public struct RouteScopeDeclaration: Sendable, Hashable {
         self.routes = routes
     }
 
+    init(branch: AnyHashable?, routes: [AnyRouteDeclaration]) {
+        self.branch = branch
+        self.routes = routes
+    }
+
     init<Branch: Hashable>(branch: Branch, routes: [AnyRouteDeclaration]) {
         self.branch = AnyHashable(branch)
         self.routes = routes
@@ -118,6 +150,15 @@ extension [RouteScopeDeclaration] {
     func containsPresentationKind(_ kind: RoutePresentationKind) -> Bool {
         flatMap(\.routes).contains {
             $0.drivesPresentation && $0.presentationKind == kind
+        }
+    }
+
+    func hosted(by presentationHostID: RoutePresentationHostID) -> Self {
+        map {
+            RouteScopeDeclaration(
+                branch: $0.branch,
+                routes: $0.routes.hosted(by: presentationHostID)
+            )
         }
     }
 }

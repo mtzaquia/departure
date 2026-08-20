@@ -23,13 +23,16 @@
 import SwiftUI
 
 struct CoverFadePresentationStyleModifier: ViewModifier {
+    let presentationHostID: RoutePresentationHostID
+
     @Environment(Router.self) private var router
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
         let presentation = router.routePresentationBinding(
             from: routeScope,
-            matching: .cover(.fade)
+            matching: .cover(.fade),
+            hostedBy: presentationHostID
         )
 
         content

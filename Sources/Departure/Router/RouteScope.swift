@@ -32,6 +32,7 @@ final class RouteScope: Identifiable {
     weak var parent: RouteScope?
 
     var branchID: AnyHashable?
+    var adoptedRoutePresentationHostID: RoutePresentationHostID?
     var declarations = DeclarationStore()
     var branchContainer: BranchContainerState?
     var branchScopes: [AnyHashable: RouteScope] = [:]

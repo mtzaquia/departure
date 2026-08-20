@@ -607,6 +607,11 @@ extension Router {
             || match.declaration.drivesPresentation
             ? match.presentationLocation.scope
             : match.presentationLocation.path.owner
+        var presentationDeclaration = match.declaration.drivingPresentation(true)
+        if match.declaration.drivesPresentation == false,
+           let presentationHostID = presentationOrigin?.adoptedRoutePresentationHostID {
+            presentationDeclaration = presentationDeclaration.hosted(by: presentationHostID)
+        }
 
         if behavior.elevatedPriority != nil, presentationOrigin == nil {
             return
@@ -622,7 +627,6 @@ extension Router {
 
                 let rootScope = RouteScope(id: UUID(), route: nil)
                 let routePath = RoutePath(owner: rootScope)
-                let presentationDeclaration = match.declaration.drivingPresentation(true)
                 let tree = RouteTree(
                     priority: priority,
                     root: rootScope,
@@ -649,7 +653,7 @@ extension Router {
             if let presentationOrigin {
                 appendedScope.attachPresentation(
                     to: presentationOrigin,
-                    declaration: match.declaration.drivingPresentation(true)
+                    declaration: presentationDeclaration
                 )
             }
 

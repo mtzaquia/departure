@@ -48,6 +48,7 @@ struct SampleDeepLink {
         "login-notice",
         "profile",
         "authentication-settings",
+        "local-detail",
         "top-level-sheet",
         "top-level-cover",
         "top-level-replacement-cover",
@@ -118,6 +119,8 @@ struct SampleDeepLink {
             ProfileRoute()
         case "authentication-settings":
             authenticationSettingsRoute(from: components)
+        case "local-detail":
+            LocalDetailRoute()
         case "top-level-sheet":
             TopLevelSheetRoute()
         case "top-level-cover":

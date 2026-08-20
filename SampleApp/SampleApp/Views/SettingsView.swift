@@ -45,6 +45,7 @@ struct SettingsView: View {
             LabPanel("Routes & actions") {
                 LazyVGrid(columns: columns, spacing: 8) {
                     action("Appearance push", symbol: "paintpalette.fill", id: SampleAppAccessibility.settingsAppearanceButton) { await router.present(AppearanceSettingsRoute(value: nil)) }
+                    action("Local detail push", symbol: "rectangle.stack.badge.plus", color: LabPalette.mint, id: SampleAppAccessibility.settingsLocalDetailButton) { await router.present(LocalDetailRoute()) }
                     action("Authentication push", symbol: "lock.shield.fill", id: SampleAppAccessibility.settingsAuthenticationButton) { await router.present(AuthenticationSettingsRoute()) }
                     action("Protected profile", symbol: "person.crop.circle", id: SampleAppAccessibility.settingsProfileButton) { await router.present(ProfileRoute()) }
                     action("Rerouting action", symbol: "arrow.triangle.2.circlepath", color: LabPalette.blue, id: SampleAppAccessibility.settingsSaveAppearanceButton) { await router.perform(SaveAppearanceSettingsAction()) }
@@ -67,6 +68,9 @@ struct SettingsView: View {
             UnwindHandler(AuthenticationSettingsRoute.self) {
                 Storage.shared.settingsBranchUnwindHookCount += 1
             }
+        }
+        .routes {
+            Push(LocalDetailRoute.self)
         }
     }
 

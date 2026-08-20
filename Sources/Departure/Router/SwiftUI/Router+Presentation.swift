@@ -57,7 +57,8 @@ struct RoutePresentation: Identifiable, Hashable {
 extension Router {
     func routePresentationBinding(
         from routeScope: RouteScope?,
-        matching presentationKind: RoutePresentationKind
+        matching presentationKind: RoutePresentationKind,
+        hostedBy presentationHostID: RoutePresentationHostID? = nil
     ) -> Binding<RoutePresentation?> {
         let routeScope = routeScope ?? root
         let routePath = routeForest.routePath(containing: routeScope) ?? normalTree.rootPath
@@ -70,7 +71,8 @@ extension Router {
             get: {
                 self.routePresentation(
                     from: routeScope,
-                    matching: presentationKind
+                    matching: presentationKind,
+                    hostedBy: presentationHostID
                 )
             },
             set: { presentation in
@@ -80,7 +82,8 @@ extension Router {
 
                 self.dismissPresentation(
                     from: routeScope,
-                    matching: presentationKind
+                    matching: presentationKind,
+                    hostedBy: presentationHostID
                 )
             }
         )
@@ -88,7 +91,8 @@ extension Router {
 
     func routePresentation(
         from routeScope: RouteScope,
-        matching presentationKind: RoutePresentationKind
+        matching presentationKind: RoutePresentationKind,
+        hostedBy presentationHostID: RoutePresentationHostID? = nil
     ) -> RoutePresentation? {
         let routePath = routeForest.routePath(containing: routeScope) ?? normalTree.rootPath
 
@@ -96,6 +100,7 @@ extension Router {
         if let presentation = hostedPresentation(
             by: routeScope,
             matching: presentationKind,
+            hostedBy: presentationHostID,
             in: routePath
         ) {
             return presentation
@@ -125,6 +130,7 @@ extension Router {
         return hostedPresentation(
             by: routeScope,
             matching: presentationKind,
+            hostedBy: presentationHostID,
             inPreservedPaths: unwindPresentationSnapshot.preservedPaths,
             snapshot: unwindPresentationSnapshot
         )
@@ -161,6 +167,7 @@ private extension Router {
     func hostedPresentation(
         by host: RouteScope,
         matching presentationKind: RoutePresentationKind,
+        hostedBy presentationHostID: RoutePresentationHostID?,
         in routePath: RoutePath
     ) -> RoutePresentation? {
         guard host.canDrivePresentation(matching: presentationKind) else {
@@ -173,7 +180,8 @@ private extension Router {
                 && $0.presentationDeclaration?.presentationKind == presentationKind
             }),
             let declaration = presentedScope.presentationDeclaration,
-            declaration.drivesPresentation
+            declaration.drivesPresentation,
+            presentationHostID == nil || declaration.presentationHostID == presentationHostID
         else {
             return nil
         }
@@ -201,6 +209,7 @@ private extension Router {
     func hostedPresentation(
         by host: RouteScope,
         matching presentationKind: RoutePresentationKind,
+        hostedBy presentationHostID: RoutePresentationHostID?,
         inPreservedPaths paths: [RouteForest.PreservedRoutePath],
         snapshot: UnwindPresentationSnapshot
     ) -> RoutePresentation? {
@@ -208,6 +217,7 @@ private extension Router {
             if let presentation = hostedPresentation(
                 by: host,
                 matching: presentationKind,
+                hostedBy: presentationHostID,
                 inPreservedPath: path,
                 snapshot: snapshot
             ) {
@@ -221,6 +231,7 @@ private extension Router {
     func hostedPresentation(
         by host: RouteScope,
         matching presentationKind: RoutePresentationKind,
+        hostedBy presentationHostID: RoutePresentationHostID?,
         inPreservedPath path: RouteForest.PreservedRoutePath,
         snapshot: UnwindPresentationSnapshot
     ) -> RoutePresentation? {
@@ -236,6 +247,7 @@ private extension Router {
                 let declaration = presentedScope.presentationDeclaration,
                 declaration.presentationKind == presentationKind,
                 declaration.drivesPresentation,
+                presentationHostID == nil || declaration.presentationHostID == presentationHostID,
                 shouldHostLocally(
                     declaration,
                     from: hostPosition,
@@ -258,9 +270,14 @@ private extension Router {
 
     func dismissPresentation(
         from routeScope: RouteScope,
-        matching presentationKind: RoutePresentationKind
+        matching presentationKind: RoutePresentationKind,
+        hostedBy presentationHostID: RoutePresentationHostID?
     ) {
-        guard let presentation = routePresentation(from: routeScope, matching: presentationKind) else {
+        guard let presentation = routePresentation(
+            from: routeScope,
+            matching: presentationKind,
+            hostedBy: presentationHostID
+        ) else {
             return
         }
 

@@ -39,7 +39,9 @@ extension RouteScope {
             .flatMap { branchID in
                 parent?
                     .adoptedRouteAttachments(forBranch: branchID)
-            } ?? []
+            }?
+            .hosted(by: adoptedRoutePresentationHostID)
+            ?? []
 
         return visible + adopted
     }
@@ -78,7 +80,10 @@ extension RouteScope {
             .first(where: { attachment in
                 routeType == attachment.routeType
             }) {
-            return RouteAttachmentMatch(branchID: nil, declaration: declaration)
+            return RouteAttachmentMatch(
+                branchID: nil,
+                declaration: declaration.hosted(by: adoptedRoutePresentationHostID)
+            )
         }
 
         if branchContainer != nil {
@@ -107,6 +112,26 @@ extension RouteScope {
         }
 
         return RouteAttachmentMatch(branchID: branch, declaration: match.declaration)
+    }
+}
+
+private extension [AnyRouteDeclaration] {
+    func hosted(by presentationHostID: RoutePresentationHostID?) -> Self {
+        guard let presentationHostID else {
+            return self
+        }
+
+        return hosted(by: presentationHostID)
+    }
+}
+
+private extension AnyRouteDeclaration {
+    func hosted(by presentationHostID: RoutePresentationHostID?) -> Self {
+        guard let presentationHostID else {
+            return self
+        }
+
+        return hosted(by: presentationHostID)
     }
 }
 

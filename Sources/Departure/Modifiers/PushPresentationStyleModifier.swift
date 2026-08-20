@@ -23,13 +23,16 @@
 import SwiftUI
 
 struct PushPresentationStyleModifier: ViewModifier {
+    let presentationHostID: RoutePresentationHostID
+
     @Environment(Router.self) private var router
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
         let presentation = router.routePresentationBinding(
             from: routeScope,
-            matching: .push
+            matching: .push,
+            hostedBy: presentationHostID
         )
 
         content

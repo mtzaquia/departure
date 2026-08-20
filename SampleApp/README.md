@@ -29,6 +29,7 @@ let route = MessageRoute(url: url)
 | `LoginNoticeRoute` | `departure-sample://route/login-notice` | Login; high-priority sheet |
 | `ProfileRoute` | `departure-sample://route/profile` | Home branch; reroutes to Login while signed out |
 | `AuthenticationSettingsRoute` | `departure-sample://route/authentication-settings` | Settings branch; push |
+| `LocalDetailRoute` | `departure-sample://route/local-detail` | Settings branch; local push that shares its scope with inherited push hosts |
 | `TopLevelSheetRoute` | `departure-sample://route/top-level-sheet` | Nearest installed declaration; normally Landing |
 | `TopLevelCoverRoute` | `departure-sample://route/top-level-cover` | Landing; cover |
 | `TopLevelReplacementCoverRoute` | `departure-sample://route/top-level-replacement-cover` | Landing; replacement cover |

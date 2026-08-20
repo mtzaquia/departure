@@ -73,6 +73,18 @@ final class SampleAppUITests: XCTestCase {
         assertLabel(A11y.messagePresentationSource, contains: "top-level branched scope")
     }
 
+    func testLocalPushHostWinsOverInheritedBranchPushHost() {
+        openLanding()
+        tapSettingsTab()
+
+        tap(A11y.settingsLocalDetailButton)
+        assertExists(A11y.localDetailTitle)
+        assertGone(A11y.settingsLocalDetailButton)
+
+        tap(A11y.localDetailAdvanceButton)
+        assertLabel(A11y.localDetailUpdateCount, contains: "Local updates: 1")
+    }
+
     func testModalArbitrationAndChainingFromPushedBranch() {
         openLanding()
         tapSettingsTab()
@@ -737,6 +749,7 @@ private enum A11y {
     static let lifecycleTeardownBackgroundCount = "sample.lifecycle-teardown.background-count"
 
     static let settingsAppearanceButton = "sample.settings.appearance"
+    static let settingsLocalDetailButton = "sample.settings.local-detail"
     static let settingsAuthenticationButton = "sample.settings.authentication"
     static let settingsProfileButton = "sample.settings.profile"
     static let settingsSaveAppearanceButton = "sample.settings.save-appearance"
@@ -748,6 +761,10 @@ private enum A11y {
     static let settingsMissingUnwindButton = "sample.settings.missing-unwind"
     static let settingsMissingUnwindResult = "sample.settings.missing-unwind-result"
     static let settingsBranchHookStatus = "sample.settings.branch-hook-status"
+
+    static let localDetailTitle = "sample.local-detail.title"
+    static let localDetailAdvanceButton = "sample.local-detail.advance"
+    static let localDetailUpdateCount = "sample.local-detail.update-count"
 
     static let appearanceTitle = "sample.appearance.title"
     static let appearanceValue = "sample.appearance.value"

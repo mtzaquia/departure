@@ -87,12 +87,14 @@ extension RouteScope {
     func registerBranchScope(
         _ routeScope: RouteScope,
         for branch: AnyHashable,
-        sourceEnvironment: EnvironmentValues? = nil
+        sourceEnvironment: EnvironmentValues? = nil,
+        presentationHostID: RoutePresentationHostID? = nil
     ) -> Bool {
         #if DEBUG
         routeScope.debugKind = .branch
         #endif
         routeScope.branchID = branch
+        routeScope.adoptedRoutePresentationHostID = presentationHostID
         if let sourceEnvironment {
             routeScope.updateSourceEnvironment(sourceEnvironment)
         }
@@ -121,6 +123,7 @@ extension RouteScope {
         branchScopes[branch] = nil
         routeScope.parent = nil
         routeScope.branchID = nil
+        routeScope.adoptedRoutePresentationHostID = nil
         log.departureDebug(.branchUnregistered(branch: branch, scope: routeScope))
     }
 }

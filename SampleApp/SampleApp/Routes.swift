@@ -96,6 +96,44 @@ struct AuthenticationSettingsRoute: SampleDeepLinkRoute {
     }
 }
 
+struct LocalDetailRoute: SampleDeepLinkRoute {
+    func destination() -> some View {
+        LocalDetailView()
+    }
+}
+
+private struct LocalDetailView: View {
+    @State private var updateCount = 0
+
+    var body: some View {
+        LabScreen("Local detail", eyebrow: "Branch host ownership", symbol: "rectangle.stack.badge.plus") {
+            Text("Local detail push active")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier(SampleAppAccessibility.localDetailTitle)
+
+            LabPanel("Host ownership") {
+                Text("This push is declared locally while the Settings branch also inherits push declarations from Landing.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                LabAction(title: "Advance local state", symbol: "arrow.triangle.2.circlepath", color: LabPalette.mint) {
+                    updateCount += 1
+                }
+                .accessibilityIdentifier(SampleAppAccessibility.localDetailAdvanceButton)
+
+                Text("Local updates: \(updateCount)")
+                    .font(.caption.weight(.semibold))
+                    .accessibilityIdentifier(SampleAppAccessibility.localDetailUpdateCount)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .navigationTitle("Local Detail")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 struct TopLevelSheetRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         TopLevelSheetView()

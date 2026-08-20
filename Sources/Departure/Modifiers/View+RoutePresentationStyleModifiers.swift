@@ -34,20 +34,21 @@ extension View {
     ///   detached from the scope's route-declaration installation lifecycle (e.g. a `background`);
     ///   otherwise the churn uninstalls freshly installed declarations.
     func routePresentationStyleModifiers(
-        for declarations: [RouteScopeDeclaration]
+        for declarations: [RouteScopeDeclaration],
+        hostedBy presentationHostID: RoutePresentationHostID
     ) -> some View {
         self
             .applyIf(declarations.containsPresentationKind(.push)) {
-                $0.modifier(PushPresentationStyleModifier())
+                $0.modifier(PushPresentationStyleModifier(presentationHostID: presentationHostID))
             }
             .applyIf(declarations.containsPresentationKind(.sheet)) {
-                $0.modifier(SheetPresentationStyleModifier())
+                $0.modifier(SheetPresentationStyleModifier(presentationHostID: presentationHostID))
             }
             .applyIf(declarations.containsPresentationKind(.cover(.slide))) {
-                $0.modifier(CoverSlidePresentationStyleModifier())
+                $0.modifier(CoverSlidePresentationStyleModifier(presentationHostID: presentationHostID))
             }
             .applyIf(declarations.containsPresentationKind(.cover(.fade))) {
-                $0.modifier(CoverFadePresentationStyleModifier())
+                $0.modifier(CoverFadePresentationStyleModifier(presentationHostID: presentationHostID))
             }
     }
 }

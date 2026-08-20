@@ -41,6 +41,7 @@ private struct RouteBranchModifier: ViewModifier {
     let branch: AnyHashable
 
     @State private var branchScope: RouteScope
+    @State private var presentationHostID = RoutePresentationHostID()
 
     @Environment(Router.self) private var router
     @Environment(\.routeScope) private var parentScope
@@ -77,7 +78,10 @@ private struct RouteBranchModifier: ViewModifier {
             // `routePresentationStyleModifiers()`.
             .background {
                 Color.black.frame(width: .zero, height: .zero)
-                    .routePresentationStyleModifiers(for: adoptedDeclarations)
+                    .routePresentationStyleModifiers(
+                        for: adoptedDeclarations,
+                        hostedBy: presentationHostID
+                    )
                     .routeScopeEnvironment(branchScope)
             }
     }
@@ -91,7 +95,8 @@ private struct RouteBranchModifier: ViewModifier {
             parentScope.registerBranchScope(
                 branchScope,
                 for: branch,
-                sourceEnvironment: sourceEnvironment
+                sourceEnvironment: sourceEnvironment,
+                presentationHostID: presentationHostID
             )
         }
         router.resumePendingRoute(for: branch, in: parentScope)
@@ -115,5 +120,6 @@ private struct RouteBranchModifier: ViewModifier {
         }
 
         return [RouteScopeDeclaration(routes: routes)]
+            .hosted(by: presentationHostID)
     }
 }

@@ -29,13 +29,18 @@ import Testing
 struct IOS17NavigationStackPushWorkaroundTests {
     @Test func installedPushDismissalWaitsForViewExitBeforeTrimmingPath() async throws {
         let router = makeRouterWithWorkaround()
+        let presentationHostID = RoutePresentationHostID()
 
-        installPushDeclaration(in: router)
+        installPushDeclaration(in: router, hostedBy: presentationHostID)
         await router.requestRoute(HomeDetailRoute())
         let pushedScope = try #require(router.normalTree.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
-        let presentation = router.routePresentationBinding(from: router.root, matching: .push)
+        let presentation = router.routePresentationBinding(
+            from: router.root,
+            matching: .push,
+            hostedBy: presentationHostID
+        )
         presentation.wrappedValue = nil
         await Task.yield()
 
@@ -209,12 +214,18 @@ struct IOS17NavigationStackPushWorkaroundTests {
         return router
     }
 
-    private func installPushDeclaration(in router: Router) {
+    private func installPushDeclaration(
+        in router: Router,
+        hostedBy presentationHostID: RoutePresentationHostID? = nil
+    ) {
+        let declarations = Push(HomeDetailRoute.self)._routeDeclarations
         router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
             routeDeclarations: [
-                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+                RouteScopeDeclaration(
+                    routes: presentationHostID.map { declarations.hosted(by: $0) } ?? declarations
+                ),
             ]
         )
     }

@@ -83,6 +83,7 @@ private struct RoutesModifier: ViewModifier {
     let declarations: [RouteScopeDeclaration]
 
     @State private var sourceID = AnyHashable(UUID())
+    @State private var presentationHostID = RoutePresentationHostID()
 
     @Environment(Router.self) private var router
     @Environment(\.routeScope) private var routeScope
@@ -120,7 +121,10 @@ private struct RoutesModifier: ViewModifier {
             // the scope's freshly installed route declarations.
             .background {
                 Color.black.frame(width: .zero, height: .zero)
-                    .routePresentationStyleModifiers(for: declarations)
+                    .routePresentationStyleModifiers(
+                        for: hostedDeclarations,
+                        hostedBy: presentationHostID
+                    )
             }
     }
 
@@ -133,7 +137,7 @@ private struct RoutesModifier: ViewModifier {
             sourceID: sourceID,
             id: explicitScopeID,
             branchSelection: selection,
-            routeDeclarations: declarations,
+            routeDeclarations: hostedDeclarations,
             sourceEnvironment: sourceEnvironment
         )
 
@@ -144,7 +148,7 @@ private struct RoutesModifier: ViewModifier {
         router.mutateRouteGraph {
             routeScope.commitRouteDeclarationInstallation(
                 branchSelection: selection,
-                routeDeclarations: declarations
+                routeDeclarations: hostedDeclarations
             )
         }
 
@@ -163,5 +167,18 @@ private struct RoutesModifier: ViewModifier {
 
     private var accumulatedBranchRouteDeclarations: [RouteScopeDeclaration] {
         branchRouteDeclarations + declarations.filter { $0.branch != nil }
+    }
+
+    private var hostedDeclarations: [RouteScopeDeclaration] {
+        declarations.map { declaration in
+            guard declaration.branch == nil else {
+                return declaration
+            }
+
+            return RouteScopeDeclaration(
+                branch: nil,
+                routes: declaration.routes.hosted(by: presentationHostID)
+            )
+        }
     }
 }

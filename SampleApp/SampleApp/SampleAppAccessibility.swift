@@ -53,6 +53,7 @@ enum SampleAppAccessibility {
     static let lifecycleTeardownBackgroundCount = "sample.lifecycle-teardown.background-count"
 
     static let settingsAppearanceButton = "sample.settings.appearance"
+    static let settingsLocalDetailButton = "sample.settings.local-detail"
     static let settingsAuthenticationButton = "sample.settings.authentication"
     static let settingsProfileButton = "sample.settings.profile"
     static let settingsSaveAppearanceButton = "sample.settings.save-appearance"
@@ -64,6 +65,10 @@ enum SampleAppAccessibility {
     static let settingsMissingUnwindButton = "sample.settings.missing-unwind"
     static let settingsMissingUnwindResult = "sample.settings.missing-unwind-result"
     static let settingsBranchHookStatus = "sample.settings.branch-hook-status"
+
+    static let localDetailTitle = "sample.local-detail.title"
+    static let localDetailAdvanceButton = "sample.local-detail.advance"
+    static let localDetailUpdateCount = "sample.local-detail.update-count"
 
     static let appearanceTitle = "sample.appearance.title"
     static let appearanceValue = "sample.appearance.value"
