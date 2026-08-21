@@ -101,6 +101,10 @@ extension Router {
         }
 
         let routeType = type(of: route)
+        log.departureDebug(.routeLookupStarted(
+            routeType: routeType,
+            activePath: routeForest.activeTree.currentRoutePath.departureDebugPathDescription
+        ))
         guard let match = routeForest.firstDeclaration(including: routeType) else {
             return .dropNoDeclaration(routeType: routeType)
         }
@@ -138,6 +142,13 @@ extension Router {
     }
 
     struct DeclarationMatch {
+        enum LookupStrategy: Equatable {
+            case currentPath(treePriority: RoutePriority)
+            case rootPath(treePriority: RoutePriority)
+            case normalRootActiveBranchScope
+            case normalRootDeclarations
+        }
+
         struct Location {
             let path: RoutePath
             let position: RoutePath.Position
@@ -152,6 +163,23 @@ extension Router {
         let declarationLocation: Location
         let branchID: AnyHashable?
         let declaration: AnyRouteDeclaration
+        let lookupStrategy: LookupStrategy
+
+        init(
+            presentationLocation: Location,
+            tree: RouteTree,
+            declarationLocation: Location,
+            branchID: AnyHashable?,
+            declaration: AnyRouteDeclaration,
+            lookupStrategy: LookupStrategy
+        ) {
+            self.presentationLocation = presentationLocation
+            self.tree = tree
+            self.declarationLocation = declarationLocation
+            self.branchID = branchID
+            self.declaration = declaration
+            self.lookupStrategy = lookupStrategy
+        }
     }
 
     func priorityDecision(for match: DeclarationMatch) -> PriorityDecision {
@@ -202,14 +230,16 @@ extension Router.DeclarationMatch {
         tree: RouteTree,
         declaringPath: RoutePath,
         declaringPosition: RoutePath.Position,
-        attachment: RouteScope.RouteAttachmentMatch
+        attachment: RouteScope.RouteAttachmentMatch,
+        lookupStrategy: LookupStrategy
     ) {
         self.init(
             presentationLocation: .init(path: routePath.path, position: routePath.position),
             tree: tree,
             declarationLocation: .init(path: declaringPath, position: declaringPosition),
             branchID: attachment.branchID,
-            declaration: attachment.declaration
+            declaration: attachment.declaration,
+            lookupStrategy: lookupStrategy
         )
     }
 
@@ -221,7 +251,8 @@ extension Router.DeclarationMatch {
             tree: tree,
             declarationLocation: declarationLocation,
             branchID: branchID,
-            declaration: declaration
+            declaration: declaration,
+            lookupStrategy: lookupStrategy
         )
     }
 }

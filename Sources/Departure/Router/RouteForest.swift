@@ -388,12 +388,22 @@ private extension [RoutePathTrim] {
 extension RouteForest {
     func firstDeclaration(including routeType: any Route.Type) -> Router.DeclarationMatch? {
         for tree in declarationSearchTrees {
-            if let match = firstDeclaration(in: tree.currentRoutePath, tree: tree, including: routeType) {
+            if let match = firstDeclaration(
+                in: tree.currentRoutePath,
+                tree: tree,
+                including: routeType,
+                lookupStrategy: .currentPath(treePriority: tree.priority)
+            ) {
                 return match
             }
 
             if tree.currentRoutePath !== tree.rootPath,
-               let match = firstDeclaration(in: tree.rootPath, tree: tree, including: routeType) {
+               let match = firstDeclaration(
+                in: tree.rootPath,
+                tree: tree,
+                including: routeType,
+                lookupStrategy: .rootPath(treePriority: tree.priority)
+            ) {
                 return match
             }
         }
@@ -406,7 +416,8 @@ extension RouteForest {
                 tree: normalTree,
                 declaringPath: normalTree.rootPath,
                 declaringPosition: .owner,
-                attachment: match
+                attachment: match,
+                lookupStrategy: .normalRootActiveBranchScope
             )
         }
 
@@ -417,7 +428,8 @@ extension RouteForest {
                 tree: normalTree,
                 declaringPath: normalTree.rootPath,
                 declaringPosition: .owner,
-                attachment: match
+                attachment: match,
+                lookupStrategy: .normalRootDeclarations
             )
         }
 
@@ -427,7 +439,8 @@ extension RouteForest {
     private func firstDeclaration(
         in searchPath: RoutePath,
         tree: RouteTree,
-        including routeType: any Route.Type
+        including routeType: any Route.Type,
+        lookupStrategy: Router.DeclarationMatch.LookupStrategy
     ) -> Router.DeclarationMatch? {
         for scope in searchPath.scopes.reversed() {
             let position = RoutePath.Position.scope(scope)
@@ -445,7 +458,8 @@ extension RouteForest {
                     tree: tree,
                     declaringPath: searchPath,
                     declaringPosition: position,
-                    attachment: match
+                    attachment: match,
+                    lookupStrategy: lookupStrategy
                 )
             }
 
@@ -455,7 +469,8 @@ extension RouteForest {
                     tree: tree,
                     declaringPath: searchPath,
                     declaringPosition: position,
-                    attachment: match
+                    attachment: match,
+                    lookupStrategy: lookupStrategy
                 )
             }
         }
@@ -470,7 +485,8 @@ extension RouteForest {
                 tree: tree,
                 declaringPath: searchPath,
                 declaringPosition: .owner,
-                attachment: match
+                attachment: match,
+                lookupStrategy: lookupStrategy
             )
         }
 

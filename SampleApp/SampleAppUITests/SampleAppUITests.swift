@@ -85,6 +85,22 @@ final class SampleAppUITests: XCTestCase {
         assertLabel(A11y.localDetailUpdateCount, contains: "Local updates: 1")
     }
 
+    func testAncestorPushReplacementFromTwoDeepStack() {
+        openLanding()
+        tapSettingsTab()
+
+        tap(A11y.settingsAppearanceButton)
+        assertExists(A11y.appearanceTitle)
+
+        tap(A11y.appearancePresentAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
+
+        tap(A11y.authenticationPresentRootSettingsPushButton)
+        assertExists(A11y.localDetailTitle)
+        assertGone(A11y.authenticationTitle)
+        assertGone(A11y.appearanceTitle)
+    }
+
     func testModalArbitrationAndChainingFromPushedBranch() {
         openLanding()
         tapSettingsTab()
@@ -780,6 +796,7 @@ private enum A11y {
     static let authenticationAttachLocalRouteToggle = "sample.authentication.attach-local-route"
     static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
     static let authenticationPresentTopLevelCoverButton = "sample.authentication.present-top-level-cover"
+    static let authenticationPresentRootSettingsPushButton = "sample.authentication.present-root-settings-push"
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
     static let authenticationUnwindToTopmostAncestorButton = "sample.authentication.unwind-to-topmost-ancestor"
     static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"

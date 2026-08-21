@@ -82,17 +82,20 @@ extension Router {
         let routeForest: RouteForest
         let preservesModalPresentationBindings: Bool
         let preservesPushPresentationBindings: Bool
+        let unanimatedPushPresentationScopeIDs: Set<ObjectIdentifier>
 
         init(
             preservedPaths: [RouteForest.PreservedRoutePath],
             routeForest: RouteForest,
             preservesModalPresentationBindings: Bool,
-            preservesPushPresentationBindings: Bool
+            preservesPushPresentationBindings: Bool,
+            unanimatedPushPresentationScopeIDs: Set<ObjectIdentifier>
         ) {
             self.preservedPaths = preservedPaths
             self.routeForest = routeForest
             self.preservesModalPresentationBindings = preservesModalPresentationBindings
             self.preservesPushPresentationBindings = preservesPushPresentationBindings
+            self.unanimatedPushPresentationScopeIDs = unanimatedPushPresentationScopeIDs
         }
     }
 
@@ -952,12 +955,14 @@ extension Router {
                 return presentationKind != .push
             }
 
-            await waitForRouteScopesToLeaveView(installedModalScopes)
-            clearUnwindPresentationSnapshot(id: presentationSnapshotID)
+            if installedModalScopes.isEmpty == false {
+                await waitForRouteScopesToLeaveView(installedModalScopes)
+                clearUnwindPresentationSnapshot(id: presentationSnapshotID)
 
-            guard pendingRoute === pendingAppend else {
-                log.departureDebug(.routeAppendSuperseded(route: route))
-                return true
+                guard pendingRoute === pendingAppend else {
+                    log.departureDebug(.routeAppendSuperseded(route: route))
+                    return true
+                }
             }
         }
 
@@ -1030,7 +1035,9 @@ extension Router {
             preservesModalPresentationBindings: false
         )
 
-        guard snapshot.preservesPushPresentationBindings else {
+        guard snapshot.preservesPushPresentationBindings
+            || snapshot.unanimatedPushPresentationScopeIDs.isEmpty == false
+        else {
             return nil
         }
 
@@ -1043,22 +1050,61 @@ extension Router {
         preservesModalPresentationBindings: Bool = true
     ) -> UnwindPresentationSnapshot {
         // A departing modal tears down its nested NavigationStack as part of the same
-        // transition. Keep that stack bound until the modal has left; a push-only unwind
-        // must still clear its binding immediately.
-        let preservesPushPresentationBindings = plan.removedScopes.contains {
+        // transition. Keep that stack bound until the modal has left. For a push-only unwind,
+        // every binding clears together, but only the outermost removed push animates so SwiftUI
+        // coalesces the path change into one visible pop.
+        let containsDepartingModal = plan.removedScopes.contains {
             guard let presentationKind = $0.presentationDeclaration?.presentationKind else {
                 return false
             }
 
             return presentationKind != .push
         }
+        let animatedPushPresentationScopeIDs = containsDepartingModal
+            ? []
+            : outermostPushPresentationScopeIDs(in: plan)
+        let removedPushPresentationScopeIDs = Set(plan.removedScopes.compactMap { routeScope in
+            routeScope.presentationDeclaration?.presentationKind == .push
+                ? ObjectIdentifier(routeScope)
+                : nil
+        })
+        let unanimatedPushPresentationScopeIDs = containsDepartingModal
+            ? []
+            : removedPushPresentationScopeIDs.subtracting(animatedPushPresentationScopeIDs)
 
         return UnwindPresentationSnapshot(
             preservedPaths: plan.preservedPaths,
             routeForest: routeForest,
             preservesModalPresentationBindings: preservesModalPresentationBindings,
-            preservesPushPresentationBindings: preservesPushPresentationBindings
+            preservesPushPresentationBindings: containsDepartingModal,
+            unanimatedPushPresentationScopeIDs: unanimatedPushPresentationScopeIDs
         )
+    }
+
+    func outermostPushPresentationScopeIDs(
+        in plan: RouteForest.UnwindPlan
+    ) -> Set<ObjectIdentifier> {
+        let removedScopeIDs = Set(plan.removedScopes.map(ObjectIdentifier.init))
+
+        return Set(plan.preservedPaths.compactMap { preservedPath in
+            guard
+                let firstRemovedScope = preservedPath.scopes.first,
+                firstRemovedScope.presentationDeclaration?.presentationKind == .push
+            else {
+                return nil
+            }
+
+            var ancestorScope = preservedPath.routePath.owner
+            while let currentScope = ancestorScope {
+                if removedScopeIDs.contains(ObjectIdentifier(currentScope)) {
+                    return nil
+                }
+
+                ancestorScope = currentScope.previousScopeInTree
+            }
+
+            return ObjectIdentifier(firstRemovedScope)
+        })
     }
 
     func clearUnwindPresentationSnapshot(id: UUID?) {

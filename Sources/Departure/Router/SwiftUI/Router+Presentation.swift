@@ -55,6 +55,34 @@ struct RoutePresentation: Identifiable, Hashable {
 }
 
 extension Router {
+    func pushPresentationDismissalDisablesAnimations(
+        from routeScope: RouteScope?,
+        hostedBy presentationHostID: RoutePresentationHostID? = nil
+    ) -> Bool {
+        let routeScope = routeScope ?? root
+        guard let unwindPresentationSnapshot else {
+            return false
+        }
+
+        return unwindPresentationSnapshot.preservedPaths.contains { path in
+            path.scopes.contains { presentedScope in
+                guard
+                    unwindPresentationSnapshot.unanimatedPushPresentationScopeIDs
+                        .contains(ObjectIdentifier(presentedScope)),
+                    presentedScope.presentationOrigin === routeScope,
+                    let declaration = presentedScope.presentationDeclaration,
+                    declaration.presentationKind == .push,
+                    presentationHostID == nil
+                        || declaration.presentationHostID == presentationHostID
+                else {
+                    return false
+                }
+
+                return true
+            }
+        }
+    }
+
     func routePresentationBinding(
         from routeScope: RouteScope?,
         matching presentationKind: RoutePresentationKind,

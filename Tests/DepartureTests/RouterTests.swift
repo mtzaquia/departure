@@ -946,7 +946,8 @@ struct RouterTests {
                 position: .scope(landingScope)
             ),
             branchID: AnyHashable(AppTab.home),
-            declaration: pushDeclaration
+            declaration: pushDeclaration,
+            lookupStrategy: .rootPath(treePriority: .normal)
         )
         let requestTask = Task {
             await router.unwindToExistingEquivalentRouteIfNeeded(
@@ -3203,6 +3204,76 @@ struct RouterTests {
         _ = await unwindTask.value
     }
 
+    @Test func routeAppendAnimatesOnlyOutermostPushDuringMultiScreenPop() async throws {
+        let router = Router()
+        let appearanceScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let authenticationScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(
+                    routes: Push(LoginRoute.self)._routeDeclarations
+                    + Push(TransactionRoute.self)._routeDeclarations
+                ),
+            ]
+        )
+        appearanceScope.installRouteDeclarations(
+            id: LoginRoute().id,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+        appearanceScope.attachPresentation(
+            to: router.root,
+            declaration: try #require(router.root.routeAttachments.first { $0.routeType == LoginRoute.self })
+        )
+        authenticationScope.attachPresentation(
+            to: appearanceScope,
+            declaration: try #require(appearanceScope.routeAttachments.first { $0.routeType == SettingsRoute.self })
+        )
+        router.normalTree.rootPath.scopes = [appearanceScope, authenticationScope]
+        router.routeScopeDidInstallInView(appearanceScope)
+        router.routeScopeDidInstallInView(authenticationScope)
+
+        let requestTask = Task {
+            await router.requestRoute(TransactionRoute())
+        }
+
+        for _ in 0..<10 where router.normalTree.rootPath.isEmpty == false {
+            await Task.yield()
+        }
+
+        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue == nil)
+        #expect(
+            router.routePresentationBinding(from: appearanceScope, matching: .push)
+                .wrappedValue == nil
+        )
+        #expect(
+            router.pushPresentationDismissalDisablesAnimations(
+                from: router.root,
+                hostedBy: router.root.routeAttachments[0].presentationHostID
+            ) == false
+        )
+        #expect(
+            router.pushPresentationDismissalDisablesAnimations(
+                from: appearanceScope,
+                hostedBy: appearanceScope.routeAttachments[0].presentationHostID
+            )
+        )
+
+        router.routeScopeDidLeaveView(authenticationScope)
+        router.routeScopeDidLeaveView(appearanceScope)
+        await requestTask.value
+
+        #expect(router.unwindPresentationSnapshot == nil)
+        #expect(router.normalTree.rootPath.count == 1)
+        #expect(router.normalTree.rootPath.last?.route is TransactionRoute)
+    }
+
     @Test func inactiveBranchPathIsPreservedWhenActiveBranchChanges() async throws {
         let router = Router()
         let (selection, selectedTab) = tabSelection(.home)
@@ -3474,6 +3545,49 @@ struct RouterTests {
     }
 
     #if DEBUG
+    @Test func routeLookupTraceDescribesSearchOrder() {
+        let event = DepartureLogEvent.routeLookupStarted(
+            routeType: SettingsRoute.self,
+            activePath: "RootRoute › LoginRoute › SettingsRoute"
+        )
+        let isTrace = if case .trace = event.logLevel { true } else { false }
+        let expectedMessage = "looking up SettingsRoute"
+            + " | strategy=highest eligible tree first, current path before root path, nearest scope first"
+            + "\n  active path: RootRoute › LoginRoute › SettingsRoute"
+
+        #expect(isTrace)
+        #expect(event.message == expectedMessage)
+    }
+
+    @Test func ancestorPushLookupExplainsSingleMultiScopeTrim() throws {
+        let router = Router()
+        let ancestorScope = RouteScope(id: RootRoute().id, route: RootRoute())
+        let firstDescendant = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let secondDescendant = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
+
+        ancestorScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(MessageRoute.self)._routeDeclarations),
+            ]
+        )
+        router.normalTree.rootPath.scopes = [ancestorScope, firstDescendant, secondDescendant]
+
+        let match = try #require(router.routeForest.firstDeclaration(including: MessageRoute.self))
+        let plan = router.routeAppendUnwindPlan(after: match)
+        let expectedDescription = "MessageRoute[push] • local scope"
+            + " • lookup=current route path in normal tree, nearest scope first"
+
+        #expect(match.lookupStrategy == .currentPath(treePriority: .normal))
+        #expect(match.departureDebugDescription == expectedDescription)
+        #expect(plan.pathTrims.count == 1)
+        #expect(plan.pathTrims.first?.keepThrough == .scope(ancestorScope))
+        #expect(plan.removedScopes.count == 2)
+        #expect(plan.removedScopes[0] === firstDescendant)
+        #expect(plan.removedScopes[1] === secondDescendant)
+    }
+
     @Test func unwindRequestLogMessagesDescribeTheirActualTargets() {
         #expect(
             DepartureLogEvent.unwindRequested(target: nil).message

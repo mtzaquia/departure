@@ -34,6 +34,10 @@ struct PushPresentationStyleModifier: ViewModifier {
             matching: .push,
             hostedBy: presentationHostID
         )
+        let disablesDismissalAnimations = router.pushPresentationDismissalDisablesAnimations(
+            from: routeScope,
+            hostedBy: presentationHostID
+        )
 
         content
             .navigationDestination(item: presentation) { route in
@@ -41,6 +45,11 @@ struct PushPresentationStyleModifier: ViewModifier {
                     scope: route.scope,
                     providesNavigation: route.providesNavigation
                 )
+            }
+            .transaction { transaction in
+                if disablesDismissalAnimations {
+                    transaction.disablesAnimations = true
+                }
             }
     }
 }

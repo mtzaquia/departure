@@ -83,7 +83,7 @@ extension AnyRouteDeclaration {
     }
 }
 
-private func departureDebugName(for type: Any.Type) -> String {
+func departureDebugName(for type: Any.Type) -> String {
     String(reflecting: type).split(separator: ".").last.map(String.init) ?? String(describing: type)
 }
 

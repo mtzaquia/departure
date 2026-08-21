@@ -84,6 +84,7 @@ enum SampleAppAccessibility {
     static let authenticationAttachLocalRouteToggle = "sample.authentication.attach-local-route"
     static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
     static let authenticationPresentTopLevelCoverButton = "sample.authentication.present-top-level-cover"
+    static let authenticationPresentRootSettingsPushButton = "sample.authentication.present-root-settings-push"
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
     static let authenticationUnwindToTopmostAncestorButton = "sample.authentication.unwind-to-topmost-ancestor"
     static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"

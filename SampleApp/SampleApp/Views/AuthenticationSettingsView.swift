@@ -67,6 +67,7 @@ struct AuthenticationSettingsView: View {
                     action("Top-level sheet", symbol: "rectangle.bottomhalf.inset.filled", id: SampleAppAccessibility.authenticationPresentTopLevelSheetButton) { await router.present(TopLevelSheetRoute()) }
                     action("Top-level cover", symbol: "rectangle.fill", id: SampleAppAccessibility.authenticationPresentTopLevelCoverButton) { await router.present(TopLevelCoverRoute()) }
                     action("Declaration crawl", symbol: "arrow.up.left.and.arrow.down.right", color: LabPalette.blue) { await router.present(StartInfoRoute()) }
+                    action("Root settings push", symbol: "arrow.uturn.backward.square.fill", color: LabPalette.blue, id: SampleAppAccessibility.authenticationPresentRootSettingsPushButton) { await router.present(LocalDetailRoute()) }
                     action("Root", symbol: "house.fill", color: LabPalette.coral, id: SampleAppAccessibility.authenticationUnwindToRootButton) { await router.unwind(to: .root) }
                     action("Topmost ancestor", symbol: "arrow.up.to.line", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindToTopmostAncestorButton) { await router.unwind(to: .topmostAncestor) }
                     action("Nearest branch", symbol: "arrow.uturn.backward", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindToNearestBranchButton) { await router.unwind(to: .nearestBranch) }

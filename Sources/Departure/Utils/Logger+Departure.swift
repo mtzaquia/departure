@@ -31,7 +31,8 @@ public enum Departure {
         case off
         /// Shows requests, routing decisions, outcomes, and resulting route paths.
         case normal
-        /// Includes declaration, lifecycle, and waiting details in addition to normal logs.
+        /// Includes declaration lookup strategy, lifecycle, and waiting details in addition to
+        /// normal logs.
         case trace
     }
 
@@ -104,6 +105,7 @@ enum DepartureLogEvent {
     case routeDroppedBranchActivationFailed(branch: AnyHashable)
     case routeDroppedNoDeclaration(routeType: any Route.Type)
     case routeDroppedResolution
+    case routeLookupStarted(routeType: any Route.Type, activePath: String)
     case routeNoOpEquivalent(route: any Route, currentRoute: any Route)
     case routeMatched(route: any Route, match: Router.DeclarationMatch)
     case routePendingWaitingForActivatedBranchHost(route: any Route, branch: AnyHashable)
@@ -193,6 +195,7 @@ extension DepartureLogEvent {
              .routeCannotPresentNoActiveLocalScope,
              .routeDeclarationsUninstalled,
              .routeDeclarationsInstalled,
+             .routeLookupStarted,
              .scopeInstalledInView,
              .scopeUninstalledFromView,
              .viewExitWaitProgress,
@@ -412,6 +415,10 @@ extension DepartureLogEvent {
             "dropped \(String(reflecting: routeType)) — no declaration found"
         case .routeDroppedResolution:
             "dropped by route resolution"
+        case let .routeLookupStarted(routeType, activePath):
+            "looking up \(departureDebugName(for: routeType))"
+                + " | strategy=highest eligible tree first, current path before root path, nearest scope first"
+                + "\n  active path: \(activePath)"
         case let .routeNoOpEquivalent(route, currentRoute):
             "kept \(currentRoute.departureDebugDescription) — already equivalent to \(route.departureDebugDescription)"
         case let .routeMatched(route, match):
@@ -467,6 +474,7 @@ extension Router.DeclarationMatch {
         } ?? "local scope"
 
         let description = "\(declaration.departureDebugDescription) • \(placementDescription)"
+            + " • lookup=\(lookupStrategy.departureDebugDescription)"
         guard presentationLocation.path !== declarationLocation.path
             || presentationLocation.position != declarationLocation.position
         else {
@@ -474,6 +482,21 @@ extension Router.DeclarationMatch {
         }
 
         return "\(description) • declared at \(declarationLocation.position) • presents at \(presentationLocation.position)"
+    }
+}
+
+private extension Router.DeclarationMatch.LookupStrategy {
+    var departureDebugDescription: String {
+        switch self {
+        case let .currentPath(treePriority):
+            "current route path in \(treePriority) tree, nearest scope first"
+        case let .rootPath(treePriority):
+            "root path in \(treePriority) tree, nearest scope first"
+        case .normalRootActiveBranchScope:
+            "active branch scope under normal root"
+        case .normalRootDeclarations:
+            "normal root declarations, active branch before local and inactive branches"
+        }
     }
 }
 #endif
