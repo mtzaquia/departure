@@ -53,10 +53,6 @@ struct WindowDestinationBuilder {
     }
 }
 
-extension EnvironmentValues {
-    @Entry var windowDestinationBuilder = WindowDestinationBuilder.passthrough
-}
-
 private enum MissingWindowDestinationWarning {
     private static var wasEmitted = false
 

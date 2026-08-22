@@ -41,12 +41,12 @@ public struct UnwindRouteAction: Equatable {
     }
 
     private let identity: Identity
-    private let handle: @MainActor (Any?) async -> Bool
+    private let handler: Handler?
 
     /// Creates an inactive unwind action.
     public init() {
         self.identity = .inactive
-        self.handle = { _ in false }
+        self.handler = nil
     }
 
     init(router: Router, routeScope: RouteScope) {
@@ -54,13 +54,7 @@ public struct UnwindRouteAction: Equatable {
             routerID: router.id,
             routeScopeID: ObjectIdentifier(routeScope)
         )
-        self.handle = { [weak routeScope] payload in
-            guard let routeScope else {
-                return false
-            }
-
-            return await router.unwindPrevious(from: routeScope, payload: payload)
-        }
+        self.handler = Handler(router: router, routeScope: routeScope)
     }
 
     /// Unwinds the captured route scope.
@@ -69,7 +63,7 @@ public struct UnwindRouteAction: Equatable {
     /// and any removed installed route scopes have left the view hierarchy.
     @discardableResult
     public func callAsFunction() async -> Bool {
-        await handle(nil)
+        await handler?.unwind(payload: nil) ?? false
     }
 
     /// Unwinds the captured route scope and delivers a payload to a matching ``UnwindHandler``.
@@ -78,11 +72,29 @@ public struct UnwindRouteAction: Equatable {
     /// and any removed installed route scopes have left the view hierarchy.
     @discardableResult
     public func callAsFunction<Payload>(payload: Payload) async -> Bool {
-        await handle(payload)
+        await handler?.unwind(payload: payload) ?? false
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.identity == rhs.identity
+    }
+
+    private final class Handler {
+        let router: Router
+        weak var routeScope: RouteScope?
+
+        init(router: Router, routeScope: RouteScope) {
+            self.router = router
+            self.routeScope = routeScope
+        }
+
+        func unwind(payload: Any?) async -> Bool {
+            guard let routeScope else {
+                return false
+            }
+
+            return await router.unwindPrevious(from: routeScope, payload: payload)
+        }
     }
 }
 

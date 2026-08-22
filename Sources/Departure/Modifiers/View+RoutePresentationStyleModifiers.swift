@@ -25,30 +25,41 @@ import SwiftUI
 extension View {
     /// Installs the presentation hosts for the styles present in `declarations`.
     ///
-    /// Hosts are attached conditionally so a style's host is never present unless that style is
-    /// declared — notably `navigationDestination` (push) is only attached when a push is declared,
-    /// so scopes that never push don't require a surrounding `NavigationStack`.
-    ///
-    /// - Important: Because the conditionals produce `_ConditionalContent`, the set of hosts
-    ///   changing tears down and rebuilds this subtree. Callers must install this in a layer
-    ///   detached from the scope's route-declaration installation lifecycle (e.g. a `background`);
-    ///   otherwise the churn uninstalls freshly installed declarations.
+    /// Each style occupies an independent, stable background slot. The slot's host is present only
+    /// while that style is declared — notably `navigationDestination` (push) is never attached when
+    /// no push exists, so scopes that never push don't require a surrounding `NavigationStack`.
     func routePresentationStyleModifiers(
         for declarations: [RouteScopeDeclaration],
         hostedBy presentationHostID: RoutePresentationHostID
     ) -> some View {
         self
-            .applyIf(declarations.containsPresentationKind(.push)) {
-                $0.modifier(PushPresentationStyleModifier(presentationHostID: presentationHostID))
+            .background {
+                if declarations.containsPresentationKind(.push) {
+                    presentationHost
+                        .modifier(PushPresentationStyleModifier(presentationHostID: presentationHostID))
+                }
             }
-            .applyIf(declarations.containsPresentationKind(.sheet)) {
-                $0.modifier(SheetPresentationStyleModifier(presentationHostID: presentationHostID))
+            .background {
+                if declarations.containsPresentationKind(.sheet) {
+                    presentationHost
+                        .modifier(SheetPresentationStyleModifier(presentationHostID: presentationHostID))
+                }
             }
-            .applyIf(declarations.containsPresentationKind(.cover(.slide))) {
-                $0.modifier(CoverSlidePresentationStyleModifier(presentationHostID: presentationHostID))
+            .background {
+                if declarations.containsPresentationKind(.cover(.slide)) {
+                    presentationHost
+                        .modifier(CoverSlidePresentationStyleModifier(presentationHostID: presentationHostID))
+                }
             }
-            .applyIf(declarations.containsPresentationKind(.cover(.fade))) {
-                $0.modifier(CoverFadePresentationStyleModifier(presentationHostID: presentationHostID))
+            .background {
+                if declarations.containsPresentationKind(.cover(.fade)) {
+                    presentationHost
+                        .modifier(CoverFadePresentationStyleModifier(presentationHostID: presentationHostID))
+                }
             }
+    }
+
+    private var presentationHost: some View {
+        Color.clear.frame(width: 0, height: 0)
     }
 }

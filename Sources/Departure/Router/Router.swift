@@ -83,6 +83,9 @@ public final class Router: Identifiable, Equatable {
     var ios17NavigationStackPushWorkaround: (any IOS17NavigationStackPushWorkaroundHandling)? =
         IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform()
 
+    @ObservationIgnored
+    var windowDestinationBuilder = WindowDestinationBuilder.passthrough
+
     var activeRouteScopeID: ObjectIdentifier
 
     var root: RouteScope {

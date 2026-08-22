@@ -88,17 +88,16 @@ private struct RoutesModifier: ViewModifier {
     @Environment(Router.self) private var router
     @Environment(\.routeScope) private var routeScope
     @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
-    @Environment(\.self) private var sourceEnvironment
 
     func body(content: Content) -> some View {
         let activeBranch = selection?.value()
 
         content
             .environment(\.branchRouteDeclarations, accumulatedBranchRouteDeclarations)
-            .onLifecycleEvent { event in
+            .onSourceEnvironmentLifecycleEvent { sourceEnvironment, event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
-                    installScopeDeclarations()
+                    installScopeDeclarations(sourceEnvironment: sourceEnvironment)
 
                 case .updated(isInstalledInWindow: false):
                     break
@@ -128,7 +127,7 @@ private struct RoutesModifier: ViewModifier {
             }
     }
 
-    private func installScopeDeclarations() {
+    private func installScopeDeclarations(sourceEnvironment: EnvironmentValues? = nil) {
         guard let routeScope else {
             return
         }
@@ -138,7 +137,7 @@ private struct RoutesModifier: ViewModifier {
             id: explicitScopeID,
             branchSelection: selection,
             routeDeclarations: hostedDeclarations,
-            sourceEnvironment: sourceEnvironment
+            sourceEnvironment: sourceEnvironment ?? routeScope.sourceEnvironment
         )
 
         guard requiresCommit else {

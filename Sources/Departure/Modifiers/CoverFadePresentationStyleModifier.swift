@@ -20,6 +20,7 @@
 //  SOFTWARE.
 //
 
+import Observation
 import SwiftUI
 
 struct CoverFadePresentationStyleModifier: ViewModifier {
@@ -84,27 +85,77 @@ struct ElevatedPriorityCoverFadeHost: View {
 #if canImport(UIKit)
 import UIKit
 
+@Observable
+private final class CoverFadePresentationState {
+    enum SystemPresentationProjection {
+        case value
+    }
+
+    var systemPresentation: RouteDestinationSnapshot?
+    var isContentVisible = false
+    var isDismissing = false
+    var fadeInTaskID: RoutePresentation.ID?
+    var dismissalTaskID: RoutePresentation.ID?
+
+    subscript(systemPresentation _: SystemPresentationProjection) -> RouteDestinationSnapshot? {
+        get {
+            systemPresentation
+        }
+        set {
+            Task { @MainActor [weak self] in
+                await Task.yield()
+                guard let self else {
+                    return
+                }
+
+                guard let newValue else {
+                    dismissWithFade()
+                    return
+                }
+
+                setSystemPresentation(newValue)
+            }
+        }
+    }
+
+    func dismissWithFade() {
+        guard systemPresentation != nil, isDismissing == false else {
+            return
+        }
+
+        isDismissing = true
+        fadeInTaskID = nil
+        dismissalTaskID = systemPresentation?.id
+    }
+
+    func setSystemPresentation(_ presentation: RouteDestinationSnapshot?) {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+
+        withTransaction(transaction) {
+            systemPresentation = presentation
+        }
+    }
+}
+
 private struct CoverFadeModalPresenter: View {
     @Binding var route: RoutePresentation?
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.windowDestinationBuilder) private var windowDestinationBuilder
     let router: Router
-    @State private var systemPresentation: RouteDestinationSnapshot?
-    @State private var isContentVisible = false
-    @State private var isDismissing = false
-    @State private var fadeInTaskID: RoutePresentation.ID?
-    @State private var dismissalTaskID: RoutePresentation.ID?
+    @State private var presentationState = CoverFadePresentationState()
 
     var body: some View {
+        @Bindable var presentationState = presentationState
+
         Color.clear
-            .fullScreenCover(item: systemPresentationBinding, onDismiss: {
+            .fullScreenCover(item: $presentationState[systemPresentation: .value], onDismiss: {
                 scheduleStateMutation {
                     finishSystemDismissal()
                 }
             }) { presentation in
                 destination(for: presentation)
                     .id(presentation.id)
-                    .opacity(isContentVisible ? 1 : 0)
+                    .opacity(presentationState.isContentVisible ? 1 : 0)
                     .presentationBackground(.clear)
                     .onLifecycleEvent { event in
                         if case .installedInWindow(isInitial: true) = event {
@@ -117,11 +168,11 @@ private struct CoverFadeModalPresenter: View {
             .transaction { transaction in
                 transaction.disablesAnimations = true
             }
-            .task(id: fadeInTaskID) {
-                await fadeInContent(for: fadeInTaskID)
+            .task(id: presentationState.fadeInTaskID) {
+                await fadeInContent(for: presentationState.fadeInTaskID)
             }
-            .task(id: dismissalTaskID) {
-                await finishDismissal(for: dismissalTaskID)
+            .task(id: presentationState.dismissalTaskID) {
+                await finishDismissal(for: presentationState.dismissalTaskID)
             }
             .onLifecycleEvent { event in
                 switch event {
@@ -146,26 +197,6 @@ private struct CoverFadeModalPresenter: View {
             }
     }
 
-    private var systemPresentationBinding: Binding<RouteDestinationSnapshot?> {
-        Binding(
-            get: {
-                systemPresentation
-            },
-            set: { newValue in
-                guard newValue == nil else {
-                    scheduleStateMutation {
-                        setSystemPresentation(newValue)
-                    }
-                    return
-                }
-
-                scheduleStateMutation {
-                    dismissWithFade()
-                }
-            }
-        )
-    }
-
     private func scheduleStateMutation(_ mutation: @escaping @MainActor () -> Void) {
         Task { @MainActor in
             await Task.yield()
@@ -174,39 +205,44 @@ private struct CoverFadeModalPresenter: View {
     }
 
     private func syncPresentation() {
-        if isDismissing {
-            guard let route, route.id != systemPresentation?.id else {
+        if presentationState.isDismissing {
+            guard let route, route.id != presentationState.systemPresentation?.id else {
                 return
             }
 
-            dismissalTaskID = nil
-            fadeInTaskID = nil
-            isDismissing = false
+            presentationState.dismissalTaskID = nil
+            presentationState.fadeInTaskID = nil
+            presentationState.isDismissing = false
         }
 
         guard let route else {
-            dismissWithFade()
+            presentationState.dismissWithFade()
             return
         }
 
-        let presentation = RouteDestinationSnapshot(route: route, destinationBuilder: windowDestinationBuilder)
+        let presentation = RouteDestinationSnapshot(
+            route: route,
+            destinationBuilder: router.windowDestinationBuilder
+        )
 
-        guard systemPresentation?.id != presentation.id else {
+        guard presentationState.systemPresentation?.id != presentation.id else {
             return
         }
 
-        dismissalTaskID = nil
-        fadeInTaskID = nil
-        isContentVisible = false
-        setSystemPresentation(presentation)
+        presentationState.dismissalTaskID = nil
+        presentationState.fadeInTaskID = nil
+        presentationState.isContentVisible = false
+        presentationState.setSystemPresentation(presentation)
     }
 
     private func fadeInContentIfNeeded(for id: RoutePresentation.ID) {
-        guard isDismissing == false, systemPresentation?.id == id else {
+        guard presentationState.isDismissing == false,
+              presentationState.systemPresentation?.id == id
+        else {
             return
         }
 
-        fadeInTaskID = id
+        presentationState.fadeInTaskID = id
     }
 
     private func fadeInContent(for id: RoutePresentation.ID?) async {
@@ -217,30 +253,15 @@ private struct CoverFadeModalPresenter: View {
         await Task.yield()
         guard
             Task.isCancelled == false,
-            isDismissing == false,
-            systemPresentation?.id == id
+            presentationState.isDismissing == false,
+            presentationState.systemPresentation?.id == id
         else {
             return
         }
 
         withAnimation(.easeInOut(duration: presentationFadeDuration)) {
-            isContentVisible = true
+            presentationState.isContentVisible = true
         }
-    }
-
-    private func dismissWithFade() {
-        guard systemPresentation != nil else {
-            route = nil
-            return
-        }
-
-        guard isDismissing == false else {
-            return
-        }
-
-        isDismissing = true
-        fadeInTaskID = nil
-        dismissalTaskID = systemPresentation?.id
     }
 
     private func finishDismissal(for id: RoutePresentation.ID?) async {
@@ -249,34 +270,37 @@ private struct CoverFadeModalPresenter: View {
         }
 
         withAnimation(.easeInOut(duration: dismissalFadeDuration)) {
-            isContentVisible = false
+            presentationState.isContentVisible = false
         }
 
         try? await Task.sleep(for: .seconds(dismissalFadeDuration))
         guard
             Task.isCancelled == false,
-            isDismissing,
-            systemPresentation?.id == id
+            presentationState.isDismissing,
+            presentationState.systemPresentation?.id == id
         else {
             return
         }
 
-        setSystemPresentation(nil)
+        presentationState.setSystemPresentation(nil)
         route = nil
-        isDismissing = false
-        dismissalTaskID = nil
+        presentationState.isDismissing = false
+        presentationState.dismissalTaskID = nil
     }
 
     private func finishSystemDismissal() {
-        guard isDismissing || route == nil || systemPresentation == nil else {
+        guard presentationState.isDismissing
+            || route == nil
+            || presentationState.systemPresentation == nil
+        else {
             return
         }
 
-        fadeInTaskID = nil
-        dismissalTaskID = nil
-        isDismissing = false
-        isContentVisible = false
-        systemPresentation = nil
+        presentationState.fadeInTaskID = nil
+        presentationState.dismissalTaskID = nil
+        presentationState.isDismissing = false
+        presentationState.isContentVisible = false
+        presentationState.systemPresentation = nil
         route = nil
     }
 
@@ -284,15 +308,6 @@ private struct CoverFadeModalPresenter: View {
         presentation.destination
             .environment(router)
             .environment(\.scenePhase, scenePhase)
-    }
-
-    private func setSystemPresentation(_ presentation: RouteDestinationSnapshot?) {
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-
-        withTransaction(transaction) {
-            systemPresentation = presentation
-        }
     }
 
     private var presentationFadeDuration: TimeInterval {

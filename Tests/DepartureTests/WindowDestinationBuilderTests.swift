@@ -86,6 +86,36 @@ struct WindowDestinationBuilderTests {
         #expect(snapshot.route == route)
     }
 
+    @Test func withRouterRegistersCustomWindowDestinationBuilderOnRouter() {
+        let router = Router()
+        let recorder = WindowDestinationRecorder()
+        let host = WithRouter(router: router) {
+            Text("Root")
+        } windowDestination: { destination, environment in
+            RecordingWindowDestinationView(
+                destination: destination,
+                environment: environment,
+                recorder: recorder
+            )
+        }
+        var environment = EnvironmentValues()
+        environment.windowDestinationTestValue = "redirected"
+        let route = RoutePresentation(
+            scope: RouteScope(id: RootRoute().id, route: RootRoute()),
+            declaration: Push(RootRoute.self)._routeDeclarations[0],
+            sourceEnvironment: environment
+        )
+
+        _ = RouteDestinationSnapshot(
+            route: route,
+            destinationBuilder: router.windowDestinationBuilder
+        )
+
+        #expect(router.windowDestinationBuilder.hasWindowDestination)
+        #expect(recorder.values == ["redirected"])
+        _ = host
+    }
+
     @Test func windowDestinationReceivesCapturedSourceEnvironment() async throws {
         let router = Router()
         let recorder = WindowDestinationRecorder()

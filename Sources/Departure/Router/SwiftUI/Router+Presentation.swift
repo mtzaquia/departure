@@ -55,6 +55,46 @@ struct RoutePresentation: Identifiable, Hashable {
 }
 
 extension Router {
+    private subscript(presentation projection: RoutePresentationProjection) -> RoutePresentation? {
+        get {
+            routePresentation(
+                from: projection.routeScope ?? root,
+                matching: projection.presentationKind,
+                hostedBy: projection.presentationHostID
+            )
+        }
+        set {
+            guard newValue == nil else {
+                return
+            }
+
+            dismissPresentation(
+                from: projection.routeScope ?? root,
+                matching: projection.presentationKind,
+                hostedBy: projection.presentationHostID
+            )
+        }
+    }
+
+    private subscript(elevatedPresentation projection: ElevatedRoutePresentationProjection) -> RoutePresentation? {
+        get {
+            elevatedRoutePresentation(
+                priority: projection.priority,
+                matching: projection.presentationKind
+            )
+        }
+        set {
+            guard newValue == nil else {
+                return
+            }
+
+            dismissElevatedPresentation(
+                priority: projection.priority,
+                matching: projection.presentationKind
+            )
+        }
+    }
+
     func pushPresentationDismissalDisablesAnimations(
         from routeScope: RouteScope?,
         hostedBy presentationHostID: RoutePresentationHostID? = nil
@@ -95,26 +135,12 @@ extension Router {
             _ = routeScope.path.scopes
         }
 
-        return Binding(
-            get: {
-                self.routePresentation(
-                    from: routeScope,
-                    matching: presentationKind,
-                    hostedBy: presentationHostID
-                )
-            },
-            set: { presentation in
-                guard presentation == nil else {
-                    return
-                }
-
-                self.dismissPresentation(
-                    from: routeScope,
-                    matching: presentationKind,
-                    hostedBy: presentationHostID
-                )
-            }
-        )
+        @Bindable var router = self
+        return $router[presentation: RoutePresentationProjection(
+            routeScope: routeScope,
+            presentationKind: presentationKind,
+            presentationHostID: presentationHostID
+        )]
     }
 
     func routePresentation(
@@ -170,25 +196,35 @@ extension Router {
     ) -> Binding<RoutePresentation?> {
         _ = routeForest.tree(for: priority)?.rootPath.scopes
 
-        return Binding(
-            get: {
-                self.elevatedRoutePresentation(
-                    priority: priority,
-                    matching: presentationKind
-                )
-            },
-            set: { presentation in
-                guard presentation == nil else {
-                    return
-                }
-
-                self.dismissElevatedPresentation(
-                    priority: priority,
-                    matching: presentationKind
-                )
-            }
-        )
+        @Bindable var router = self
+        return $router[elevatedPresentation: ElevatedRoutePresentationProjection(
+            priority: priority,
+            presentationKind: presentationKind
+        )]
     }
+}
+
+private struct RoutePresentationProjection: Hashable {
+    let routeScope: RouteScope?
+    let presentationKind: RoutePresentationKind
+    let presentationHostID: RoutePresentationHostID?
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.routeScope === rhs.routeScope
+            && lhs.presentationKind == rhs.presentationKind
+            && lhs.presentationHostID == rhs.presentationHostID
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(routeScope.map(ObjectIdentifier.init))
+        hasher.combine(presentationKind)
+        hasher.combine(presentationHostID)
+    }
+}
+
+private struct ElevatedRoutePresentationProjection: Hashable {
+    let priority: RoutePriority
+    let presentationKind: RoutePresentationKind
 }
 
 private extension Router {

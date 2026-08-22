@@ -37,8 +37,11 @@ public struct WithRouter<Content: View>: View {
     public var body: some View {
         content
             .routeScopeEnvironment(router.root, router: router)
-            .environment(\.windowDestinationBuilder, windowDestinationBuilder)
             .background {
+                WindowDestinationBuilderRegistration(
+                    router: router,
+                    windowDestinationBuilder: windowDestinationBuilder
+                )
                 ElevatedPrioritySheetHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
                 ElevatedPriorityCoverSlideHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
                 ElevatedPriorityCoverFadeHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
@@ -53,7 +56,9 @@ public struct WithRouter<Content: View>: View {
     ///
     /// Pass a ``Router`` when app code needs to keep an explicit reference.
     public init(router: Router? = nil, @ViewBuilder content: () -> Content) {
-        self._router = State(wrappedValue: router ?? Router())
+        let router = router ?? Router()
+        router.windowDestinationBuilder = .passthrough
+        self._router = State(wrappedValue: router)
         self.content = content()
         self.windowDestinationBuilder = .passthrough
     }
@@ -70,8 +75,30 @@ public struct WithRouter<Content: View>: View {
         @ViewBuilder _ content: () -> Content,
         @ViewBuilder windowDestination: @escaping (RouteView, EnvironmentValues) -> WindowContent
     ) {
-        self._router = State(wrappedValue: router ?? Router())
+        let router = router ?? Router()
+        let windowDestinationBuilder = WindowDestinationBuilder(windowDestination)
+        router.windowDestinationBuilder = windowDestinationBuilder
+        self._router = State(wrappedValue: router)
         self.content = content()
-        self.windowDestinationBuilder = WindowDestinationBuilder(windowDestination)
+        self.windowDestinationBuilder = windowDestinationBuilder
+    }
+}
+
+private struct WindowDestinationBuilderRegistration: View {
+    let router: Router
+    let windowDestinationBuilder: WindowDestinationBuilder
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .onLifecycleEvent { event in
+                switch event {
+                case .installedInWindow, .updated:
+                    router.windowDestinationBuilder = windowDestinationBuilder
+
+                case .dismantled, .deinitialized:
+                    break
+                }
+            }
     }
 }

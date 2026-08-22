@@ -23,12 +23,22 @@
 import SwiftUI
 
 extension View {
-    @ViewBuilder
-    func applyIf<Result: View>(_ condition: Bool, _ transform: (Self) -> Result) -> some View {
-        if condition {
-            transform(self)
-        } else {
-            self
-        }
+    func onSourceEnvironmentLifecycleEvent(
+        _ handler: @escaping @MainActor (EnvironmentValues, ViewLifecycleBridge.Event) -> Void
+    ) -> some View {
+        modifier(SourceEnvironmentLifecycleEventModifier(handler: handler))
+    }
+}
+
+private struct SourceEnvironmentLifecycleEventModifier: ViewModifier {
+    let handler: @MainActor (EnvironmentValues, ViewLifecycleBridge.Event) -> Void
+
+    @Environment(\.self) private var sourceEnvironment
+
+    func body(content: Content) -> some View {
+        content
+            .onLifecycleEvent { event in
+                handler(sourceEnvironment, event)
+            }
     }
 }

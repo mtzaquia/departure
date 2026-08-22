@@ -46,7 +46,6 @@ private struct RouteBranchModifier: ViewModifier {
     @Environment(Router.self) private var router
     @Environment(\.routeScope) private var parentScope
     @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
-    @Environment(\.self) private var sourceEnvironment
 
     init(branch: AnyHashable) {
         self.branch = branch
@@ -61,10 +60,10 @@ private struct RouteBranchModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .routeScopeEnvironment(branchScope, router: router)
-            .onLifecycleEvent { event in
+            .onSourceEnvironmentLifecycleEvent { sourceEnvironment, event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
-                    registerBranchScope()
+                    registerBranchScope(sourceEnvironment: sourceEnvironment)
 
                 case .updated(isInstalledInWindow: false):
                     break
@@ -86,7 +85,7 @@ private struct RouteBranchModifier: ViewModifier {
             }
     }
 
-    private func registerBranchScope() {
+    private func registerBranchScope(sourceEnvironment: EnvironmentValues) {
         guard let parentScope else {
             return
         }

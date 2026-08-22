@@ -387,6 +387,19 @@ struct UnwindHookTests {
         #expect(await UnwindRouteAction()() == false)
     }
 
+    @Test func unwindRouteActionDoesNotRetainItsAssignedScope() async {
+        let router = Router()
+        weak var releasedScope: RouteScope?
+        let action = {
+            let scope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+            releasedScope = scope
+            return UnwindRouteAction(router: router, routeScope: scope)
+        }()
+
+        #expect(releasedScope == nil)
+        #expect(await action() == false)
+    }
+
     @Test func unwindRouteActionHasStableIdentityForSameRouterAndScope() {
         let router = Router()
         let scope = RouteScope(id: LoginRoute().id, route: LoginRoute())
