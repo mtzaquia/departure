@@ -59,6 +59,22 @@ enum DepartureLogTrace {
     }
 }
 
+enum DepartureWarningEvent {
+    case routeDroppedNoDeclaration(routeType: any Route.Type)
+
+    var renderedMessage: String {
+        let trace = DepartureLogTrace.id.map { "[\($0)]" } ?? ""
+        return "[route]\(trace) ⊘ \(message)"
+    }
+
+    private var message: String {
+        switch self {
+        case let .routeDroppedNoDeclaration(routeType):
+            "dropped \(String(reflecting: routeType)) — no declaration found"
+        }
+    }
+}
+
 enum DepartureLogEvent {
     case actionCompleted(action: any Action)
     case actionDirectInvocationEnded(action: any Action, error: any Error)
@@ -103,7 +119,6 @@ enum DepartureLogEvent {
     case routeCannotPresentDiscoveryBranchInactive(branch: AnyHashable)
     case routeCannotPresentNoActiveLocalScope(branch: AnyHashable)
     case routeDroppedBranchActivationFailed(branch: AnyHashable)
-    case routeDroppedNoDeclaration(routeType: any Route.Type)
     case routeDroppedResolution
     case routeLookupStarted(routeType: any Route.Type, activePath: String)
     case routeNoOpEquivalent(route: any Route, currentRoute: any Route)
@@ -148,6 +163,11 @@ extension Logger {
 
     func departureWarning(_ message: @autoclosure () -> String) {
         let message = message()
+        warning("\(message, privacy: .public)")
+    }
+
+    func departureWarning(_ event: @autoclosure () -> DepartureWarningEvent) {
+        let message = event().renderedMessage
         warning("\(message, privacy: .public)")
     }
 
@@ -308,7 +328,6 @@ extension DepartureLogEvent {
              .routeAppendSuperseded,
              .routeBlockedByElevatedPriority,
              .routeDroppedBranchActivationFailed,
-             .routeDroppedNoDeclaration,
              .routeDroppedResolution,
              .routeNoOpEquivalent,
              .ios17PushDismissalDropped,
@@ -411,8 +430,6 @@ extension DepartureLogEvent {
             "route cannot present | branch=\(branch.departureDebugDescription) | reason=no active local scope"
         case let .routeDroppedBranchActivationFailed(branch):
             "dropped route — could not activate branch \(branch.departureDebugDescription)"
-        case let .routeDroppedNoDeclaration(routeType):
-            "dropped \(String(reflecting: routeType)) — no declaration found"
         case .routeDroppedResolution:
             "dropped by route resolution"
         case let .routeLookupStarted(routeType, activePath):

@@ -3559,6 +3559,20 @@ struct RouterTests {
         #expect(event.message == expectedMessage)
     }
 
+    @Test func missingRouteDeclarationWarningPreservesRouteContext() {
+        let warning = DepartureLogTrace.$id.withValue("r:12345678") {
+            DepartureWarningEvent.routeDroppedNoDeclaration(
+                routeType: SettingsRoute.self
+            ).renderedMessage
+        }
+
+        #expect(
+            warning
+                == "[route][r:12345678] ⊘ dropped \(String(reflecting: SettingsRoute.self))"
+                    + " — no declaration found"
+        )
+    }
+
     @Test func ancestorPushLookupExplainsSingleMultiScopeTrim() throws {
         let router = Router()
         let ancestorScope = RouteScope(id: RootRoute().id, route: RootRoute())

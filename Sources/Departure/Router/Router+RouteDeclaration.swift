@@ -44,7 +44,7 @@ extension Router {
             return
 
         case .dropNoDeclaration(let routeType):
-            log.departureDebug(.routeDroppedNoDeclaration(routeType: routeType))
+            log.departureWarning(.routeDroppedNoDeclaration(routeType: routeType))
             return
 
         case .dropBlockedByElevatedPriority(let match):
