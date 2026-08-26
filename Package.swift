@@ -20,9 +20,14 @@ let package = Package(
                 .defaultIsolation(MainActor.self)
             ]
         ),
+        .target(
+            name: "RouteDomainFixtures",
+            dependencies: ["Departure"],
+            path: "Tests/RouteDomainFixtures"
+        ),
         .testTarget(
             name: "DepartureTests",
-            dependencies: ["Departure"]
+            dependencies: ["Departure", "RouteDomainFixtures"]
         ),
     ],
     swiftLanguageModes: [.v6]

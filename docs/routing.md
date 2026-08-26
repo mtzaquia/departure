@@ -12,6 +12,45 @@ Declare each route on the scope that should present it.
 
 `router.present(...)` starts at the active route and uses the closest matching declaration. The same route type may be declared in more than one scope; the nearest owner wins. If no scope owns it, nothing is presented.
 
+## Supply a view from a feature module
+
+A route can live in a top-level Domain module without depending on its feature view. Omit
+`destination()` from the route declaration:
+
+```swift
+// Domain module
+import Departure
+
+public struct SettingsRoute: Route {
+  public init() {}
+}
+```
+
+The feature module imports Domain and supplies the destination:
+
+```swift
+// SettingsFeature module
+import Departure
+import Domain
+import SwiftUI
+
+extension SettingsRoute: RouteViewProviding {
+  public func destination() -> some View {
+    SettingsView()
+  }
+}
+```
+
+Departure chooses a destination in this order:
+
+1. `RouteViewProviding.destination()` when the route conforms to `RouteViewProviding`.
+2. The route's existing `Route.destination()` implementation.
+3. A diagnostic view naming the route type in Debug builds, or `EmptyView` in Release builds.
+
+Only one module can add the `RouteViewProviding` conformance for a route type. Modules in the same
+package use the extension above. Add `@retroactive` to the conformance only when the route belongs
+to a different package.
+
 ## Styles
 
 | Declaration | Presentation |

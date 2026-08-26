@@ -70,6 +70,15 @@ public extension Route {
     func resolveRoute() async -> RouteResolution {
         .allow
     }
+
+    /// Builds the fallback shown when this route does not provide a destination.
+    ///
+    /// Debug builds show a diagnostic with the route type. Release builds render an empty view.
+    /// Implement ``RouteViewProviding/destination()`` in another module to supply the destination
+    /// separately from the route declaration.
+    func destination() -> some View {
+        MissingRouteDestination(routeType: Self.self)
+    }
 }
 
 // MARK: - Supporting types

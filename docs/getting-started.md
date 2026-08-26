@@ -48,4 +48,8 @@ struct HomeView: View {
 
 Use `Push` inside a `NavigationStack`. `Sheet` and `Cover` present modally and provide a navigation stack around their destination by default.
 
+For an app split into Domain and Feature modules, the route can omit `destination()` and the
+feature can supply it separately. See
+[Supply a view from a feature module](routing.md#supply-a-view-from-a-feature-module).
+
 Next: [Routing](routing.md)

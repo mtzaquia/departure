@@ -12,6 +12,7 @@
 Declare the destinations a screen owns. Request them from wherever the user’s intent starts. Departure finds the closest eligible owner, presents with the right style, and gives actions a route-aware place to run.
 
 - Push, sheet, and cover routes from one small API.
+- Keep domain routes independent from the feature modules that build their views.
 - Preserve navigation state across tabs and other selection-based containers.
 - Reroute guarded flows, unwind precisely, and intercept route-scoped actions.
 - Raise a critical flow above the app when it truly cannot wait.
@@ -73,6 +74,10 @@ struct HomeView: View {
 ```
 
 That’s the core idea: the screen that owns the presentation declares it; the screen that starts the flow simply asks for the route.
+
+Routes may also omit `destination()` and let a feature module supply the view through
+`RouteViewProviding`. See [Routing](docs/routing.md#supply-a-view-from-a-feature-module) for the
+module layout and fallback behavior.
 
 > [!NOTE]
 > Declare `Push(...)` inside a `NavigationStack`.

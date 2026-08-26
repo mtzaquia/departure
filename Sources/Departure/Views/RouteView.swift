@@ -52,7 +52,7 @@ public struct RouteView: View {
 
     @ViewBuilder
     private var content: some View {
-        let destination = (scope.route?.destination()).map(AnyView.init)
+        let destination = scope.route.map { routeDestination(for: $0) }
 
         if providesNavigation {
             NavigationStack {
@@ -63,4 +63,16 @@ public struct RouteView: View {
         }
     }
 
+}
+
+func routeDestination(for route: any Route) -> AnyView {
+    if let provider = route as? any RouteViewProviding {
+        return AnyView(provider.destination())
+    }
+
+    return eraseRouteDestination(route)
+}
+
+private func eraseRouteDestination<R: Route>(_ route: R) -> AnyView {
+    AnyView(route.destination())
 }
