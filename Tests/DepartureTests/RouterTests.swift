@@ -2863,6 +2863,68 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }
 
+    @Test func targetedUnwindClearsCoverHostedByRetainedNonRootScopeWhilePreservingNestedPush() async throws {
+        let router = Router()
+        let paymentMethodsID = AnyHashable("paymentMethods")
+        let paymentMethodsScope = RouteScope(id: paymentMethodsID, route: CardsListRoute())
+        let coverScope = RouteScope(id: AddMethodRoute().id, route: AddMethodRoute())
+        let pushedScope = RouteScope(id: AddCardRoute().id, route: AddCardRoute())
+
+        paymentMethodsScope.installRouteDeclarations(
+            id: paymentMethodsID,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Cover(AddMethodRoute.self)._routeDeclarations),
+            ]
+        )
+        coverScope.installRouteDeclarations(
+            id: AddMethodRoute().id,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(AddCardRoute.self)._routeDeclarations),
+            ]
+        )
+        coverScope.attachPresentation(
+            to: paymentMethodsScope,
+            declaration: try #require(
+                paymentMethodsScope.routeAttachments.first { $0.presentationKind == .cover(.slide) }
+            )
+        )
+        pushedScope.attachPresentation(
+            to: coverScope,
+            declaration: try #require(
+                coverScope.routeAttachments.first { $0.presentationKind == .push }
+            )
+        )
+        router.normalTree.rootPath.scopes = [paymentMethodsScope, coverScope, pushedScope]
+        router.routeScopeDidInstallInView(coverScope)
+        router.routeScopeDidInstallInView(pushedScope)
+
+        let unwindTask = Task {
+            await router.unwind(to: .id(paymentMethodsID))
+        }
+
+        for _ in 0..<10 where router.unwindPresentationSnapshot == nil {
+            await Task.yield()
+        }
+
+        #expect(router.normalTree.rootPath.scopes.elementsEqual([paymentMethodsScope], by: { $0 === $1 }))
+        #expect(
+            router.routePresentationBinding(from: paymentMethodsScope, matching: .cover(.slide))
+                .wrappedValue == nil
+        )
+        #expect(
+            router.routePresentationBinding(from: coverScope, matching: .push)
+                .wrappedValue?.scope === pushedScope
+        )
+
+        router.routeScopeDidLeaveView(coverScope)
+        router.routeScopeDidLeaveView(pushedScope)
+
+        #expect(await unwindTask.value)
+        #expect(router.unwindPresentationSnapshot == nil)
+    }
+
     @Test func rootUnwindPreservesBranchDescendantPresentationBindingUntilAncestorLeavesView() async throws {
         let router = Router()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
@@ -3073,7 +3135,7 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue?.scope === router.normalTree.rootPath.last)
     }
 
-    @Test func routeAppendReleasesPreservedPushAfterNestedModalLeavesView() async throws {
+    @Test func routeAppendDoesNotPreservePushHostedByRetainedScopeWhileNestedModalLeaves() async throws {
         let router = Router()
         let appearanceScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let authenticationScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
@@ -3133,7 +3195,7 @@ struct RouterTests {
         }
 
         #expect(router.normalTree.rootPath.scopes.elementsEqual([appearanceScope], by: { $0 === $1 }))
-        #expect(router.routePresentationBinding(from: appearanceScope, matching: .push).wrappedValue?.scope === authenticationScope)
+        #expect(router.routePresentationBinding(from: appearanceScope, matching: .push).wrappedValue == nil)
 
         router.routeScopeDidLeaveView(sheetScope)
         let supersedingTask = Task {

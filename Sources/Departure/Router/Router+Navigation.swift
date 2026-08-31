@@ -82,6 +82,7 @@ extension Router {
         let routeForest: RouteForest
         let preservesModalPresentationBindings: Bool
         let preservesPushPresentationBindings: Bool
+        let departingPresentationHostScopeIDs: Set<ObjectIdentifier>
         let unanimatedPushPresentationScopeIDs: Set<ObjectIdentifier>
 
         init(
@@ -89,12 +90,14 @@ extension Router {
             routeForest: RouteForest,
             preservesModalPresentationBindings: Bool,
             preservesPushPresentationBindings: Bool,
+            departingPresentationHostScopeIDs: Set<ObjectIdentifier>,
             unanimatedPushPresentationScopeIDs: Set<ObjectIdentifier>
         ) {
             self.preservedPaths = preservedPaths
             self.routeForest = routeForest
             self.preservesModalPresentationBindings = preservesModalPresentationBindings
             self.preservesPushPresentationBindings = preservesPushPresentationBindings
+            self.departingPresentationHostScopeIDs = departingPresentationHostScopeIDs
             self.unanimatedPushPresentationScopeIDs = unanimatedPushPresentationScopeIDs
         }
     }
@@ -1068,6 +1071,7 @@ extension Router {
                 ? ObjectIdentifier(routeScope)
                 : nil
         })
+        let departingHostScopeIDs = departingPresentationHostScopeIDs(in: plan)
         let unanimatedPushPresentationScopeIDs = containsDepartingModal
             ? []
             : removedPushPresentationScopeIDs.subtracting(animatedPushPresentationScopeIDs)
@@ -1077,8 +1081,33 @@ extension Router {
             routeForest: routeForest,
             preservesModalPresentationBindings: preservesModalPresentationBindings,
             preservesPushPresentationBindings: containsDepartingModal,
+            departingPresentationHostScopeIDs: departingHostScopeIDs,
             unanimatedPushPresentationScopeIDs: unanimatedPushPresentationScopeIDs
         )
+    }
+
+    func departingPresentationHostScopeIDs(
+        in plan: RouteForest.UnwindPlan
+    ) -> Set<ObjectIdentifier> {
+        let removedScopeIDs = Set(plan.removedScopes.map(ObjectIdentifier.init))
+        let departingPresentationHostScopeIDs = plan.removedScopes.compactMap { removedScope -> ObjectIdentifier? in
+            guard let host = removedScope.presentationOrigin else {
+                return nil
+            }
+
+            var hostOrAncestorScope: RouteScope? = host
+            while let currentScope = hostOrAncestorScope {
+                if removedScopeIDs.contains(ObjectIdentifier(currentScope)) {
+                    return ObjectIdentifier(host)
+                }
+
+                hostOrAncestorScope = currentScope.previousScopeInTree
+            }
+
+            return nil
+        }
+
+        return Set(departingPresentationHostScopeIDs)
     }
 
     func outermostPushPresentationScopeIDs(

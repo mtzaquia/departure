@@ -162,7 +162,9 @@ extension Router {
 
         guard
             routeScope !== root,
-            let unwindPresentationSnapshot
+            let unwindPresentationSnapshot,
+            unwindPresentationSnapshot.departingPresentationHostScopeIDs
+                .contains(ObjectIdentifier(routeScope))
         else {
             return nil
         }
