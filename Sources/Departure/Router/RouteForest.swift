@@ -410,13 +410,12 @@ extension RouteForest {
 
         let root = normalTree.root
         if let match = root.firstBranchScopeRouteAttachment(for: routeType, in: root.activeBranch) {
-            let routePath = routePath(for: match, under: root, fallbackPath: normalTree.rootPath, fallbackPosition: .owner)
-            return Router.DeclarationMatch(
-                routePath: routePath,
+            return declarationMatchForActiveBranchScope(
+                match,
+                under: root,
                 tree: normalTree,
                 declaringPath: normalTree.rootPath,
                 declaringPosition: .owner,
-                attachment: match,
                 lookupStrategy: .normalRootActiveBranchScope
             )
         }
@@ -446,19 +445,12 @@ extension RouteForest {
             let position = RoutePath.Position.scope(scope)
 
             if let match = scope.firstBranchScopeRouteAttachment(for: routeType, in: scope.activeBranch) {
-                let routePath = routePathForActiveBranchScopeMatch(
-                    for: match,
+                return declarationMatchForActiveBranchScope(
+                    match,
                     under: scope,
-                    tree: tree,
-                    fallbackPath: searchPath,
-                    fallbackPosition: position
-                )
-                return Router.DeclarationMatch(
-                    routePath: routePath,
                     tree: tree,
                     declaringPath: searchPath,
                     declaringPosition: position,
-                    attachment: match,
                     lookupStrategy: lookupStrategy
                 )
             }
@@ -491,6 +483,32 @@ extension RouteForest {
         }
 
         return nil
+    }
+
+    private func declarationMatchForActiveBranchScope(
+        _ attachment: RouteScope.RouteAttachmentMatch,
+        under routeScope: RouteScope,
+        tree: RouteTree,
+        declaringPath: RoutePath,
+        declaringPosition: RoutePath.Position,
+        lookupStrategy: Router.DeclarationMatch.LookupStrategy
+    ) -> Router.DeclarationMatch {
+        let presentationLocation = routePathForActiveBranchScopeMatch(
+            for: attachment,
+            under: routeScope,
+            tree: tree,
+            fallbackPath: declaringPath,
+            fallbackPosition: declaringPosition
+        )
+
+        return Router.DeclarationMatch(
+            routePath: presentationLocation,
+            tree: tree,
+            declaringPath: declaringPath,
+            declaringPosition: declaringPosition,
+            attachment: attachment,
+            lookupStrategy: lookupStrategy
+        )
     }
 
     private func routePathForActiveBranchScopeMatch(

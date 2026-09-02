@@ -918,6 +918,146 @@ struct RouterTests {
         )
     }
 
+    @Test func normalRootBranchLocalPushBehindModalPreservesActiveLocalScope() async throws {
+        let router = Router()
+        let (selection, _) = tabSelection(.wallet)
+        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        let walletRouteScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let modalScope = RouteScope(id: MessageRoute().id, route: MessageRoute())
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Sheet(SettingsRoute.self)
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Sheet(MessageRoute.self)
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.wallet) {
+                        Push(TransactionRoute.self)
+                    }
+                )
+            )
+        )
+        walletRouteScope.installRouteDeclarations(
+            id: LoginRoute().id,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+        router.root.registerBranchScope(walletScope, for: AppTab.wallet)
+
+        let walletRouteDeclaration = try #require(Push(LoginRoute.self)._routeDeclarations.first)
+        let modalDeclaration = try #require(
+            router.root.declarations.local.routeAttachments.first {
+                $0.routeTypeID == ObjectIdentifier(MessageRoute.self)
+            }
+        )
+        walletRouteScope.attachPresentation(
+            to: walletScope,
+            declaration: walletRouteDeclaration.drivingPresentation(true)
+        )
+        modalScope.attachPresentation(to: router.root, declaration: modalDeclaration)
+        walletScope.path.scopes = [walletRouteScope]
+        router.normalTree.rootPath.scopes = [modalScope]
+
+        let match = try #require(router.routeForest.firstDeclaration(including: SettingsRoute.self))
+        let unwindPlan = router.routeAppendUnwindPlan(after: match)
+
+        #expect(match.lookupStrategy == .normalRootActiveBranchScope)
+        #expect(match.declaration.presentationKind == .push)
+        #expect(match.presentationLocation.path === walletScope.path)
+        #expect(match.presentationLocation.position == .scope(walletRouteScope))
+        #expect(match.declarationLocation.path === router.normalTree.rootPath)
+        #expect(match.declarationLocation.position == .owner)
+        #expect(unwindPlan.removedScopes.count == 1)
+        #expect(unwindPlan.removedScopes.first === modalScope)
+
+        router.routeScopeDidInstallInView(modalScope)
+        let requestTask = Task {
+            await router.requestRoute(SettingsRoute())
+        }
+
+        for _ in 0..<10 where router.normalTree.rootPath.isEmpty == false {
+            await Task.yield()
+        }
+
+        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(walletScope.path.count == 1)
+        #expect(walletScope.path.last === walletRouteScope)
+        #expect(router.pendingRoute?.route is SettingsRoute)
+
+        router.routeScopeDidLeaveView(modalScope)
+        await requestTask.value
+
+        #expect(walletScope.path.count == 2)
+        #expect(walletScope.path.first === walletRouteScope)
+        let transactionScope = try #require(walletScope.path.last)
+        #expect(transactionScope.route is SettingsRoute)
+        #expect(transactionScope.presentationOrigin === walletRouteScope)
+        #expect(router.pendingRoute == nil)
+        #expect(
+            router.root.declarations.local.routeAttachment(for: SettingsRoute.self)?
+                .presentationKind == .sheet
+        )
+        #expect(
+            router.routePresentationBinding(from: walletRouteScope, matching: .push)
+                .wrappedValue?.scope === transactionScope
+        )
+    }
+
+    @Test func branchDeclaredPushBehindModalStillReplacesActiveBranchPath() throws {
+        let router = Router()
+        let (selection, _) = tabSelection(.wallet)
+        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
+        let walletRouteScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let modalScope = RouteScope(id: MessageRoute().id, route: MessageRoute())
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: AnyRouteBranchSelection(selection),
+            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Sheet(SettingsRoute.self)
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Sheet(MessageRoute.self)
+                ),
+                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
+                    Branch(.wallet) {
+                        Push(SettingsRoute.self)
+                    }
+                )
+            )
+        )
+        router.root.registerBranchScope(walletScope, for: AppTab.wallet)
+        let modalDeclaration = try #require(
+            router.root.declarations.local.routeAttachments.first {
+                $0.routeTypeID == ObjectIdentifier(MessageRoute.self)
+            }
+        )
+        modalScope.attachPresentation(to: router.root, declaration: modalDeclaration)
+        walletScope.path.scopes = [walletRouteScope]
+        router.normalTree.rootPath.scopes = [modalScope]
+
+        let match = try #require(router.routeForest.firstDeclaration(including: SettingsRoute.self))
+        let unwindPlan = router.routeAppendUnwindPlan(after: match)
+
+        #expect(match.lookupStrategy == .normalRootDeclarations)
+        #expect(match.declaration.presentationKind == .push)
+        #expect(match.presentationLocation.path === walletScope.path)
+        #expect(match.presentationLocation.position == .owner)
+        #expect(match.declarationLocation.path === router.normalTree.rootPath)
+        #expect(match.declarationLocation.position == .owner)
+        #expect(unwindPlan.removedScopes.count == 2)
+        #expect(unwindPlan.removedScopes.contains { $0 === walletRouteScope })
+        #expect(unwindPlan.removedScopes.contains { $0 === modalScope })
+    }
+
     @Test func equivalentBranchPushDismissesTopLevelModalWithoutReplacingExistingScope() async throws {
         let router = Router()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
