@@ -27,8 +27,26 @@ import SwiftUI
 
 extension RouteScope {
     struct RouteAttachmentMatch {
+        enum PresentationAnchor: Equatable {
+            case declarationLocation
+            case branchOwner
+            case activeLocalScope
+        }
+
         let branchID: AnyHashable?
         let declaration: AnyRouteDeclaration
+        let presentationAnchor: PresentationAnchor
+
+        init(
+            branchID: AnyHashable?,
+            declaration: AnyRouteDeclaration,
+            presentationAnchor: PresentationAnchor? = nil
+        ) {
+            self.branchID = branchID
+            self.declaration = declaration
+            self.presentationAnchor = presentationAnchor
+                ?? (branchID == nil ? .declarationLocation : .branchOwner)
+        }
     }
 
     var routeAttachments: [AnyRouteDeclaration] {
@@ -111,7 +129,44 @@ extension RouteScope {
             return nil
         }
 
-        return RouteAttachmentMatch(branchID: branch, declaration: match.declaration)
+        return RouteAttachmentMatch(
+            branchID: branch,
+            declaration: match.declaration,
+            presentationAnchor: .activeLocalScope
+        )
+    }
+
+    func drivingPresentationDeclaration(
+        matching declaration: AnyRouteDeclaration,
+        hostedBy presentationHostID: RoutePresentationHostID?
+    ) -> AnyRouteDeclaration? {
+        routeAttachments.first {
+            $0.routeType == declaration.routeType
+            && $0.kind == declaration.kind
+            && $0.drivesPresentation
+            && (
+                presentationHostID == nil
+                    || $0.presentationHostID == presentationHostID
+            )
+        }
+    }
+
+    func attachedPresentationDeclaration(
+        presentedBy host: RouteScope,
+        matching presentationKind: RoutePresentationKind,
+        hostedBy presentationHostID: RoutePresentationHostID?
+    ) -> AnyRouteDeclaration? {
+        guard
+            presentationOrigin === host,
+            let declaration = presentationDeclaration,
+            declaration.presentationKind == presentationKind,
+            declaration.drivesPresentation,
+            presentationHostID == nil || declaration.presentationHostID == presentationHostID
+        else {
+            return nil
+        }
+
+        return declaration
     }
 }
 

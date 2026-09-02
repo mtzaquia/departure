@@ -69,7 +69,7 @@ extension Router {
             }
 
             log.departureDebug(.routeAcceptedReplaceElevatedPriority(route: resolvedRoute))
-            replaceElevatedTree(priority, with: resolvedRoute, after: match)
+            await replaceElevatedTree(priority, with: resolvedRoute, after: match)
             return
         }
     }
@@ -163,7 +163,25 @@ extension Router {
         let declarationLocation: Location
         let branchID: AnyHashable?
         let declaration: AnyRouteDeclaration
+        let presentationAnchor: RouteScope.RouteAttachmentMatch.PresentationAnchor
         let lookupStrategy: LookupStrategy
+
+        var presentationHost: RouteScope? {
+            switch presentationAnchor {
+            case .branchOwner:
+                presentationLocation.path.owner
+
+            case .declarationLocation, .activeLocalScope:
+                presentationLocation.scope
+            }
+        }
+
+        var presentationHostID: RoutePresentationHostID? {
+            declaration.presentationHostID
+                ?? (presentationAnchor == .branchOwner
+                    ? presentationHost?.adoptedRoutePresentationHostID
+                    : nil)
+        }
 
         init(
             presentationLocation: Location,
@@ -171,6 +189,7 @@ extension Router {
             declarationLocation: Location,
             branchID: AnyHashable?,
             declaration: AnyRouteDeclaration,
+            presentationAnchor: RouteScope.RouteAttachmentMatch.PresentationAnchor = .declarationLocation,
             lookupStrategy: LookupStrategy
         ) {
             self.presentationLocation = presentationLocation
@@ -178,6 +197,7 @@ extension Router {
             self.declarationLocation = declarationLocation
             self.branchID = branchID
             self.declaration = declaration
+            self.presentationAnchor = presentationAnchor
             self.lookupStrategy = lookupStrategy
         }
     }
@@ -239,6 +259,7 @@ extension Router.DeclarationMatch {
             declarationLocation: .init(path: declaringPath, position: declaringPosition),
             branchID: attachment.branchID,
             declaration: attachment.declaration,
+            presentationAnchor: attachment.presentationAnchor,
             lookupStrategy: lookupStrategy
         )
     }
@@ -252,6 +273,7 @@ extension Router.DeclarationMatch {
             declarationLocation: declarationLocation,
             branchID: branchID,
             declaration: declaration,
+            presentationAnchor: presentationAnchor,
             lookupStrategy: lookupStrategy
         )
     }

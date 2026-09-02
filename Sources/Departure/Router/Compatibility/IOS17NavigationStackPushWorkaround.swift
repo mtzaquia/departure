@@ -257,7 +257,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         _ first: RouteForest.UnwindPlan,
         _ second: RouteForest.UnwindPlan
     ) -> Bool {
-        guard first.clearsElevatedTrees == second.clearsElevatedTrees,
+        guard first.elevatedTreePrioritiesToClear == second.elevatedTreePrioritiesToClear,
               first.pathTrims.count == second.pathTrims.count,
               first.preservedPaths.count == second.preservedPaths.count,
               first.removedScopes.elementsEqual(second.removedScopes, by: { $0 === $1 })

@@ -54,6 +54,12 @@ struct RoutePresentation: Identifiable, Hashable {
     }
 }
 
+private struct ResolvedRoutePresentation {
+    let presentation: RoutePresentation
+    let routePath: RoutePath
+    let isLive: Bool
+}
+
 extension Router {
     private subscript(presentation projection: RoutePresentationProjection) -> RoutePresentation? {
         get {
@@ -109,11 +115,11 @@ extension Router {
                 guard
                     unwindPresentationSnapshot.unanimatedPushPresentationScopeIDs
                         .contains(ObjectIdentifier(presentedScope)),
-                    presentedScope.presentationOrigin === routeScope,
-                    let declaration = presentedScope.presentationDeclaration,
-                    declaration.presentationKind == .push,
-                    presentationHostID == nil
-                        || declaration.presentationHostID == presentationHostID
+                    presentedScope.attachedPresentationDeclaration(
+                        presentedBy: routeScope,
+                        matching: .push,
+                        hostedBy: presentationHostID
+                    ) != nil
                 else {
                     return false
                 }
@@ -129,8 +135,9 @@ extension Router {
         hostedBy presentationHostID: RoutePresentationHostID? = nil
     ) -> Binding<RoutePresentation?> {
         let routeScope = routeScope ?? root
-        let routePath = routeForest.routePath(containing: routeScope) ?? normalTree.rootPath
-        _ = routePath.scopes
+        if let routePath = routeForest.routePath(containing: routeScope) {
+            _ = routePath.scopes
+        }
         if routeScope !== root {
             _ = routeScope.path.scopes
         }
@@ -148,16 +155,33 @@ extension Router {
         matching presentationKind: RoutePresentationKind,
         hostedBy presentationHostID: RoutePresentationHostID? = nil
     ) -> RoutePresentation? {
-        let routePath = routeForest.routePath(containing: routeScope) ?? normalTree.rootPath
+        resolvedRoutePresentation(
+            from: routeScope,
+            matching: presentationKind,
+            hostedBy: presentationHostID
+        )?.presentation
+    }
+
+    private func resolvedRoutePresentation(
+        from routeScope: RouteScope,
+        matching presentationKind: RoutePresentationKind,
+        hostedBy presentationHostID: RoutePresentationHostID?
+    ) -> ResolvedRoutePresentation? {
+        let routePath = routeForest.routePath(containing: routeScope)
 
         // Live read: return the host's structural slot directly.
-        if let presentation = hostedPresentation(
+        if let routePath,
+           let presentation = hostedPresentation(
             by: routeScope,
             matching: presentationKind,
             hostedBy: presentationHostID,
             in: routePath
         ) {
-            return presentation
+            return ResolvedRoutePresentation(
+                presentation: presentation,
+                routePath: routePath,
+                isLive: true
+            )
         }
 
         guard
@@ -242,12 +266,17 @@ private extension Router {
 
         guard
             let presentedScope = routePath.scopes.first(where: {
-                $0.presentationOrigin === host
-                && $0.presentationDeclaration?.presentationKind == presentationKind
+                $0.attachedPresentationDeclaration(
+                    presentedBy: host,
+                    matching: presentationKind,
+                    hostedBy: presentationHostID
+                ) != nil
             }),
-            let declaration = presentedScope.presentationDeclaration,
-            declaration.drivesPresentation,
-            presentationHostID == nil || declaration.presentationHostID == presentationHostID
+            let declaration = presentedScope.attachedPresentationDeclaration(
+                presentedBy: host,
+                matching: presentationKind,
+                hostedBy: presentationHostID
+            )
         else {
             return nil
         }
@@ -278,7 +307,7 @@ private extension Router {
         hostedBy presentationHostID: RoutePresentationHostID?,
         inPreservedPaths paths: [RouteForest.PreservedRoutePath],
         snapshot: UnwindPresentationSnapshot
-    ) -> RoutePresentation? {
+    ) -> ResolvedRoutePresentation? {
         for path in paths {
             if let presentation = hostedPresentation(
                 by: host,
@@ -287,7 +316,11 @@ private extension Router {
                 inPreservedPath: path,
                 snapshot: snapshot
             ) {
-                return presentation
+                return ResolvedRoutePresentation(
+                    presentation: presentation,
+                    routePath: path.routePath,
+                    isLive: false
+                )
             }
         }
 
@@ -309,11 +342,11 @@ private extension Router {
 
         for presentedScope in path.scopes {
             guard
-                presentedScope.presentationOrigin === host,
-                let declaration = presentedScope.presentationDeclaration,
-                declaration.presentationKind == presentationKind,
-                declaration.drivesPresentation,
-                presentationHostID == nil || declaration.presentationHostID == presentationHostID,
+                let declaration = presentedScope.attachedPresentationDeclaration(
+                    presentedBy: host,
+                    matching: presentationKind,
+                    hostedBy: presentationHostID
+                ),
                 shouldHostLocally(
                     declaration,
                     from: hostPosition,
@@ -339,13 +372,14 @@ private extension Router {
         matching presentationKind: RoutePresentationKind,
         hostedBy presentationHostID: RoutePresentationHostID?
     ) {
-        guard let presentation = routePresentation(
+        guard let resolution = resolvedRoutePresentation(
             from: routeScope,
             matching: presentationKind,
             hostedBy: presentationHostID
-        ) else {
+        ), resolution.isLive else {
             return
         }
+        let presentation = resolution.presentation
 
         if ios17NavigationStackPushWorkaround?.interceptDismissal(
             of: presentation,
@@ -355,30 +389,23 @@ private extension Router {
             return
         }
 
-        let routePath = routeForest.routePath(containing: presentation.scope) ?? normalTree.rootPath
-
+        let routePath = resolution.routePath
         guard let targetPosition = routePath.positionBefore(presentation.scope) else {
-            let fallbackPosition = routePath.position(of: routeScope) ?? .owner
-            let removedScopes = routePath.scopesRemovedAfter(fallbackPosition)
-            let targetScope = routePath.scope(at: fallbackPosition)
-            performPresentationDismissalUnwind(
-                for: presentation.scope,
-                in: targetScope,
-                removing: removedScopes
-            ) {
-                keepPathThrough(fallbackPosition, in: routePath)
-            }
             return
         }
 
-        let removedScopes = routePath.scopesRemovedAfter(targetPosition)
+        let unwindPlan = routeForest.unwindPlan(for: .scoped(
+            routePath: routePath,
+            after: targetPosition
+        ))
+        let removedScopes = unwindPlan.removedScopes
         let targetScope = routePath.scope(at: targetPosition)
         performPresentationDismissalUnwind(
             for: presentation.scope,
             in: targetScope,
             removing: removedScopes
         ) {
-            keepPathThrough(targetPosition, in: routePath)
+            applyUnwindPlan(unwindPlan)
         }
     }
 
@@ -448,17 +475,15 @@ private extension Router {
             return
         }
 
-        let removedScopes = tree.rootPath.scopesRemovedAfter(.owner)
+        let unwindPlan = routeForest.unwindPlan(for: .tree(tree))
+        let removedScopes = unwindPlan.removedScopes
         let targetScope = tree.elevatedOrigin?.scope
         performPresentationDismissalUnwind(
             for: presentation.scope,
             in: targetScope,
             removing: removedScopes
         ) {
-            keepPathThrough(.owner, in: tree.rootPath)
-            mutateRouteGraph {
-                routeForest.setElevatedTree(nil, for: priority)
-            }
+            applyUnwindPlan(unwindPlan)
         }
     }
 }
