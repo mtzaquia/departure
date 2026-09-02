@@ -71,18 +71,6 @@ extension RouteScope {
 // MARK: - Branch Scopes
 
 extension RouteScope {
-    func activeLocalScope(for branch: AnyHashable) -> RouteScope? {
-        if let branchScope = branchScopes[branch] {
-            return branchScope.activeLocalScope
-        }
-
-        guard branch == activeBranch else {
-            return nil
-        }
-
-        return self
-    }
-
     @discardableResult
     func registerBranchScope(
         _ routeScope: RouteScope,

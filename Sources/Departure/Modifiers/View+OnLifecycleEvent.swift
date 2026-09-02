@@ -111,12 +111,6 @@ struct ViewLifecycleBridge {
 
     let onEvent: @MainActor (LifecycleView, Event) -> Void
 
-    init(onEvent: @escaping @MainActor (Event) -> Void) {
-        self.onEvent = { _, event in
-            onEvent(event)
-        }
-    }
-
     init(onIdentifiedEvent: @escaping @MainActor (LifecycleView, Event) -> Void) {
         self.onEvent = onIdentifiedEvent
     }
