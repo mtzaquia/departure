@@ -2787,6 +2787,26 @@ struct RouterTests {
         #expect(router.normalTree.rootPath.last?.route is AlertRoute)
     }
 
+    @Test func clearingExplicitScopeIDRestoresInitialUnwindTarget() async {
+        let router = Router()
+        let initialID = router.root.id
+        let declarations = [RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations)]
+        router.root.installRouteDeclarations(
+            sourceID: "source", id: "custom", branchSelection: nil, routeDeclarations: declarations
+        )
+        let changed = router.root.installRouteDeclarations(
+            sourceID: "source", id: nil, branchSelection: nil, routeDeclarations: declarations
+        )
+
+        #expect(changed)
+        #expect(router.root.id == initialID)
+        await router.present(HomeDetailRoute())
+        #expect(await router.unwind(to: .id("custom")) == false)
+        #expect(router.normalTree.rootPath.count == 1)
+        #expect(await router.unwind(to: .id(initialID)))
+        #expect(router.normalTree.rootPath.isEmpty)
+    }
+
     @Test func cancellingPresentationWaitingForNavigationRemovesPendingRequest() async {
         let router = Router()
         router.root.installRouteDeclarations(

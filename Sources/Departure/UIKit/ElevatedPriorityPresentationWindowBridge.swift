@@ -325,6 +325,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
 #else
 struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
     @Binding var route: RoutePresentation?
+    let windowDestinationBuilder: WindowDestinationBuilder
     @ViewBuilder let content: (
         RouteDestinationSnapshot,
         @escaping @MainActor () -> Void
@@ -334,13 +335,14 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
         priority _: RoutePriority,
         route: Binding<RoutePresentation?>,
         sourceScenePhase _: ScenePhase,
-        windowDestinationBuilder _: WindowDestinationBuilder,
+        windowDestinationBuilder: WindowDestinationBuilder,
         @ViewBuilder content: @escaping (
             RouteDestinationSnapshot,
             @escaping @MainActor () -> Void
         ) -> HostedContent
     ) {
         self._route = route
+        self.windowDestinationBuilder = windowDestinationBuilder
         self.content = content
     }
 
@@ -348,7 +350,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
     var body: some View {
         if let route {
             content(
-                RouteDestinationSnapshot(route: route),
+                RouteDestinationSnapshot(route: route, destinationBuilder: windowDestinationBuilder),
                 {
                     self.route = nil
                 }

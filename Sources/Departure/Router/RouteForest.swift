@@ -131,7 +131,7 @@ struct RouteForest {
     }
 
     func unwindPlan(for request: UnwindPlanRequest) -> UnwindPlan {
-        let pathTrims = pathTrims(for: request).mergingByPath()
+        let pathTrims = includingDependentElevatedTrees(in: pathTrims(for: request).mergingByPath())
         return UnwindPlan(
             pathTrims: pathTrims,
             elevatedTreePrioritiesToClear: Set(elevatedTrees.compactMap { tree in
@@ -140,6 +140,39 @@ struct RouteForest {
                 } ? tree.priority : nil
             })
         )
+    }
+
+    private func includingDependentElevatedTrees(in initialTrims: [RoutePathTrim]) -> [RoutePathTrim] {
+        var trims = initialTrims
+
+        // Closing an origin also closes elevated contexts declared inside it. Recompute
+        // after each addition so dependencies cascade across priority and branch boundaries.
+        while true {
+            let clearedTrees = elevatedTrees.filter { tree in
+                trims.contains { $0.path === tree.rootPath && $0.keepThrough == .owner }
+            }
+            let removedScopeIDs = Set(
+                (trims.flatMap(\.removedScopes) + clearedTrees.map(\.root)).map(ObjectIdentifier.init)
+            )
+            guard let dependentTree = elevatedTrees.first(where: { tree in
+                guard !clearedTrees.contains(where: { $0 === tree }) else {
+                    return false
+                }
+                var origin = tree.elevatedOrigin?.scope
+                while let scope = origin {
+                    if removedScopeIDs.contains(ObjectIdentifier(scope)) {
+                        return true
+                    }
+                    // Branch roots are not path entries; their lifetime follows their parent.
+                    origin = scope.parent
+                }
+                return false
+            }) else {
+                return trims
+            }
+
+            trims = (trims + pathTrims(for: .tree(dependentTree))).mergingByPath()
+        }
     }
 
     private func pathTrims(for request: UnwindPlanRequest) -> [RoutePathTrim] {
@@ -202,19 +235,6 @@ struct RouteForest {
             for tree in allTrees {
                 ownedPaths.appendUnique(contentsOf: tree.allBranchPaths(under: removedScope))
             }
-        }
-
-        for elevatedTree in elevatedTrees {
-            guard let originScope = elevatedTree.elevatedOrigin?.scope else {
-                continue
-            }
-
-            guard directlyRemovedScopes.contains(where: { $0 === originScope }) else {
-                continue
-            }
-
-            ownedPaths.appendUnique(contentsOf: [elevatedTree.rootPath])
-            ownedPaths.appendUnique(contentsOf: elevatedTree.allBranchPaths())
         }
 
         return [RoutePathTrim(path: routePath, keepThrough: position)]
@@ -437,6 +457,24 @@ extension RouteForest {
                 lookupStrategy: .currentPath(treePriority: tree.priority)
             ) {
                 return match
+            }
+
+            // Nested branches own separate paths. Search each enclosing branch path
+            // before falling back to the tree root and its lazy container declarations.
+            var enclosingPath = tree.currentRoutePath
+            while let parent = enclosingPath.owner?.parent,
+                  let parentPath = tree.routePath(containing: parent),
+                  parentPath !== enclosingPath,
+                  parentPath !== tree.rootPath {
+                if let match = firstDeclaration(
+                    in: parentPath,
+                    tree: tree,
+                    including: routeType,
+                    lookupStrategy: .ancestorPath(treePriority: tree.priority)
+                ) {
+                    return match
+                }
+                enclosingPath = parentPath
             }
 
             if tree.currentRoutePath !== tree.rootPath,

@@ -238,7 +238,7 @@ extension RouteScope {
             usesBranches: usesBranches
         )
         let didChangeDeclarations = declarationInstallation.hasRouteSource(sourceID) == false
-            || (id != nil && id != self.id)
+            || (id ?? declarationInstallation.initialID) != self.id
             || (branchContainer != nil) != usesBranches
             || declarations.routeAttachmentIdentities != desiredIdentities
 

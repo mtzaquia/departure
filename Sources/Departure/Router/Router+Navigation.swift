@@ -45,7 +45,7 @@ extension Router {
         let state: State
 
         enum State {
-            case request(CheckedContinuation<Void, Never>)
+            case request(CheckedContinuation<Void, Never>, stage: RouteRequestStage)
             case append(Append)
         }
 
@@ -68,7 +68,7 @@ extension Router {
         }
 
         func resumeRequestIfNeeded() {
-            guard case let .request(continuation) = state else {
+            guard case let .request(continuation, _) = state else {
                 return
             }
 
@@ -1156,15 +1156,20 @@ extension Router {
         await drainPendingRouteRequests()
     }
 
+    enum RouteRequestStage {
+        case resolve
+        case presentResolved
+    }
+
     func drainPendingRouteRequests() async {
         guard let route = pendingRoute,
-              case .request = route.state
+              case let .request(_, stage) = route.state
         else {
             return
         }
 
         pendingRoute = nil
-        await requestRoute(route.route)
+        await requestRouteWhenReady(route.route, stage: stage)
         route.resumeRequestIfNeeded()
     }
 
@@ -1173,7 +1178,10 @@ extension Router {
         self.pendingRoute = pendingRoute
     }
 
-    func requestRouteWhenReady(_ route: any Route) async {
+    func requestRouteWhenReady(
+        _ route: any Route,
+        stage: RouteRequestStage = .resolve
+    ) async {
         guard navigationTransaction.isInProgress == false else {
             let requestID = UUID()
             await withTaskCancellationHandler {
@@ -1186,7 +1194,7 @@ extension Router {
                     replacePendingRoute(PendingRoute(
                         id: requestID,
                         route: route,
-                        state: .request(continuation)
+                        state: .request(continuation, stage: stage)
                     ))
                 }
             } onCancel: {
@@ -1197,7 +1205,12 @@ extension Router {
             return
         }
 
-        await requestRoute(route)
+        switch stage {
+        case .resolve:
+            await requestRoute(route)
+        case .presentResolved:
+            await presentResolvedRoute(route)
+        }
     }
 
     func cancelPendingRequest(id: UUID) {

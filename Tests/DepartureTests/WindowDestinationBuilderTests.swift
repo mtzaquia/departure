@@ -442,6 +442,35 @@ struct WindowDestinationBuilderTests {
         _ = host
     }
 
+    #if !canImport(UIKit)
+    @Test func elevatedBridgeUsesWindowDestinationBuilderOnMacOS() {
+        let recorder = WindowDestinationRecorder()
+        var environment = EnvironmentValues()
+        environment.windowDestinationTestValue = "macOS elevated"
+        let presentation = RoutePresentation(
+            scope: RouteScope(id: SettingsRoute().id, route: SettingsRoute()),
+            declaration: Sheet(SettingsRoute.self, priority: .high)._routeDeclarations[0],
+            sourceEnvironment: environment
+        )
+        let builder = WindowDestinationBuilder { destination, environment in
+            RecordingWindowDestinationView(
+                destination: destination, environment: environment, recorder: recorder
+            )
+        }
+        let bridge = ElevatedPriorityPresentationWindowBridge(
+            priority: .high,
+            route: .constant(presentation),
+            sourceScenePhase: .active,
+            windowDestinationBuilder: builder
+        ) { snapshot, _ in
+            snapshot.destination
+        }
+
+        _ = bridge.body
+        #expect(recorder.values == ["macOS elevated"])
+    }
+    #endif
+
     @Test func normalFadeCoverDestinationUsesWindowDestinationBuilder() async throws {
         let router = Router()
         let recorder = WindowDestinationRecorder()

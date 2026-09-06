@@ -38,6 +38,12 @@ extension Router {
         let resolvedRoute = await resolveRouteChain(startingWith: route)
         guard let resolvedRoute else { return }
 
+        // Resolution can suspend while another command starts an unwind. Re-enter the
+        // readiness gate without evaluating the resolved route a second time.
+        await requestRouteWhenReady(resolvedRoute, stage: .presentResolved)
+    }
+
+    func presentResolvedRoute(_ resolvedRoute: any Route) async {
         switch transitionPlan(for: resolvedRoute) {
         case .noOp(let currentRoute):
             log.departureDebug(.routeNoOpEquivalent(route: resolvedRoute, currentRoute: currentRoute))
@@ -144,6 +150,7 @@ extension Router {
     struct DeclarationMatch {
         enum LookupStrategy: Equatable {
             case currentPath(treePriority: RoutePriority)
+            case ancestorPath(treePriority: RoutePriority)
             case rootPath(treePriority: RoutePriority)
             case normalRootActiveBranchScope
             case normalRootDeclarations

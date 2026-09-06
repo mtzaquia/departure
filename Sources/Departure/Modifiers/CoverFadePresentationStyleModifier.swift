@@ -520,33 +520,15 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 private struct ElevatedPriorityCoverFadePresenter: View {
     let presentation: RouteDestinationSnapshot
     let router: Router
-
-    init(
-        presentation: RouteDestinationSnapshot,
-        router: Router,
-        onDismiss _: @escaping @MainActor () -> Void
-    ) {
-        self.presentation = presentation
-        self.router = router
-    }
+    let onDismiss: @MainActor () -> Void
 
     var body: some View {
-        CrossDissolveModalPresenter(
-            presentation: presentation,
-            router: router,
+        // macOS uses a sheet for covers, matching the normal-priority cover fallback.
+        ElevatedPrioritySheetPresenter(
+            onDismiss: onDismiss,
+            destination: presentation.destination
         )
-    }
-}
-
-private struct CrossDissolveModalPresenter: View {
-    let presentation: RouteDestinationSnapshot?
-    let router: Router
-
-    var body: some View {
-        if let presentation {
-            presentation.destination
-                .environment(router)
-        }
+        .environment(router)
     }
 }
 #endif

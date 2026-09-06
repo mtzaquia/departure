@@ -72,7 +72,7 @@ struct ElevatedPrioritySheetHost: View {
 
 // MARK: - Private
 
-private struct ElevatedPrioritySheetPresenter: View {
+struct ElevatedPrioritySheetPresenter: View {
     let onDismiss: @MainActor () -> Void
     let destination: AnyView
 

@@ -507,6 +507,8 @@ private extension Router.DeclarationMatch.LookupStrategy {
         switch self {
         case let .currentPath(treePriority):
             "current route path in \(treePriority) tree, nearest scope first"
+        case let .ancestorPath(treePriority):
+            "enclosing branch path in \(treePriority) tree, nearest scope first"
         case let .rootPath(treePriority):
             "root path in \(treePriority) tree, nearest scope first"
         case .normalRootActiveBranchScope:

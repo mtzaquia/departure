@@ -47,9 +47,7 @@ final class RouteScopeDeclarationInstallation {
         routeSourceID = sourceID
         updateSourceEnvironment(sourceEnvironment)
 
-        if let id {
-            self.id = id
-        }
+        self.id = id ?? initialID
     }
 
     func uninstallRouteSource(sourceID: AnyHashable) -> Bool {
