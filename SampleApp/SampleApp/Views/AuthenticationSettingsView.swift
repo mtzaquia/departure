@@ -24,7 +24,7 @@ import Departure
 import SwiftUI
 
 struct AuthenticationSettingsView: View {
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
     @State private var storage = Storage.shared
 
     let state: AuthenticationSettingsRouteState

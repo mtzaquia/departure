@@ -36,16 +36,19 @@ extension RouteScope {
         let branchID: AnyHashable?
         let declaration: AnyRouteDeclaration
         let presentationAnchor: PresentationAnchor
+        let adoptedFromBranch: AnyHashable?
 
         init(
             branchID: AnyHashable?,
             declaration: AnyRouteDeclaration,
-            presentationAnchor: PresentationAnchor? = nil
+            presentationAnchor: PresentationAnchor? = nil,
+            adoptedFromBranch: AnyHashable? = nil
         ) {
             self.branchID = branchID
             self.declaration = declaration
             self.presentationAnchor = presentationAnchor
                 ?? (branchID == nil ? .declarationLocation : .branchOwner)
+            self.adoptedFromBranch = adoptedFromBranch
         }
     }
 
@@ -82,8 +85,8 @@ extension RouteScope {
             .drivingPresentation(true)
     }
 
-    func firstRouteAttachment(for routeType: (some Route).Type) -> RouteAttachmentMatch? {
-        if branchContainer != nil,
+    func firstRouteAttachment(for routeType: (some Route).Type, includingOtherBranches: Bool = true) -> RouteAttachmentMatch? {
+        if includingOtherBranches, branchContainer != nil,
            let declaration = declarations.declarations(forBranch: activeBranch).routeAttachment(for: routeType) {
             return RouteAttachmentMatch(branchID: activeBranch, declaration: declaration)
         }
@@ -100,11 +103,12 @@ extension RouteScope {
             }) {
             return RouteAttachmentMatch(
                 branchID: nil,
-                declaration: declaration.hosted(by: adoptedRoutePresentationHostID)
+                declaration: declaration.hosted(by: adoptedRoutePresentationHostID),
+                adoptedFromBranch: branchID
             )
         }
 
-        if branchContainer != nil {
+        if includingOtherBranches, branchContainer != nil {
             for branchID in declarations.branchIDs where branchID != activeBranch {
                 guard let declaration = declarations.declarations(forBranch: branchID).routeAttachment(for: routeType) else {
                     continue
@@ -240,6 +244,7 @@ extension RouteScope {
         let didChangeDeclarations = declarationInstallation.hasRouteSource(sourceID) == false
             || (id ?? declarationInstallation.initialID) != self.id
             || (branchContainer != nil) != usesBranches
+            || (branchContainer?.isConcurrent ?? false) != (branchSelection?.concurrent ?? false)
             || declarations.routeAttachmentIdentities != desiredIdentities
 
         declarationInstallation.installRouteSource(
@@ -290,6 +295,7 @@ extension RouteScope {
         }
 
         branchContainer = nil
+        participation.isConcurrent = false
         declarations = DeclarationStore()
         log.departureDebug(.routeDeclarationsUninstalled(scope: self))
     }
@@ -349,6 +355,7 @@ private extension RouteScope {
             return
         }
 
+        participation.isConcurrent = branchSelection?.concurrent ?? false
         branchContainer.selection = branchSelection
         self.branchContainer = branchContainer
     }
@@ -378,6 +385,7 @@ private extension RouteScope {
         branchSelection: AnyRouteBranchSelection?,
         routeDeclarations: [RouteScopeDeclaration]
     ) {
+        participation.isConcurrent = branchSelection?.concurrent ?? false
         let hasBranchDeclarations = routeDeclarations.contains {
             $0.branch != nil
         }

@@ -68,3 +68,16 @@ that owns branched `.routes` declarations, forcing its lifecycle representable t
 bring Departure back to the foreground between replacements. The generation must advance, the
 nested route phase must return to `active`, the background-transition counter must advance, and
 the app must remain running without a Swift exclusivity trap.
+
+## Concurrent split-view branches
+
+Choose **Split-view lab** on the start screen. The three-column layout uses ordinary
+`NavigationSplitView` and `NavigationStack` views with `concurrent: true` on the existing
+branch modifier. **Show content** and **Show detail** address a sibling explicitly through
+`router.branch(...)`. On compact layouts the preferred compact column reveals the target;
+on iPad the other columns retain their paths. **Cover from detail** demonstrates the
+existing full-screen cover behavior and captured `unwindRoute` dismissal.
+
+The main route lab also uses scoped environment routers. Cross-branch actions address
+their target explicitly, and the external URL coordinator retains live environment contexts
+rather than relying on a globally current routing scope.

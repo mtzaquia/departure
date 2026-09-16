@@ -98,6 +98,20 @@ struct SampleDeepLink {
         self.route = route
     }
 
+    static func router(for route: any Route, from router: Router) -> Router {
+        switch route {
+        case is ProfileRoute, is MessageRoute, is DismissProbeRoute,
+             is NavigationBarFadeOcclusionRoute, is LifecycleTeardownRoute:
+            router.branch(LandingView.TabItem.home)
+        case is AuthenticationSettingsRoute, is AppearanceSettingsRoute,
+             is PendingPriorityRoute, is SettingsModalRoute, is RerouteChainStartRoute,
+             is RerouteChainIntermediateRoute, is RerouteChainFinalRoute, is LocalDetailRoute:
+            router.branch(LandingView.TabItem.settings)
+        default:
+            router
+        }
+    }
+
     private static func makeRoute(
         path: String,
         components: URLComponents

@@ -44,7 +44,7 @@ struct ActionHookTests {
     }
 
     @Test func currentScopeInterceptorWinsOverAncestorInterceptor() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = ActionRecorder()
@@ -71,7 +71,7 @@ struct ActionHookTests {
     }
 
     @Test func currentRouteScopeUsesSelectedInstalledBranchScopeForHooks() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
 
@@ -96,7 +96,7 @@ struct ActionHookTests {
     }
 
     @Test func inactiveBranchHooksDoNotInterceptActions() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
 
@@ -121,7 +121,7 @@ struct ActionHookTests {
     }
 
     @Test func clearingHooksRemovesInterceptorsFromScope() async {
-        let router = Router()
+        let router = RouterEngine()
         let scope = RouteScope(id: RootRoute().id, route: RootRoute())
         let sourceID = AnyHashable("hooks")
         let recorder = ActionRecorder()
@@ -144,7 +144,7 @@ struct ActionHookTests {
     }
 
     @Test func actionReroutePresentsRouteAndRetriesOnce() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = ActionEventRecorder()
 
         router.root.installRouteDeclarations(
@@ -167,7 +167,7 @@ struct ActionHookTests {
     }
 
     @Test func actionRerouteWaitsForInstalledDestinationInterceptorsBeforeRetrying() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = ActionEventRecorder()
 
         router.root.installRouteDeclarations(
@@ -200,7 +200,7 @@ struct ActionHookTests {
     }
 
     @Test func actionRerouteLoopIsDroppedAfterRetry() async {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = ActionEventRecorder()
 
         router.root.installRouteDeclarations(
@@ -224,7 +224,7 @@ struct ActionHookTests {
     }
 
     @Test func selectedBranchScopeChangesWhenActiveBranchChanges() {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)

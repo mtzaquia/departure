@@ -35,6 +35,51 @@ final class SampleAppUITests: XCTestCase {
     override func tearDownWithError() throws {
         app.terminate()
         app = nil
+        XCUIDevice.shared.orientation = .portrait
+    }
+
+    func testConcurrentSplitBranchTargetRevealsDetailAndDismissesLocally() {
+        openSplitLab()
+        tap("sample.split.show-detail")
+        assertExists("sample.split.detail-destination")
+        tap("sample.split.detail-done")
+        assertGone("sample.split.detail-destination")
+    }
+
+    func testConcurrentSplitBranchCoverPreservesSelectedDestination() {
+        openSplitLab()
+        tap("sample.split.show-detail")
+        assertExists("sample.split.detail-destination")
+        tap("sample.split.cover-detail.destination")
+        assertExists("sample.split.cover")
+        tap("sample.split.cover-done")
+        assertExists("sample.split.detail-destination")
+        tap("sample.split.detail-done")
+        assertGone("sample.split.detail-destination")
+    }
+
+    func testConcurrentSplitBranchesCoexistOnIPad() throws {
+        guard app.windows.firstMatch.frame.width > 700 else { throw XCTSkip("Requires an iPad layout") }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        tap("sample.split.start")
+        tap("sample.split.show-content")
+        assertExists("sample.split.content-destination")
+        tap("sample.split.show-detail")
+        assertExists("sample.split.detail-destination")
+        assertExists("sample.split.content-destination")
+        let columns = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        columns.name = "Concurrent content and detail destinations"
+        columns.lifetime = .keepAlways
+        add(columns)
+        tap("sample.split.cover-detail.destination")
+        assertExists("sample.split.cover")
+        tap("sample.split.cover-done")
+        assertExists("sample.split.content-destination")
+        assertExists("sample.split.detail-destination")
+        tap("sample.split.detail-done")
+        assertGone("sample.split.detail-destination")
+        assertExists("sample.split.content-destination")
     }
 
     func testBranchCrawlActivationAndStackPersistence() {
@@ -636,6 +681,13 @@ final class SampleAppUITests: XCTestCase {
 }
 
 private extension SampleAppUITests {
+    func openSplitLab() {
+        if app.windows.firstMatch.frame.width > 700 {
+            XCUIDevice.shared.orientation = .landscapeLeft
+        }
+        tap("sample.split.start")
+    }
+
     func openLanding() {
         tap(A11y.startButton)
         assertExists(A11y.homeWelcome)
@@ -650,7 +702,7 @@ private extension SampleAppUITests {
     }
 
     func tapTab(named title: String, identifier: String) {
-        let identified = element(identifier)
+        let identified = app.buttons.matching(identifier: identifier).firstMatch
         if identified.waitForExistence(timeout: 1) {
             identified.tap()
             return
@@ -677,7 +729,10 @@ private extension SampleAppUITests {
         let expectedValue = on ? "1" : "0"
         if target.valueDescription != expectedValue {
             XCTAssertTrue(target.isHittable, "Expected switch \(identifier) to be hittable")
-            target.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+            // SwiftUI exposes the label and control as one switch row. A
+            // proportional offset can miss the trailing control in a wide row.
+            target.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5))
+                .withOffset(CGVector(dx: -20, dy: 0)).tap()
         }
 
         let deadline = Date().addingTimeInterval(2)

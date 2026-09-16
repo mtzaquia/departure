@@ -49,7 +49,7 @@ public struct UnwindRouteAction: Equatable {
         self.handler = nil
     }
 
-    init(router: Router, routeScope: RouteScope) {
+    init(router: RouterEngine, routeScope: RouteScope) {
         self.identity = .routeScope(
             routerID: router.id,
             routeScopeID: ObjectIdentifier(routeScope)
@@ -80,10 +80,10 @@ public struct UnwindRouteAction: Equatable {
     }
 
     private final class Handler {
-        let router: Router
+        let router: RouterEngine
         weak var routeScope: RouteScope?
 
-        init(router: Router, routeScope: RouteScope) {
+        init(router: RouterEngine, routeScope: RouteScope) {
             self.router = router
             self.routeScope = routeScope
         }
@@ -100,10 +100,10 @@ public struct UnwindRouteAction: Equatable {
 
 /// The current routing phase for a view's local route scope.
 public enum RoutePhase: Equatable, Sendable {
-    /// This view's route scope is the router's current route scope.
+    /// This view's route scope is current within its participating branch.
     case active
 
-    /// This view's route scope is installed, but another route scope is current.
+    /// This view's scope is behind another destination or belongs to an unselected exclusive branch.
     case inactive
 }
 
@@ -112,6 +112,9 @@ extension EnvironmentValues {
 }
 
 public extension EnvironmentValues {
+    /// The router bound to this view's route scope, or an inactive router outside `WithRouter`.
+    @Entry var router = Router.inactive
+
     /// Unwinds the captured route scope.
     @Entry var unwindRoute = UnwindRouteAction()
 
@@ -123,21 +126,54 @@ public extension EnvironmentValues {
     @Entry var routePhase = RoutePhase.inactive
 }
 
+public extension Environment where Value == Router {
+    /// Reads the contextual router using the legacy type-based spelling.
+    ///
+    /// `@Environment(Router.self)` reads the same scoped handle as
+    /// `@Environment(\.router)`, including its inactive default outside `WithRouter`.
+    /// - Parameter type: The router type identifying the compatibility lookup.
+    @available(*, deprecated, message: "Use @Environment(\\.router) instead.")
+    init(_ type: Router.Type) {
+        self.init(\.router)
+    }
+}
+
 extension View {
     func routeScopeEnvironment(_ routeScope: RouteScope) -> some View {
         environment(\.routeScope, routeScope)
     }
 
-    func routeScopeEnvironment(_ routeScope: RouteScope, router: Router) -> some View {
+    func routeScopeEnvironment(_ routeScope: RouteScope, router: RouterEngine) -> some View {
         self
             .environment(\.routeScope, routeScope)
+            .environment(\.router, Router(engine: router, scope: routeScope))
             .environment(\.routePhase, router.routePhase(for: routeScope))
             .environment(\.unwindRoute, UnwindRouteAction(router: router, routeScope: routeScope))
     }
 }
 
-extension Router {
+extension RouterEngine {
     func routePhase(for routeScope: RouteScope) -> RoutePhase {
-        activeRouteScopeID == ObjectIdentifier(routeScope) ? .active : .inactive
+        _ = activeRouteScopeID
+        _ = routeScope.participation.isBranchHostRegistered
+        guard let path = routeForest.routePath(containing: routeScope),
+              let tree = routeForest.tree(containing: path), tree === routeForest.activeTree else { return .inactive }
+        // A modal suspends scopes outside its subtree. Concurrent columns hosted
+        // inside that modal still participate together.
+        if let deepestModal = tree.currentModalScope {
+            var ancestor: RouteScope? = routeScope
+            while let current = ancestor, current !== deepestModal {
+                ancestor = current.previousScopeInTree
+            }
+            guard ancestor === deepestModal else { return .inactive }
+        }
+        var scope = routeScope
+        while let previous = scope.previousScopeInTree {
+            if let branch = scope.branchID,
+               previous.participates(inBranch: branch) == false { return .inactive }
+            scope = previous
+        }
+        let current = path.last?.activeLocalScope ?? path.owner?.activeLocalScope
+        return current === routeScope ? .active : .inactive
     }
 }

@@ -24,7 +24,7 @@ import Departure
 import SwiftUI
 
 struct ProfileView: View {
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
     @Environment(\.routePhase) private var routePhase
 
     var body: some View {

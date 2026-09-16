@@ -58,17 +58,27 @@ public extension View {
     ///     }
     /// ```
     ///
+    /// Set `concurrent` for containers whose branches participate together, such as
+    /// split views. The selection binding identifies the branch to reveal during
+    /// programmatic navigation; changing it does not clear other branch paths.
+    /// In a split view, connect it to the preferred compact column, or adapt an
+    /// app-defined branch value to the container's visibility state.
+    /// Keep this enabled when a split view collapses; it describes the container,
+    /// rather than the size class or number of currently visible columns.
+    ///
+    /// - Parameter concurrent: Whether all registered branches participate together.
     /// - Important: Place branch content under ``SwiftUICore/View/routeBranch(_:)`` so branch-local
     ///   presentations are hosted by the selected branch view.
     func routes<ID: Hashable, Selection: Hashable>(
         id: ID? = AnyHashable?.none,
         branch selection: Binding<Selection>,
+        concurrent: Bool = false,
         @BranchedRouteDeclarationBuilder<Selection> _ declarations: () -> [RouteScopeDeclaration]
     ) -> some View {
         modifier(
             RoutesModifier(
                 explicitScopeID: id.map({ AnyHashable($0) }),
-                selection: AnyRouteBranchSelection(selection),
+                selection: AnyRouteBranchSelection(selection, concurrent: concurrent),
                 declarations: declarations()
             )
         )
@@ -85,7 +95,7 @@ private struct RoutesModifier: ViewModifier {
     @State private var sourceID = AnyHashable(UUID())
     @State private var presentationHostID = RoutePresentationHostID()
 
-    @Environment(Router.self) private var router
+    @Environment(RouterEngine.self) private var router
     @Environment(\.routeScope) private var routeScope
     @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
 
@@ -107,6 +117,9 @@ private struct RoutesModifier: ViewModifier {
                 }
             }
             .onChange(of: activeBranch) { _, _ in
+                installScopeDeclarations()
+            }
+            .onChange(of: selection?.concurrent) { _, _ in
                 installScopeDeclarations()
             }
             .onChange(of: declarations) { _, _ in

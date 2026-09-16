@@ -25,7 +25,7 @@ import SwiftUI
 struct CoverSlidePresentationStyleModifier: ViewModifier {
     let presentationHostID: RoutePresentationHostID
 
-    @Environment(Router.self) private var router
+    @Environment(RouterEngine.self) private var router
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
@@ -55,7 +55,7 @@ struct CoverSlidePresentationStyleModifier: ViewModifier {
 }
 
 struct ElevatedPriorityCoverSlideHost: View {
-    @Environment(Router.self) private var router
+    @Environment(RouterEngine.self) private var router
     @Environment(\.scenePhase) private var scenePhase
     let priority: RoutePriority
     let windowDestinationBuilder: WindowDestinationBuilder

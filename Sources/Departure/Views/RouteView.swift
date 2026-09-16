@@ -26,7 +26,7 @@ public struct RouteView: View {
     let scope: RouteScope
     let providesNavigation: Bool
 
-    @Environment(Router.self) private var router
+    @Environment(RouterEngine.self) private var router
 
     init(scope: RouteScope, providesNavigation: Bool = false) {
         self.scope = scope

@@ -29,9 +29,9 @@ import Testing
 @Suite
 struct RouterTests {
     @Test func routersCompareByIdentity() {
-        let router = Router()
+        let router = RouterEngine()
         let sameRouter = router
-        let otherRouter = Router()
+        let otherRouter = RouterEngine()
 
         #expect(router == sameRouter)
         #expect(router != otherRouter)
@@ -48,7 +48,7 @@ struct RouterTests {
     }
 
     @Test func publicRoutingActionsDispatchThroughRouter() async {
-        let router = Router()
+        let router = RouterEngine()
         let actionRecorder = AsyncActionRecorder()
 
         router.root.installRouteDeclarations(
@@ -75,7 +75,7 @@ struct RouterTests {
     }
 
     @Test func routePhaseTracksCurrentRouteScope() {
-        let router = Router()
+        let router = RouterEngine()
         let routeScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         #expect(router.routePhase(for: router.root) == .active)
@@ -90,7 +90,7 @@ struct RouterTests {
     }
 
     @Test func deferredBranchedDeclarationTeardownReconcilesRoutePhaseAfterTheCurrentTurn() async {
-        let router = Router()
+        let router = RouterEngine()
         let sourceID = AnyHashable("routed-scroll")
         let (selection, _) = tabSelection(.home)
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -133,7 +133,7 @@ struct RouterTests {
     }
 
     @Test func activeEmptyBranchIsTheCurrentRoutePath() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
 
@@ -160,7 +160,7 @@ struct RouterTests {
     }
 
     @Test func routePhaseTreatsActiveBranchRootAsCurrentScope() {
-        let router = Router()
+        let router = RouterEngine()
         let containerScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
@@ -187,7 +187,7 @@ struct RouterTests {
     }
 
     @Test func routePhaseTracksActiveBranchChanges() {
-        let router = Router()
+        let router = RouterEngine()
         let containerScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
@@ -208,7 +208,7 @@ struct RouterTests {
     }
 
     @Test func presentedBranchModalIsTheOnlyActiveRouteScope() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let containerScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
 
@@ -236,7 +236,7 @@ struct RouterTests {
     }
 
     @Test func publicUnwindReportsMissingTargetBeforeContinuation() async {
-        let router = Router()
+        let router = RouterEngine()
         router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
@@ -255,7 +255,7 @@ struct RouterTests {
     }
 
     @Test func publicUnwindReportsNoRouteAtRoot() async {
-        let router = Router()
+        let router = RouterEngine()
 
         #expect(await router.unwind(to: .root) == false)
         #expect(await router.unwind(to: .topmostAncestor) == false)
@@ -263,14 +263,14 @@ struct RouterTests {
     }
 
     @Test func publicUnwindReportsMissingNearestBranch() async {
-        let router = Router()
+        let router = RouterEngine()
 
         #expect(await router.unwind(to: .nearestBranch) == false)
         #expect(router.normalTree.rootPath.isEmpty)
     }
 
     @Test func routeRequestSelectsInactiveBranchAndWaitsForInstalledBranchScope() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.wallet)
 
         router.root.installRouteDeclarations(
@@ -319,7 +319,7 @@ struct RouterTests {
     }
 
     @Test func routeRequestDoesNotTrimDeclaringPathWhileActiveBranchHostIsMissing() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         router.normalTree.rootPath.scopes = [landingScope]
@@ -382,7 +382,7 @@ struct RouterTests {
     }
 
     @Test func unchangedBranchedDeclarationRefreshesSelectionAndMovesHooksInPlace() async {
-        let router = Router()
+        let router = RouterEngine()
         let (initialSelection, initialTab) = tabSelection(.home)
         let declarations = BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
             BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
@@ -459,7 +459,7 @@ struct RouterTests {
     }
 
     @Test func branchScopeChecksLocalDeclarationsBeforeAdoptedDeclarations() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -505,7 +505,7 @@ struct RouterTests {
     }
 
     @Test func routeRequestFromInstalledInactiveBranchWaitsForTargetBranchScope() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.wallet)
 
         router.root.installRouteDeclarations(
@@ -559,7 +559,7 @@ struct RouterTests {
     }
 
     @Test func inactiveBranchRequestResumesAfterMountedHostObservesSelection() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.wallet)
 
         router.root.installRouteDeclarations(
@@ -600,7 +600,7 @@ struct RouterTests {
     }
 
     @Test func inactiveBranchCoverRequestActivatesBranchAndPresentsFromAdoptedScope() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.wallet)
 
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
@@ -664,7 +664,7 @@ struct RouterTests {
     }
 
     @Test func branchContainerCoverPresentsFromContainerWithoutClearingBranchPath() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
 
         router.root.installRouteDeclarations(
@@ -719,7 +719,7 @@ struct RouterTests {
     }
 
     @Test func branchContainerSheetDoesNotReappearAfterBranchSwitchDismissal() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -787,7 +787,7 @@ struct RouterTests {
     }
 
     @Test func branchPushRequestDismissesTopLevelModalBeforeAppending() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -857,7 +857,7 @@ struct RouterTests {
     }
 
     @Test func branchLocalPushDiscoveredBehindModalAppendsAfterActiveLocalScope() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
@@ -919,7 +919,7 @@ struct RouterTests {
     }
 
     @Test func normalRootBranchLocalPushBehindModalPreservesActiveLocalScope() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let walletRouteScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -1011,7 +1011,7 @@ struct RouterTests {
     }
 
     @Test func pendingActiveLocalPushResumePreservesResolvedLocalScope() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let walletRouteScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -1069,7 +1069,7 @@ struct RouterTests {
     }
 
     @Test func branchDeclaredPushBehindModalStillReplacesActiveBranchPath() throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let walletRouteScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -1117,7 +1117,7 @@ struct RouterTests {
     }
 
     @Test func branchOwnerModalUsesResolvedOwnerWhilePreservingBranchPath() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let walletRouteScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -1161,7 +1161,7 @@ struct RouterTests {
     }
 
     @Test func equivalentBranchPushDismissesTopLevelModalWithoutReplacingExistingScope() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let detailScope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute())
@@ -1180,7 +1180,7 @@ struct RouterTests {
         router.normalTree.rootPath.scopes = [landingScope, modalScope]
         router.routeScopeDidInstallInView(modalScope)
 
-        let match = Router.DeclarationMatch(
+        let match = RouterEngine.DeclarationMatch(
             presentationLocation: .init(path: homeScope.path, position: .owner),
             tree: router.normalTree,
             declarationLocation: .init(
@@ -1222,7 +1222,7 @@ struct RouterTests {
     }
 
     @Test func nearestModalDeclarationWinsOverEquivalentRouteInBranch() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let existingDetailScope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute())
@@ -1260,7 +1260,7 @@ struct RouterTests {
     }
 
     @Test func localSheetDeclarationWinsOverTopLevelDeclarationForSameRoute() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -1310,7 +1310,7 @@ struct RouterTests {
     }
 
     @Test func localSheetOnPushedScopeWinsOverContainerLevelDeclaration() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -1368,7 +1368,7 @@ struct RouterTests {
     }
 
     @Test func presentingTopLevelSheetOverBranchLocalSheetReplacesItRatherThanStacking() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -1421,7 +1421,7 @@ struct RouterTests {
     }
 
     @Test func presentingTopLevelCoverOverBranchLocalSheetReplacesItAcrossModalKinds() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -1472,7 +1472,7 @@ struct RouterTests {
     }
 
     @Test func nestedModalsOccupySuccessiveModalDepthsAndAncestorReplacementClearsBoth() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -1512,7 +1512,7 @@ struct RouterTests {
     }
 
     @Test func replacingTopLevelCoverPreservesActiveBranchPushStack() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -1584,7 +1584,7 @@ struct RouterTests {
     }
 
     @Test func ancestorCoverRemovesDescendantLocalSheetAndPreservesPushStack() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -1696,7 +1696,7 @@ struct RouterTests {
     }
 
     @Test func crawlBackBranchSwitchWaitsForAdoptedLocalDeclarationBeforePresenting() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -1766,7 +1766,7 @@ struct RouterTests {
     }
 
     @Test func unresolvedRoutesAndUndeclaredRoutesAreDropped() async {
-        let router = Router()
+        let router = RouterEngine()
 
         await router.requestRoute(DroppedRoute())
         #expect(router.normalTree.rootPath.isEmpty)
@@ -1776,7 +1776,7 @@ struct RouterTests {
     }
 
     @Test func routeResolutionReroutePresentsResolvedRoute() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -1793,7 +1793,7 @@ struct RouterTests {
     }
 
     @Test func routeResolutionRerouteChainStopsWhenAResolvedRouteDrops() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -1809,7 +1809,7 @@ struct RouterTests {
     }
 
     @Test func normalPresentationResolvesAndDismissesFromDeclaringScope() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -1835,7 +1835,7 @@ struct RouterTests {
     }
 
     @Test func repeatedPresentationOfEquivalentRouteKeepsPresentationIdentity() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -1864,7 +1864,7 @@ struct RouterTests {
     }
 
     @Test func repeatedPresentationOfUnequalRouteValueGetsNewPresentationIdentity() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -1893,7 +1893,7 @@ struct RouterTests {
     }
 
     @Test func presentingEquivalentAncestorUnwindsToExistingScopeInsteadOfRePresenting() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -1955,7 +1955,7 @@ struct RouterTests {
     }
 
     @Test func presentingEquivalentRouteInInactiveBranchSelectsBranchAndUnwindsThere() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.wallet)
 
         router.root.installRouteDeclarations(
@@ -2027,7 +2027,7 @@ struct RouterTests {
     }
 
     @Test func replacingInstalledPushWaitsForOldScopeToLeaveViewBeforeAppendingNextRoute() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -2060,7 +2060,7 @@ struct RouterTests {
     }
 
     @Test func removingPresentedRouteScopeSynchronizesRouterPath() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -2080,7 +2080,7 @@ struct RouterTests {
     }
 
     @Test func routeScopeLeavingViewUninstallsWithoutRemovingRouterPath() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -2103,7 +2103,7 @@ struct RouterTests {
     }
 
     @Test func installedModalDismissalRetainsImmediateGraphSemantics() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -2127,7 +2127,7 @@ struct RouterTests {
     }
 
     @Test func presentationDismissalClearsBranchPathsOwnedByRemovedScope() throws {
-        let router = Router()
+        let router = RouterEngine()
         let modalScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let branchScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let detailScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
@@ -2152,7 +2152,7 @@ struct RouterTests {
     }
 
     @Test func snapshotPresentationWriteBackDoesNotTrimLiveRootPath() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let retainedScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let coverScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let pushedScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
@@ -2192,7 +2192,7 @@ struct RouterTests {
     }
 
     @Test func routeScopeViewLifecycleResumesEveryWaiterForEachTransition() async {
-        let router = Router()
+        let router = RouterEngine()
         let scope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         let firstInstallWaiter = Task {
@@ -2223,7 +2223,7 @@ struct RouterTests {
     }
 
     @Test func unwindDismissesCurrentRoute() async {
-        let router = Router()
+        let router = RouterEngine()
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
@@ -2238,7 +2238,7 @@ struct RouterTests {
     }
 
     @Test func unwindToIDKeepsMatchingRouteScope() async {
-        let router = Router()
+        let router = RouterEngine()
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
@@ -2253,7 +2253,7 @@ struct RouterTests {
     }
 
     @Test func combinedUnwindPlanKeepsShallowestBoundaryForTheSamePath() {
-        let router = Router()
+        let router = RouterEngine()
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let thirdScope = RouteScope(id: AlertRoute().id, route: AlertRoute())
@@ -2272,7 +2272,7 @@ struct RouterTests {
     }
 
     @Test func unwindToRootClearsPath() async {
-        let router = Router()
+        let router = RouterEngine()
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
@@ -2286,7 +2286,7 @@ struct RouterTests {
     }
 
     @Test func unwindToRootClearsAppRootAndActiveBranchFromDeepWithinBranch() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -2324,7 +2324,7 @@ struct RouterTests {
     }
 
     @Test func unwindToRootClearsActiveBranchPushAndAdoptedModal() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -2373,7 +2373,7 @@ struct RouterTests {
     }
 
     @Test func unwindToRootClearsInactiveBranchStacksOwnedByRemovedScope() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -2439,7 +2439,7 @@ struct RouterTests {
     }
 
     @Test func unwindToRootPreservesInactiveBranchPushStackButClearsModal() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -2511,7 +2511,7 @@ struct RouterTests {
     }
 
     @Test func unwindToNearestBranchClearsThatBranchPathButKeepsTheAppRoot() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -2549,7 +2549,7 @@ struct RouterTests {
     }
 
     @Test func unwindToNearestBranchAtBranchRootIsNoOp() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -2585,7 +2585,7 @@ struct RouterTests {
     }
 
     @Test func sequentialUnwindThenPresentWaitsForInstalledRouteScopeToLeaveView() async {
-        let router = Router()
+        let router = RouterEngine()
         let loginScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
         router.root.installRouteDeclarations(
@@ -2620,7 +2620,7 @@ struct RouterTests {
     }
 
     @Test func modalReplacementWaitsForInstalledRouteScopeToLeaveView() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -2659,7 +2659,7 @@ struct RouterTests {
     }
 
     @Test func sheetToCoverReplacementWaitsForOldScopeToLeaveView() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -2700,7 +2700,7 @@ struct RouterTests {
     }
 
     @Test func coverToSheetReplacementWaitsForOldScopeToLeaveView() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -2741,7 +2741,7 @@ struct RouterTests {
     }
 
     @Test func pendingModalReplacementUsesLatestRequest() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -2788,7 +2788,7 @@ struct RouterTests {
     }
 
     @Test func clearingExplicitScopeIDRestoresInitialUnwindTarget() async {
-        let router = Router()
+        let router = RouterEngine()
         let initialID = router.root.id
         let declarations = [RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations)]
         router.root.installRouteDeclarations(
@@ -2808,7 +2808,7 @@ struct RouterTests {
     }
 
     @Test func cancellingPresentationWaitingForNavigationRemovesPendingRequest() async {
-        let router = Router()
+        let router = RouterEngine()
         router.root.installRouteDeclarations(
             id: nil,
             branchSelection: nil,
@@ -2839,7 +2839,7 @@ struct RouterTests {
     }
 
     @Test func pendingPresentationWaitsForEveryOverlappingNavigationTransaction() async {
-        let router = Router()
+        let router = RouterEngine()
         let firstDismissedScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let secondDismissedScope = RouteScope(id: AlertRoute().id, route: AlertRoute())
 
@@ -2898,7 +2898,7 @@ struct RouterTests {
     }
 
     @Test func snapshotPresentationUsesOriginalPositionForHighTreeLocalHosting() async {
-        let router = Router()
+        let router = RouterEngine()
         let rootScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let loginScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let noticeScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
@@ -2934,7 +2934,7 @@ struct RouterTests {
     }
 
     @Test func unwindFromBranchPresentationKeepsPresentedTopLevelScope() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -2968,7 +2968,7 @@ struct RouterTests {
     }
 
     @Test func highPriorityUnwindFromBranchKeepsPresentedTopLevelScopeForContinuation() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -3037,7 +3037,7 @@ struct RouterTests {
     }
 
     @Test func unwindFromBranchPushCanTargetAncestorRouteForContinuation() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
@@ -3100,7 +3100,7 @@ struct RouterTests {
     }
 
     @Test func sequentialUnwindThenPresentCutsPathBeforeWaitingForAllRemovedScopes() async {
-        let router = Router()
+        let router = RouterEngine()
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let thirdScope = RouteScope(id: AlertRoute().id, route: AlertRoute())
@@ -3144,7 +3144,7 @@ struct RouterTests {
     }
 
     @Test func unwindPreservesDescendantPresentationBindingsUntilAncestorLeavesView() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let profileScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -3191,7 +3191,7 @@ struct RouterTests {
     }
 
     @Test func targetedUnwindClearsCoverHostedByRetainedNonRootScopeWhilePreservingNestedPush() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let paymentMethodsID = AnyHashable("paymentMethods")
         let paymentMethodsScope = RouteScope(id: paymentMethodsID, route: CardsListRoute())
         let coverScope = RouteScope(id: AddMethodRoute().id, route: AddMethodRoute())
@@ -3253,7 +3253,7 @@ struct RouterTests {
     }
 
     @Test func rootUnwindPreservesBranchDescendantPresentationBindingUntilAncestorLeavesView() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let profileScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -3314,7 +3314,7 @@ struct RouterTests {
     }
 
     @Test func rootUnwindPreservesDeepBranchPushStackWhileLandingCoverDismisses() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let settingsScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let authenticationScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -3389,7 +3389,7 @@ struct RouterTests {
     }
 
     @Test func routeAppendPreservesDeepBranchPushStackWhileReplacingAncestorModal() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let settingsScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let appearanceScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -3463,7 +3463,7 @@ struct RouterTests {
     }
 
     @Test func routeAppendDoesNotPreservePushHostedByRetainedScopeWhileNestedModalLeaves() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let appearanceScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let authenticationScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
         let sheetScope = RouteScope(id: MessageRoute().id, route: MessageRoute())
@@ -3551,7 +3551,7 @@ struct RouterTests {
     }
 
     @Test func unwindSnapshotDoesNotPreservePushPresentationBindingWithoutDepartingModal() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let settingsScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let authenticationScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -3594,7 +3594,7 @@ struct RouterTests {
     }
 
     @Test func routeAppendAnimatesOnlyOutermostPushDuringMultiScreenPop() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let appearanceScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let authenticationScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
 
@@ -3664,7 +3664,7 @@ struct RouterTests {
     }
 
     @Test func inactiveBranchPathIsPreservedWhenActiveBranchChanges() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -3730,7 +3730,7 @@ struct RouterTests {
     }
 
     @Test func highPriorityTreeClearsWhenHighRouteLeavesViewOnInactiveBranch() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.wallet)
 
         router.root.installRouteDeclarations(
@@ -3788,7 +3788,7 @@ struct RouterTests {
     }
 
     @Test func inactiveBranchPushPresentationBindingStaysStableWhenActiveBranchChanges() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -3849,7 +3849,7 @@ struct RouterTests {
     }
 
     @Test func branchLocalModalPresentationOnlyDrivesWhenParentBranchIsActive() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -3880,7 +3880,7 @@ struct RouterTests {
     }
 
     @Test func presentingModalInSiblingBranchClearsSharedModalLane() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -3963,7 +3963,7 @@ struct RouterTests {
     }
 
     @Test func ancestorPushLookupExplainsSingleMultiScopeTrim() throws {
-        let router = Router()
+        let router = RouterEngine()
         let ancestorScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let firstDescendant = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let secondDescendant = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
@@ -4037,7 +4037,7 @@ struct RouterTests {
     #endif
 
     @Test func highPriorityPresentationUsesActiveLocalBranchScope() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -4070,7 +4070,7 @@ struct RouterTests {
     }
 
     @Test func pendingElevatedPresentationBlocksLowerPriorityBeforeTreeStarts() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -4116,7 +4116,7 @@ struct RouterTests {
     }
 
     @Test func equalPriorityRequestReplacesPendingElevatedPresentationBeforeTreeStarts() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -4146,7 +4146,7 @@ struct RouterTests {
     }
 
     @Test func highPriorityPresentationCanUseContainerDeclarationFromActiveLocalBranch() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
 
         router.root.installRouteDeclarations(
@@ -4186,7 +4186,7 @@ struct RouterTests {
     }
 
     @Test func normalRouteBeforeActiveHighTreeIsDropped() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4209,7 +4209,7 @@ struct RouterTests {
     }
 
     @Test func highPriorityPresentationOverlaysNormalPresentation() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4256,7 +4256,7 @@ struct RouterTests {
     }
 
     @Test func highPriorityReplacementPreservesUnderlyingNormalPresentation() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4298,7 +4298,7 @@ struct RouterTests {
     }
 
     @Test func highPriorityReplacementClearsAndWaitsForOwnedBranchPaths() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let branchScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let branchDetailScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
 
@@ -4349,7 +4349,7 @@ struct RouterTests {
     }
 
     @Test func normalRouteMatchedInsideHighTreeAppendsNormally() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4378,7 +4378,7 @@ struct RouterTests {
     }
 
     @Test func highPriorityDeclarationInsideHighTreeAppendsNormally() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4408,7 +4408,7 @@ struct RouterTests {
     }
 
     @Test func presentingEquivalentHighPriorityRouteUnwindsInsideHighTreeInsteadOfReplacing() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4459,7 +4459,7 @@ struct RouterTests {
     }
 
     @Test func equivalentHighPriorityRouteClearsBranchesOwnedByRemovedScopes() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let branchScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let branchDetailScope = RouteScope(id: TransactionRoute().id, route: TransactionRoute())
 
@@ -4493,7 +4493,7 @@ struct RouterTests {
     }
 
     @Test func elevatedPresentationDismissalClearsOwnedBranchPaths() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let branchScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let branchDetailScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
 
@@ -4520,7 +4520,7 @@ struct RouterTests {
     }
 
     @Test func ancestorHighPriorityDeclarationReplacesActiveHighPriorityRoute() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4548,7 +4548,7 @@ struct RouterTests {
     }
 
     @Test func criticalPriorityPresentationOverlaysHighPriorityPresentation() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4589,7 +4589,7 @@ struct RouterTests {
     }
 
     @Test func unwindingHighPriorityRoutePreservesCriticalTreeAnchoredToAncestor() async throws {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4615,7 +4615,7 @@ struct RouterTests {
     }
 
     @Test func criticalPriorityReplacementPreservesUnderlyingHighPriorityPresentation() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4657,7 +4657,7 @@ struct RouterTests {
     }
 
     @Test func lowerPriorityRouteBeforeActiveCriticalTreeIsDropped() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4683,7 +4683,7 @@ struct RouterTests {
     }
 
     @Test func criticalPriorityDeclarationInsideHighTreeStartsCriticalTree() async {
-        let router = Router()
+        let router = RouterEngine()
 
         router.root.installRouteDeclarations(
             id: nil,
@@ -4716,7 +4716,7 @@ struct RouterTests {
     }
 
     @Test func repeatedRouteDeclarationRefreshesInsideCriticalCoverKeepTheStoreStable() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let sourceID = AnyHashable("critical-cover-routes")
         let recorder = ActionRecorder()
         let declarations = [
@@ -4789,7 +4789,7 @@ struct RouterTests {
     }
 }
 
-private extension Router {
+private extension RouterEngine {
     @MainActor
     func installElevatedTree(priority: RoutePriority, scopes: [RouteScope]) {
         let rootScope = RouteScope(id: UUID(), route: nil)

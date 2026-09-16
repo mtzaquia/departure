@@ -23,10 +23,12 @@
 import SwiftUI
 
 struct AnyRouteBranchSelection {
+    let concurrent: Bool
     let value: @MainActor () -> AnyHashable
     let setValue: @MainActor (AnyHashable) -> Bool
 
-    init<Selection: Hashable>(_ selection: Binding<Selection>) {
+    init<Selection: Hashable>(_ selection: Binding<Selection>, concurrent: Bool = false) {
+        self.concurrent = concurrent
         self.value = {
             AnyHashable(selection.wrappedValue)
         }

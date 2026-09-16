@@ -110,7 +110,7 @@ enum DepartureLogEvent {
     case routeAcceptedAppend(route: any Route)
     case routeAcceptedReplaceElevatedPriority(route: any Route)
     case routeAppendSuperseded(route: any Route)
-    case routeAppendPreparing(route: any Route, match: Router.DeclarationMatch)
+    case routeAppendPreparing(route: any Route, match: RouterEngine.DeclarationMatch)
     case routeAppendWaitingReplacingScopes(removedScopes: Int)
     case routeAppended(route: any Route, path: String)
     case routeBlockedByElevatedPriority(route: any Route)
@@ -122,7 +122,7 @@ enum DepartureLogEvent {
     case routeDroppedResolution
     case routeLookupStarted(routeType: any Route.Type, activePath: String)
     case routeNoOpEquivalent(route: any Route, currentRoute: any Route)
-    case routeMatched(route: any Route, match: Router.DeclarationMatch)
+    case routeMatched(route: any Route, match: RouterEngine.DeclarationMatch)
     case routePendingWaitingForActivatedBranchHost(route: any Route, branch: AnyHashable)
     case routePendingWaitingForLocalPresentationScope(route: any Route, branch: AnyHashable)
     case routeRequested(route: any Route)
@@ -138,9 +138,9 @@ enum DepartureLogEvent {
     case unwindAccepted(keepThrough: RoutePath.Position, removing: Int)
     case unwindAcceptedAncestorTarget(keepThrough: RoutePath.Position, removing: Int)
     case unwindCompleted(path: String)
-    case unwindDroppedTargetNotFound(target: Router.UnwindTarget?)
+    case unwindDroppedTargetNotFound(target: RouterEngine.UnwindTarget?)
     case unwindPreviousRequested
-    case unwindRequested(target: Router.UnwindTarget?)
+    case unwindRequested(target: RouterEngine.UnwindTarget?)
     case unwindSkippedNoRoute
     case unwindSkippedNotInsideBranch
 }
@@ -484,7 +484,7 @@ extension DepartureLogEvent {
     }
 }
 
-extension Router.DeclarationMatch {
+extension RouterEngine.DeclarationMatch {
     var departureDebugDescription: String {
         let placementDescription = branchID.map {
             "branch \($0.departureDebugDescription)"
@@ -502,7 +502,7 @@ extension Router.DeclarationMatch {
     }
 }
 
-private extension Router.DeclarationMatch.LookupStrategy {
+private extension RouterEngine.DeclarationMatch.LookupStrategy {
     var departureDebugDescription: String {
         switch self {
         case let .currentPath(treePriority):

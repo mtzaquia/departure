@@ -87,9 +87,9 @@ struct WindowDestinationBuilderTests {
     }
 
     @Test func withRouterRegistersCustomWindowDestinationBuilderOnRouter() {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = WindowDestinationRecorder()
-        let host = WithRouter(router: router) {
+        let host = WithRouter(router: Router(engine: router, scope: router.root)) {
             Text("Root")
         } windowDestination: { destination, environment in
             RecordingWindowDestinationView(
@@ -117,7 +117,7 @@ struct WindowDestinationBuilderTests {
     }
 
     @Test func windowDestinationReceivesCapturedSourceEnvironment() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = WindowDestinationRecorder()
 
         router.root.installRouteDeclarations(
@@ -161,7 +161,7 @@ struct WindowDestinationBuilderTests {
     }
 
     @Test func routeDeclarationInstallationAttachesSourceEnvironmentForHighPriorityPresentation() async throws {
-        let router = Router()
+        let router = RouterEngine()
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "installed"
 
@@ -184,7 +184,7 @@ struct WindowDestinationBuilderTests {
     }
 
     @Test func elevatedPresentationRetainsSourceEnvironmentAfterOriginScopeIsReleased() throws {
-        let router = Router()
+        let router = RouterEngine()
         let declaration = Cover(LoginRoute.self, priority: .high)._routeDeclarations[0]
         let elevatedRoot = RouteScope(id: UUID(), route: nil)
         let elevatedPath = RoutePath(owner: elevatedRoot)
@@ -221,7 +221,7 @@ struct WindowDestinationBuilderTests {
     }
 
     @Test func existingWindowDestinationSnapshotKeepsCapturedSourceEnvironment() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = WindowDestinationRecorder()
         let destinationBuilder = WindowDestinationBuilder { destination, environment in
             RecordingWindowDestinationView(
@@ -275,7 +275,7 @@ struct WindowDestinationBuilderTests {
     }
 
     @Test func replacingHighPriorityPresentationUsesReplacementSourceEnvironment() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = WindowDestinationRecorder()
         let destinationBuilder = WindowDestinationBuilder { destination, environment in
             RecordingWindowDestinationView(
@@ -337,7 +337,7 @@ struct WindowDestinationBuilderTests {
     }
 
     @Test func normalPresentationUsesDeclaringScopeSourceEnvironment() async throws {
-        let router = Router()
+        let router = RouterEngine()
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "declaring"
 
@@ -360,7 +360,7 @@ struct WindowDestinationBuilderTests {
     }
 
     @Test func branchContainerPresentationUsesContainerSourceEnvironment() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         var containerEnvironment = EnvironmentValues()
@@ -408,7 +408,7 @@ struct WindowDestinationBuilderTests {
     }
 
     @Test func normalSheetPresentationDoesNotUseWindowDestinationBuilder() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = WindowDestinationRecorder()
 
         let host = WithRouter {
@@ -472,7 +472,7 @@ struct WindowDestinationBuilderTests {
     #endif
 
     @Test func normalFadeCoverDestinationUsesWindowDestinationBuilder() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = WindowDestinationRecorder()
 
         router.root.installRouteDeclarations(

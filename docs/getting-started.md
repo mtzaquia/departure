@@ -33,7 +33,7 @@ struct ProfileRoute: Route {
 }
 
 struct HomeView: View {
-  @Environment(Router.self) private var router
+  @Environment(\.router) private var router
 
   var body: some View {
     Button("View profile") {
@@ -45,6 +45,11 @@ struct HomeView: View {
   }
 }
 ```
+
+The environment router captures the view's scope. Keeping a copy preserves that origin;
+it does not follow whichever pane or tab becomes current later. After the scope leaves
+the routing graph, its router becomes inactive. Outside `WithRouter`, the environment
+router is inactive and commands do nothing.
 
 Use `Push` inside a `NavigationStack`. `Sheet` and `Cover` present modally and provide a navigation stack around their destination by default.
 

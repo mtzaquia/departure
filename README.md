@@ -13,13 +13,17 @@ Declare the destinations a screen owns. Request them from wherever the user’s 
 
 - Push, sheet, and cover routes from one small API.
 - Keep domain routes independent from the feature modules that build their views.
-- Preserve navigation state across tabs and other selection-based containers.
+- Preserve independent navigation paths across tabs and concurrent split-view columns.
 - Reroute guarded flows, unwind precisely, and intercept route-scoped actions.
 - Raise a critical flow above the app when it truly cannot wait.
 
 ```swift
 await router.present(SettingsRoute())
 ```
+
+> [!NOTE]
+> This checkout develops Departure 3.0. Its examples use the new scoped environment
+> router, `@Environment(\.router)`, which is not available in the published 2.x release.
 
 ## Install
 
@@ -60,7 +64,7 @@ struct SettingsView: View {
 }
 
 struct HomeView: View {
-  @Environment(Router.self) private var router
+  @Environment(\.router) private var router
 
   var body: some View {
     Button("Settings") {

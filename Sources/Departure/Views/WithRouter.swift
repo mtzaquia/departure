@@ -30,7 +30,7 @@ import SwiftUI
 /// }
 /// ```
 public struct WithRouter<Content: View>: View {
-    @State var router: Router
+    @State var router: RouterEngine
     @ViewBuilder let content: Content
     let windowDestinationBuilder: WindowDestinationBuilder
 
@@ -56,7 +56,7 @@ public struct WithRouter<Content: View>: View {
     ///
     /// Pass a ``Router`` when app code needs to keep an explicit reference.
     public init(router: Router? = nil, @ViewBuilder content: () -> Content) {
-        let router = router ?? Router()
+        let router = router?.engine ?? RouterEngine()
         router.windowDestinationBuilder = .passthrough
         self._router = State(wrappedValue: router)
         self.content = content()
@@ -75,7 +75,7 @@ public struct WithRouter<Content: View>: View {
         @ViewBuilder _ content: () -> Content,
         @ViewBuilder windowDestination: @escaping (RouteView, EnvironmentValues) -> WindowContent
     ) {
-        let router = router ?? Router()
+        let router = router?.engine ?? RouterEngine()
         let windowDestinationBuilder = WindowDestinationBuilder(windowDestination)
         router.windowDestinationBuilder = windowDestinationBuilder
         self._router = State(wrappedValue: router)
@@ -85,7 +85,7 @@ public struct WithRouter<Content: View>: View {
 }
 
 private struct WindowDestinationBuilderRegistration: View {
-    let router: Router
+    let router: RouterEngine
     let windowDestinationBuilder: WindowDestinationBuilder
 
     var body: some View {

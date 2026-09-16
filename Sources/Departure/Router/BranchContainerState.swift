@@ -26,6 +26,8 @@ struct BranchContainerState {
     var defaultBranch: AnyHashable
     var selection: AnyRouteBranchSelection?
 
+    var isConcurrent: Bool { selection?.concurrent ?? false }
+
     var activeBranch: AnyHashable {
         selection?.value() ?? defaultBranch
     }

@@ -1,6 +1,6 @@
 # Actions
 
-An action represents user intent that should run in the active route scope. It can ask Departure to route first.
+An action represents user intent that should run in the scope captured by the receiving router. It can ask Departure to route first.
 
 ```swift
 struct SaveDraftAction: Action {
@@ -40,7 +40,7 @@ Attach an interceptor to a route scope when it needs to wrap, replace, or observ
 }
 ```
 
-Calling `invocation()` runs the original action. Omitting it consumes the action—for example, after a confirmation prompt is declined. Only the active route scope participates in interception.
+Calling `invocation()` runs the original action. Omitting it consumes the action—for example, after a confirmation prompt is declined. Only the scope captured by the receiving router participates in interception.
 
 If that invocation asks to reroute, it throws `CancellationError` back to the interceptor. Departure automatically routes using the usual rules, then retries the action once in its new scope.
 

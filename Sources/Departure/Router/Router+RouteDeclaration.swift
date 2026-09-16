@@ -22,12 +22,12 @@
 
 import Foundation
 
-extension Router {
-    func requestRoute(_ route: some Route) async {
+extension RouterEngine {
+    func requestRoute(_ route: some Route, origin: RouteRequestOrigin? = nil) async {
         #if DEBUG
         guard DepartureLogTrace.id != nil else {
             await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "r")) {
-                await requestRoute(route)
+                await requestRoute(route, origin: origin)
             }
             return
         }
@@ -40,12 +40,17 @@ extension Router {
 
         // Resolution can suspend while another command starts an unwind. Re-enter the
         // readiness gate without evaluating the resolved route a second time.
-        await requestRouteWhenReady(resolvedRoute, stage: .presentResolved)
+        await requestRouteWhenReady(resolvedRoute, stage: .presentResolved, origin: origin)
     }
 
-    func presentResolvedRoute(_ resolvedRoute: any Route) async {
-        switch transitionPlan(for: resolvedRoute) {
+    func presentResolvedRoute(_ resolvedRoute: any Route, origin: RouteRequestOrigin? = nil) async {
+        switch transitionPlan(for: resolvedRoute, origin: origin) {
         case .noOp(let currentRoute):
+            if let source = origin?.resolve(in: routeForest)?.scope,
+               let path = routeForest.routePath(containing: source),
+               let tree = routeForest.tree(containing: path),
+               tree.priority < routeForest.activeTree.priority { return }
+            guard activateOrigin(origin) else { return }
             log.departureDebug(.routeNoOpEquivalent(route: resolvedRoute, currentRoute: currentRoute))
             return
 
@@ -59,12 +64,14 @@ extension Router {
             return
 
         case .append(let match):
+            guard origin == nil || activatePresentationOwner(match) else { return }
             logMatchedRoute(resolvedRoute, to: match)
             log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
             await appendRoute(resolvedRoute, after: match)
             return
 
         case .replaceElevatedTree(let priority, let match):
+            guard origin == nil || activatePresentationOwner(match) else { return }
             logMatchedRoute(resolvedRoute, to: match)
             if await unwindToExistingEquivalentRouteInPriorityTreeIfNeeded(resolvedRoute, priority: priority) {
                 return
@@ -100,8 +107,8 @@ extension Router {
         }
     }
 
-    private func transitionPlan(for route: any Route) -> RouteTransitionPlan {
-        if let currentRoute = currentRouteScope.route,
+    private func transitionPlan(for route: any Route, origin: RouteRequestOrigin? = nil) -> RouteTransitionPlan {
+        if let currentRoute = resolveRequestOrigin(origin)?.scope?.route,
            currentRoute._isEqual(to: route) {
             return .noOp(currentRoute: currentRoute)
         }
@@ -111,7 +118,7 @@ extension Router {
             routeType: routeType,
             activePath: routeForest.activeTree.currentRoutePath.departureDebugPathDescription
         ))
-        guard let match = routeForest.firstDeclaration(including: routeType) else {
+        guard let match = routeForest.firstDeclaration(including: routeType, origin: origin) else {
             return .dropNoDeclaration(routeType: routeType)
         }
 
@@ -132,7 +139,7 @@ extension Router {
     }
 }
 
-extension Router {
+extension RouterEngine {
     enum RouteTransitionPlan {
         case noOp(currentRoute: any Route)
         case dropNoDeclaration(routeType: any Route.Type)
@@ -236,14 +243,16 @@ extension Router {
 
     /// The path owned by the branch nearest to the current position, or `nil` when the current
     /// position is not inside any branch. `.nearestBranch` unwinds clear this path back to its root.
-    var nearestBranchPath: RoutePath? {
-        var scope: RouteScope? = currentRouteScope
+    var nearestBranchPath: RoutePath? { nearestBranchPath(from: currentRouteScope) }
+
+    func nearestBranchPath(from sourceScope: RouteScope) -> RoutePath? {
+        var scope: RouteScope? = sourceScope
         while let current = scope {
             if current.branchID != nil {
                 return current.path
             }
 
-            scope = current.owningPath?.owner
+            scope = current.previousScopeInTree
         }
 
         return nil
@@ -251,7 +260,7 @@ extension Router {
 
 }
 
-extension Router.DeclarationMatch {
+extension RouterEngine.DeclarationMatch {
     init(
         routePath: (path: RoutePath, position: RoutePath.Position),
         tree: RouteTree,
@@ -283,5 +292,42 @@ extension Router.DeclarationMatch {
             presentationAnchor: presentationAnchor,
             lookupStrategy: lookupStrategy
         )
+    }
+}
+
+extension RouterEngine {
+    /// Selects enclosing branches without altering their independent paths.
+    func activateOrigin(_ origin: RouteRequestOrigin?) -> Bool {
+        guard let origin else { return true }
+        guard let target = origin.resolve(in: routeForest) else { return false }
+        var source: RouteScope
+        switch target {
+        case .scope(let scope): source = scope
+        case .unmountedBranch(let owner, _): source = owner
+        }
+        return activateScopeAncestors(source)
+    }
+
+    /// A reroute to a common ancestor activates that destination's owner, rather
+    /// than revealing the originally requested branch underneath it.
+    private func activatePresentationOwner(_ match: DeclarationMatch) -> Bool {
+        let source = match.branchID == nil
+            ? match.presentationHost ?? match.declarationLocation.scope
+            : match.declarationLocation.scope
+        guard let source else { return false }
+        return activateScopeAncestors(source)
+    }
+
+    private func activateScopeAncestors(_ scope: RouteScope) -> Bool {
+        var source = scope
+        var ancestry: [(RouteScope, AnyHashable)] = []
+        while let previous = source.previousScopeInTree {
+            if let branch = source.branchID { ancestry.append((previous, branch)) }
+            source = previous
+        }
+        for (owner, branch) in ancestry.reversed() {
+            guard activateBranch(branch, in: owner) else { return false }
+        }
+        return true
     }
 }

@@ -29,7 +29,7 @@ import Testing
 struct NavigationReadinessTests {
     @Test(arguments: [false, true])
     func resolutionFinishingDuringUnwindWaitsWithoutResolvingAgain(cancel: Bool) async throws {
-        let router = Router()
+        let router = RouterEngine()
         router.root.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations: [
             RouteScopeDeclaration(routes: Sheet(SettingsRoute.self)._routeDeclarations),
             RouteScopeDeclaration(routes: Sheet(DelayedResolutionRoute.self)._routeDeclarations),

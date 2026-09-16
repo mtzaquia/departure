@@ -60,7 +60,7 @@ private struct ResolvedRoutePresentation {
     let isLive: Bool
 }
 
-extension Router {
+extension RouterEngine {
     private subscript(presentation projection: RoutePresentationProjection) -> RoutePresentation? {
         get {
             routePresentation(
@@ -253,7 +253,7 @@ private struct ElevatedRoutePresentationProjection: Hashable {
     let presentationKind: RoutePresentationKind
 }
 
-private extension Router {
+private extension RouterEngine {
     func hostedPresentation(
         by host: RouteScope,
         matching presentationKind: RoutePresentationKind,

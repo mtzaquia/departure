@@ -20,7 +20,7 @@
 //  SOFTWARE.
 //
 
-/// Intercepts an ``Action`` in the current route scope.
+/// Intercepts an ``Action`` requested from the declaring route scope.
 ///
 /// Call ``ActionInvocation/callAsFunction()`` to run the intercepted action.
 ///
@@ -42,7 +42,7 @@ public struct ActionInterceptor<A: Action>: HookDeclaration, Sendable {
         self.declaration = AnyHookDeclaration(
             kind: .actionInterceptor(
                 actionType,
-                AnyActionInterceptor { router, action, hasRerouted async in
+                AnyActionInterceptor { router, action, hasRerouted, origin async in
                     guard let action = action as? A else {
                         log.departureWarning(
                             "Action interceptor for `\(String(reflecting: actionType))` received "
@@ -53,7 +53,7 @@ public struct ActionInterceptor<A: Action>: HookDeclaration, Sendable {
                     }
 
                     let invocation = ActionInvocation<A.Output> {
-                        try await router.runAction(action, hasRerouted: hasRerouted)
+                        try await router.runAction(action, hasRerouted: hasRerouted, origin: origin)
                     }
 
                     await intercept(invocation)
@@ -70,9 +70,9 @@ public struct ActionInterceptor<A: Action>: HookDeclaration, Sendable {
 // MARK: - Supporting types
 
 struct AnyActionInterceptor {
-    let invoke: @MainActor (Router, any Action, Bool) async -> Void
+    let invoke: @MainActor (RouterEngine, any Action, Bool, RouteRequestOrigin?) async -> Void
 
-    init(invoke: @escaping @MainActor (Router, any Action, Bool) async -> Void) {
+    init(invoke: @escaping @MainActor (RouterEngine, any Action, Bool, RouteRequestOrigin?) async -> Void) {
         self.invoke = invoke
     }
 }

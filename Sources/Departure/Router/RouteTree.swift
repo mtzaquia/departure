@@ -140,12 +140,16 @@ final class RouteTree {
         return depth
     }
 
-    func modalScopes(atDepth depth: Int) -> [(path: RoutePath, scope: RouteScope)] {
+    var currentModalScope: RouteScope? {
+        modalScopes().max { modalDepth(of: $0.scope) < modalDepth(of: $1.scope) }?.scope
+    }
+
+    func modalScopes(atDepth depth: Int? = nil) -> [(path: RoutePath, scope: RouteScope)] {
         allRoutePaths.flatMap { path in
             path.scopes.compactMap { scope in
                 guard let declaration = scope.presentationDeclaration,
                       declaration.presentationKind != .push,
-                      modalDepth(of: scope) == depth
+                      depth == nil || modalDepth(of: scope) == depth
                 else {
                     return nil
                 }
@@ -187,11 +191,9 @@ final class RouteTree {
         under owner: RouteScope,
         includesInactiveBranches: Bool
     ) -> [RouteScope] {
-        guard includesInactiveBranches == false else {
-            return Array(owner.branchScopes.values)
+        owner.branchScopes.compactMap { branch, scope in
+            includesInactiveBranches || owner.participates(inBranch: branch) ? scope : nil
         }
-
-        return owner.branchScopes[owner.activeBranch].map { [$0] } ?? []
     }
 
     private func contains(_ routePath: RoutePath, under owner: RouteScope) -> Bool {

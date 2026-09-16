@@ -26,7 +26,7 @@ import SwiftUI
 struct CoverFadePresentationStyleModifier: ViewModifier {
     let presentationHostID: RoutePresentationHostID
 
-    @Environment(Router.self) private var router
+    @Environment(RouterEngine.self) private var router
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
@@ -56,7 +56,7 @@ struct CoverFadePresentationStyleModifier: ViewModifier {
 }
 
 struct ElevatedPriorityCoverFadeHost: View {
-    @Environment(Router.self) private var router
+    @Environment(RouterEngine.self) private var router
     @Environment(\.scenePhase) private var scenePhase
     let priority: RoutePriority
     let windowDestinationBuilder: WindowDestinationBuilder
@@ -141,7 +141,7 @@ private final class CoverFadePresentationState {
 private struct CoverFadeModalPresenter: View {
     @Binding var route: RoutePresentation?
     @Environment(\.scenePhase) private var scenePhase
-    let router: Router
+    let router: RouterEngine
     @State private var presentationState = CoverFadePresentationState()
 
     var body: some View {
@@ -321,7 +321,7 @@ private struct CoverFadeModalPresenter: View {
 
 private struct ElevatedPriorityCoverFadePresenter: View {
     let presentation: RouteDestinationSnapshot
-    let router: Router
+    let router: RouterEngine
     let onDismiss: @MainActor () -> Void
     @Environment(\.scenePhase) private var scenePhase
 
@@ -337,7 +337,7 @@ private struct ElevatedPriorityCoverFadePresenter: View {
 
 private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
     let presentation: RouteDestinationSnapshot?
-    let router: Router
+    let router: RouterEngine
     let sourceScenePhase: ScenePhase
     let onDismiss: @MainActor () -> Void
 
@@ -360,7 +360,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 
     final class Controller: UIViewController, UIAdaptivePresentationControllerDelegate {
         private var pendingPresentation: RouteDestinationSnapshot?
-        private var router: Router?
+        private var router: RouterEngine?
         private var sourceScenePhase: ScenePhase?
         private var onDismiss: (@MainActor () -> Void)?
         private var presentedRouteID: RoutePresentation.ID?
@@ -380,7 +380,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 
         func update(
             presentation: RouteDestinationSnapshot?,
-            router: Router,
+            router: RouterEngine,
             sourceScenePhase: ScenePhase,
             onDismiss: @escaping @MainActor () -> Void
         ) {
@@ -471,7 +471,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 
         private func updatePresentedScenePhaseIfNeeded(
             presentation: RouteDestinationSnapshot,
-            router: Router,
+            router: RouterEngine,
             sourceScenePhase: ScenePhase
         ) {
             guard presentedScenePhase != sourceScenePhase else {
@@ -487,7 +487,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         }
 
         private func rootView(
-            router: Router,
+            router: RouterEngine,
             destination: AnyView,
             sourceScenePhase: ScenePhase
         ) -> AnyView {
@@ -519,7 +519,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 #else
 private struct ElevatedPriorityCoverFadePresenter: View {
     let presentation: RouteDestinationSnapshot
-    let router: Router
+    let router: RouterEngine
     let onDismiss: @MainActor () -> Void
 
     var body: some View {

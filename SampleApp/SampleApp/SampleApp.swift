@@ -27,6 +27,8 @@ import SwiftUI
 final class Storage {
     static let shared = Storage()
 
+    var activeRouter: Router?
+    var landingRouter: Router?
     var isLoggedIn = false
     var appearanceSaveCount = 0
     var emoji: String = "🎉"
@@ -88,7 +90,7 @@ struct DepartureSampleApp: App {
         WindowGroup {
             WithRouter(router: router) {
                 NavigationStack {
-                    StartView()
+                    StartView().modifier(SampleRoutingContext())
                 }
                 .environment(\.sampleWindowBadge, "forwarded from app window")
             } windowDestination: { destination, environment in
@@ -97,16 +99,29 @@ struct DepartureSampleApp: App {
                     .environment(\.samplePresentationSource, environment.samplePresentationSource)
             }
             .onOpenURL { url in
-                guard let route = SampleDeepLink(url: url)?.route else {
+                guard let link = SampleDeepLink(url: url) else {
                     print("[deeplink] dropped | reason=unmatched | \(url)")
                     return
                 }
 
+                let route = link.route
                 print("[deeplink] accepted | \(url) → \(route)")
                 Task {
-                    await router.present(route)
+                    await SampleDeepLink.router(for: route, from: Storage.shared.activeRouter ?? router).present(route)
                 }
             }
+        }
+    }
+}
+
+/// Keeps the sample's external URL coordinator attached to an explicit live scope.
+struct SampleRoutingContext: ViewModifier {
+    @Environment(\.router) private var router
+    @Environment(\.routePhase) private var phase
+
+    func body(content: Content) -> some View {
+        content.onChange(of: phase, initial: true) { _, phase in
+            if phase == .active { Storage.shared.activeRouter = router }
         }
     }
 }

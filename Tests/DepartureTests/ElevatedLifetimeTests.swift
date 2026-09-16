@@ -72,8 +72,8 @@ struct ElevatedLifetimeTests {
     private func makeChain(
         criticalAtRoot: Bool = false,
         highInBranch: Bool = false
-    ) async throws -> (Router, RouteScope, RouteScope, RouteScope) {
-        let router = Router()
+    ) async throws -> (RouterEngine, RouteScope, RouteScope, RouteScope) {
+        let router = RouterEngine()
         var rootRoutes = Push(HomeDetailRoute.self)._routeDeclarations
         if criticalAtRoot {
             rootRoutes += Sheet(AlertRoute.self, priority: .critical)._routeDeclarations

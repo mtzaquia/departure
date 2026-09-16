@@ -21,6 +21,18 @@
 //
 
 enum SampleAppAccessibility {
+    static let splitStart = "sample.split.start"
+    static let splitShowContent = "sample.split.show-content"
+    static let splitShowDetail = "sample.split.show-detail"
+    static let splitCoverDetail = "sample.split.cover-detail"
+    static let splitContentDestination = "sample.split.content-destination"
+    static let splitDetailDestination = "sample.split.detail-destination"
+    static let splitContentDone = "sample.split.content-done"
+    static let splitDetailDone = "sample.split.detail-done"
+    static let splitCover = "sample.split.cover"
+    static let splitCoverDone = "sample.split.cover-done"
+    static let splitReturnSidebar = "sample.split.return-sidebar"
+
     static let startButton = "sample.start.button"
     static let startShowInfoButton = "sample.start.show-info"
     static let startScopeID = "sample.start.scope"

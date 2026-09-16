@@ -26,12 +26,12 @@ protocol IOS17NavigationStackPushWorkaroundHandling: AnyObject {
     func interceptDismissal(
         of presentation: RoutePresentation,
         matching presentationKind: RoutePresentationKind,
-        in router: Router
+        in router: RouterEngine
     ) -> Bool
-    func routeGraphDidMutate(in router: Router)
+    func routeGraphDidMutate(in router: RouterEngine)
     func routeScopeDidInstall(_ routeScope: RouteScope)
-    func routeScopeDidLeave(_ routeScope: RouteScope, in router: Router) -> Bool
-    func startViewExitWatchdogs(for routeScopes: [RouteScope], in router: Router)
+    func routeScopeDidLeave(_ routeScope: RouteScope, in router: RouterEngine) -> Bool
+    func startViewExitWatchdogs(for routeScopes: [RouteScope], in router: RouterEngine)
 }
 
 enum IOS17NavigationStackPushWorkaroundFactory {
@@ -69,7 +69,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
     func interceptDismissal(
         of presentation: RoutePresentation,
         matching presentationKind: RoutePresentationKind,
-        in router: Router
+        in router: RouterEngine
     ) -> Bool {
         guard presentationKind == .push, presentation.scope.isInstalledInView else {
             return false
@@ -85,7 +85,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         return true
     }
 
-    func routeGraphDidMutate(in router: Router) {
+    func routeGraphDidMutate(in router: RouterEngine) {
         reconcilePendingDismissals(in: router)
     }
 
@@ -98,7 +98,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         invalidate(dismissal)
     }
 
-    func routeScopeDidLeave(_ routeScope: RouteScope, in router: Router) -> Bool {
+    func routeScopeDidLeave(_ routeScope: RouteScope, in router: RouterEngine) -> Bool {
         cancelViewExitWatchdog(for: routeScope)
         reconcilePendingDismissals(in: router)
 
@@ -136,7 +136,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         return true
     }
 
-    func startViewExitWatchdogs(for routeScopes: [RouteScope], in router: Router) {
+    func startViewExitWatchdogs(for routeScopes: [RouteScope], in router: RouterEngine) {
         for routeScope in routeScopes {
             let scopeID = ObjectIdentifier(routeScope)
             guard viewExitWatchdogs[scopeID] == nil else {
@@ -167,7 +167,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
 
     private func makePendingDismissal(
         for presentationScope: RouteScope,
-        in router: Router
+        in router: RouterEngine
     ) -> PendingDismissal? {
         guard
             let routePath = router.routeForest.routePath(containing: presentationScope),
@@ -191,7 +191,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         )
     }
 
-    private func isValid(_ dismissal: PendingDismissal, in router: Router) -> Bool {
+    private func isValid(_ dismissal: PendingDismissal, in router: RouterEngine) -> Bool {
         let scope = dismissal.scope
         guard router.routeForest.routePath(containing: scope) === dismissal.routePath,
               dismissal.routePath.scopes.contains(where: { $0 === scope }),
@@ -210,7 +210,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         return hasSameStructure(dismissal.unwindPlan, currentPlan)
     }
 
-    private func reconcilePendingDismissals(in router: Router) {
+    private func reconcilePendingDismissals(in router: RouterEngine) {
         let invalidDismissals = pendingDismissals.values.filter {
             isValid($0, in: router) == false
         }
@@ -230,7 +230,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         log.departureDebug(.ios17PushDismissalDropped(scope: dismissal.scope))
     }
 
-    private func isActivePresentationPath(_ routePath: RoutePath, in router: Router) -> Bool {
+    private func isActivePresentationPath(_ routePath: RoutePath, in router: RouterEngine) -> Bool {
         guard let tree = router.routeForest.tree(containing: routePath) else {
             return false
         }
@@ -239,7 +239,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
             || tree.activeBranchPaths().contains(where: { $0 === routePath })
     }
 
-    private func complete(_ dismissal: PendingDismissal, in router: Router) {
+    private func complete(_ dismissal: PendingDismissal, in router: RouterEngine) {
         router.performPresentationDismissalUnwind(
             for: dismissal.scope,
             in: dismissal.routePath.scope(at: dismissal.targetPosition),

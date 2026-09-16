@@ -26,12 +26,14 @@ import SwiftUI
 struct LandingRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         LandingView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct StartInfoRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         StartInfoView()
+            .modifier(SampleRoutingContext())
     }
 }
 
@@ -40,6 +42,7 @@ struct LoginRoute: SampleDeepLinkRoute, Equatable {
 
     func destination() -> some View {
         LoginView(nextRoute: nextRoute)
+            .modifier(SampleRoutingContext())
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
@@ -50,18 +53,21 @@ struct LoginRoute: SampleDeepLinkRoute, Equatable {
 struct LoginReplacementRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         LoginReplacementView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct LoginDetailRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         LoginDetailView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct LoginNoticeRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         LoginNoticeView()
+            .modifier(SampleRoutingContext())
     }
 }
 
@@ -72,6 +78,7 @@ struct ProfileRoute: SampleDeepLinkRoute {
 
     func destination() -> some View {
         ProfileView()
+            .modifier(SampleRoutingContext())
     }
 }
 
@@ -93,12 +100,14 @@ struct AuthenticationSettingsRoute: SampleDeepLinkRoute {
 
     func destination() -> some View {
         AuthenticationSettingsView(state: state)
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct LocalDetailRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         LocalDetailView()
+            .modifier(SampleRoutingContext())
     }
 }
 
@@ -137,48 +146,56 @@ private struct LocalDetailView: View {
 struct TopLevelSheetRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         TopLevelSheetView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct TopLevelCoverRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         TopLevelCoverView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct TopLevelReplacementCoverRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         TopLevelReplacementCoverView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct HighPriorityPassthroughSheetRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         HighPriorityPassthroughSheetView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct HighPriorityBlockingSheetRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         HighPriorityBlockingSheetView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct PendingPriorityRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         PendingPriorityView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct NavigationBarFadeOcclusionRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         NavigationBarFadeOcclusionView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct LifecycleTeardownRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         LifecycleTeardownView()
+            .modifier(SampleRoutingContext())
     }
 }
 
@@ -203,7 +220,7 @@ struct PendingPriorityView: View {
 struct TopLevelSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.samplePresentationSource) private var samplePresentationSource
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
 
     var body: some View {
         LabModalCard("Top-level sheet", subtitle: "The nearest matching declaration decides which scope owns this presentation.", symbol: "rectangle.bottomhalf.inset.filled", color: LabPalette.blue) {
@@ -229,7 +246,7 @@ struct TopLevelSheetView: View {
 }
 
 struct TopLevelCoverView: View {
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
 
     var body: some View {
         ZStack {
@@ -370,48 +387,56 @@ struct AppearanceSettingsRoute: SampleDeepLinkRoute, Equatable {
 
     func destination() -> some View {
         AppearanceSettingsView(value: value)
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct AlertRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         AlertView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct CriticalRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         CriticalView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct CriticalReplacementRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         CriticalReplacementView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct MessageRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         MessageView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct DismissProbeRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         DismissProbeView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct NestedModalRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         NestedModalView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct SettingsModalRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         SettingsModalView()
+            .modifier(SampleRoutingContext())
     }
 }
 
@@ -422,6 +447,7 @@ struct RerouteChainStartRoute: SampleDeepLinkRoute {
 
     func destination() -> some View {
         EmptyView()
+            .modifier(SampleRoutingContext())
     }
 }
 
@@ -432,18 +458,20 @@ struct RerouteChainIntermediateRoute: SampleDeepLinkRoute {
 
     func destination() -> some View {
         EmptyView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct RerouteChainFinalRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         RerouteChainFinalView()
+            .modifier(SampleRoutingContext())
     }
 }
 
 struct DismissProbeView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
 
     var body: some View {
         LabModalCard("Dismiss probe", subtitle: "Compare nested and shared branch modal ownership, then observe the unwind hook.", symbol: "square.stack.3d.up.fill") {
@@ -455,7 +483,7 @@ struct DismissProbeView: View {
             .buttonStyle(.bordered)
             .accessibilityIdentifier(SampleAppAccessibility.dismissProbePresentNestedButton)
 
-            Button("Present settings modal") { Task { await router.present(SettingsModalRoute()) } }
+            Button("Present settings modal") { Task { await router.branch(LandingView.TabItem.settings).present(SettingsModalRoute()) } }
             .labPrimaryButton()
             .accessibilityIdentifier(SampleAppAccessibility.dismissProbePresentSettingsModalButton)
 
@@ -525,6 +553,7 @@ struct DroppedRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         Text("Dropped route should not appear.")
             .accessibilityIdentifier(SampleAppAccessibility.droppedRouteText)
+            .modifier(SampleRoutingContext())
     }
 }
 
@@ -532,5 +561,6 @@ struct UndeclaredRoute: SampleDeepLinkRoute {
     func destination() -> some View {
         Text("Undeclared route should not appear.")
             .accessibilityIdentifier(SampleAppAccessibility.undeclaredRouteText)
+            .modifier(SampleRoutingContext())
     }
 }

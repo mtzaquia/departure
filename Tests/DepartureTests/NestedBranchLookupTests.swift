@@ -100,8 +100,8 @@ struct NestedBranchLookupTests {
         #expect(router.routePresentation(from: container, matching: .sheet) != nil)
     }
 
-    private func makeNestedBranches(hasLazyDeclaration: Bool) -> (Router, RouteScope, RouteScope) {
-        let router = Router()
+    private func makeNestedBranches(hasLazyDeclaration: Bool) -> (RouterEngine, RouteScope, RouteScope) {
+        let router = RouterEngine()
         let outer = RouteScope(id: "outer", route: nil)
         let inner = RouteScope(id: "inner", route: nil)
         if hasLazyDeclaration {

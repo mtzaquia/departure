@@ -8,7 +8,10 @@ await router.unwind(to: .topmostAncestor)
 await router.unwind(to: .id("settings-flow"))
 ```
 
-`.topmostAncestor` is resolved from the router’s topmost route scope, not the view hierarchy that calls it. Use `unwindRoute()` for a dismissal captured from a specific view.
+The environment router resolves targets from its captured scope. `.nearestBranch` clears
+that scope’s enclosing branch; `.topmostAncestor` dismisses that scope and its descendants.
+`.root` explicitly clears the entire routing container, including sibling branches.
+`unwindRoute()` remains the convenient local dismissal action.
 
 Tag a scope to make it a stable target.
 

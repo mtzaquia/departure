@@ -30,12 +30,13 @@ struct LandingView: View {
     }
 
     @State private var tab: TabItem = .home
+    @Environment(\.router) private var router
     @Environment(\.unwindRoute) private var unwindRoute
 
     var body: some View {
         TabView(selection: $tab) {
             NavigationStack {
-                HomeView()
+                HomeView().modifier(SampleRoutingContext())
                     .routeBranch(TabItem.home)
             }
             .tabItem {
@@ -45,7 +46,7 @@ struct LandingView: View {
             .tag(TabItem.home)
 
             NavigationStack {
-                SettingsView()
+                SettingsView().modifier(SampleRoutingContext())
                     .routeBranch(TabItem.settings)
             }
             .tabItem {
@@ -91,6 +92,7 @@ struct LandingView: View {
         }
         .onAppear {
             Storage.shared.landingUnwindRoute = unwindRoute
+            Storage.shared.landingRouter = router
         }
         .environment(\.samplePresentationSource, "top-level branched scope")
     }

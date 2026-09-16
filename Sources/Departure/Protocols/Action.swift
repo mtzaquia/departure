@@ -22,7 +22,7 @@
 
 import Foundation
 
-/// Work that runs from the current route scope.
+/// Work that runs from the receiving router’s captured route scope.
 ///
 /// Use actions for user intent that may need to run locally, be intercepted, or route first.
 ///

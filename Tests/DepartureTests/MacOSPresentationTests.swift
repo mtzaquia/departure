@@ -32,11 +32,38 @@ import Testing
 // and --filter MacOSPresentationTests.
 @Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["DEPARTURE_RUN_HOSTED_UI_TESTS"] == "1"))
 struct MacOSPresentationTests {
+    @Test func legacyEnvironmentReadsTheSameContextualRouter() async throws {
+        let router = Router()
+        let engine = router.engine!
+        let child = RouteScope(id: "child", route: nil)
+        let local = Router(engine: engine, scope: child)
+        let recorder = LegacyRouterRecorder()
+        let host = WithRouter(router: router) {
+            VStack {
+                LegacyRouterReader(recorder: recorder, expected: router)
+                LegacyRouterReader(recorder: recorder, expected: local)
+                    .environment(\.router, local)
+            }
+        }
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: host)
+        window.orderFront(nil)
+        defer { window.close() }
+
+        let installed = await waitUntil { recorder.matches.count == 2 }
+        try #require(installed)
+        #expect(recorder.matches.allSatisfy { $0 })
+    }
+
     @Test(arguments: [RoutePriority.high, .critical])
     func elevatedFadeCoverPresentsAndDismissesAsSheet(priority: RoutePriority) async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = MacOSDismissRecorder()
-        let host = WithRouter(router: router) {
+        let host = WithRouter(router: Router(engine: router, scope: router.root)) {
             Color.clear.frame(width: 320, height: 240)
                 .routes {
                     Cover(MacOSFadeRoute.self, priority: priority, transition: .fade)
@@ -72,6 +99,26 @@ struct MacOSPresentationTests {
             try? await Task.sleep(for: .milliseconds(20))
         }
         return condition()
+    }
+}
+
+@MainActor
+private final class LegacyRouterRecorder {
+    var matches: [Bool] = []
+}
+
+private struct LegacyRouterReader: View {
+    // Deliberately exercises the deprecated public spelling for compatibility.
+    @Environment(Router.self) private var legacyRouter
+    @Environment(\.router) private var contextualRouter
+    let recorder: LegacyRouterRecorder
+    let expected: Router
+
+    var body: some View {
+        Color.clear.frame(width: 1, height: 1)
+            .onAppear {
+                recorder.matches.append(legacyRouter == contextualRouter && legacyRouter == expected)
+            }
     }
 }
 

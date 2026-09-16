@@ -24,7 +24,7 @@ import Departure
 import SwiftUI
 
 struct StartView: View {
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
     @State private var storage = Storage.shared
 
     var body: some View {
@@ -80,6 +80,11 @@ struct StartView: View {
                     .labPrimaryButton()
                     .accessibilityIdentifier(SampleAppAccessibility.startButton)
 
+                    Button("Split-view lab", systemImage: "rectangle.split.3x1") {
+                        Task { await router.present(SplitBranchesRoute()) }
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.splitStart)
+
                     Button("About this sample", systemImage: "info.circle") {
                         Task { await router.present(StartInfoRoute()) }
                     }
@@ -95,6 +100,7 @@ struct StartView: View {
         }
         .routes(id: SampleAppAccessibility.startScopeID) {
             Cover(LandingRoute.self, providesNavigation: false)
+            Cover(SplitBranchesRoute.self, providesNavigation: false)
             Sheet(StartInfoRoute.self, providesNavigation: false)
         }
         .hooks {

@@ -36,6 +36,11 @@ extension RouteScope {
         ?? self
     }
 
+    func participates(inBranch branch: AnyHashable) -> Bool {
+        _ = participation.isConcurrent
+        return branchContainer?.isConcurrent == true || activeBranch == branch
+    }
+
     func canDrivePresentation(matching presentationKind: RoutePresentationKind) -> Bool {
         if presentationKind == .push {
             return true
@@ -45,7 +50,7 @@ extension RouteScope {
             return true
         }
 
-        return parent.activeBranch == (branchID ?? id)
+        return parent.participates(inBranch: branchID ?? id)
     }
 }
 
@@ -94,6 +99,7 @@ extension RouteScope {
 
         routeScope.parent = self
         branchScopes[branch] = routeScope
+        routeScope.participation.isBranchHostRegistered = true
         log.departureDebug(.branchRegistered(branch: branch, parent: self, scope: routeScope))
         return true
     }
@@ -109,6 +115,7 @@ extension RouteScope {
         }
 
         branchScopes[branch] = nil
+        routeScope.participation.isBranchHostRegistered = false
         routeScope.parent = nil
         routeScope.branchID = nil
         routeScope.adoptedRoutePresentationHostID = nil

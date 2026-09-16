@@ -22,7 +22,7 @@
 
 import Foundation
 
-extension Router {
+extension RouterEngine {
     final class PendingRoute {
         struct Append {
             let match: DeclarationMatch
@@ -43,6 +43,7 @@ extension Router {
         let id: UUID
         let route: any Route
         let state: State
+        let origin: RouteRequestOrigin?
 
         enum State {
             case request(CheckedContinuation<Void, Never>, stage: RouteRequestStage)
@@ -52,11 +53,13 @@ extension Router {
         init(
             id: UUID = UUID(),
             route: any Route,
-            state: State
+            state: State,
+            origin: RouteRequestOrigin? = nil
         ) {
             self.id = id
             self.route = route
             self.state = state
+            self.origin = origin
         }
 
         var append: Append? {
@@ -139,17 +142,21 @@ extension Router {
     }
 
     @discardableResult
-    func unwindAndWait(to target: UnwindTarget?, payload: Any? = nil) async -> Bool {
+    func unwindAndWait(to target: UnwindTarget?, payload: Any? = nil, origin: RouteRequestOrigin? = nil) async -> Bool {
         #if DEBUG
         guard DepartureLogTrace.id != nil else {
             return await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "u")) {
-                await unwindAndWait(to: target, payload: payload)
+                await unwindAndWait(to: target, payload: payload, origin: origin)
             }
         }
         #endif
 
         log.departureDebug(.unwindRequested(target: target))
-        let sourceScope = currentRouteScope
+        guard let sourceScope = resolveRequestOrigin(origin)?.scope else { return false }
+
+        if origin != nil, case .topmostAncestor = target {
+            return await unwindPrevious(from: sourceScope, payload: payload)
+        }
 
         if case .root = target {
             let plan = routeForest.unwindPlan(for: .root)
@@ -180,7 +187,7 @@ extension Router {
             routePath = normalTree.rootPath
 
         case .nearestBranch:
-            guard let branchPath = nearestBranchPath else {
+            guard let branchPath = nearestBranchPath(from: sourceScope) else {
                 // Not inside a branch — there is nothing nearer to unwind to.
                 log.departureDebug(.unwindSkippedNotInsideBranch)
                 return false
@@ -188,7 +195,7 @@ extension Router {
             routePath = branchPath
 
         case nil, .topmostAncestor, .id:
-            routePath = routeForest.activeTree.currentRoutePath
+            routePath = routeForest.routePath(containing: sourceScope) ?? routeForest.activeTree.currentRoutePath
         }
 
         switch routePath.unwindResolution(to: target) {
@@ -478,8 +485,9 @@ extension Router {
         guard let branchID = match.branchID else {
             return false
         }
-
-        return match.declarationLocation.scope?.activeBranch != branchID
+        guard let owner = match.declarationLocation.scope else { return false }
+        if owner.branchContainer?.isConcurrent == true, owner.branchScopes[branchID] != nil { return false }
+        return owner.activeBranch != branchID
     }
 
     func requiresBranchHostRegistration(for match: DeclarationMatch) -> Bool {
@@ -503,6 +511,10 @@ extension Router {
             return false
         }
 
+        return activateBranch(branchID, in: scope)
+    }
+
+    func activateBranch(_ branchID: AnyHashable, in scope: RouteScope) -> Bool {
         guard scope.activeBranch != branchID else {
             log.departureDebug(.branchActivationSkipped(branch: branchID, scope: scope))
             return true
@@ -690,8 +702,9 @@ extension Router {
     func resolvePresentationHost(
         for match: DeclarationMatch
     ) -> (scope: RouteScope, declaration: AnyRouteDeclaration)? {
-        let resolution = match.presentationHost.flatMap { scope in
-            scope.drivingPresentationDeclaration(
+        let resolution = match.presentationHost.flatMap { scope -> (scope: RouteScope, declaration: AnyRouteDeclaration)? in
+            guard routeForest.routePath(containing: scope) != nil else { return nil }
+            return scope.drivingPresentationDeclaration(
                 matching: match.declaration,
                 hostedBy: match.presentationHostID
             ).map { (scope, $0) }
@@ -1169,7 +1182,7 @@ extension Router {
         }
 
         pendingRoute = nil
-        await requestRouteWhenReady(route.route, stage: stage)
+        await requestRouteWhenReady(route.route, stage: stage, origin: route.origin)
         route.resumeRequestIfNeeded()
     }
 
@@ -1180,8 +1193,10 @@ extension Router {
 
     func requestRouteWhenReady(
         _ route: any Route,
-        stage: RouteRequestStage = .resolve
+        stage: RouteRequestStage = .resolve,
+        origin: RouteRequestOrigin? = nil
     ) async {
+        guard Task.isCancelled == false, resolveRequestOrigin(origin) != nil else { return }
         guard navigationTransaction.isInProgress == false else {
             let requestID = UUID()
             await withTaskCancellationHandler {
@@ -1194,7 +1209,8 @@ extension Router {
                     replacePendingRoute(PendingRoute(
                         id: requestID,
                         route: route,
-                        state: .request(continuation, stage: stage)
+                        state: .request(continuation, stage: stage),
+                        origin: origin
                     ))
                 }
             } onCancel: {
@@ -1207,9 +1223,9 @@ extension Router {
 
         switch stage {
         case .resolve:
-            await requestRoute(route)
+            await requestRoute(route, origin: origin)
         case .presentResolved:
-            await presentResolvedRoute(route)
+            await presentResolvedRoute(route, origin: origin)
         }
     }
 

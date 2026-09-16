@@ -245,7 +245,7 @@ struct RouteForest {
 
     func ancestorUnwindResolution(
         from routePath: RoutePath,
-        to target: Router.UnwindTarget?
+        to target: RouterEngine.UnwindTarget?
     ) -> (path: RoutePath, position: RoutePath.Position)? {
         guard case .id = target else {
             return nil
@@ -406,7 +406,7 @@ extension RouteForest {
     }
 
     func presentationTransitionPlan(
-        after match: Router.DeclarationMatch,
+        after match: RouterEngine.DeclarationMatch,
         transition: PresentationTransition
     ) -> UnwindPlan {
         var requests: [UnwindPlanRequest] = []
@@ -448,7 +448,8 @@ extension RouteForest {
         return unwindPlan(for: .combined(requests))
     }
 
-    func firstDeclaration(including routeType: any Route.Type) -> Router.DeclarationMatch? {
+    func firstDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin? = nil) -> RouterEngine.DeclarationMatch? {
+        if let origin { return scopedDeclaration(including: routeType, origin: origin) }
         for tree in declarationSearchTrees {
             if let match = firstDeclaration(
                 in: tree.currentRoutePath,
@@ -508,8 +509,8 @@ extension RouteForest {
         in searchPath: RoutePath,
         tree: RouteTree,
         including routeType: any Route.Type,
-        lookupStrategy: Router.DeclarationMatch.LookupStrategy
-    ) -> Router.DeclarationMatch? {
+        lookupStrategy: RouterEngine.DeclarationMatch.LookupStrategy
+    ) -> RouterEngine.DeclarationMatch? {
         for scope in searchPath.scopes.reversed() {
             let position = RoutePath.Position.scope(scope)
 
@@ -550,9 +551,9 @@ extension RouteForest {
         including routeType: any Route.Type,
         declaringPath: RoutePath,
         declaringPosition: RoutePath.Position,
-        branchLookupStrategy: Router.DeclarationMatch.LookupStrategy,
-        localLookupStrategy: Router.DeclarationMatch.LookupStrategy
-    ) -> Router.DeclarationMatch? {
+        branchLookupStrategy: RouterEngine.DeclarationMatch.LookupStrategy,
+        localLookupStrategy: RouterEngine.DeclarationMatch.LookupStrategy
+    ) -> RouterEngine.DeclarationMatch? {
         if let attachment = routeScope.firstBranchScopeRouteAttachment(
             for: routeType,
             in: routeScope.activeBranch
@@ -587,8 +588,17 @@ extension RouteForest {
         tree: RouteTree,
         declaringPath: RoutePath,
         declaringPosition: RoutePath.Position,
-        lookupStrategy: Router.DeclarationMatch.LookupStrategy
-    ) -> Router.DeclarationMatch {
+        lookupStrategy: RouterEngine.DeclarationMatch.LookupStrategy
+    ) -> RouterEngine.DeclarationMatch {
+        // An adopted declaration retains its branch host and container for
+        // presentation readiness, irrespective of the declaration search policy.
+        if let branch = attachment.adoptedFromBranch, let parent = routeScope.parent,
+           let parentPath = tree.routePath(containing: parent) {
+            return declarationMatch(.init(branchID: branch, declaration: attachment.declaration),
+                under: parent, tree: tree, declaringPath: parentPath,
+                declaringPosition: parentPath.position(of: parent) ?? .owner,
+                lookupStrategy: lookupStrategy)
+        }
         let presentationLocation = routePath(
             for: attachment,
             under: routeScope,
@@ -597,7 +607,7 @@ extension RouteForest {
             fallbackPosition: declaringPosition
         )
 
-        return Router.DeclarationMatch(
+        return RouterEngine.DeclarationMatch(
             routePath: presentationLocation,
             tree: tree,
             declaringPath: declaringPath,
@@ -669,8 +679,8 @@ extension RouteForest {
     }
 
     func refreshingPresentationLocation(
-        for match: Router.DeclarationMatch
-    ) -> Router.DeclarationMatch {
+        for match: RouterEngine.DeclarationMatch
+    ) -> RouterEngine.DeclarationMatch {
         guard let declaringScope = match.declarationLocation.scope else {
             return match
         }
@@ -688,5 +698,46 @@ extension RouteForest {
             fallbackPosition: match.presentationLocation.position
         )
         return match.updatingPresentationPath(presentationLocation)
+    }
+}
+
+private extension RouteForest {
+    func scopedDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin) -> RouterEngine.DeclarationMatch? {
+        guard let target = origin.resolve(in: self) else { return nil }
+        var source: RouteScope
+        switch target {
+        case .scope(let scope):
+            source = scope
+        case .unmountedBranch(let owner, let id):
+            if let declaration = owner.declarations.declarations(forBranch: id).routeAttachment(for: routeType),
+               let path = routePath(containing: owner), let tree = tree(containing: path) {
+                return declarationMatch(.init(branchID: id, declaration: declaration), under: owner,
+                    tree: tree, declaringPath: path, declaringPosition: path.position(of: owner) ?? .owner,
+                    lookupStrategy: .ancestorPath(treePriority: tree.priority))
+            }
+            source = owner
+        }
+        while let path = routePath(containing: source), let tree = tree(containing: path) {
+            // Plain requests can discover branch maps while climbing out of their
+            // local scope. Explicit branch handles keep their chosen search boundary.
+            if let attachment = source.firstRouteAttachment(for: routeType,
+                includingOtherBranches: origin.branches.isEmpty) {
+                return declarationMatch(attachment, under: source, tree: tree,
+                    declaringPath: path, declaringPosition: path.position(of: source) ?? .owner,
+                    lookupStrategy: .ancestorPath(treePriority: tree.priority))
+            }
+            guard let previous = enclosingScope(before: source) else { break }
+            source = previous
+        }
+        return nil
+    }
+}
+
+extension RouteForest {
+    /// Crosses detached priority roots through their recorded declaration origin.
+    func enclosingScope(before scope: RouteScope) -> RouteScope? {
+        if let previous = scope.previousScopeInTree { return previous }
+        guard let path = routePath(containing: scope) else { return nil }
+        return tree(containing: path)?.elevatedOrigin?.scope
     }
 }

@@ -198,7 +198,7 @@ final class RoutePath: Identifiable {
         return lhsIndex <= rhsIndex ? lhs : rhs
     }
 
-    func unwindResolution(to target: Router.UnwindTarget?) -> UnwindResolution {
+    func unwindResolution(to target: RouterEngine.UnwindTarget?) -> UnwindResolution {
         guard let target else {
             guard let currentScope = scopes.last else {
                 return .noRouteToUnwind
@@ -210,7 +210,7 @@ final class RoutePath: Identifiable {
         switch target {
         case .root, .nearestBranch:
             // Both clear the resolved path entirely; they differ only in which path
-            // `Router.unwindAndWait` resolves against (the root path vs. the nearest branch path).
+            // `RouterEngine.unwindAndWait` resolves against (the root path vs. the nearest branch path).
             // Clearing an already-empty branch path is the `.nearestBranch` no-op.
             return .keepPathThrough(.owner)
 

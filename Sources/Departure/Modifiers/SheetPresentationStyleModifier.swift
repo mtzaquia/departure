@@ -25,7 +25,7 @@ import SwiftUI
 struct SheetPresentationStyleModifier: ViewModifier {
     let presentationHostID: RoutePresentationHostID
 
-    @Environment(Router.self) private var router
+    @Environment(RouterEngine.self) private var router
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
@@ -46,7 +46,7 @@ struct SheetPresentationStyleModifier: ViewModifier {
 }
 
 struct ElevatedPrioritySheetHost: View {
-    @Environment(Router.self) private var router
+    @Environment(RouterEngine.self) private var router
     @Environment(\.scenePhase) private var scenePhase
     let priority: RoutePriority
     let windowDestinationBuilder: WindowDestinationBuilder

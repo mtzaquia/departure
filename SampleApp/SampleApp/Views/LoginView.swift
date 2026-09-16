@@ -26,7 +26,7 @@ import SwiftUI
 struct LoginView: View {
     let nextRoute: (any Route)?
 
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
     @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
@@ -74,8 +74,11 @@ struct LoginView: View {
                 Button("Log in and continue", systemImage: "person.badge.key.fill") {
                     Storage.shared.isLoggedIn = true
                     Task {
+                        let continuation = Storage.shared.landingRouter ?? router
                         await unwindRoute()
-                        if let nextRoute { await router.present(nextRoute) }
+                        if let nextRoute {
+                            await SampleDeepLink.router(for: nextRoute, from: continuation).present(nextRoute)
+                        }
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -149,7 +152,7 @@ struct LoginReplacementView: View {
 }
 
 struct CriticalView: View {
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
     @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
@@ -204,7 +207,7 @@ private extension ScenePhase {
 }
 
 struct LoginDetailView: View {
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
 
     var body: some View {
         LabScreen("Local push", eyebrow: "Inside high priority", symbol: "arrow.right.square.fill") {

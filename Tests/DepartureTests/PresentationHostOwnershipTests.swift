@@ -69,7 +69,7 @@ struct PresentationHostOwnershipTests {
     }
 
     @Test func inactiveBranchDeclarationUsesHostThatAdoptsItAfterSelectionChanges() async throws {
-        let router = Router()
+        let router = RouterEngine()
         router.ios17NavigationStackPushWorkaround = nil
         let (selection, selectedTab) = tabSelection(.home)
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -228,7 +228,7 @@ struct PresentationHostOwnershipTests {
         inherited: [AnyRouteDeclaration],
         local: [AnyRouteDeclaration]
     ) -> BranchSetup {
-        let router = Router()
+        let router = RouterEngine()
         router.ios17NavigationStackPushWorkaround = nil
         let (selection, _) = tabSelection(.wallet)
         let branchScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
@@ -269,7 +269,7 @@ struct PresentationHostOwnershipTests {
 
 @MainActor
 private struct BranchSetup {
-    let router: Router
+    let router: RouterEngine
     let branchScope: RouteScope
     let inheritedHostID: RoutePresentationHostID
     let localHostID: RoutePresentationHostID

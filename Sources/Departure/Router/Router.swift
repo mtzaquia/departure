@@ -21,23 +21,13 @@
 //
 
 import SwiftUI
-import Observation
 
-/// The routing engine installed by ``WithRouter``.
+/// A router bound to a route scope in a shared routing container.
 ///
-/// Consumer views read the router from the environment, then send commands through it.
-///
-/// ```swift
-/// @Environment(Router.self) private var router
-///
-/// Button("Settings") {
-///     Task {
-///         await router.present(SettingsRoute())
-///     }
-/// }
-/// ```
-@Observable
-public final class Router: Identifiable, Equatable {
+/// Read `@Environment(\.router)` in views. Stored routers retain their original
+/// scope; commands become inactive when that scope leaves the routing graph.
+/// Routers and their commands are isolated to the main actor.
+public struct Router: Equatable {
     /// A destination for ``Router/unwind(to:)``.
     public enum UnwindTarget {
         /// Unwinds every presented route across all branches and scopes, returning to the app's start.
@@ -45,164 +35,157 @@ public final class Router: Identifiable, Equatable {
 
         /// Unwinds to the first scope of the nearest enclosing branch.
         ///
-        /// Brings the user to the branch's root regardless of how deep the current route is. If the
+        /// Brings the user to the branch's root regardless of how deep the receiving scope is. If the
         /// user is already at the branch root, this is a no-op. If the user is not inside a branch,
         /// the unwind request returns `false`.
         case nearestBranch
 
-        /// Unwinds to the nearest ancestor of the router's top-most route scope.
+        /// Unwinds to the nearest ancestor of the receiving router's route scope.
         ///
-        /// Unlike ``UnwindRouteAction``, this target is resolved from the router's current
-        /// route scope rather than the view hierarchy where the call originates.
+        /// Dismisses the receiving scope and its descendants, matching a local
+        /// ``UnwindRouteAction`` captured from that scope.
         case topmostAncestor
 
         /// Unwinds to the scope that was declared with a matching ``SwiftUICore/View/routes(id:_:)`` ID.
         case id(AnyHashable)
     }
 
-    /// Stable identity for this router instance.
-    @ObservationIgnored public let id = UUID()
+    let engine: RouterEngine?
+    let origin: RouteRequestOrigin?
 
-    var routeForest: RouteForest
-
-    @ObservationIgnored
-    var pendingRoute: PendingRoute?
-
-    var unwindPresentationSnapshot: UnwindPresentationSnapshot?
-
-    @ObservationIgnored
-    var navigationTransaction = NavigationTransaction()
-
-    @ObservationIgnored
-    var deliveredUnwindHandlers: [UnwindHandlerDeliveryKey: DeliveredUnwindHandler] = [:]
-
-    @ObservationIgnored
-    var routeGraphMutationDepth = 0
-
-    @ObservationIgnored
-    var ios17NavigationStackPushWorkaround: (any IOS17NavigationStackPushWorkaroundHandling)? =
-        IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform()
-
-    @ObservationIgnored
-    var windowDestinationBuilder = WindowDestinationBuilder.passthrough
-
-    var activeRouteScopeID: ObjectIdentifier
-
-    var root: RouteScope {
-        routeForest.normalTree.root
-    }
-
-    var normalTree: RouteTree {
-        routeForest.normalTree
-    }
-
-    var currentRouteScope: RouteScope {
-        routeForest.activeTree.currentRouteScope
-    }
-
-    /// Creates an empty router.
+    /// Creates a root router for a new routing container.
     public init() {
-        let root = RouteScope(id: UUID(), route: nil)
-        let rootPath = RoutePath(owner: root)
-        let normalTree = RouteTree(priority: .normal, root: root, rootPath: rootPath)
-        self.routeForest = RouteForest(normalTree: normalTree)
-        self.activeRouteScopeID = normalTree.activeRouteScopeID
+        let engine = RouterEngine()
+        self.init(engine: engine, scope: engine.root)
     }
 
-    /// Requests a route presentation.
+    init(engine: RouterEngine, scope: RouteScope) {
+        self.engine = engine
+        self.origin = RouteRequestOrigin(scope: scope)
+    }
+
+    private init(engine: RouterEngine?, origin: RouteRequestOrigin?) {
+        self.engine = engine
+        self.origin = origin
+    }
+
+    static let inactive = Router(engine: nil, origin: nil)
+
+    /// Returns a router targeting a named branch of the nearest enclosing container.
     ///
-    /// This method returns after the request has resolved and the router has updated its routing state.
-    /// It does not wait for SwiftUI to mount or display the destination view.
+    /// Obtaining the router does not activate the branch. A presentation owned by
+    /// the branch activates it through the container's selection binding. A missing
+    /// branch produces an inactive command rather than falling back to another branch.
+    /// Route lookup does not fall back to sibling branches when the target has no match.
+    /// Branch routers are tied to the owning container rather than the requesting
+    /// destination, so they remain usable after that destination is dismissed.
+    /// Chained calls address branches nested inside the preceding target.
+    /// - Parameter id: The branch value declared by the target container.
+    public func branch<ID: Hashable & Sendable>(_ id: ID) -> Router {
+        Router(engine: engine, origin: origin?.targeting(AnyHashable(id), in: engine?.routeForest))
+    }
+
+    /// Resolves and presents a route from this router's scope.
+    ///
+    /// Returns after routing state updates, without waiting for SwiftUI to display
+    /// the destination. Rejected routes do not activate the targeted branch.
+    /// - Parameter route: The route to resolve and present.
     public func present(_ route: any Route) async {
-        await requestRouteWhenReady(route)
+        guard let engine, let origin else { return }
+        await engine.requestRouteWhenReady(route, origin: origin)
     }
 
-    /// Dismisses route scopes to an explicit target.
+    /// Unwinds from this router's scope to an explicit target.
     ///
-    /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed installed route scopes have left the view hierarchy.
-    ///
-    /// - Parameter target: The target to unwind to.
-    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
+    /// `.root` clears the entire routing container. Other targets resolve locally.
+    /// - Returns: Whether an unwind target was found for an active scope.
     @discardableResult
     public func unwind(to target: UnwindTarget) async -> Bool {
-        await unwindAndWait(to: target)
+        guard let engine, let origin else { return false }
+        return await engine.unwindAndWait(to: target, origin: origin)
     }
 
-    /// Dismisses route scopes to an explicit target, delivering a payload to a matching ``UnwindHandler``.
-    ///
-    /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed installed route scopes have left the view hierarchy.
-    ///
-    /// - Parameters:
-    ///   - target: The target to unwind to.
-    ///   - payload: A value delivered to a matching ``UnwindHandler``.
-    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
+    /// Unwinds from this router's scope and delivers a payload to a matching handler.
+    /// - Returns: Whether an unwind target was found for an active scope.
     @discardableResult
     public func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {
-        await unwindAndWait(to: target, payload: payload)
+        guard let engine, let origin else { return false }
+        return await engine.unwindAndWait(to: target, payload: payload, origin: origin)
     }
 
-    /// Performs an action from the current route scope.
+    /// Performs an action from this router's scope.
     public func perform(_ action: any Action) async {
-        await performAction(action)
+        guard let engine, let origin else { return }
+        await engine.performAction(action, origin: origin)
     }
 
     public static func == (lhs: Router, rhs: Router) -> Bool {
-        lhs.id == rhs.id
+        lhs.engine === rhs.engine && lhs.origin == rhs.origin
     }
 }
 
-extension Router {
-    struct NavigationTransaction {
-        struct Token: Hashable {
-            let id = UUID()
+/// Carries request identity across resolution and navigation readiness waits.
+final class RouteRequestOrigin: Equatable {
+    weak var scope: RouteScope?
+    let scopeID: ObjectIdentifier
+    let branches: [AnyHashable]
 
-            static func == (lhs: Self, rhs: Self) -> Bool {
-                lhs.id == rhs.id
+    init(scope: RouteScope, branches: [AnyHashable] = []) {
+        self.scope = scope
+        self.scopeID = ObjectIdentifier(scope)
+        self.branches = branches
+    }
+
+    func targeting(_ branch: AnyHashable, in forest: RouteForest?) -> RouteRequestOrigin? {
+        guard let scope, let forest, forest.routePath(containing: scope) != nil else { return nil }
+        if branches.isEmpty {
+            var candidate: RouteScope? = scope
+            while let owner = candidate {
+                if owner.branchContainer != nil {
+                    return RouteRequestOrigin(scope: owner, branches: [branch])
+                }
+                candidate = forest.enclosingScope(before: owner)
             }
-
-            func hash(into hasher: inout Hasher) {
-                hasher.combine(id)
-            }
+            return nil
         }
+        return RouteRequestOrigin(scope: scope, branches: branches + [branch])
+    }
 
-        private var activeTokens: Set<Token> = []
+    static func == (lhs: RouteRequestOrigin, rhs: RouteRequestOrigin) -> Bool {
+        lhs.scopeID == rhs.scopeID && lhs.branches == rhs.branches
+    }
+}
 
-        var isInProgress: Bool {
-            activeTokens.isEmpty == false
-        }
+extension RouteRequestOrigin {
+    enum Target {
+        case scope(RouteScope)
+        case unmountedBranch(owner: RouteScope, id: AnyHashable)
 
-        mutating func begin() -> Token {
-            let token = Token()
-            activeTokens.insert(token)
-            return token
-        }
-
-        @discardableResult
-        mutating func finish(_ token: Token) -> Bool {
-            activeTokens.remove(token) != nil
+        var scope: RouteScope? {
+            if case .scope(let scope) = self { return scope }
+            return nil
         }
     }
 
-    func mutateRouteGraph(_ mutation: () -> Void) {
-        routeGraphMutationDepth += 1
-        mutation()
-        routeGraphMutationDepth -= 1
+    func resolve(in forest: RouteForest) -> Target? {
+        guard let scope, forest.routePath(containing: scope) != nil else { return nil }
+        guard branches.isEmpty == false else { return .scope(scope) }
 
-        if routeGraphMutationDepth == 0 {
-            ios17NavigationStackPushWorkaround?.routeGraphDidMutate(in: self)
-            reconcileActiveRouteScopeID()
-            #if DEBUG
-            routeForest.validateInvariants()
-            #endif
+        // Branch handles already capture their container at creation. Losing
+        // that container must not redirect a stored handle to an ancestor.
+        guard scope.branchContainer != nil else { return nil }
+        var container = scope
+        for (index, branch) in branches.enumerated() {
+            guard container.declarations.branchIDs.contains(branch)
+                || container.branchScopes[branch] != nil else { return nil }
+            guard let child = container.branchScopes[branch] else {
+                return index == branches.count - 1 ? .unmountedBranch(owner: container, id: branch) : nil
+            }
+            if index == branches.count - 1 { return .scope(child.activeLocalScope) }
+            // Stay at the next container instead of following its selected branch
+            // into a destination that no longer owns the nested branch map.
+            container = child.path.scopes.reversed().first { $0.branchContainer != nil } ?? child
         }
-    }
-
-    private func reconcileActiveRouteScopeID() {
-        let routeScopeID = routeForest.activeTree.activeRouteScopeID
-        if activeRouteScopeID != routeScopeID {
-            activeRouteScopeID = routeScopeID
-        }
+        return nil
     }
 }

@@ -22,29 +22,31 @@
 
 import Foundation
 
-extension Router {
-    func performAction<A: Action>(_ action: A) async {
+extension RouterEngine {
+    func performAction<A: Action>(_ action: A, origin: RouteRequestOrigin? = nil) async {
         #if DEBUG
         guard DepartureLogTrace.id != nil else {
             await DepartureLogTrace.$id.withValue("a:\(action.id.departureDebugDescription)") {
-                await performAction(action)
+                await performAction(action, origin: origin)
             }
             return
         }
         #endif
 
         log.departureDebug(.actionRequested(action: action))
-        await performAction(action, hasRerouted: false)
+        await performAction(action, hasRerouted: false, origin: origin)
     }
 
     @discardableResult
     func runAction<A: Action>(
         _ action: A,
         hasRerouted: Bool,
-        logsStart: Bool = true
+        logsStart: Bool = true,
+        origin: RouteRequestOrigin? = nil
     ) async throws -> A.Output {
+        guard let source = resolveRequestOrigin(origin)?.scope else { throw CancellationError() }
         do {
-            let currentRoute: (any Route.Type)? = currentRouteScope.currentRoute.map { type(of: $0) }
+            let currentRoute: (any Route.Type)? = source.currentRoute.map { type(of: $0) }
             if logsStart {
                 log.departureDebug(.actionRunning(action: action, currentRoute: currentRoute))
             }
@@ -60,15 +62,16 @@ extension Router {
             case let .reroute(route):
                 log.departureDebug(.actionRerouteRequested(action: action, route: route))
                 Task {
-                    let sourceScope = currentRouteScope
-                    await requestRouteWhenReady(route)
-                    let targetScope = currentRouteScope
+                    let sourceScope = source
+                    let continuationOwner = origin == nil ? nil : (nearestBranchPath(from: source)?.owner ?? root)
+                    await requestRouteWhenReady(route, origin: origin)
+                    let targetScope = continuationOwner?.activeLocalScope ?? currentRouteScope
 
                     if targetScope !== sourceScope || targetScope.isInstalledInView {
                         await waitForRouteScopeToInstall(targetScope)
                     }
 
-                    await performAction(action, hasRerouted: true)
+                    await performAction(action, hasRerouted: true, origin: continuationOwner.map { RouteRequestOrigin(scope: $0.activeLocalScope) })
                 }
                 
                 throw CancellationError()
@@ -81,30 +84,31 @@ extension Router {
     }
 }
 
-private extension Router {
+private extension RouterEngine {
     func waitForRouteScopeToInstall(_ routeScope: RouteScope) async {
         await routeScope.viewLifecycle.waitUntilInstalled()
     }
 
-    func performAction<A: Action>(_ action: A, hasRerouted: Bool) async {
-        if let interceptor = currentRouteScope.firstInterceptor(for: A.self) {
-            log.departureDebug(.actionIntercepted(action: action, scope: currentRouteScope))
-            await interceptor.invoke(self, action, hasRerouted)
+    func performAction<A: Action>(_ action: A, hasRerouted: Bool, origin: RouteRequestOrigin? = nil) async {
+        guard let source = resolveRequestOrigin(origin)?.scope else { return }
+        if let interceptor = source.firstInterceptor(for: A.self) {
+            log.departureDebug(.actionIntercepted(action: action, scope: source))
+            await interceptor.invoke(self, action, hasRerouted, origin)
             log.departureDebug(.actionInterceptorFinished(action: action))
             return
         }
 
-        let currentRoute: (any Route.Type)? = currentRouteScope.currentRoute.map { type(of: $0) }
+        let currentRoute: (any Route.Type)? = source.currentRoute.map { type(of: $0) }
         log.departureDebug(.actionNoInterceptor(
             action: action,
-            scope: currentRouteScope,
+            scope: source,
             currentRoute: currentRoute
         ))
 
         // A top-level action dispatch is fire-and-forget. Interceptors can
         // capture invocation failures by catching errors from `invocation()`.
         do {
-            _ = try await runAction(action, hasRerouted: hasRerouted, logsStart: false)
+            _ = try await runAction(action, hasRerouted: hasRerouted, logsStart: false, origin: origin)
         } catch {
             log.departureDebug(.actionDirectInvocationEnded(action: action, error: error))
         }

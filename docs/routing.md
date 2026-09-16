@@ -10,7 +10,7 @@ Declare each route on the scope that should present it.
 }
 ```
 
-`router.present(...)` starts at the active route and uses the closest matching declaration. The same route type may be declared in more than one scope; the nearest owner wins. If no scope owns it, nothing is presented.
+`router.present(...)` starts at the scope captured by that router and uses the closest matching declaration in its branch or enclosing scopes. If the current branch has no match, discovery crawls up to container `Branch(...)` declarations and automatically selects the branch owning the match, including a branch whose view has not been built yet. It does not search arbitrary destination scopes inside sibling stacks. The same route type may be declared in more than one scope; the nearest owner wins. Use `router.branch(...)` to explicitly choose a branch when needed. If no eligible scope owns the route, nothing is presented.
 
 ## Supply a view from a feature module
 
@@ -77,7 +77,7 @@ Fade covers render in a detached host. As with elevated-priority presentations, 
 
 ## Route phase
 
-Read `routePhase` when a view needs to react to whether its local route scope is current.
+Read `routePhase` when a view needs to react to whether its local scope is current within its participating branch. Several concurrent branches can have active scopes at once; visibility and focus are separate from this phase.
 
 ```swift
 @Environment(\.routePhase) private var routePhase

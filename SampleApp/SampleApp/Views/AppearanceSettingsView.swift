@@ -27,7 +27,7 @@ struct AppearanceSettingsView: View {
     let value: UUID?
 
     @State private var storage = Storage.shared
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
 
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
@@ -51,8 +51,9 @@ struct AppearanceSettingsView: View {
                     action("New value · replace", symbol: "arrow.triangle.2.circlepath", color: LabPalette.blue, id: SampleAppAccessibility.appearanceRePresentDifferentButton) { await router.present(AppearanceSettingsRoute(value: UUID())) }
                     action("Nested push", symbol: "arrow.right.square.fill", id: SampleAppAccessibility.appearancePresentAuthenticationButton) { await router.present(AuthenticationSettingsRoute()) }
                     action("Unwind then route", symbol: "arrow.uturn.backward.square.fill", color: LabPalette.amber, id: SampleAppAccessibility.appearanceUnwindToLandingPresentMessageButton) {
+                        let home = router.branch(LandingView.TabItem.home)
                         guard await router.unwind(to: .id(LandingRoute().id)) else { return }
-                        await router.present(MessageRoute())
+                        await home.present(MessageRoute())
                     }
                     action("Intercepted save", symbol: "tray.and.arrow.down.fill", color: LabPalette.mint, id: SampleAppAccessibility.appearanceSaveButton) { await router.perform(SaveAppearanceSettingsAction()) }
                 }

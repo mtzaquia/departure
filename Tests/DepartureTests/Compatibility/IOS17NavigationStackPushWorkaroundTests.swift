@@ -58,7 +58,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
     }
 
     @Test func disabledWorkaroundRetainsImmediatePushDismissalSemantics() async throws {
-        let router = Router()
+        let router = RouterEngine()
         router.ios17NavigationStackPushWorkaround = nil
 
         installPushDeclaration(in: router)
@@ -198,7 +198,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
     @Test func viewExitWatchdogForcesReconciliationWhenLifecycleCallbackIsMissing() async {
         let workaround = IOS17NavigationStackPushWorkaround()
         workaround.viewExitTimeout = .milliseconds(10)
-        let router = Router()
+        let router = RouterEngine()
         router.ios17NavigationStackPushWorkaround = workaround
         let scope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute())
         router.routeScopeDidInstallInView(scope)
@@ -208,14 +208,14 @@ struct IOS17NavigationStackPushWorkaroundTests {
         #expect(scope.isInstalledInView == false)
     }
 
-    private func makeRouterWithWorkaround() -> Router {
-        let router = Router()
+    private func makeRouterWithWorkaround() -> RouterEngine {
+        let router = RouterEngine()
         router.ios17NavigationStackPushWorkaround = IOS17NavigationStackPushWorkaround()
         return router
     }
 
     private func installPushDeclaration(
-        in router: Router,
+        in router: RouterEngine,
         hostedBy presentationHostID: RoutePresentationHostID? = nil
     ) {
         let declarations = Push(HomeDetailRoute.self)._routeDeclarations

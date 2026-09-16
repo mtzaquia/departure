@@ -27,7 +27,7 @@ import Testing
 @Suite
 struct UnwindHookTests {
     @Test func ancestorHandlerFiresWhenUnwindLandsOnDescendantScope() async {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = UnwindRecorder()
 
         router.root.installRouteDeclarations(
@@ -65,7 +65,7 @@ struct UnwindHookTests {
     }
 
     @Test func landedScopeHandlerFiresForLowerDeclaredRoute() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = UnwindRecorder()
 
         router.root.installRouteDeclarations(
@@ -112,7 +112,7 @@ struct UnwindHookTests {
     }
 
     @Test func nearestUnwindHandlerWinsOverFartherAncestor() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = UnwindRecorder()
 
         router.root.installRouteDeclarations(
@@ -164,7 +164,7 @@ struct UnwindHookTests {
     }
 
     @Test func siblingBranchUnwindHandlerDoesNotFire() async {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
@@ -215,7 +215,7 @@ struct UnwindHookTests {
     }
 
     @Test func swiftUIDismissBubblesHandlerFromDescendantLandingToAncestor() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = UnwindRecorder()
 
         router.root.installRouteDeclarations(
@@ -253,7 +253,7 @@ struct UnwindHookTests {
     }
 
     @Test func payloadHandlerReceivesPayloadWhenChildUnwindsToDeclaringScope() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
@@ -274,7 +274,7 @@ struct UnwindHookTests {
     }
 
     @Test func payloadHandlerDoesNotTriggerWhenPayloadTypeMismatches() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
@@ -295,7 +295,7 @@ struct UnwindHookTests {
     }
 
     @Test func noPayloadHandlerTriggersForExplicitIDTarget() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
@@ -316,7 +316,7 @@ struct UnwindHookTests {
     }
 
     @Test func unwindRouteActionStartsFromAssignedScopeWhenItIsNotCurrent() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let sourceScope = RouteScope(id: CardsListRoute().id, route: CardsListRoute())
         let childScope = RouteScope(id: AddMethodRoute().id, route: AddMethodRoute())
@@ -348,7 +348,7 @@ struct UnwindHookTests {
     }
 
     @Test func unwindRouteActionClearsPathsOwnedByAssignedScopeWithoutDescendantHandlers() async {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let settingsScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let appearanceScope = RouteScope(id: AddMethodRoute().id, route: AddMethodRoute())
@@ -388,7 +388,7 @@ struct UnwindHookTests {
     }
 
     @Test func unwindRouteActionDoesNotRetainItsAssignedScope() async {
-        let router = Router()
+        let router = RouterEngine()
         weak var releasedScope: RouteScope?
         let action = {
             let scope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -401,7 +401,7 @@ struct UnwindHookTests {
     }
 
     @Test func unwindRouteActionHasStableIdentityForSameRouterAndScope() {
-        let router = Router()
+        let router = RouterEngine()
         let scope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let otherScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
 
@@ -411,7 +411,7 @@ struct UnwindHookTests {
     }
 
     @Test func autoUnwindToEquivalentRouteTriggersTargetScopeHandlerForDismissedRoute() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = UnwindRecorder()
 
         router.root.installRouteDeclarations(
@@ -453,7 +453,7 @@ struct UnwindHookTests {
     }
 
     @Test func rootTargetTriggersRootScopeHook() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
@@ -474,7 +474,7 @@ struct UnwindHookTests {
     }
 
     @Test func rootTargetTriggersRootScopeHookForBranchLocalSourceRoute() async {
-        let router = Router()
+        let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
@@ -517,7 +517,7 @@ struct UnwindHookTests {
     }
 
     @Test func nearestBranchTriggersContainerHookInsteadOfBranchRootHook() async {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let settingsScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
@@ -549,7 +549,7 @@ struct UnwindHookTests {
     }
 
     @Test func explicitBranchRootIDTriggersBranchRootHook() async {
-        let router = Router()
+        let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let settingsScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
@@ -581,7 +581,7 @@ struct UnwindHookTests {
     }
 
     @Test func payloadHandlerRunsWhenUnwindIsAccepted() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
@@ -604,7 +604,7 @@ struct UnwindHookTests {
     }
 
     @Test func routerUnwindDoesNotWaitForAsyncHandlerBody() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
@@ -637,7 +637,7 @@ struct UnwindHookTests {
     }
 
     @Test func handlerCanPresentRouteAfterRouterUnwindFinishes() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
@@ -684,7 +684,7 @@ struct UnwindHookTests {
     }
 
     @Test func swiftUIDismissHandlerCanPresentRouteAfterDismissalFinishes() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = UnwindRecorder()
 
@@ -729,7 +729,7 @@ struct UnwindHookTests {
     }
 
     @Test func swiftUIDismissTriggersNoPayloadHandlerOnlyOnce() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = UnwindRecorder()
 
@@ -764,7 +764,7 @@ struct UnwindHookTests {
     }
 
     @Test func routerUnwindTriggersNoPayloadHandlerOnlyOnceWhenPresentationBindingAlsoDismisses() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = UnwindRecorder()
 
@@ -803,7 +803,7 @@ struct UnwindHookTests {
     }
 
     @Test func staleDeliveredUnwindHandlerKeyDoesNotSuppressNewScope() async {
-        let router = Router()
+        let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let sourceScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let recorder = UnwindRecorder()
@@ -817,11 +817,11 @@ struct UnwindHookTests {
         )
 
         var staleSourceScope: RouteScope? = RouteScope(id: LoginRoute().id, route: LoginRoute())
-        let collidingKey = Router.UnwindHandlerDeliveryKey(
+        let collidingKey = RouterEngine.UnwindHandlerDeliveryKey(
             sourceScopeID: ObjectIdentifier(sourceScope),
             targetScopeID: parentScope.id
         )
-        router.deliveredUnwindHandlers[collidingKey] = Router.DeliveredUnwindHandler(
+        router.deliveredUnwindHandlers[collidingKey] = RouterEngine.DeliveredUnwindHandler(
             sourceScope: staleSourceScope
         )
         staleSourceScope = nil
@@ -838,7 +838,7 @@ struct UnwindHookTests {
     }
 
     @Test func routerUnwindTriggersHandlerForHighPriorityPresentation() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = UnwindRecorder()
 
         router.root.installRouteDeclarations(
@@ -878,7 +878,7 @@ struct UnwindHookTests {
     }
 
     @Test func swiftUIDismissTriggersNoPayloadHandlerForHighPriorityPresentation() async throws {
-        let router = Router()
+        let router = RouterEngine()
         let recorder = UnwindRecorder()
 
         router.root.installRouteDeclarations(
@@ -940,8 +940,8 @@ private final class UnwindRecorder {
 }
 
 @MainActor
-private func branchUnwindEvents(to target: Router.UnwindTarget) async -> [String] {
-    let router = Router()
+private func branchUnwindEvents(to target: RouterEngine.UnwindTarget) async -> [String] {
+    let router = RouterEngine()
     let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
     let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
     let sourceScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())

@@ -31,7 +31,7 @@ public extension View {
     /// ```
     ///
     /// - Important: The value must match a ``Branch`` value declared by
-    ///   ``SwiftUICore/View/routes(id:branch:_:)``.
+    ///   ``SwiftUICore/View/routes(id:branch:concurrent:_:)``.
     func routeBranch<Branch: Hashable>(_ branch: Branch) -> some View {
         modifier(RouteBranchModifier(branch: AnyHashable(branch)))
     }
@@ -43,7 +43,7 @@ private struct RouteBranchModifier: ViewModifier {
     @State private var branchScope: RouteScope
     @State private var presentationHostID = RoutePresentationHostID()
 
-    @Environment(Router.self) private var router
+    @Environment(RouterEngine.self) private var router
     @Environment(\.routeScope) private var parentScope
     @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
 

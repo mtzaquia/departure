@@ -24,7 +24,7 @@ import Foundation
 
 /// Groups declarations under a branch selection value.
 ///
-/// Use ``Branch`` inside ``SwiftUICore/View/routes(id:branch:_:)`` so routes are discoverable even when
+/// Use ``Branch`` inside ``SwiftUICore/View/routes(id:branch:concurrent:_:)`` so routes are discoverable even when
 /// a branch view has not been built yet.
 ///
 /// ```swift

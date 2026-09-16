@@ -55,7 +55,7 @@ public enum RouteDeclarationBuilder {
 }
 
 @resultBuilder
-/// Builds declarations for ``View/routes(id:branch:_:)``.
+/// Builds declarations for ``View/routes(id:branch:concurrent:_:)``.
 public enum BranchedRouteDeclarationBuilder<Selection: Hashable & Sendable> {
     public static func buildExpression(
         _ expression: Branch<Selection>

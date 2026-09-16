@@ -21,6 +21,7 @@
 //
 
 import Foundation
+import Observation
 import SwiftUI
 
 final class RouteScope: Identifiable {
@@ -30,6 +31,8 @@ final class RouteScope: Identifiable {
 
     let route: (any Route)?
     weak var parent: RouteScope?
+
+    let participation = RouteScopeParticipation()
 
     var branchID: AnyHashable?
     var adoptedRoutePresentationHostID: RoutePresentationHostID?
@@ -115,3 +118,10 @@ extension RouteScope {
     }
 }
 #endif
+
+/// Observes only stable branch state; declaration refreshes remain non-observable.
+@Observable
+final class RouteScopeParticipation {
+    var isConcurrent = false
+    var isBranchHostRegistered = false
+}

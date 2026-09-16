@@ -1,0 +1,182 @@
+//
+//  Copyright (c) 2026 @mtzaquia
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
+//
+
+import SwiftUI
+import Observation
+
+@Observable
+final class RouterEngine: Identifiable, Equatable {
+    typealias UnwindTarget = Router.UnwindTarget
+
+    /// Stable identity for this router instance.
+    @ObservationIgnored let id = UUID()
+
+    var routeForest: RouteForest
+
+    @ObservationIgnored
+    var pendingRoute: PendingRoute?
+
+    var unwindPresentationSnapshot: UnwindPresentationSnapshot?
+
+    @ObservationIgnored
+    var navigationTransaction = NavigationTransaction()
+
+    @ObservationIgnored
+    var deliveredUnwindHandlers: [UnwindHandlerDeliveryKey: DeliveredUnwindHandler] = [:]
+
+    @ObservationIgnored
+    var routeGraphMutationDepth = 0
+
+    @ObservationIgnored
+    var ios17NavigationStackPushWorkaround: (any IOS17NavigationStackPushWorkaroundHandling)? =
+        IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform()
+
+    @ObservationIgnored
+    var windowDestinationBuilder = WindowDestinationBuilder.passthrough
+
+    var activeRouteScopeID: ObjectIdentifier
+
+    var root: RouteScope {
+        routeForest.normalTree.root
+    }
+
+    var normalTree: RouteTree {
+        routeForest.normalTree
+    }
+
+    var currentRouteScope: RouteScope {
+        routeForest.activeTree.currentRouteScope
+    }
+
+    /// Creates an empty router.
+    init() {
+        let root = RouteScope(id: UUID(), route: nil)
+        let rootPath = RoutePath(owner: root)
+        let normalTree = RouteTree(priority: .normal, root: root, rootPath: rootPath)
+        self.routeForest = RouteForest(normalTree: normalTree)
+        self.activeRouteScopeID = normalTree.activeRouteScopeID
+    }
+
+    /// Requests a route presentation.
+    ///
+    /// This method returns after the request has resolved and the router has updated its routing state.
+    /// It does not wait for SwiftUI to mount or display the destination view.
+    func present(_ route: any Route) async {
+        await requestRouteWhenReady(route)
+    }
+
+    /// Dismisses route scopes to an explicit target.
+    ///
+    /// This method returns after the unwind request has resolved, the router path has been updated,
+    /// and any removed installed route scopes have left the view hierarchy.
+    ///
+    /// - Parameter target: The target to unwind to.
+    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
+    @discardableResult
+    func unwind(to target: UnwindTarget) async -> Bool {
+        await unwindAndWait(to: target)
+    }
+
+    /// Dismisses route scopes to an explicit target, delivering a payload to a matching ``UnwindHandler``.
+    ///
+    /// This method returns after the unwind request has resolved, the router path has been updated,
+    /// and any removed installed route scopes have left the view hierarchy.
+    ///
+    /// - Parameters:
+    ///   - target: The target to unwind to.
+    ///   - payload: A value delivered to a matching ``UnwindHandler``.
+    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
+    @discardableResult
+    func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {
+        await unwindAndWait(to: target, payload: payload)
+    }
+
+    /// Performs an action from the current route scope.
+    func perform(_ action: any Action) async {
+        await performAction(action)
+    }
+
+    static func == (lhs: RouterEngine, rhs: RouterEngine) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
+extension RouterEngine {
+    struct NavigationTransaction {
+        struct Token: Hashable {
+            let id = UUID()
+
+            static func == (lhs: Self, rhs: Self) -> Bool {
+                lhs.id == rhs.id
+            }
+
+            func hash(into hasher: inout Hasher) {
+                hasher.combine(id)
+            }
+        }
+
+        private var activeTokens: Set<Token> = []
+
+        var isInProgress: Bool {
+            activeTokens.isEmpty == false
+        }
+
+        mutating func begin() -> Token {
+            let token = Token()
+            activeTokens.insert(token)
+            return token
+        }
+
+        @discardableResult
+        mutating func finish(_ token: Token) -> Bool {
+            activeTokens.remove(token) != nil
+        }
+    }
+
+    func mutateRouteGraph(_ mutation: () -> Void) {
+        routeGraphMutationDepth += 1
+        mutation()
+        routeGraphMutationDepth -= 1
+
+        if routeGraphMutationDepth == 0 {
+            ios17NavigationStackPushWorkaround?.routeGraphDidMutate(in: self)
+            reconcileActiveRouteScopeID()
+            #if DEBUG
+            routeForest.validateInvariants()
+            #endif
+        }
+    }
+
+    /// Resolves a command's captured origin; an absent origin is the internal
+    /// current-scope lookup used by engine operations.
+    func resolveRequestOrigin(_ origin: RouteRequestOrigin?) -> RouteRequestOrigin.Target? {
+        if let origin { return origin.resolve(in: routeForest) }
+        return .scope(currentRouteScope)
+    }
+
+    private func reconcileActiveRouteScopeID() {
+        let routeScopeID = routeForest.activeTree.activeRouteScopeID
+        if activeRouteScopeID != routeScopeID {
+            activeRouteScopeID = routeScopeID
+        }
+    }
+}

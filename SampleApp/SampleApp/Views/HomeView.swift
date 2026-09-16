@@ -24,7 +24,7 @@ import Departure
 import SwiftUI
 
 struct HomeView: View {
-    @Environment(Router.self) private var router
+    @Environment(\.router) private var router
     @Environment(\.routePhase) private var routePhase
     @State private var storage = Storage.shared
     @State private var passthroughTapCount = 0
@@ -62,7 +62,7 @@ struct HomeView: View {
                     action("Fade navigation", symbol: "menubar.rectangle", id: SampleAppAccessibility.homeShowNavigationBarFadeButton) { await router.present(NavigationBarFadeOcclusionRoute()) }
                     action("Lifecycle teardown", symbol: "arrow.triangle.2.circlepath", color: LabPalette.mint, id: SampleAppAccessibility.homeShowLifecycleTeardownButton) { await router.present(LifecycleTeardownRoute()) }
                     action("Priority race", symbol: "flag.checkered", color: LabPalette.coral, id: SampleAppAccessibility.homePresentPendingPriorityRaceButton) {
-                        await router.present(PendingPriorityRoute())
+                        await router.branch(LandingView.TabItem.settings).present(PendingPriorityRoute())
                         await router.present(TopLevelSheetRoute())
                     }
                     action("Passthrough sheet", symbol: "hand.tap", color: LabPalette.blue, id: SampleAppAccessibility.homePresentHighPriorityPassthroughSheetButton) { await router.present(HighPriorityPassthroughSheetRoute()) }
