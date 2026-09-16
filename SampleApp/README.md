@@ -78,6 +78,11 @@ branch modifier. **Show content** and **Show detail** address a sibling explicit
 on iPad the other columns retain their paths. **Cover from detail** demonstrates the
 existing full-screen cover behavior and captured `unwindRoute` dismissal.
 
-The main route lab also uses scoped environment routers. Cross-branch actions address
-their target explicitly, and the external URL coordinator retains live environment contexts
+**Select detail** uses `Replace` to select an in-place detail root. **Select next** changes
+the root without adding a Back entry. **Open child** demonstrates ordinary nested pushes;
+**Replace from child** clears that navigation, and **Clear selection** restores the original
+branch content. Other columns keep their paths throughout.
+
+The main route lab also uses scoped environment routers. Cross-branch actions demonstrate
+both automatic container discovery and explicit targeting, and the external URL coordinator retains live environment contexts
 rather than relying on a globally current routing scope.

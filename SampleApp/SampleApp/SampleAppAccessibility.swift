@@ -21,6 +21,15 @@
 //
 
 enum SampleAppAccessibility {
+    static let splitSelectDetail = "sample.split.select-detail"
+    static let splitSelection = "sample.split.selection"
+    static let splitSelectNext = "sample.split.select-next"
+    static let splitSelectionOpenChild = "sample.split.selection-open-child"
+    static let splitSelectionPreview = "sample.split.selection-preview"
+    static let splitSelectionClear = "sample.split.selection-clear"
+    static let splitSelectionChild = "sample.split.selection-child"
+    static let splitSelectionChildReplace = "sample.split.selection-child-replace"
+    static let splitSelectionChildDone = "sample.split.selection-child-done"
     static let splitStart = "sample.split.start"
     static let splitShowContent = "sample.split.show-content"
     static let splitShowDetail = "sample.split.show-detail"

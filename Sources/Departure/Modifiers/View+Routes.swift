@@ -103,6 +103,9 @@ private struct RoutesModifier: ViewModifier {
         let activeBranch = selection?.value()
 
         content
+            // Replace changes this content slot; keep declaration injection and registration outside it.
+            .modifier(ReplacePresentationStyleModifier(presentationHostID: presentationHostID,
+                isEnabled: hostedDeclarations.containsPresentationKind(.replace)))
             .environment(\.branchRouteDeclarations, accumulatedBranchRouteDeclarations)
             .onSourceEnvironmentLifecycleEvent { sourceEnvironment, event in
                 switch event {

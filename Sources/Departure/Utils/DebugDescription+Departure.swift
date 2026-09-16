@@ -72,6 +72,8 @@ extension AnyRouteDeclaration {
         switch kind {
         case .push:
             presentationDescription = "push"
+        case .replace:
+            presentationDescription = "replace"
         case let .sheet(priority, _):
             presentationDescription = "sheet@\(priority)"
         case let .cover(priority, transition, _):

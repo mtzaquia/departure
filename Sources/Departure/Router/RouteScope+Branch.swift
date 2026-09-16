@@ -42,7 +42,7 @@ extension RouteScope {
     }
 
     func canDrivePresentation(matching presentationKind: RoutePresentationKind) -> Bool {
-        if presentationKind == .push {
+        if !presentationKind.isModal {
             return true
         }
 

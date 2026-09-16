@@ -118,7 +118,7 @@ struct RouteForest {
             }
 
             guard let modalScope = branchPath.scopes.first(where: {
-                $0.presentationDeclaration?.presentationKind != .push
+                $0.presentationDeclaration?.presentationKind.isModal == true
             }) else {
                 return nil
             }
@@ -352,7 +352,7 @@ struct RouteForest {
                     )
 
                     guard let declaration = scope.presentationDeclaration,
-                          declaration.presentationKind != .push
+                          declaration.presentationKind.isModal
                     else {
                         continue
                     }
@@ -418,7 +418,7 @@ extension RouteForest {
                 after: targetPosition
             ))
 
-        case .append where match.declaration.presentationKind == .push:
+        case .append where !match.declaration.presentationKind.isModal:
             requests.append(.scoped(
                 routePath: match.presentationLocation.path,
                 after: match.presentationLocation.position
@@ -668,7 +668,7 @@ extension RouteForest {
             return (path: fallbackPath, position: fallbackPosition)
         }
 
-        guard declaration.presentationKind != .push else {
+        guard declaration.presentationKind.isModal else {
             return (path: branchScope.path, position: .owner)
         }
 

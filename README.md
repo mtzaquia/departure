@@ -86,6 +86,10 @@ module layout and fallback behavior.
 > [!NOTE]
 > Declare `Push(...)` inside a `NavigationStack`.
 
+Use `Replace(...)` for selected content that should change in place without navigation
+history. It clears that slot's descendants and keeps other branch paths. See
+[Branches](docs/branches.md#route-across-concurrent-columns) for a split-view example.
+
 ## Documentation
 
 - [Getting started](docs/getting-started.md) — setup, routes, and declarations.

@@ -194,7 +194,7 @@ extension RouterEngine {
         }
 
         switch presentationKind {
-        case .push:
+        case .push, .replace:
             guard unwindPresentationSnapshot.preservesPushPresentationBindings else {
                 return nil
             }

@@ -130,7 +130,7 @@ final class RouteTree {
 
         while let current = scope, current !== root {
             if let declaration = current.presentationDeclaration,
-               declaration.presentationKind != .push {
+               declaration.presentationKind.isModal {
                 depth += 1
             }
 
@@ -148,7 +148,7 @@ final class RouteTree {
         allRoutePaths.flatMap { path in
             path.scopes.compactMap { scope in
                 guard let declaration = scope.presentationDeclaration,
-                      declaration.presentationKind != .push,
+                      declaration.presentationKind.isModal,
                       depth == nil || modalDepth(of: scope) == depth
                 else {
                     return nil

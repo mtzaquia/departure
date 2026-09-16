@@ -23,7 +23,10 @@
 import SwiftUI
 
 extension View {
-    /// Installs the presentation hosts for the styles present in `declarations`.
+    /// Installs the detached navigation and modal hosts for the styles in `declarations`.
+    ///
+    /// Replace wraps the caller's actual content separately, before its environment and registration
+    /// modifiers. Keeping this background outside those modifiers preserves source-environment cascading.
     ///
     /// Each style occupies an independent, stable background slot. The slot's host is present only
     /// while that style is declared — notably `navigationDestination` (push) is never attached when

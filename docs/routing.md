@@ -56,8 +56,13 @@ to a different package.
 | Declaration | Presentation |
 | --- | --- |
 | `Push` | Pushes onto the nearest `NavigationStack`. |
+| `Replace` | Replaces the declaring view's content and clears its descendants without adding a Back entry. |
 | `Sheet` | Presents a sheet. |
 | `Cover` | Presents a full-screen cover. |
+
+`Replace` needs no `NavigationStack` unless its destination declares pushes. In a `Branch`
+map, it changes that branch's selected root while preserving other branches. See
+[replacement selections](branches.md#route-across-concurrent-columns) for the split-view workflow.
 
 `Sheet` and `Cover` wrap destinations in a `NavigationStack`. Use `providesNavigation: false` when that is not wanted.
 

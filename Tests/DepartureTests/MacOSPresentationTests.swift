@@ -32,6 +32,88 @@ import Testing
 // and --filter MacOSPresentationTests.
 @Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["DEPARTURE_RUN_HOSTED_UI_TESTS"] == "1"))
 struct MacOSPresentationTests {
+    @Test func replacementPreservesBranchSourceEnvironmentAndContextualDestination() async throws {
+        let router = Router()
+        let engine = router.engine!
+        let recorder = MacOSScopeRecorder()
+        let host = WithRouter(router: router) {
+            MacOSScopeReader(recorder: recorder)
+                .routeBranch("detail")
+                .routes(branch: .constant("detail"), concurrent: true) {
+                    Branch("detail") { Replace(MacOSScopedReplacementRoute.self) }
+                }
+        }
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: host)
+        window.orderFront(nil)
+        defer { window.close() }
+
+        try #require(await waitUntil { engine.root.branchScopes["detail"] != nil && recorder.scope != nil })
+        let branch = try #require(engine.root.branchScopes["detail"])
+        #expect(branch.parent === engine.root)
+        #expect(branch.sourceEnvironment.routeScope === engine.root)
+        #expect(branch.sourceEnvironment.router == router)
+        #expect(recorder.scope === branch)
+        #expect(recorder.router == Router(engine: engine, scope: branch))
+
+        await router.branch("detail").present(MacOSScopedReplacementRoute(recorder: recorder))
+        let selected = try #require(branch.path.last)
+        try #require(await waitUntil { recorder.scope === selected })
+        #expect(recorder.router == Router(engine: engine, scope: selected))
+        #expect(engine.root.branchScopes["detail"] === branch)
+        #expect(branch.sourceEnvironment.routeScope === engine.root)
+        #expect(branch.sourceEnvironment.router == router)
+        #expect(engine.root.routeAttachments.count == 1)
+    }
+
+    @Test func inlineReplacementNeedsNoNavigationStackAndKeepsItsDeclarationHost() async throws {
+        let router = Router()
+        let recorder = MacOSInlineRecorder()
+        let control = MacOSInlineControl()
+        let host = WithRouter(router: router) {
+            MacOSInlinePlaceholder(control: control)
+        }
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: host)
+        window.orderFront(nil)
+        defer { window.close() }
+
+        let installed = await waitUntil { !router.engine!.root.routeAttachments.isEmpty }
+        try #require(installed)
+        await router.present(MacOSInlineRoute(number: 1, recorder: recorder))
+        let first = await waitUntil { recorder.number == 1 }
+        try #require(first)
+        await router.present(MacOSInlineRoute(number: 2, recorder: recorder))
+        let second = await waitUntil { recorder.number == 2 }
+        try #require(second)
+        #expect(router.engine!.root.routeAttachments.count == 1)
+        #expect(router.engine!.normalTree.rootPath.count == 1)
+        #expect(window.attachedSheet == nil)
+        control.isEnabled = false
+        let cleared = await waitUntil {
+            router.engine!.normalTree.rootPath.isEmpty && recorder.number == nil
+                && router.engine!.root.routeAttachments.isEmpty
+        }
+        try #require(cleared)
+        control.isEnabled = true
+        let restored = await waitUntil { router.engine!.root.routeAttachments.count == 1 }
+        try #require(restored)
+        await router.present(MacOSInlineRoute(number: 3, recorder: recorder))
+        let third = await waitUntil { recorder.number == 3 }
+        try #require(third)
+        #expect(await router.unwind(to: .root))
+        #expect(recorder.number == nil)
+        #expect(router.engine!.root.routeAttachments.count == 1)
+    }
+
     @Test func legacyEnvironmentReadsTheSameContextualRouter() async throws {
         let router = Router()
         let engine = router.engine!
@@ -105,6 +187,52 @@ struct MacOSPresentationTests {
 @MainActor
 private final class LegacyRouterRecorder {
     var matches: [Bool] = []
+}
+
+@MainActor
+private final class MacOSInlineRecorder { var number: Int? }
+
+@MainActor
+private final class MacOSScopeRecorder {
+    var scope: RouteScope?
+    var router: Router?
+}
+
+private struct MacOSScopeReader: View {
+    let recorder: MacOSScopeRecorder
+    @Environment(\.routeScope) private var scope
+    @Environment(\.router) private var router
+    var body: some View {
+        Text("Scope").frame(width: 320, height: 240)
+            .onAppear { recorder.scope = scope; recorder.router = router }
+    }
+}
+
+private struct MacOSScopedReplacementRoute: Route {
+    let recorder: MacOSScopeRecorder
+    func destination() -> some View { MacOSScopeReader(recorder: recorder) }
+}
+
+@MainActor
+@Observable
+private final class MacOSInlineControl { var isEnabled = true }
+
+private struct MacOSInlinePlaceholder: View {
+    let control: MacOSInlineControl
+    var body: some View {
+        Text("Placeholder").frame(width: 320, height: 240)
+            .routes { if control.isEnabled { Replace(MacOSInlineRoute.self) } }
+    }
+}
+
+private struct MacOSInlineRoute: Route {
+    let number: Int
+    let recorder: MacOSInlineRecorder
+    func destination() -> some View {
+        Text("Selected \(number)").frame(width: 320, height: 240)
+            .onAppear { recorder.number = number }
+            .onDisappear { if recorder.number == number { recorder.number = nil } }
+    }
 }
 
 private struct LegacyRouterReader: View {

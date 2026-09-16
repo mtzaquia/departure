@@ -108,11 +108,6 @@ extension RouterEngine {
     }
 
     private func transitionPlan(for route: any Route, origin: RouteRequestOrigin? = nil) -> RouteTransitionPlan {
-        if let currentRoute = resolveRequestOrigin(origin)?.scope?.route,
-           currentRoute._isEqual(to: route) {
-            return .noOp(currentRoute: currentRoute)
-        }
-
         let routeType = type(of: route)
         log.departureDebug(.routeLookupStarted(
             routeType: routeType,
@@ -120,6 +115,14 @@ extension RouterEngine {
         ))
         guard let match = routeForest.firstDeclaration(including: routeType, origin: origin) else {
             return .dropNoDeclaration(routeType: routeType)
+        }
+
+        if let source = resolveRequestOrigin(origin)?.scope,
+           let currentRoute = source.route, currentRoute._isEqual(to: route),
+           let host = match.presentationHost,
+           source.attachedPresentationDeclaration(presentedBy: host,
+                matching: match.declaration.presentationKind, hostedBy: match.presentationHostID) != nil {
+            return .noOp(currentRoute: currentRoute)
         }
 
         return switch priorityDecision(for: match) {

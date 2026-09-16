@@ -31,6 +31,7 @@ struct SplitBranchesView: View {
             Branch(.content) { Push(SplitPaneRoute.self) }
             Branch(.detail) {
                 Push(SplitPaneRoute.self)
+                Replace(SplitSelectionRoute.self)
                 Cover(SplitPreviewRoute.self, providesNavigation: false)
             }
         }
@@ -66,6 +67,13 @@ private struct SplitBranchPane: View {
                 }
                 .accessibilityIdentifier(controlID(SampleAppAccessibility.splitCoverDetail))
             }
+            Section("Replace selected content") {
+                Text("Select a detail root without adding a Back entry. A new selection clears its child navigation and keeps the other columns.")
+                Button("Select detail") {
+                    Task { await router.branch(NavigationSplitViewColumn.detail).present(SplitSelectionRoute(number: 1)) }
+                }
+                .accessibilityIdentifier(controlID(SampleAppAccessibility.splitSelectDetail))
+            }
         }
         .navigationTitle(column == .sidebar ? "Sidebar" : column == .content ? "Content" : "Detail")
     }
@@ -98,6 +106,61 @@ private struct SplitPaneDestination: View {
         }
         .padding()
         .navigationTitle(column == .content ? "Content selection" : column == .detail ? "Detail selection" : "Sidebar selection")
+    }
+}
+
+private struct SplitSelectionRoute: Route, Equatable {
+    let number: Int
+    func destination() -> some View { SplitSelectionDestination(number: number) }
+}
+
+private struct SplitSelectionDestination: View {
+    let number: Int
+    @Environment(\.router) private var router
+    @Environment(\.unwindRoute) private var unwindRoute
+    @Environment(\.routePhase) private var phase
+
+    var body: some View {
+        List {
+            Section("Selected root") {
+                Text("Detail selection \(number)")
+                    .accessibilityIdentifier(SampleAppAccessibility.splitSelection)
+                Text("Local phase: \(phase == .active ? "active" : "inactive")")
+                Button("Select next") { Task { await router.present(SplitSelectionRoute(number: number + 1)) } }
+                    .accessibilityIdentifier(SampleAppAccessibility.splitSelectNext)
+                Button("Open child") { Task { await router.present(SplitSelectionChildRoute(number: number)) } }
+                    .accessibilityIdentifier(SampleAppAccessibility.splitSelectionOpenChild)
+                Button("Preview") { Task { await router.present(SplitPreviewRoute()) } }
+                    .accessibilityIdentifier(SampleAppAccessibility.splitSelectionPreview)
+                Button("Clear selection") { Task { await unwindRoute() } }
+                    .accessibilityIdentifier(SampleAppAccessibility.splitSelectionClear)
+            }
+        }
+        .navigationTitle("Selected detail")
+        .routes { Push(SplitSelectionChildRoute.self) }
+    }
+}
+
+private struct SplitSelectionChildRoute: Route, Equatable {
+    let number: Int
+    func destination() -> some View { SplitSelectionChildDestination(number: number) }
+}
+
+private struct SplitSelectionChildDestination: View {
+    let number: Int
+    @Environment(\.router) private var router
+    @Environment(\.unwindRoute) private var unwindRoute
+
+    var body: some View {
+        List {
+            Text("Child of selection \(number)")
+                .accessibilityIdentifier(SampleAppAccessibility.splitSelectionChild)
+            Button("Replace from child") { Task { await router.present(SplitSelectionRoute(number: number + 1)) } }
+                .accessibilityIdentifier(SampleAppAccessibility.splitSelectionChildReplace)
+            Button("Done") { Task { await unwindRoute() } }
+                .accessibilityIdentifier(SampleAppAccessibility.splitSelectionChildDone)
+        }
+        .navigationTitle("Selection child")
     }
 }
 

@@ -46,6 +46,78 @@ final class SampleAppUITests: XCTestCase {
         assertGone("sample.split.detail-destination")
     }
 
+    func testReplaceSelectionHasNoBackEntryAndClearsChildNavigation() {
+        openSplitLab()
+        tap("sample.split.select-detail")
+        let revealed = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        revealed.name = "Compact branch after replacement selection"
+        revealed.lifetime = .keepAlways
+        add(revealed)
+        let hierarchy = XCTAttachment(string: app.debugDescription)
+        hierarchy.name = "Replacement selection hierarchy"
+        hierarchy.lifetime = .keepAlways
+        add(hierarchy)
+        assertLabel("sample.split.selection", contains: "Detail selection 1")
+        assertNoReplacementBackEntry()
+        tap("sample.split.select-next")
+        assertLabel("sample.split.selection", contains: "Detail selection 2")
+        assertNoReplacementBackEntry()
+        tap("sample.split.selection-open-child")
+        assertLabel("sample.split.selection-child", contains: "Child of selection 2")
+        tap("sample.split.selection-child-replace")
+        assertGone("sample.split.selection-child")
+        assertLabel("sample.split.selection", contains: "Detail selection 3")
+        assertNoReplacementBackEntry()
+        tap("sample.split.selection-open-child")
+        assertLabel("sample.split.selection-child", contains: "Child of selection 3")
+        tap("sample.split.selection-child-done")
+        assertGone("sample.split.selection-child")
+        assertLabel("sample.split.selection", contains: "Detail selection 3")
+        tap("sample.split.selection-preview")
+        assertExists("sample.split.cover")
+        tap("sample.split.cover-done")
+        assertLabel("sample.split.selection", contains: "Detail selection 3")
+        let selection = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        selection.name = "Replacement root with no navigation Back entry"
+        selection.lifetime = .keepAlways
+        add(selection)
+        tap("sample.split.selection-clear")
+        assertGone("sample.split.selection")
+        assertExists("sample.split.select-detail.detail")
+    }
+
+    func testReplaceSelectionPreservesOtherColumnsOnIPad() throws {
+        guard app.windows.firstMatch.frame.width > 700 else { throw XCTSkip("Requires an iPad layout") }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        tap("sample.split.start")
+        tap("sample.split.show-content")
+        assertExists("sample.split.content-destination")
+        tap("sample.split.select-detail")
+        assertLabel("sample.split.selection", contains: "Detail selection 1")
+        tap("sample.split.selection-open-child")
+        assertExists("sample.split.selection-child")
+        tap("sample.split.select-detail")
+        assertGone("sample.split.selection-child")
+        assertLabel("sample.split.selection", contains: "Detail selection 1")
+        assertExists("sample.split.content-destination")
+        let columns = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        columns.name = "Replacement selection preserves the content column"
+        columns.lifetime = .keepAlways
+        add(columns)
+        tap("sample.split.selection-clear")
+        assertGone("sample.split.selection")
+        assertExists("sample.split.content-destination")
+    }
+
+    private func assertNoReplacementBackEntry() {
+        let bar = app.navigationBars["Selected detail"]
+        XCTAssertTrue(bar.waitForExistence(timeout: 5))
+        // The split view may offer a native control for returning to the sidebar.
+        // Replacing content must not add history for the placeholder or old selection.
+        XCTAssertFalse(bar.buttons["Detail"].exists)
+        XCTAssertFalse(bar.buttons["Selected detail"].exists)
+    }
+
     func testConcurrentSplitBranchCoverPreservesSelectedDestination() {
         openSplitLab()
         tap("sample.split.show-detail")

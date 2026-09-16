@@ -31,6 +31,7 @@ struct RoutePresentationHostID: Hashable, Sendable {
 public struct AnyRouteDeclaration: Sendable, Hashable {
     enum Kind: Hashable, Sendable {
         case push
+        case replace
         case sheet(priority: RoutePriority, providesNavigation: Bool)
         case cover(priority: RoutePriority, transition: Cover.Transition, providesNavigation: Bool)
     }
@@ -68,14 +69,22 @@ public struct AnyRouteDeclaration: Sendable, Hashable {
 
 enum RoutePresentationKind: Hashable, Sendable {
     case push
+    case replace
     case sheet
     case cover(Cover.Transition)
+
+    var isModal: Bool {
+        switch self {
+        case .push, .replace: false
+        case .sheet, .cover: true
+        }
+    }
 }
 
 extension AnyRouteDeclaration {
     var priority: RoutePriority {
         switch kind {
-        case .push: .normal
+        case .push, .replace: .normal
         case let .sheet(priority, _), let .cover(priority, _, _): priority
         }
     }
@@ -83,6 +92,7 @@ extension AnyRouteDeclaration {
     var presentationKind: RoutePresentationKind {
         switch kind {
         case .push: .push
+        case .replace: .replace
         case .sheet: .sheet
         case let .cover(_, transition, _): .cover(transition)
         }
@@ -90,7 +100,7 @@ extension AnyRouteDeclaration {
 
     var providesNavigation: Bool {
         switch kind {
-        case .push: false
+        case .push, .replace: false
         case let .sheet(_, providesNavigation), let .cover(_, _, providesNavigation):
             providesNavigation
         }
@@ -165,7 +175,7 @@ extension [RouteScopeDeclaration] {
 
 /// A value accepted by ``SwiftUICore/View/routes(id:_:)``.
 ///
-/// ``Push``, ``Sheet``, and ``Cover`` conform to this protocol.
+/// ``Push``, ``Replace``, ``Sheet``, and ``Cover`` conform to this protocol.
 public protocol RouteDeclaration {
     var _routeDeclarations: [AnyRouteDeclaration] { get }
 }

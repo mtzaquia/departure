@@ -122,10 +122,27 @@ suspends the other branches. Sheets and covers retain their existing modal prese
 behavior; branch ownership does not confine them to a column’s bounds.
 
 Changing one branch does not infer changes to others. The app must coordinate selections
-that depend on each other. Replaceable root selection is not implemented in this slice;
-`Push` retains its existing navigation behavior.
+that depend on each other. Use `Replace` when a branch displays a selected root rather
+than a history of pushed selections:
+
+```swift
+.routes(branch: $column, concurrent: true) {
+    Branch(.detail) { Replace(MessageRoute.self) }
+}
+```
+
+`router.branch(NavigationSplitViewColumn.detail).present(MessageRoute(id: messageID))`
+selects the detail branch and renders the message in place. A different message replaces
+the previous root and clears its descendant paths. It does not add a Back entry, and
+other branches retain their paths. The destination can declare `Push` routes when hosted
+inside a `NavigationStack`. A sheet or cover overlays the selected root as usual.
+
+Unwinding the selected root reveals the original branch content. Presenting an equivalent
+selected route keeps its scope identity and unwinds its descendants back to that root.
+An equal route pushed elsewhere is not reused as the selected root. A `Replace` declared
+locally with `.routes` replaces that declaring view's slot rather than the entire branch.
 
 The [split-view sample](../SampleApp/SampleApp/Views/SplitBranchesView.swift) demonstrates
-three concurrent columns, targeted pushes, and a detail-owned cover.
+three concurrent columns, targeted pushes, replacement selections, and a detail-owned cover.
 
 Next: [Priority](priority.md)

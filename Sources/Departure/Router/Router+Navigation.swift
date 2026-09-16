@@ -450,7 +450,18 @@ extension RouterEngine {
         to route: any Route,
         after match: DeclarationMatch
     ) -> EquivalentRouteMatch? {
-        equivalentRouteMatch(
+        // Replacement equality belongs to the selected slot, not an equal route
+        // that happens to be pushed farther down the same path.
+        if match.declaration.presentationKind == .replace {
+            guard let host = match.presentationHost,
+                  let presentation = routePresentation(from: host, matching: .replace,
+                    hostedBy: match.presentationHostID),
+                  presentation.scope.route?._isEqual(to: route) == true,
+                  let position = match.presentationLocation.path.position(of: presentation.scope)
+            else { return nil }
+            return EquivalentRouteMatch(position: position)
+        }
+        return equivalentRouteMatch(
             to: route,
             in: match.presentationLocation.path,
             startingAt: match.presentationLocation.position
@@ -900,7 +911,7 @@ extension RouterEngine {
                     return false
                 }
 
-                return presentationKind != .push
+                return presentationKind.isModal
             }
 
             if installedModalScopes.isEmpty == false {
@@ -1006,7 +1017,7 @@ extension RouterEngine {
                 return false
             }
 
-            return presentationKind != .push
+            return presentationKind.isModal
         }
         let animatedPushPresentationScopeIDs = containsDepartingModal
             ? []

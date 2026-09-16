@@ -59,6 +59,9 @@ private struct RouteBranchModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // Replace changes this content slot; keep scope injection and registration outside it.
+            .modifier(ReplacePresentationStyleModifier(presentationHostID: presentationHostID,
+                isEnabled: adoptedDeclarations.containsPresentationKind(.replace)))
             .routeScopeEnvironment(branchScope, router: router)
             .onSourceEnvironmentLifecycleEvent { sourceEnvironment, event in
                 switch event {
