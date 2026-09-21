@@ -53,6 +53,14 @@ struct OrderedStorage<Key: Hashable, Value> {
         }
     }
 
+    /// Replaces a source and makes it the most recent one, so removing it restores
+    /// the source that was active before it.
+    mutating func setMostRecent(_ value: Value, for key: Key) {
+        orderedKeys.removeAll { $0 == key }
+        orderedKeys.append(key)
+        valuesByKey[key] = value
+    }
+
     mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
         orderedKeys.removeAll(keepingCapacity: keepCapacity)
         valuesByKey.removeAll(keepingCapacity: keepCapacity)

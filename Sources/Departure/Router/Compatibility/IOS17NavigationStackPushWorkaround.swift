@@ -23,6 +23,13 @@
 import Foundation
 
 protocol IOS17NavigationStackPushWorkaroundHandling: AnyObject {
+    func pushHostIdentity(
+        for branch: AnyHashable,
+        in parentScope: RouteScope?,
+        router: RouterEngine
+    ) -> Bool
+    /// Returns true when a newer route request superseded the append during preparation.
+    func prepareAppend(after match: RouterEngine.DeclarationMatch, in router: RouterEngine) async -> Bool
     func interceptDismissal(
         of presentation: RoutePresentation,
         matching presentationKind: RoutePresentationKind,
@@ -66,12 +73,58 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
     private var pendingDismissals: [ObjectIdentifier: PendingDismissal] = [:]
     private var viewExitWatchdogs: [ObjectIdentifier: Task<Void, Never>] = [:]
 
+    func pushHostIdentity(
+        for branch: AnyHashable,
+        in parentScope: RouteScope?,
+        router: RouterEngine
+    ) -> Bool {
+        // RouteScope itself is not observable; this signal makes SwiftUI reconsider the host
+        // when routing activates a different concurrent branch.
+        _ = router.activeRouteScopeID
+        guard parentScope?.branchContainer?.isConcurrent == true else { return true }
+        return parentScope?.activeBranch == branch
+    }
+
+    func prepareAppend(after match: RouterEngine.DeclarationMatch, in router: RouterEngine) async -> Bool {
+        guard match.declaration.presentationKind == .replace,
+              let host = match.presentationHost,
+              let replacing = router.routePresentation(
+                from: host, matching: .replace, hostedBy: match.presentationHostID
+              )?.scope,
+              let path = router.routeForest.routePath(containing: replacing),
+              let position = path.position(of: replacing),
+              path.scopesRemovedAfter(position).contains(where: {
+                $0.presentationDeclaration?.presentationKind == .push
+              })
+        else { return false }
+
+        // iOS 17 cannot reliably remove a pushed child and replace its enclosing selection
+        // in the same graph update. Pop the child first and preserve latest-request semantics.
+        let transaction = router.beginNavigationTransaction()
+        let plan = router.routeForest.unwindPlan(for: .scoped(routePath: path, after: position))
+        let removed = router.prepareRouteAppendPath(plan)
+        await router.waitForRouteScopesToLeaveView(removed)
+        let wasSuperseded = router.pendingRoute != nil
+        await router.finishNavigationTransaction(transaction)
+        return wasSuperseded
+    }
+
     func interceptDismissal(
         of presentation: RoutePresentation,
         matching presentationKind: RoutePresentationKind,
         in router: RouterEngine
     ) -> Bool {
-        guard presentationKind == .push, presentation.scope.isInstalledInView else {
+        guard presentationKind == .push else {
+            return false
+        }
+
+        // iOS 17 may write nil while revealing a branch, before NavigationStack has mounted
+        // the newly appended destination. An unseen push cannot be a user dismissal.
+        guard presentation.scope.ledger.hasEverInstalled else {
+            return true
+        }
+
+        guard presentation.scope.isInstalledInView else {
             return false
         }
 

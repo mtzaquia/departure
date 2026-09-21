@@ -109,6 +109,7 @@ public enum RoutePhase: Equatable, Sendable {
 
 extension EnvironmentValues {
     @Entry var routeScope: RouteScope?
+    @Entry var unscopedRouter = Router.inactive
 }
 
 public extension EnvironmentValues {
@@ -127,14 +128,14 @@ public extension EnvironmentValues {
 }
 
 public extension Environment where Value == Router {
-    /// Reads the contextual router using the legacy type-based spelling.
+    /// Reads the unscoped router using the legacy type-based spelling.
     ///
-    /// `@Environment(Router.self)` reads the same scoped handle as
-    /// `@Environment(\.router)`, including its inactive default outside `WithRouter`.
+    /// Unlike `@Environment(\.router)`, this router searches without a captured
+    /// view scope. Both spellings are inactive outside `WithRouter`.
     /// - Parameter type: The router type identifying the compatibility lookup.
     @available(*, deprecated, message: "Use @Environment(\\.router) instead.")
     init(_ type: Router.Type) {
-        self.init(\.router)
+        self.init(\.unscopedRouter)
     }
 }
 
@@ -147,6 +148,7 @@ extension View {
         self
             .environment(\.routeScope, routeScope)
             .environment(\.router, Router(engine: router, scope: routeScope))
+            .environment(\.unscopedRouter, Router(engine: router))
             .environment(\.routePhase, router.routePhase(for: routeScope))
             .environment(\.unwindRoute, UnwindRouteAction(router: router, routeScope: routeScope))
     }

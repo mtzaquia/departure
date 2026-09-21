@@ -84,7 +84,7 @@ struct ElevatedPrioritySheetPresenter: View {
             .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
                 destination
             }
-            .onLifecycleEvent { event in
+            .onLifecycleEvent { _, _, event in
                 if case .installedInWindow(isInitial: true) = event {
                     isPresented = true
                 }

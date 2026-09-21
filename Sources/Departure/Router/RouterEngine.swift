@@ -47,6 +47,9 @@ final class RouterEngine: Identifiable, Equatable {
     var routeGraphMutationDepth = 0
 
     @ObservationIgnored
+    private(set) var didWarnAboutUnscopedRouter = false
+
+    @ObservationIgnored
     var ios17NavigationStackPushWorkaround: (any IOS17NavigationStackPushWorkaroundHandling)? =
         IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform()
 
@@ -65,6 +68,12 @@ final class RouterEngine: Identifiable, Equatable {
 
     var currentRouteScope: RouteScope {
         routeForest.activeTree.currentRouteScope
+    }
+
+    func warnAboutUnscopedRouterIfNeeded() {
+        guard didWarnAboutUnscopedRouter == false else { return }
+        didWarnAboutUnscopedRouter = true
+        log.departureWarning(.unscopedRouterUsed)
     }
 
     /// Creates an empty router.

@@ -30,9 +30,9 @@ import Testing
 struct ViewLifecycleBridgeTests {
     @Test func transientWindowRemovalDoesNotEmitLifecycleEvents() {
         var events: [ViewLifecycleBridge.Event] = []
-        let view = ViewLifecycleBridge.LifecycleView { event in
+        let view = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, event in
             events.append(event)
-        }
+        })
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
             styleMask: [],
@@ -56,9 +56,9 @@ struct ViewLifecycleBridgeTests {
 
     @Test func stableWindowRemovalDoesNotEmitLifecycleEvents() {
         var events: [ViewLifecycleBridge.Event] = []
-        let view = ViewLifecycleBridge.LifecycleView { event in
+        let view = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, event in
             events.append(event)
-        }
+        })
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
             styleMask: [],
@@ -76,9 +76,9 @@ struct ViewLifecycleBridgeTests {
 
     @Test func dismantleEmitsDismantledOnce() {
         var events: [ViewLifecycleBridge.Event] = []
-        let view = ViewLifecycleBridge.LifecycleView { event in
+        let view = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, event in
             events.append(event)
-        }
+        })
 
         ViewLifecycleBridge.dismantleNSView(view, coordinator: ())
         ViewLifecycleBridge.dismantleNSView(view, coordinator: ())
@@ -139,6 +139,37 @@ struct ViewLifecycleBridgeTests {
         }
         await staleTask.value
         #expect(didRun == false)
+    }
+
+    @Test func identifiedTeardownIsCoalescedWithRegistrationTeardown() async {
+        let delivery = ViewLifecycleTeardownDelivery()
+        let replacedView = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        let replacementView = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        var identifiedTeardowns = 0
+        var teardownIDs: [UUID] = []
+        let handler: @MainActor (ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event) -> Void = { view, id, event in
+            if case .dismantled = event {
+                #expect(view == nil)
+                identifiedTeardowns += 1
+                teardownIDs.append(id)
+            }
+        }
+
+        delivery.deliver(.installedInWindow(isInitial: true), for: replacedView,
+            handler: handler)
+        let teardown = delivery.deliver(.dismantled, for: replacedView,
+            handler: handler)
+        delivery.deliver(.installedInWindow(isInitial: true), for: replacementView,
+            handler: handler)
+
+        await teardown?.value
+        #expect(identifiedTeardowns == 0)
+
+        let finalTeardown = delivery.deliver(.dismantled, for: replacementView,
+            handler: handler)
+        await finalTeardown?.value
+        #expect(identifiedTeardowns == 1)
+        #expect(teardownIDs == [replacementView.id])
     }
 }
 

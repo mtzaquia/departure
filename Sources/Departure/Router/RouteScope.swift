@@ -26,7 +26,7 @@ import SwiftUI
 
 final class RouteScope: Identifiable {
     var id: AnyHashable {
-        declarationInstallation.id
+        ledger.id
     }
 
     let route: (any Route)?
@@ -40,8 +40,7 @@ final class RouteScope: Identifiable {
     var branchContainer: BranchContainerState?
     var branchScopes: [AnyHashable: RouteScope] = [:]
 
-    let declarationInstallation: RouteScopeDeclarationInstallation
-    let viewLifecycle = RouteScopeViewLifecycle()
+    let ledger: RouteScopeLedger
 
     lazy var path = RoutePath(owner: self)
     weak var owningPath: RoutePath?
@@ -53,14 +52,14 @@ final class RouteScope: Identifiable {
     #endif
 
     var isInstalledInView: Bool {
-        viewLifecycle.isInstalled
+        ledger.isInstalled
     }
     var sourceEnvironment: EnvironmentValues {
         sourceEnvironmentReference.values
     }
 
     var sourceEnvironmentReference: RouteSourceEnvironment {
-        declarationInstallation.sourceEnvironment
+        ledger.sourceEnvironment
     }
 
     var presentationOrigin: RouteScope? {
@@ -74,7 +73,7 @@ final class RouteScope: Identifiable {
     init(id: AnyHashable, route: (any Route)?, parent: RouteScope? = nil) {
         self.route = route
         self.parent = parent
-        self.declarationInstallation = RouteScopeDeclarationInstallation(initialID: id)
+        self.ledger = RouteScopeLedger(initialID: id)
     }
 }
 
@@ -100,12 +99,12 @@ extension RouteScope {
 
 extension RouteScope {
     func updateSourceEnvironment(_ sourceEnvironment: EnvironmentValues) {
-        declarationInstallation.updateSourceEnvironment(sourceEnvironment)
+        ledger.setBaseEnvironment(sourceEnvironment)
     }
 
     func defaultBranchID(hasSelection: Bool) -> AnyHashable {
         hasSelection
-            ? branchContainer?.defaultBranch ?? declarationInstallation.initialID
+            ? branchContainer?.defaultBranch ?? ledger.initialID
             : id
     }
 }

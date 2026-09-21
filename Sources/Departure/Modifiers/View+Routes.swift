@@ -92,12 +92,13 @@ private struct RoutesModifier: ViewModifier {
     let selection: AnyRouteBranchSelection?
     let declarations: [RouteScopeDeclaration]
 
-    @State private var sourceID = AnyHashable(UUID())
     @State private var presentationHostID = RoutePresentationHostID()
+    @State private var attachment = RouteScopeAttachment(kind: .routes)
 
     @Environment(RouterEngine.self) private var router
     @Environment(\.routeScope) private var routeScope
     @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
+    @Environment(\.self) private var sourceEnvironment
 
     func body(content: Content) -> some View {
         let activeBranch = selection?.value()
@@ -107,26 +108,27 @@ private struct RoutesModifier: ViewModifier {
             .modifier(ReplacePresentationStyleModifier(presentationHostID: presentationHostID,
                 isEnabled: hostedDeclarations.containsPresentationKind(.replace)))
             .environment(\.branchRouteDeclarations, accumulatedBranchRouteDeclarations)
-            .onSourceEnvironmentLifecycleEvent { sourceEnvironment, event in
+            .onLifecycleEvent { lifecycleView, _, event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
-                    installScopeDeclarations(sourceEnvironment: sourceEnvironment)
+                    guard let lifecycleView else { return }
+                    configureAttachment(view: lifecycleView)
 
                 case .updated(isInstalledInWindow: false):
                     break
 
                 case .dismantled, .deinitialized:
-                    uninstallScopeDeclarations()
+                    attachment.detach()
                 }
             }
             .onChange(of: activeBranch) { _, _ in
-                installScopeDeclarations()
+                configureAttachment()
             }
             .onChange(of: selection?.concurrent) { _, _ in
-                installScopeDeclarations()
+                configureAttachment()
             }
             .onChange(of: declarations) { _, _ in
-                installScopeDeclarations()
+                configureAttachment()
             }
             // Presentation hosts live in a detached background layer. They are installed only for
             // the declared styles (so e.g. `navigationDestination` is never attached without a
@@ -143,41 +145,32 @@ private struct RoutesModifier: ViewModifier {
             }
     }
 
-    private func installScopeDeclarations(sourceEnvironment: EnvironmentValues? = nil) {
-        guard let routeScope else {
-            return
-        }
-
-        let requiresCommit = routeScope.prepareRouteDeclarationInstallation(
-            sourceID: sourceID,
-            id: explicitScopeID,
-            branchSelection: selection,
-            routeDeclarations: hostedDeclarations,
-            sourceEnvironment: sourceEnvironment ?? routeScope.sourceEnvironment
-        )
-
-        guard requiresCommit else {
-            return
-        }
-
-        router.mutateRouteGraph {
-            routeScope.commitRouteDeclarationInstallation(
+    private func configureAttachment(view: PlatformView? = nil) {
+        let router = router
+        let sourceID = attachment.id
+        let explicitScopeID = explicitScopeID
+        let selection = selection
+        let declarations = hostedDeclarations
+        let sourceEnvironment = sourceEnvironment
+        let apply: (RouteScope) -> Void = { scope in
+            let requiresCommit = scope.prepareRouteDeclarationInstallation(
+                sourceID: sourceID,
+                id: explicitScopeID,
                 branchSelection: selection,
-                routeDeclarations: hostedDeclarations
+                routeDeclarations: declarations,
+                sourceEnvironment: sourceEnvironment
             )
+            guard requiresCommit else { return }
+            router.mutateRouteGraph { scope.commitRouteDeclarationInstallation() }
+            if let parent = scope.parent {
+                router.resumePendingRoute(for: scope.id, in: parent)
+            }
+        }
+        let remove: (RouteScope) -> Void = { scope in
+            router.mutateRouteGraph { scope.uninstallRouteDeclarations(sourceID: sourceID) }
         }
 
-        guard let parentScope = routeScope.parent else {
-            return
-        }
-
-        router.resumePendingRoute(for: routeScope.id, in: parentScope)
-    }
-
-    private func uninstallScopeDeclarations() {
-        router.mutateRouteGraph {
-            routeScope?.uninstallRouteDeclarations(sourceID: sourceID)
-        }
+        attachment.update(target: routeScope, view: view, apply: apply, remove: remove)
     }
 
     private var accumulatedBranchRouteDeclarations: [RouteScopeDeclaration] {

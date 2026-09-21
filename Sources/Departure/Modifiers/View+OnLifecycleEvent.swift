@@ -32,42 +32,35 @@ typealias PlatformView = NSView
 #endif
 
 extension View {
-    func onLifecycleEvent(_ handler: @escaping @MainActor (ViewLifecycleBridge.Event) -> Void) -> some View {
+    func onLifecycleEvent(
+        _ handler: @escaping @MainActor (
+            ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event
+        ) -> Void
+    ) -> some View {
         modifier(ViewLifecycleEventModifier(handler: handler))
     }
 }
 
 private struct ViewLifecycleEventModifier: ViewModifier {
-    let handler: @MainActor (ViewLifecycleBridge.Event) -> Void
+    let handler: @MainActor (
+        ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event
+    ) -> Void
 
     @State private var teardownDelivery = ViewLifecycleTeardownDelivery()
 
     func body(content: Content) -> some View {
         content.background {
             ViewLifecycleBridge(onIdentifiedEvent: { lifecycleView, event in
-                let lifecycleID = lifecycleView.id
-
-                switch event {
-                case .installedInWindow, .updated(isInstalledInWindow: true):
-                    teardownDelivery.install(lifecycleID)
-                    handler(event)
-
-                case .updated(isInstalledInWindow: false):
-                    handler(event)
-
-                case .dismantled, .deinitialized:
-                    teardownDelivery.schedule(for: lifecycleID) {
-                        handler(event)
-                    }
-                }
+                teardownDelivery.deliver(event, for: lifecycleView, handler: handler)
             })
             .frame(width: 0, height: 0)
         }
     }
 }
 
-/// Moves teardown work out of SwiftUI's representable dismantle stack. A later installation
-/// invalidates pending work so transient bridge replacement cannot uninstall a live source.
+/// Moves teardown out of SwiftUI's representable dismantle stack.
+/// A later installation invalidates pending work so transient bridge replacement cannot
+/// uninstall a live registration.
 final class ViewLifecycleTeardownDelivery {
     private var installedLifecycleID: UUID?
     private var generation = 0
@@ -75,6 +68,31 @@ final class ViewLifecycleTeardownDelivery {
     func install(_ lifecycleID: UUID) {
         installedLifecycleID = lifecycleID
         generation &+= 1
+    }
+
+    @discardableResult
+    func deliver(
+        _ event: ViewLifecycleBridge.Event,
+        for view: ViewLifecycleBridge.LifecycleView,
+        handler: @escaping @MainActor (ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event) -> Void
+    ) -> Task<Void, Never>? {
+        let lifecycleID = view.id
+
+        switch event {
+        case .installedInWindow, .updated(isInstalledInWindow: true):
+            install(lifecycleID)
+            handler(view, lifecycleID, event)
+            return nil
+
+        case .updated(isInstalledInWindow: false):
+            handler(view, lifecycleID, event)
+            return nil
+
+        case .dismantled, .deinitialized:
+            return schedule(for: lifecycleID) {
+                handler(nil, lifecycleID, event)
+            }
+        }
     }
 
     @discardableResult
@@ -145,17 +163,6 @@ extension ViewLifecycleBridge {
         var onEvent: @MainActor (LifecycleView, Event) -> Void
         private var hasInstalledInWindow = false
         private var hasDismantled = false
-        private var hasDeinitialized = false
-
-        init(onEvent: @escaping @MainActor (Event) -> Void) {
-            self.onEvent = { _, event in
-                onEvent(event)
-            }
-            super.init(frame: .zero)
-            #if canImport(UIKit)
-            isUserInteractionEnabled = false
-            #endif
-        }
 
         init(onIdentifiedEvent: @escaping @MainActor (LifecycleView, Event) -> Void) {
             self.onEvent = onIdentifiedEvent
@@ -205,11 +212,6 @@ extension ViewLifecycleBridge {
         }
 
         func notifyDeinitialized() {
-            guard hasDeinitialized == false else {
-                return
-            }
-
-            hasDeinitialized = true
             onEvent(self, .deinitialized)
         }
 

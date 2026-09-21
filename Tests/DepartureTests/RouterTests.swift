@@ -48,7 +48,8 @@ struct RouterTests {
     }
 
     @Test func publicRoutingActionsDispatchThroughRouter() async {
-        let router = RouterEngine()
+        let handle = Router()
+        let router = handle.engine!
         let actionRecorder = AsyncActionRecorder()
 
         router.root.installRouteDeclarations(
@@ -59,17 +60,17 @@ struct RouterTests {
             ]
         )
 
-        await router.present(HomeDetailRoute())
+        await handle.present(HomeDetailRoute())
 
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last?.route is HomeDetailRoute)
 
-        await router.unwind(to: .topmostAncestor)
+        await handle.unwind(to: .topmostAncestor)
 
         #expect(router.normalTree.rootPath.isEmpty)
 
         router.normalTree.rootPath.scopes = [RouteScope(id: RootRoute().id, route: RootRoute())]
-        await router.perform(RecordingProbeAction(recorder: actionRecorder))
+        await handle.perform(RecordingProbeAction(recorder: actionRecorder))
 
         #expect(await actionRecorder.values() == [true])
     }
@@ -2196,10 +2197,10 @@ struct RouterTests {
         let scope = RouteScope(id: RootRoute().id, route: RootRoute())
 
         let firstInstallWaiter = Task {
-            await scope.viewLifecycle.waitUntilInstalled()
+            await scope.ledger.waitUntilInstalled()
         }
         let secondInstallWaiter = Task {
-            await scope.viewLifecycle.waitUntilInstalled()
+            await scope.ledger.waitUntilInstalled()
         }
         await Task.yield()
 
@@ -2209,10 +2210,10 @@ struct RouterTests {
         #expect(scope.isInstalledInView)
 
         let firstUninstallWaiter = Task {
-            await scope.viewLifecycle.waitUntilUninstalled()
+            await scope.ledger.waitUntilUninstalled()
         }
         let secondUninstallWaiter = Task {
-            await scope.viewLifecycle.waitUntilUninstalled()
+            await scope.ledger.waitUntilUninstalled()
         }
         await Task.yield()
 
@@ -3962,6 +3963,12 @@ struct RouterTests {
         )
     }
 
+    @Test func unscopedRouterWarningExplainsTheMigration() {
+        #expect(DepartureWarningEvent.unscopedRouterUsed.renderedMessage
+            == "[route] • unscoped router used — lookup searches the active routing graph; "
+                + "use @Environment(\\.router) in views")
+    }
+
     @Test func ancestorPushLookupExplainsSingleMultiScopeTrim() throws {
         let router = RouterEngine()
         let ancestorScope = RouteScope(id: RootRoute().id, route: RootRoute())
@@ -4751,10 +4758,7 @@ struct RouterTests {
             )
         )
         router.mutateRouteGraph {
-            coverScope.commitRouteDeclarationInstallation(
-                branchSelection: nil,
-                routeDeclarations: declarations
-            )
+            coverScope.commitRouteDeclarationInstallation()
         }
 
         coverScope.installHookDeclarations(

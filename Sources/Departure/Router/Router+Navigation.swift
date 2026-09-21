@@ -306,6 +306,10 @@ extension RouterEngine {
             return
         }
 
+        if await ios17NavigationStackPushWorkaround?.prepareAppend(after: match, in: self) == true {
+            return
+        }
+
         if await unwindToExistingEquivalentRouteIfNeeded(route, after: match) {
             return
         }
@@ -804,7 +808,7 @@ extension RouterEngine {
 
     func routeScopeDidInstallInView(_ routeScope: RouteScope) {
         let wasInstalled = routeScope.isInstalledInView
-        routeScope.viewLifecycle.install()
+        routeScope.ledger.install()
         log.departureDebug(.scopeInstalledInView(scope: routeScope))
 
         guard wasInstalled == false else {
@@ -817,7 +821,7 @@ extension RouterEngine {
     func routeScopeDidLeaveView(_ routeScope: RouteScope) {
         guard routeScope.isInstalledInView else { return }
 
-        routeScope.viewLifecycle.uninstall()
+        routeScope.ledger.uninstall()
         log.departureDebug(.scopeUninstalledFromView(scope: routeScope))
 
         if ios17NavigationStackPushWorkaround?.routeScopeDidLeave(routeScope, in: self) == true {
@@ -856,7 +860,7 @@ extension RouterEngine {
         )
 
         for (index, routeScope) in installedRouteScopes.enumerated() {
-            await routeScope.viewLifecycle.waitUntilUninstalled()
+            await routeScope.ledger.waitUntilUninstalled()
             log.departureDebug(.viewExitWaitProgress(
                 remaining: installedRouteScopes.count - index - 1
             ))

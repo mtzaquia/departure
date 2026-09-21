@@ -60,15 +60,19 @@ enum DepartureLogTrace {
 }
 
 enum DepartureWarningEvent {
+    case unscopedRouterUsed
     case routeDroppedNoDeclaration(routeType: any Route.Type)
 
     var renderedMessage: String {
         let trace = DepartureLogTrace.id.map { "[\($0)]" } ?? ""
-        return "[route]\(trace) ⊘ \(message)"
+        let marker = if case .unscopedRouterUsed = self { "•" } else { "⊘" }
+        return "[route]\(trace) \(marker) \(message)"
     }
 
     private var message: String {
         switch self {
+        case .unscopedRouterUsed:
+            "unscoped router used — lookup searches the active routing graph; use @Environment(\\.router) in views"
         case let .routeDroppedNoDeclaration(routeType):
             "dropped \(String(reflecting: routeType)) — no declaration found"
         }

@@ -133,7 +133,7 @@ struct ReplaceTests {
         let fixture = ReplaceFixture()
         await fixture.router.branch("wallet").present(SelectedRoute(number: 1))
         let old = try #require(fixture.wallet.path.first)
-        old.viewLifecycle.install()
+        old.ledger.install()
         let first = Task { await fixture.router.branch("wallet").present(SelectedRoute(number: 2)) }
         while fixture.engine.pendingRoute == nil { await Task.yield() }
         #expect(fixture.wallet.path.isEmpty)
@@ -145,6 +145,51 @@ struct ReplaceTests {
         await first.value
         await latest.value
         #expect(fixture.wallet.path.count == 1)
+        #expect(fixture.wallet.path.first?.route as? SelectedRoute == SelectedRoute(number: 3))
+        #expect(fixture.engine.pendingRoute == nil)
+    }
+
+    @Test func ios17ReplacementPopsInstalledChildBeforeReplacingSelection() async throws {
+        let fixture = ReplaceFixture()
+        fixture.engine.ios17NavigationStackPushWorkaround = IOS17NavigationStackPushWorkaround()
+        await fixture.router.branch("wallet").present(SelectedRoute(number: 1))
+        let selected = try #require(fixture.wallet.path.first)
+        fixture.installChildren(on: selected)
+        await fixture.local(selected).present(ChildRoute())
+        let child = try #require(fixture.wallet.path.last)
+        fixture.engine.routeScopeDidInstallInView(child)
+
+        let replacement = Task { await fixture.router.branch("wallet").present(SelectedRoute(number: 2)) }
+        while fixture.wallet.path.count != 1 { await Task.yield() }
+        #expect(fixture.wallet.path.first === selected)
+        #expect(fixture.engine.navigationTransaction.isInProgress)
+
+        fixture.engine.routeScopeDidLeaveView(child)
+        await replacement.value
+        #expect(fixture.wallet.path.first?.route as? SelectedRoute == SelectedRoute(number: 2))
+        #expect(fixture.engine.navigationTransaction.isInProgress == false)
+    }
+
+    @Test func ios17StagedReplacementKeepsLatestRequest() async throws {
+        let fixture = ReplaceFixture()
+        fixture.engine.ios17NavigationStackPushWorkaround = IOS17NavigationStackPushWorkaround()
+        await fixture.router.branch("wallet").present(SelectedRoute(number: 1))
+        let selected = try #require(fixture.wallet.path.first)
+        fixture.installChildren(on: selected)
+        await fixture.local(selected).present(ChildRoute())
+        let child = try #require(fixture.wallet.path.last)
+        fixture.engine.routeScopeDidInstallInView(child)
+
+        let first = Task { await fixture.router.branch("wallet").present(SelectedRoute(number: 2)) }
+        while fixture.wallet.path.count != 1 { await Task.yield() }
+        let latest = Task { await fixture.router.branch("wallet").present(SelectedRoute(number: 3)) }
+        while fixture.engine.pendingRoute?.route as? SelectedRoute != SelectedRoute(number: 3) {
+            await Task.yield()
+        }
+
+        fixture.engine.routeScopeDidLeaveView(child)
+        await first.value
+        await latest.value
         #expect(fixture.wallet.path.first?.route as? SelectedRoute == SelectedRoute(number: 3))
         #expect(fixture.engine.pendingRoute == nil)
     }

@@ -157,7 +157,7 @@ private struct CoverFadeModalPresenter: View {
                     .id(presentation.id)
                     .opacity(presentationState.isContentVisible ? 1 : 0)
                     .presentationBackground(.clear)
-                    .onLifecycleEvent { event in
+                    .onLifecycleEvent { _, _, event in
                         if case .installedInWindow(isInitial: true) = event {
                             scheduleStateMutation {
                                 fadeInContentIfNeeded(for: presentation.id)
@@ -174,7 +174,7 @@ private struct CoverFadeModalPresenter: View {
             .task(id: presentationState.dismissalTaskID) {
                 await finishDismissal(for: presentationState.dismissalTaskID)
             }
-            .onLifecycleEvent { event in
+            .onLifecycleEvent { _, _, event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
                     scheduleStateMutation {

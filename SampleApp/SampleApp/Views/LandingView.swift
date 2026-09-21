@@ -30,14 +30,18 @@ struct LandingView: View {
     }
 
     @State private var tab: TabItem = .home
+    @State private var legacySheet: LegacySheet?
     @Environment(\.router) private var router
     @Environment(\.unwindRoute) private var unwindRoute
 
     var body: some View {
         TabView(selection: $tab) {
             NavigationStack {
-                HomeView().modifier(SampleRoutingContext())
-                    .routeBranch(TabItem.home)
+                HomeView {
+                    legacySheet = LegacySheet()
+                }
+                .modifier(SampleRoutingContext())
+                .routeBranch(TabItem.home)
             }
             .tabItem {
                 Label("Home", systemImage: "house")
@@ -46,8 +50,11 @@ struct LandingView: View {
             .tag(TabItem.home)
 
             NavigationStack {
-                SettingsView().modifier(SampleRoutingContext())
-                    .routeBranch(TabItem.settings)
+                SettingsView {
+                    legacySheet = LegacySheet()
+                }
+                .modifier(SampleRoutingContext())
+                .routeBranch(TabItem.settings)
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")
@@ -57,6 +64,11 @@ struct LandingView: View {
         }
         .accessibilityIdentifier(SampleAppAccessibility.landing)
         .tint(LabPalette.indigo)
+        .sheet(item: $legacySheet) { _ in
+            NavigationStack {
+                LegacySheetView()
+            }
+        }
         .routes(branch: $tab) {
             Cover(LoginRoute.self, priority: .high)
             Cover(LoginReplacementRoute.self, priority: .high)
@@ -95,5 +107,29 @@ struct LandingView: View {
             Storage.shared.landingRouter = router
         }
         .environment(\.samplePresentationSource, "top-level branched scope")
+    }
+}
+
+private struct LegacySheet: Identifiable {
+    let id = UUID()
+}
+
+private struct LegacySheetView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Legacy SwiftUI sheet")
+                .font(.title2.weight(.semibold))
+                .accessibilityIdentifier(SampleAppAccessibility.legacySheetText)
+
+            Button("Dismiss") { dismiss() }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier(SampleAppAccessibility.legacySheetDismissButton)
+        }
+        .padding(32)
+        .navigationTitle("External presentation")
+        // This inherits the presenting scope, but must not replace its declarations.
+        .routes { Sheet(TopLevelSheetRoute.self) }
     }
 }

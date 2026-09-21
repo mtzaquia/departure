@@ -27,6 +27,37 @@ import Testing
 @MainActor
 @Suite
 struct IOS17NavigationStackPushWorkaroundTests {
+    @Test func factoryOnlyEnablesTheWorkaroundOnIOS17() {
+        #if os(iOS)
+        if #available(iOS 18, *) {
+            #expect(IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform() == nil)
+        } else {
+            #expect(IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform() != nil)
+        }
+        #else
+        #expect(IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform() == nil)
+        #endif
+    }
+
+    @Test func pushHostIdentityChangesOnlyForConcurrentBranchSelection() {
+        let router = makeRouterWithWorkaround()
+        let workaround = IOS17NavigationStackPushWorkaround()
+        let (selection, _) = tabSelection(.home)
+        router.root.branchContainer = BranchContainerState(
+            defaultBranch: AnyHashable(AppTab.home),
+            selection: AnyRouteBranchSelection(selection, concurrent: true)
+        )
+
+        #expect(workaround.pushHostIdentity(for: AppTab.home, in: router.root, router: router))
+        #expect(!workaround.pushHostIdentity(for: AppTab.wallet, in: router.root, router: router))
+
+        router.root.branchContainer = BranchContainerState(
+            defaultBranch: AnyHashable(AppTab.home),
+            selection: AnyRouteBranchSelection(selection)
+        )
+        #expect(workaround.pushHostIdentity(for: AppTab.wallet, in: router.root, router: router))
+    }
+
     @Test func installedPushDismissalWaitsForViewExitBeforeTrimmingPath() async throws {
         let router = makeRouterWithWorkaround()
         let presentationHostID = RoutePresentationHostID()
@@ -55,6 +86,20 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         #expect(router.normalTree.rootPath.isEmpty)
         #expect(presentation.wrappedValue == nil)
+    }
+
+    @Test func pushWriteBackBeforeFirstMountDoesNotRemovePendingDestination() async throws {
+        let router = makeRouterWithWorkaround()
+        installPushDeclaration(in: router)
+        await router.requestRoute(HomeDetailRoute())
+        let pushedScope = try #require(router.normalTree.rootPath.last)
+        let presentation = router.routePresentationBinding(from: router.root, matching: .push)
+
+        presentation.wrappedValue = nil
+
+        #expect(router.normalTree.rootPath.last === pushedScope)
+        #expect(presentation.wrappedValue?.scope === pushedScope)
+        #expect(pushedScope.ledger.hasEverInstalled == false)
     }
 
     @Test func disabledWorkaroundRetainsImmediatePushDismissalSemantics() async throws {

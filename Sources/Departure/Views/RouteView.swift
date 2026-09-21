@@ -36,15 +36,20 @@ public struct RouteView: View {
     public var body: some View {
         content
             .routeScopeEnvironment(scope, router: router)
-            .onLifecycleEvent { event in
+            .onLifecycleEvent { lifecycleView, lifecycleID, event in
                 switch event {
-                case .updated:
+                case .updated(isInstalledInWindow: true), .installedInWindow:
+                    guard let lifecycleView else { return }
+                    scope.ledger.installManagedView(lifecycleView, id: lifecycleID)
+                    if case .installedInWindow = event {
+                        router.routeScopeDidInstallInView(scope)
+                    }
+
+                case .updated(isInstalledInWindow: false):
                     break
 
-                case .installedInWindow:
-                    router.routeScopeDidInstallInView(scope)
-
                 case .dismantled, .deinitialized:
+                    scope.ledger.uninstallManagedView(id: lifecycleID)
                     router.routeScopeDidLeaveView(scope)
                 }
             }

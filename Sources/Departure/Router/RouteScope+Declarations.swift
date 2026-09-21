@@ -217,10 +217,7 @@ extension RouteScope {
             return false
         }
 
-        commitRouteDeclarationInstallation(
-            branchSelection: branchSelection,
-            routeDeclarations: routeDeclarations
-        )
+        commitRouteDeclarationInstallation()
         return true
     }
 
@@ -236,47 +233,18 @@ extension RouteScope {
         routeDeclarations: [RouteScopeDeclaration],
         sourceEnvironment: EnvironmentValues
     ) -> Bool {
-        let usesBranches = branchSelection != nil || routeDeclarations.contains { $0.branch != nil }
-        let desiredIdentities = routeAttachmentIdentities(
-            from: routeDeclarations,
-            usesBranches: usesBranches
+        let previousID = self.id
+        ledger.setRouteSource(
+            .init(id: id, selection: branchSelection, declarations: routeDeclarations,
+                environment: sourceEnvironment),
+            for: sourceID
         )
-        let didChangeDeclarations = declarationInstallation.hasRouteSource(sourceID) == false
-            || (id ?? declarationInstallation.initialID) != self.id
-            || (branchContainer != nil) != usesBranches
-            || (branchContainer?.isConcurrent ?? false) != (branchSelection?.concurrent ?? false)
-            || declarations.routeAttachmentIdentities != desiredIdentities
-
-        declarationInstallation.installRouteSource(
-            sourceID: sourceID,
-            id: id,
-            sourceEnvironment: sourceEnvironment
-        )
-
-        guard didChangeDeclarations else {
-            let hookDeclarations = declarations.allHookAttachments
-            refreshBranchSelection(branchSelection)
-            declarations.refreshRouteAttachments(
-                from: routeDeclarations,
-                activeBranch: activeBranch,
-                usesBranches: usesBranches
-            )
-            declarations.refreshHookAttachments(
-                hookDeclarations,
-                activeBranch: activeBranch,
-                usesBranches: usesBranches
-            )
-            return false
-        }
-
-        return true
+        return reconcileRouteSources(previousID: previousID)
     }
 
-    func commitRouteDeclarationInstallation(
-        branchSelection: AnyRouteBranchSelection?,
-        routeDeclarations: [RouteScopeDeclaration]
-    ) {
-        let hookDeclarations = declarations.allHookAttachments
+    func commitRouteDeclarationInstallation() {
+        let branchSelection = ledger.selection
+        let routeDeclarations = ledger.routeDeclarations
         configureBranchContainer(
             branchSelection: branchSelection,
             routeDeclarations: routeDeclarations
@@ -284,19 +252,20 @@ extension RouteScope {
         self.declarations = makeDeclarationStore(
             from: routeDeclarations,
             activeBranch: activeBranch,
-            hookDeclarations: hookDeclarations
+            hookDeclarations: ledger.hookDeclarations
         )
         log.departureDebug(.routeDeclarationsInstalled(scope: self, declarationCount: routeDeclarations.count))
     }
 
     func uninstallRouteDeclarations(sourceID: AnyHashable) {
-        guard declarationInstallation.uninstallRouteSource(sourceID: sourceID) else {
+        let previousID = id
+        guard ledger.removeRouteSource(sourceID) else {
             return
         }
 
-        branchContainer = nil
-        participation.isConcurrent = false
-        declarations = DeclarationStore()
+        if reconcileRouteSources(previousID: previousID) {
+            commitRouteDeclarationInstallation()
+        }
         log.departureDebug(.routeDeclarationsUninstalled(scope: self))
     }
 
@@ -305,10 +274,11 @@ extension RouteScope {
         sourceID: AnyHashable = AnyHashable("default"),
         hookDeclarations: [AnyHookDeclaration]
     ) -> Bool {
-        declarationInstallation.installHookSource(sourceID: sourceID)
+        let previousIdentities = Set(declarations.allHookAttachments.map(\.identity))
+        ledger.setHookSource(hookDeclarations, for: sourceID)
         var scopeDeclarations = ScopeDeclarations()
 
-        for hookDeclaration in hookDeclarations {
+        for hookDeclaration in ledger.hookDeclarations {
             let inserted = scopeDeclarations.appendHook(hookDeclaration)
             guard inserted == false else {
                 continue
@@ -317,15 +287,12 @@ extension RouteScope {
             logDuplicateHookDeclaration(hookDeclaration, branchID: activeBranch)
         }
 
-        let didChangeDeclarations: Bool
-        if branchContainer != nil {
-            didChangeDeclarations = declarations.declarations(forBranch: activeBranch).hookIdentities
-                != scopeDeclarations.hookIdentities
-            declarations.setHooks(scopeDeclarations.hookAttachments, forBranch: activeBranch)
-        } else {
-            didChangeDeclarations = declarations.local.hookIdentities != scopeDeclarations.hookIdentities
-            declarations.local.setHooks(scopeDeclarations.hookAttachments)
-        }
+        let didChangeDeclarations = previousIdentities != scopeDeclarations.hookIdentities
+        declarations.refreshHookAttachments(
+            scopeDeclarations.hookAttachments,
+            activeBranch: activeBranch,
+            usesBranches: branchContainer != nil
+        )
 
         if didChangeDeclarations {
             log.departureDebug(.hookDeclarationsInstalled(scope: self, hookCount: hookDeclarations.count))
@@ -334,15 +301,15 @@ extension RouteScope {
     }
 
     func uninstallHookDeclarations(sourceID: AnyHashable) {
-        guard declarationInstallation.uninstallHookSource(sourceID: sourceID) else {
+        guard ledger.removeHookSource(sourceID) else {
             return
         }
 
-        if branchContainer != nil {
-            declarations.removeHooks(forBranch: activeBranch)
-        } else {
-            declarations.local.removeHooks()
-        }
+        declarations.refreshHookAttachments(
+            ledger.hookDeclarations,
+            activeBranch: activeBranch,
+            usesBranches: branchContainer != nil
+        )
         log.departureDebug(.hookDeclarationsUninstalled(scope: self))
     }
 }
@@ -350,6 +317,34 @@ extension RouteScope {
 // MARK: - Private Helpers
 
 private extension RouteScope {
+    func reconcileRouteSources(previousID: AnyHashable) -> Bool {
+        let effectiveSelection = ledger.selection
+        let effectiveDeclarations = ledger.routeDeclarations
+        let usesBranches = effectiveSelection != nil || effectiveDeclarations.contains { $0.branch != nil }
+        let desiredIdentities = routeAttachmentIdentities(
+            from: effectiveDeclarations,
+            usesBranches: usesBranches
+        )
+        let didChangeDeclarations = previousID != id
+            || (branchContainer != nil) != usesBranches
+            || (branchContainer?.isConcurrent ?? false) != (effectiveSelection?.concurrent ?? false)
+            || declarations.routeAttachmentIdentities != desiredIdentities
+
+        guard didChangeDeclarations == false else { return true }
+        refreshBranchSelection(effectiveSelection)
+        declarations.refreshRouteAttachments(
+            from: effectiveDeclarations,
+            activeBranch: activeBranch,
+            usesBranches: usesBranches
+        )
+        declarations.refreshHookAttachments(
+            ledger.hookDeclarations,
+            activeBranch: activeBranch,
+            usesBranches: usesBranches
+        )
+        return false
+    }
+
     func refreshBranchSelection(_ branchSelection: AnyRouteBranchSelection?) {
         guard var branchContainer else {
             return

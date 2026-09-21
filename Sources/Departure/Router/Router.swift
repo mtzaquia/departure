@@ -22,11 +22,12 @@
 
 import SwiftUI
 
-/// A router bound to a route scope in a shared routing container.
+/// A routing handle for a shared routing container.
 ///
-/// Read `@Environment(\.router)` in views. Stored routers retain their original
-/// scope; commands become inactive when that scope leaves the routing graph.
-/// Routers and their commands are isolated to the main actor.
+/// Read `@Environment(\.router)` for a view-scoped router. Routers created outside
+/// a view search the active routing graph without a captured scope. Stored scoped
+/// routers retain their original scope; commands become inactive when that scope
+/// leaves the routing graph. Routers and their commands are isolated to the main actor.
 public struct Router: Equatable {
     /// A destination for ``Router/unwind(to:)``.
     public enum UnwindTarget {
@@ -40,7 +41,8 @@ public struct Router: Equatable {
         /// the unwind request returns `false`.
         case nearestBranch
 
-        /// Unwinds to the nearest ancestor of the receiving router's route scope.
+        /// Unwinds to the nearest ancestor of the receiving router's route scope,
+        /// or the current route for an unscoped router.
         ///
         /// Dismisses the receiving scope and its descendants, matching a local
         /// ``UnwindRouteAction`` captured from that scope.
@@ -53,10 +55,15 @@ public struct Router: Equatable {
     let engine: RouterEngine?
     let origin: RouteRequestOrigin?
 
-    /// Creates a root router for a new routing container.
+    /// Creates an unscoped router for a new routing container.
     public init() {
         let engine = RouterEngine()
-        self.init(engine: engine, scope: engine.root)
+        self.init(engine: engine)
+    }
+
+    init(engine: RouterEngine) {
+        self.engine = engine
+        self.origin = nil
     }
 
     init(engine: RouterEngine, scope: RouteScope) {
@@ -72,6 +79,7 @@ public struct Router: Equatable {
     static let inactive = Router(engine: nil, origin: nil)
 
     /// Returns a router targeting a named branch of the nearest enclosing container.
+    /// An unscoped router targets from the root container.
     ///
     /// Obtaining the router does not activate the branch. A presentation owned by
     /// the branch activates it through the container's selection binding. A missing
@@ -82,41 +90,59 @@ public struct Router: Equatable {
     /// Chained calls address branches nested inside the preceding target.
     /// - Parameter id: The branch value declared by the target container.
     public func branch<ID: Hashable & Sendable>(_ id: ID) -> Router {
-        Router(engine: engine, origin: origin?.targeting(AnyHashable(id), in: engine?.routeForest))
+        guard let engine else { return .inactive }
+        warnIfUnscoped(using: engine)
+        let source = origin ?? RouteRequestOrigin(scope: engine.root)
+        guard let target = source.targeting(AnyHashable(id), in: engine.routeForest) else {
+            return .inactive
+        }
+        return Router(engine: engine, origin: target)
     }
 
-    /// Resolves and presents a route from this router's scope.
+    /// Resolves and presents a route from this router's scope, or from the active
+    /// routing graph when this router has no scope.
     ///
     /// Returns after routing state updates, without waiting for SwiftUI to display
     /// the destination. Rejected routes do not activate the targeted branch.
     /// - Parameter route: The route to resolve and present.
     public func present(_ route: any Route) async {
-        guard let engine, let origin else { return }
+        guard let engine else { return }
+        warnIfUnscoped(using: engine)
         await engine.requestRouteWhenReady(route, origin: origin)
     }
 
-    /// Unwinds from this router's scope to an explicit target.
+    /// Unwinds from this router's scope, or the current route when unscoped,
+    /// to an explicit target.
     ///
     /// `.root` clears the entire routing container. Other targets resolve locally.
     /// - Returns: Whether an unwind target was found for an active scope.
     @discardableResult
     public func unwind(to target: UnwindTarget) async -> Bool {
-        guard let engine, let origin else { return false }
+        guard let engine else { return false }
+        warnIfUnscoped(using: engine)
         return await engine.unwindAndWait(to: target, origin: origin)
     }
 
-    /// Unwinds from this router's scope and delivers a payload to a matching handler.
+    /// Unwinds from this router's scope, or the current route when unscoped,
+    /// and delivers a payload to a matching handler.
     /// - Returns: Whether an unwind target was found for an active scope.
     @discardableResult
     public func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {
-        guard let engine, let origin else { return false }
+        guard let engine else { return false }
+        warnIfUnscoped(using: engine)
         return await engine.unwindAndWait(to: target, payload: payload, origin: origin)
     }
 
-    /// Performs an action from this router's scope.
+    /// Performs an action from this router's scope, or from the current route
+    /// when this router has no scope.
     public func perform(_ action: any Action) async {
-        guard let engine, let origin else { return }
+        guard let engine else { return }
+        warnIfUnscoped(using: engine)
         await engine.performAction(action, origin: origin)
+    }
+
+    private func warnIfUnscoped(using engine: RouterEngine) {
+        if origin == nil { engine.warnAboutUnscopedRouterIfNeeded() }
     }
 
     public static func == (lhs: Router, rhs: Router) -> Bool {

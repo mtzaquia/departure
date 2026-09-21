@@ -13,6 +13,35 @@ struct ScopedRouterTests {
         #expect(await environment.router.unwind(to: .root) == false)
     }
 
+    @Test func unscopedRouterSearchesTheCurrentPathInsteadOfItsRootScope() async {
+        let fixture = Fixture(concurrent: true)
+        fixture.sidebar.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations: [
+            RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+        ])
+
+        #expect(fixture.root.origin == nil)
+        #expect(fixture.local(fixture.engine.root).origin != nil)
+        await fixture.root.present(SettingsRoute())
+
+        #expect(fixture.sidebar.path.last?.route is SettingsRoute)
+        #expect(fixture.detail.path.isEmpty)
+        #expect(fixture.selection.value == "sidebar")
+    }
+
+    @Test func unscopedRouterWarnsOnceAndScopedRoutersDoNotWarn() async {
+        let root = Router()
+        let engine = root.engine!
+        let scoped = Router(engine: engine, scope: engine.root)
+
+        await scoped.present(SettingsRoute())
+        #expect(engine.didWarnAboutUnscopedRouter == false)
+
+        await root.present(SettingsRoute())
+        #expect(engine.didWarnAboutUnscopedRouter)
+        await root.present(SettingsRoute())
+        #expect(engine.didWarnAboutUnscopedRouter)
+    }
+
     @Test func localPresentationDoesNotUseAnotherBranchsDeeperDeclaration() async throws {
         let fixture = Fixture(concurrent: true)
         let deeper = RouteScope(id: "deeper", route: NumberedRoute(number: 1))

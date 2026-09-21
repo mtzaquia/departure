@@ -86,7 +86,7 @@ extension RouterEngine {
 
 private extension RouterEngine {
     func waitForRouteScopeToInstall(_ routeScope: RouteScope) async {
-        await routeScope.viewLifecycle.waitUntilInstalled()
+        await routeScope.ledger.waitUntilInstalled()
     }
 
     func performAction<A: Action>(_ action: A, hasRerouted: Bool, origin: RouteRequestOrigin? = nil) async {

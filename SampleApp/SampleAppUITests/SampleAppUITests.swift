@@ -46,6 +46,26 @@ final class SampleAppUITests: XCTestCase {
         assertGone("sample.split.detail-destination")
     }
 
+    func testLegacySheetDismissalKeepsTopLevelRouteDeclarationsInBothBranches() {
+        openLanding()
+
+        for _ in 0..<2 {
+            assertLegacySheetThenTopLevelRoute(
+                presentLegacySheetButton: A11y.homePresentLegacySheetButton,
+                presentRouteButton: A11y.homePresentRouteAfterLegacySheetButton
+            )
+        }
+
+        tapSettingsTab()
+
+        for _ in 0..<2 {
+            assertLegacySheetThenTopLevelRoute(
+                presentLegacySheetButton: A11y.settingsPresentLegacySheetButton,
+                presentRouteButton: A11y.settingsPresentRouteAfterLegacySheetButton
+            )
+        }
+    }
+
     func testReplaceSelectionHasNoBackEntryAndClearsChildNavigation() {
         openSplitLab()
         tap("sample.split.select-detail")
@@ -200,6 +220,38 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.localDetailAdvanceButton)
         assertLabel(A11y.localDetailUpdateCount, contains: "Local updates: 1")
+    }
+
+    func testNativeBackFromBranchPushReconcilesAndCanRepush() {
+        openLanding()
+        tapSettingsTab()
+
+        for _ in 0..<2 {
+            tap(A11y.settingsAppearanceButton)
+            assertExists(A11y.appearanceTitle)
+
+            let back = app.navigationBars["Appearance"].buttons["Settings"]
+            XCTAssertTrue(back.waitForExistence(timeout: 5))
+            back.tap()
+
+            assertGone(A11y.appearanceTitle)
+            assertExists(A11y.settingsAppearanceButton)
+        }
+    }
+
+    func testBranchLocalDeclarationSurvivesTabBridgeReplacement() {
+        openLanding()
+
+        for _ in 0..<4 {
+            tapSettingsTab()
+            assertExists(A11y.settingsLocalDetailButton)
+            tapHomeTab()
+            assertExists(A11y.homeWelcome)
+        }
+
+        tapSettingsTab()
+        tap(A11y.settingsLocalDetailButton)
+        assertExists(A11y.localDetailTitle)
     }
 
     func testAncestorPushReplacementFromTwoDeepStack() {
@@ -753,6 +805,21 @@ final class SampleAppUITests: XCTestCase {
 }
 
 private extension SampleAppUITests {
+    func assertLegacySheetThenTopLevelRoute(
+        presentLegacySheetButton: String,
+        presentRouteButton: String
+    ) {
+        tap(presentLegacySheetButton)
+        assertExists(A11y.legacySheetText)
+        tap(A11y.legacySheetDismissButton)
+        assertGone(A11y.legacySheetText)
+
+        tap(presentRouteButton)
+        assertExists(A11y.topLevelSheetText)
+        tap(A11y.topLevelSheetDismissButton)
+        assertGone(A11y.topLevelSheetText)
+    }
+
     func openSplitLab() {
         if app.windows.firstMatch.frame.width > 700 {
             XCUIDevice.shared.orientation = .landscapeLeft
@@ -879,6 +946,8 @@ private enum A11y {
     static let homePresentHighPriorityBlockingSheetButton = "sample.home.present-high-priority-blocking-sheet"
     static let homeShowNavigationBarFadeButton = "sample.home.show-navigation-bar-fade"
     static let homeShowLifecycleTeardownButton = "sample.home.show-lifecycle-teardown"
+    static let homePresentLegacySheetButton = "sample.home.present-legacy-sheet"
+    static let homePresentRouteAfterLegacySheetButton = "sample.home.present-route-after-legacy-sheet"
     static let homePassthroughBehindButton = "sample.home.passthrough-behind"
     static let homePassthroughTapCount = "sample.home.passthrough-tap-count"
     static let homeRoutePhase = "sample.home.route-phase"
@@ -904,6 +973,11 @@ private enum A11y {
     static let settingsMissingUnwindButton = "sample.settings.missing-unwind"
     static let settingsMissingUnwindResult = "sample.settings.missing-unwind-result"
     static let settingsBranchHookStatus = "sample.settings.branch-hook-status"
+    static let settingsPresentLegacySheetButton = "sample.settings.present-legacy-sheet"
+    static let settingsPresentRouteAfterLegacySheetButton = "sample.settings.present-route-after-legacy-sheet"
+
+    static let legacySheetText = "sample.legacy-sheet.text"
+    static let legacySheetDismissButton = "sample.legacy-sheet.dismiss"
 
     static let localDetailTitle = "sample.local-detail.title"
     static let localDetailAdvanceButton = "sample.local-detail.advance"

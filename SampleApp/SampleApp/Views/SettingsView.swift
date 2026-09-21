@@ -24,6 +24,8 @@ import Departure
 import SwiftUI
 
 struct SettingsView: View {
+    let presentLegacySheet: @MainActor () -> Void
+
     @Environment(\.router) private var router
     @State private var storage = Storage.shared
 
@@ -44,6 +46,13 @@ struct SettingsView: View {
 
             LabPanel("Routes & actions") {
                 LazyVGrid(columns: columns, spacing: 8) {
+                    LabAction(title: "Legacy sheet", symbol: "rectangle.bottomhalf.inset.filled", color: LabPalette.amber) {
+                        presentLegacySheet()
+                    }
+                    .accessibilityIdentifier(SampleAppAccessibility.settingsPresentLegacySheetButton)
+                    action("Route after legacy sheet", symbol: "arrow.up.forward.app.fill", color: LabPalette.mint, id: SampleAppAccessibility.settingsPresentRouteAfterLegacySheetButton) {
+                        await router.present(TopLevelSheetRoute())
+                    }
                     action("Appearance push", symbol: "paintpalette.fill", id: SampleAppAccessibility.settingsAppearanceButton) { await router.present(AppearanceSettingsRoute(value: nil)) }
                     action("Local detail push", symbol: "rectangle.stack.badge.plus", color: LabPalette.mint, id: SampleAppAccessibility.settingsLocalDetailButton) { await router.present(LocalDetailRoute()) }
                     action("Authentication push", symbol: "lock.shield.fill", id: SampleAppAccessibility.settingsAuthenticationButton) { await router.present(AuthenticationSettingsRoute()) }

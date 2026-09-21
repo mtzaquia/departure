@@ -42,10 +42,12 @@ private struct RouteBranchModifier: ViewModifier {
 
     @State private var branchScope: RouteScope
     @State private var presentationHostID = RoutePresentationHostID()
+    @State private var attachment = RouteScopeAttachment(kind: .branch)
 
     @Environment(RouterEngine.self) private var router
     @Environment(\.routeScope) private var parentScope
     @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
+    @Environment(\.self) private var sourceEnvironment
 
     init(branch: AnyHashable) {
         self.branch = branch
@@ -58,22 +60,34 @@ private struct RouteBranchModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
+        let pushHostIdentity = router.ios17NavigationStackPushWorkaround?.pushHostIdentity(
+            for: branch,
+            in: parentScope,
+            router: router
+        ) ?? true
+
         content
             // Replace changes this content slot; keep scope injection and registration outside it.
             .modifier(ReplacePresentationStyleModifier(presentationHostID: presentationHostID,
                 isEnabled: adoptedDeclarations.containsPresentationKind(.replace)))
             .routeScopeEnvironment(branchScope, router: router)
-            .onSourceEnvironmentLifecycleEvent { sourceEnvironment, event in
+            .onLifecycleEvent { lifecycleView, lifecycleID, event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
-                    registerBranchScope(sourceEnvironment: sourceEnvironment)
+                    guard let lifecycleView else { return }
+                    branchScope.ledger.installManagedView(lifecycleView, id: lifecycleID)
+                    configureAttachment(view: lifecycleView)
 
                 case .updated(isInstalledInWindow: false):
                     break
 
                 case .dismantled, .deinitialized:
-                    unregisterBranchScope()
+                    attachment.detach()
+                    branchScope.ledger.uninstallManagedView(id: lifecycleID)
                 }
+            }
+            .onChange(of: branch) { _, _ in
+                configureAttachment()
             }
             // Presentation hosts live in a detached background layer so their per-declaration
             // structural changes never tear down the registration bridge above. See
@@ -82,32 +96,41 @@ private struct RouteBranchModifier: ViewModifier {
                 Color.black.frame(width: .zero, height: .zero)
                     .routePresentationStyleModifiers(
                         for: adoptedDeclarations,
-                        hostedBy: presentationHostID
+                        hostedBy: presentationHostID,
+                        pushHostIdentity: pushHostIdentity
                     )
                     .routeScopeEnvironment(branchScope)
             }
     }
 
-    private func registerBranchScope(sourceEnvironment: EnvironmentValues) {
-        guard let parentScope else {
-            return
-        }
-
-        router.mutateRouteGraph {
-            parentScope.registerBranchScope(
-                branchScope,
-                for: branch,
-                sourceEnvironment: sourceEnvironment,
-                presentationHostID: presentationHostID
-            )
-        }
-        router.resumePendingRoute(for: branch, in: parentScope)
-    }
-
-    private func unregisterBranchScope() {
-        router.mutateRouteGraph {
-            parentScope?.unregisterBranchScope(branchScope, for: branch)
-        }
+    private func configureAttachment(view: PlatformView? = nil) {
+        let router = router
+        let branchScope = branchScope
+        let branch = branch
+        let sourceEnvironment = sourceEnvironment
+        let presentationHostID = presentationHostID
+        attachment.update(
+            target: parentScope,
+            key: branch,
+            view: view,
+            apply: { parent in
+                branchScope.ledger.updateInitialID(branch)
+                router.mutateRouteGraph {
+                    parent.registerBranchScope(
+                        branchScope,
+                        for: branch,
+                        sourceEnvironment: sourceEnvironment,
+                        presentationHostID: presentationHostID
+                    )
+                }
+                router.resumePendingRoute(for: branch, in: parent)
+            },
+            remove: { parent in
+                router.mutateRouteGraph {
+                    parent.unregisterBranchScope(branchScope, for: branch)
+                }
+            }
+        )
     }
 
     private var adoptedDeclarations: [RouteScopeDeclaration] {

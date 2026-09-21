@@ -91,13 +91,18 @@ private struct WindowDestinationBuilderRegistration: View {
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
-            .onLifecycleEvent { event in
+            .onLifecycleEvent { lifecycleView, lifecycleID, event in
                 switch event {
-                case .installedInWindow, .updated:
+                case .installedInWindow, .updated(isInstalledInWindow: true):
+                    router.windowDestinationBuilder = windowDestinationBuilder
+                    guard let lifecycleView else { return }
+                    router.root.ledger.installManagedView(lifecycleView, id: lifecycleID)
+
+                case .updated(isInstalledInWindow: false):
                     router.windowDestinationBuilder = windowDestinationBuilder
 
                 case .dismantled, .deinitialized:
-                    break
+                    router.root.ledger.uninstallManagedView(id: lifecycleID)
                 }
             }
     }

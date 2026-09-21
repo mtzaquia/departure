@@ -86,39 +86,63 @@ extension RouteScope {
         #if DEBUG
         routeScope.debugKind = .branch
         #endif
-        routeScope.branchID = branch
-        routeScope.adoptedRoutePresentationHostID = presentationHostID
         if let sourceEnvironment {
             routeScope.updateSourceEnvironment(sourceEnvironment)
         }
 
-        if branchScopes[branch] === routeScope {
-            routeScope.parent = self
-            return false
+        if let previousParent = routeScope.parent, previousParent !== self,
+           let previousBranch = routeScope.branchID {
+            previousParent.unregisterBranchScope(routeScope, for: previousBranch)
         }
 
-        routeScope.parent = self
-        branchScopes[branch] = routeScope
-        routeScope.participation.isBranchHostRegistered = true
-        log.departureDebug(.branchRegistered(branch: branch, parent: self, scope: routeScope))
-        return true
+        for previousBranch in ledger.branches(containing: routeScope) where previousBranch != branch {
+            unregisterBranchScope(routeScope, for: previousBranch)
+        }
+
+        let previous = branchScopes[branch]
+        ledger.setBranchSource(
+            .init(scope: routeScope, environment: sourceEnvironment,
+                presentationHostID: presentationHostID),
+            for: branch
+        )
+        updateActiveBranchSource(for: branch)
+        return branchScopes[branch] !== previous
     }
 
     func unregisterBranchScope(_ routeScope: RouteScope, for branch: AnyHashable) {
-        guard let registeredScope = branchScopes[branch] else {
-            return
-        }
-
-        guard registeredScope === routeScope else {
+        guard ledger.removeBranchSource(routeScope, for: branch) else {
             log.departureDebug(.branchUnregisterSkipped(branch: branch, scope: routeScope))
             return
         }
 
-        branchScopes[branch] = nil
-        routeScope.participation.isBranchHostRegistered = false
-        routeScope.parent = nil
-        routeScope.branchID = nil
-        routeScope.adoptedRoutePresentationHostID = nil
-        log.departureDebug(.branchUnregistered(branch: branch, scope: routeScope))
+        updateActiveBranchSource(for: branch)
+    }
+
+    private func updateActiveBranchSource(for branch: AnyHashable) {
+        let previous = branchScopes[branch]
+        let active = ledger.activeBranchSource(for: branch)
+        if previous !== active?.scope {
+            if let previous {
+                previous.participation.isBranchHostRegistered = false
+                previous.parent = nil
+                previous.branchID = nil
+                previous.adoptedRoutePresentationHostID = nil
+                log.departureDebug(.branchUnregistered(branch: branch, scope: previous))
+            }
+            branchScopes[branch] = active?.scope
+            if let active {
+                active.scope.parent = self
+                active.scope.branchID = branch
+                active.scope.participation.isBranchHostRegistered = true
+                log.departureDebug(.branchRegistered(branch: branch, parent: self, scope: active.scope))
+            }
+        }
+
+        if let active {
+            active.scope.adoptedRoutePresentationHostID = active.presentationHostID
+            if let environment = active.environment {
+                active.scope.updateSourceEnvironment(environment)
+            }
+        }
     }
 }

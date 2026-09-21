@@ -33,13 +33,15 @@ extension View {
     /// no push exists, so scopes that never push don't require a surrounding `NavigationStack`.
     func routePresentationStyleModifiers(
         for declarations: [RouteScopeDeclaration],
-        hostedBy presentationHostID: RoutePresentationHostID
+        hostedBy presentationHostID: RoutePresentationHostID,
+        pushHostIdentity: Bool = true
     ) -> some View {
         self
             .background {
                 if declarations.containsPresentationKind(.push) {
                     presentationHost
                         .modifier(PushPresentationStyleModifier(presentationHostID: presentationHostID))
+                        .id(pushHostIdentity)
                 }
             }
             .background {

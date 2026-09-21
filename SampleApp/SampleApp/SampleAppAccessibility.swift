@@ -61,6 +61,8 @@ enum SampleAppAccessibility {
     static let homePresentHighPriorityBlockingSheetButton = "sample.home.present-high-priority-blocking-sheet"
     static let homeShowNavigationBarFadeButton = "sample.home.show-navigation-bar-fade"
     static let homeShowLifecycleTeardownButton = "sample.home.show-lifecycle-teardown"
+    static let homePresentLegacySheetButton = "sample.home.present-legacy-sheet"
+    static let homePresentRouteAfterLegacySheetButton = "sample.home.present-route-after-legacy-sheet"
     static let homePassthroughBehindButton = "sample.home.passthrough-behind"
     static let homePassthroughTapCount = "sample.home.passthrough-tap-count"
     static let homeRoutePhase = "sample.home.route-phase"
@@ -86,6 +88,11 @@ enum SampleAppAccessibility {
     static let settingsMissingUnwindButton = "sample.settings.missing-unwind"
     static let settingsMissingUnwindResult = "sample.settings.missing-unwind-result"
     static let settingsBranchHookStatus = "sample.settings.branch-hook-status"
+    static let settingsPresentLegacySheetButton = "sample.settings.present-legacy-sheet"
+    static let settingsPresentRouteAfterLegacySheetButton = "sample.settings.present-route-after-legacy-sheet"
+
+    static let legacySheetText = "sample.legacy-sheet.text"
+    static let legacySheetDismissButton = "sample.legacy-sheet.dismiss"
 
     static let localDetailTitle = "sample.local-detail.title"
     static let localDetailAdvanceButton = "sample.local-detail.advance"

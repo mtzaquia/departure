@@ -99,7 +99,7 @@ private struct ElevatedPriorityCoverSlidePresenter: View {
                 destination
             }
 #endif
-            .onLifecycleEvent { event in
+            .onLifecycleEvent { _, _, event in
                 if case .installedInWindow(isInitial: true) = event {
                     isPresented = true
                 }

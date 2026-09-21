@@ -50,34 +50,33 @@ public extension View {
 private struct HooksModifier: ViewModifier {
     let declarations: [AnyHookDeclaration]
 
-    @State private var sourceID = AnyHashable(UUID())
+    @State private var attachment = RouteScopeAttachment(kind: .hooks)
 
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
         content
-            .onLifecycleEvent { event in
+            .onLifecycleEvent { lifecycleView, _, event in
                 switch event {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
-                    installScopeDeclarations()
+                    guard let lifecycleView else { return }
+                    let sourceID = attachment.id
+                    let declarations = declarations
+                    attachment.update(
+                        target: routeScope,
+                        view: lifecycleView,
+                        apply: { $0.installHookDeclarations(
+                            sourceID: sourceID, hookDeclarations: declarations
+                        ) },
+                        remove: { $0.uninstallHookDeclarations(sourceID: sourceID) }
+                    )
 
                 case .updated(isInstalledInWindow: false):
                     break
 
                 case .dismantled, .deinitialized:
-                    uninstallScopeDeclarations()
+                    attachment.detach()
                 }
             }
-    }
-
-    private func installScopeDeclarations() {
-        routeScope?.installHookDeclarations(
-            sourceID: sourceID,
-            hookDeclarations: declarations
-        )
-    }
-
-    private func uninstallScopeDeclarations() {
-        routeScope?.uninstallHookDeclarations(sourceID: sourceID)
     }
 }
