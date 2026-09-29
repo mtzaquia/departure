@@ -21,17 +21,13 @@ Declare the destinations a screen owns. Request them from wherever the user’s 
 await router.present(SettingsRoute())
 ```
 
-> [!NOTE]
-> This checkout develops Departure 3.0. Its examples use the new scoped environment
-> router, `@Environment(\.router)`, which is not available in the published 2.x release.
-
 ## Install
 
 Departure requires Swift 6.3+, supports iOS 17+ and macOS 14+, and is available through Swift Package Manager.
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/mtzaquia/departure.git", from: "2.0.3"),
+  .package(url: "https://github.com/mtzaquia/departure.git", from: "2.1.0"),
 ],
 ```
 
