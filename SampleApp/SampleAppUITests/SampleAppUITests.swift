@@ -38,6 +38,73 @@ final class SampleAppUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
     }
 
+    func testSheetKeepsTwoPushesDuringRootUnwind() {
+        assertSheetKeepsTwoPushesDuringDismissal("sample.dismissal-probe.unwind")
+    }
+
+    func testSheetKeepsTwoPushesDuringAncestorUnwind() {
+        assertSheetKeepsTwoPushesDuringDismissal("sample.dismissal-probe.unwind-ancestor")
+    }
+
+    func testSheetKeepsTwoPushesDuringBindingDismissal() {
+        assertSheetKeepsTwoPushesDuringDismissal("sample.dismissal-probe.dismiss")
+    }
+
+    func testNestedSheetsAndStacksJumpToRootTogether() {
+        app.terminate()
+        app.launchArguments = ["--nested-modal-probe"]
+        app.launch()
+
+        tap("sample.nested-modal.present-a")
+        tap("sample.nested-modal.push-a")
+        tap("sample.nested-modal.present-b")
+        tap("sample.nested-modal.push-b")
+
+        let aDepth = dismissalProbeValue("sample.nested-modal.a-depth")
+        let bDepth = dismissalProbeValue("sample.nested-modal.b-depth")
+        XCTAssertGreaterThanOrEqual(aDepth, 2)
+        XCTAssertGreaterThanOrEqual(bDepth, 2)
+
+        tap("sample.nested-modal.unwind")
+        assertGone("sample.nested-modal.unwind")
+        XCTAssertTrue(app.buttons["sample.nested-modal.present-a"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["sample.nested-modal.present-a"].isHittable)
+        XCTAssertFalse(app.buttons["sample.nested-modal.present-b"].exists)
+
+        XCTAssertGreaterThan(dismissalProbeValue("sample.nested-modal.a-samples"), 0)
+        XCTAssertGreaterThan(dismissalProbeValue("sample.nested-modal.b-samples"), 0)
+        XCTAssertEqual(dismissalProbeValue("sample.nested-modal.a-minimum-depth"), aDepth)
+        XCTAssertEqual(dismissalProbeValue("sample.nested-modal.b-minimum-depth"), bDepth)
+    }
+
+    private func assertSheetKeepsTwoPushesDuringDismissal(_ dismissal: String) {
+        app.terminate()
+        app.launchArguments = ["--dismissal-stack-probe"]
+        app.launch()
+
+        tap("sample.dismissal-probe.present")
+        tap("sample.dismissal-probe.push-first")
+        tap("sample.dismissal-probe.push-second")
+        assertExists("sample.dismissal-probe.second")
+
+        let currentDepth = dismissalProbeValue("sample.dismissal-probe.current-depth")
+        XCTAssertGreaterThanOrEqual(currentDepth, 3)
+        tap(dismissal)
+        assertGone("sample.dismissal-probe.second")
+
+        XCTAssertGreaterThan(dismissalProbeValue("sample.dismissal-probe.samples"), 0)
+        XCTAssertEqual(
+            dismissalProbeValue("sample.dismissal-probe.minimum-depth"), currentDepth,
+            "firstDropMs=\(dismissalProbeValue("sample.dismissal-probe.first-drop")), dismissal=\(dismissal)"
+        )
+    }
+
+    private func dismissalProbeValue(_ identifier: String) -> Int {
+        let element = app.staticTexts[identifier]
+        XCTAssertTrue(element.waitForExistence(timeout: 5))
+        return Int(element.label.split(separator: ":").last?.trimmingCharacters(in: .whitespaces) ?? "") ?? -1
+    }
+
     func testConcurrentSplitBranchTargetRevealsDetailAndDismissesLocally() {
         openSplitLab()
         tap("sample.split.show-detail")

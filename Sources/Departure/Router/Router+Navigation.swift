@@ -282,12 +282,16 @@ extension RouterEngine {
             keepThrough: targetPosition
         )
 
+        let removesModal = plan.removedScopes.contains {
+            $0.presentationDeclaration?.presentationKind.isModal == true
+        }
+
         await performPlannedUnwind(
             for: sourceScope,
             payload: payload,
             in: targetScope,
             plan: plan,
-            preservesSnapshot: false
+            preservesSnapshot: removesModal
         )
 
         return true
@@ -1258,7 +1262,29 @@ extension RouterEngine {
     func performPresentationDismissalUnwind(
         for sourceScope: RouteScope?,
         in targetScope: RouteScope?,
+        plan: RouteForest.UnwindPlan
+    ) {
+        var snapshotID: UUID?
+        performPresentationDismissalUnwind(
+            for: sourceScope,
+            in: targetScope,
+            removing: plan.removedScopes,
+            afterScopesLeave: { self.clearUnwindPresentationSnapshot(id: snapshotID) }
+        ) {
+            let snapshot = makeUnwindPresentationSnapshot(for: plan)
+            if snapshot.preservesPushPresentationBindings {
+                unwindPresentationSnapshot = snapshot
+                snapshotID = snapshot.id
+            }
+            applyUnwindPlan(plan)
+        }
+    }
+
+    func performPresentationDismissalUnwind(
+        for sourceScope: RouteScope?,
+        in targetScope: RouteScope?,
         removing removedScopes: [RouteScope],
+        afterScopesLeave: @escaping () -> Void = {},
         updatePath: () -> Void
     ) {
         if removedScopes.isEmpty == false {
@@ -1271,6 +1297,7 @@ extension RouterEngine {
                     removing: removedScopes
                 )
                 await waitForRouteScopesToLeaveView(removedScopes)
+                afterScopesLeave()
                 await finishNavigationTransaction(transaction)
             }
         }

@@ -88,26 +88,40 @@ struct DepartureSampleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WithRouter(router: router) {
-                NavigationStack {
-                    StartView().modifier(SampleRoutingContext())
+            if ProcessInfo.processInfo.arguments.contains("--nested-modal-probe") {
+                WithRouter(router: router) {
+                    NavigationStack {
+                        NestedModalProbeRoot()
+                    }
                 }
-                .environment(\.sampleWindowBadge, "forwarded from app window")
-            } windowDestination: { destination, environment in
-                destination
-                    .environment(\.sampleWindowBadge, environment.sampleWindowBadge)
-                    .environment(\.samplePresentationSource, environment.samplePresentationSource)
-            }
-            .onOpenURL { url in
-                guard let link = SampleDeepLink(url: url) else {
-                    print("[deeplink] dropped | reason=unmatched | \(url)")
-                    return
+            } else if ProcessInfo.processInfo.arguments.contains("--dismissal-stack-probe") {
+                WithRouter(router: router) {
+                    NavigationStack {
+                        DismissalStackProbeRoot()
+                    }
                 }
+            } else {
+                WithRouter(router: router) {
+                    NavigationStack {
+                        StartView().modifier(SampleRoutingContext())
+                    }
+                    .environment(\.sampleWindowBadge, "forwarded from app window")
+                } windowDestination: { destination, environment in
+                    destination
+                        .environment(\.sampleWindowBadge, environment.sampleWindowBadge)
+                        .environment(\.samplePresentationSource, environment.samplePresentationSource)
+                }
+                .onOpenURL { url in
+                    guard let link = SampleDeepLink(url: url) else {
+                        print("[deeplink] dropped | reason=unmatched | \(url)")
+                        return
+                    }
 
-                let route = link.route
-                print("[deeplink] accepted | \(url) → \(route)")
-                Task {
-                    await SampleDeepLink.router(for: route, from: Storage.shared.activeRouter ?? router).present(route)
+                    let route = link.route
+                    print("[deeplink] accepted | \(url) → \(route)")
+                    Task {
+                        await SampleDeepLink.router(for: route, from: Storage.shared.activeRouter ?? router).present(route)
+                    }
                 }
             }
         }

@@ -3191,6 +3191,144 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }
 
+    @Test func scopedTopmostAncestorKeepsModalPushSnapshotUntilSheetLeavesView() async throws {
+        let router = RouterEngine()
+        let sheetScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let pushedScope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute(), parent: sheetScope)
+
+        router.root.installRouteDeclarations(
+            id: "root",
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Sheet(LoginRoute.self)._routeDeclarations),
+            ]
+        )
+        sheetScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+            ]
+        )
+        sheetScope.attachPresentation(
+            to: router.root,
+            declaration: try #require(router.root.routeAttachments.first { $0.presentationKind == .sheet })
+        )
+        pushedScope.attachPresentation(
+            to: sheetScope,
+            declaration: try #require(sheetScope.routeAttachments.first { $0.presentationKind == .push })
+        )
+        router.normalTree.rootPath.scopes = [sheetScope, pushedScope]
+        router.routeScopeDidInstallInView(sheetScope)
+        router.routeScopeDidInstallInView(pushedScope)
+
+        let unwind = Task { await Router(engine: router, scope: sheetScope).unwind(to: .topmostAncestor) }
+        await Task.yield()
+
+        #expect(router.unwindPresentationSnapshot != nil)
+        #expect(router.routePresentationBinding(from: sheetScope, matching: .push).wrappedValue?.scope === pushedScope)
+        #expect(sheetScope.routeAttachments.contains { $0.presentationKind == .push })
+
+        router.routeScopeDidLeaveView(pushedScope)
+        router.routeScopeDidLeaveView(sheetScope)
+        #expect(await unwind.value)
+        #expect(router.unwindPresentationSnapshot == nil)
+    }
+
+    @Test func capturedAncestorUnwindRemovesBothNestedSheetsInOnePlan() async throws {
+        let router = RouterEngine()
+        let sheetA = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let sheetB = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
+
+        router.root.installRouteDeclarations(
+            id: "root",
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Sheet(LoginRoute.self)._routeDeclarations),
+            ]
+        )
+        sheetA.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Sheet(SettingsRoute.self)._routeDeclarations),
+            ]
+        )
+        sheetA.attachPresentation(
+            to: router.root,
+            declaration: try #require(router.root.routeAttachments.first { $0.presentationKind == .sheet })
+        )
+        sheetB.attachPresentation(
+            to: sheetA,
+            declaration: try #require(sheetA.routeAttachments.first { $0.presentationKind == .sheet })
+        )
+        router.normalTree.rootPath.scopes = [sheetA, sheetB]
+        router.routeScopeDidInstallInView(sheetA)
+        router.routeScopeDidInstallInView(sheetB)
+
+        let unwind = Task { await UnwindRouteAction(router: router, routeScope: sheetA)() }
+        for _ in 0..<10 where !router.normalTree.rootPath.isEmpty {
+            await Task.yield()
+        }
+
+        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(router.unwindPresentationSnapshot != nil)
+        #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
+        #expect(router.routePresentationBinding(from: sheetA, matching: .sheet).wrappedValue?.scope === sheetB)
+
+        router.routeScopeDidLeaveView(sheetB)
+        router.routeScopeDidLeaveView(sheetA)
+        #expect(await unwind.value)
+        #expect(router.unwindPresentationSnapshot == nil)
+    }
+
+    @Test func sheetBindingDismissalPreservesNestedPushUntilSheetLeavesView() async throws {
+        let router = RouterEngine()
+        let sheetScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+        let pushedScope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute(), parent: sheetScope)
+
+        router.root.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Sheet(LoginRoute.self)._routeDeclarations),
+            ]
+        )
+        sheetScope.installRouteDeclarations(
+            id: nil,
+            branchSelection: nil,
+            routeDeclarations: [
+                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+            ]
+        )
+        sheetScope.attachPresentation(
+            to: router.root,
+            declaration: try #require(router.root.routeAttachments.first { $0.presentationKind == .sheet })
+        )
+        pushedScope.attachPresentation(
+            to: sheetScope,
+            declaration: try #require(sheetScope.routeAttachments.first { $0.presentationKind == .push })
+        )
+        router.normalTree.rootPath.scopes = [sheetScope, pushedScope]
+        router.routeScopeDidInstallInView(sheetScope)
+        router.routeScopeDidInstallInView(pushedScope)
+
+        router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue = nil
+
+        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(router.unwindPresentationSnapshot != nil)
+        #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
+        #expect(router.routePresentationBinding(from: sheetScope, matching: .push).wrappedValue?.scope === pushedScope)
+        #expect(sheetScope.routeAttachments.contains { $0.presentationKind == .push })
+
+        router.routeScopeDidLeaveView(pushedScope)
+        router.routeScopeDidLeaveView(sheetScope)
+        for _ in 0..<10 where router.unwindPresentationSnapshot != nil {
+            await Task.yield()
+        }
+        #expect(router.unwindPresentationSnapshot == nil)
+    }
+
     @Test func targetedUnwindClearsCoverHostedByRetainedNonRootScopeWhilePreservingNestedPush() async throws {
         let router = RouterEngine()
         let paymentMethodsID = AnyHashable("paymentMethods")

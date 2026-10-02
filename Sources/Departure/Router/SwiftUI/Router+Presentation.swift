@@ -398,15 +398,12 @@ private extension RouterEngine {
             routePath: routePath,
             after: targetPosition
         ))
-        let removedScopes = unwindPlan.removedScopes
         let targetScope = routePath.scope(at: targetPosition)
         performPresentationDismissalUnwind(
             for: presentation.scope,
             in: targetScope,
-            removing: removedScopes
-        ) {
-            applyUnwindPlan(unwindPlan)
-        }
+            plan: unwindPlan
+        )
     }
 
     func shouldHostLocally(
@@ -476,14 +473,11 @@ private extension RouterEngine {
         }
 
         let unwindPlan = routeForest.unwindPlan(for: .tree(tree))
-        let removedScopes = unwindPlan.removedScopes
         let targetScope = tree.elevatedOrigin?.scope
         performPresentationDismissalUnwind(
             for: presentation.scope,
             in: targetScope,
-            removing: removedScopes
-        ) {
-            applyUnwindPlan(unwindPlan)
-        }
+            plan: unwindPlan
+        )
     }
 }

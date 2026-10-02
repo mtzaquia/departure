@@ -296,10 +296,8 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         router.performPresentationDismissalUnwind(
             for: dismissal.scope,
             in: dismissal.routePath.scope(at: dismissal.targetPosition),
-            removing: dismissal.unwindPlan.removedScopes
-        ) {
-            router.applyUnwindPlan(dismissal.unwindPlan)
-        }
+            plan: dismissal.unwindPlan
+        )
     }
 
     private func cancelViewExitWatchdog(for routeScope: RouteScope) {
