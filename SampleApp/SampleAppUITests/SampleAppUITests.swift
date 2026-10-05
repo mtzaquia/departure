@@ -77,6 +77,39 @@ final class SampleAppUITests: XCTestCase {
         XCTAssertEqual(dismissalProbeValue("sample.nested-modal.b-minimum-depth"), bDepth)
     }
 
+    func testNormalEquivalentRouteKeepsDepartingNestedStack() {
+        assertEquivalentRouteKeepsDepartingNestedStack(priorityArgument: nil)
+    }
+
+    func testHighEquivalentRouteKeepsDepartingNestedStack() {
+        assertEquivalentRouteKeepsDepartingNestedStack(priorityArgument: "--nested-modal-high")
+    }
+
+    func testCriticalEquivalentRouteKeepsDepartingNestedStack() {
+        assertEquivalentRouteKeepsDepartingNestedStack(priorityArgument: "--nested-modal-critical")
+    }
+
+    private func assertEquivalentRouteKeepsDepartingNestedStack(priorityArgument: String?) {
+        app.terminate()
+        app.launchArguments = ["--nested-modal-probe"] + [priorityArgument].compactMap { $0 }
+        app.launch()
+
+        tap("sample.nested-modal.present-a")
+        tap("sample.nested-modal.push-a")
+        tap("sample.nested-modal.present-b")
+        tap("sample.nested-modal.push-b")
+
+        let bDepth = dismissalProbeValue("sample.nested-modal.b-depth")
+        XCTAssertGreaterThanOrEqual(bDepth, 2)
+        tap("sample.nested-modal.reuse-a")
+        assertGone("sample.nested-modal.reuse-a")
+        XCTAssertTrue(app.buttons["sample.nested-modal.push-a"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["sample.nested-modal.push-a"].isHittable)
+        XCTAssertFalse(app.buttons["sample.nested-modal.present-b"].exists)
+        XCTAssertGreaterThan(dismissalProbeValue("sample.nested-modal.retained-b-samples"), 0)
+        XCTAssertEqual(dismissalProbeValue("sample.nested-modal.retained-b-minimum-depth"), bDepth)
+    }
+
     private func assertSheetKeepsTwoPushesDuringDismissal(_ dismissal: String) {
         app.terminate()
         app.launchArguments = ["--dismissal-stack-probe"]

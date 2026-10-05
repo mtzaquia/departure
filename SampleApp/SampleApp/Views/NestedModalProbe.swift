@@ -64,6 +64,12 @@ struct NestedModalProbeRoot: View {
     @Environment(\.router) private var router
     @State private var probe = NestedModalProbeState.shared
 
+    private var priority: RoutePriority {
+        if ProcessInfo.processInfo.arguments.contains("--nested-modal-critical") { return .critical }
+        if ProcessInfo.processInfo.arguments.contains("--nested-modal-high") { return .high }
+        return .normal
+    }
+
     var body: some View {
         VStack {
             Button("Present sheet A") {
@@ -80,11 +86,11 @@ struct NestedModalProbeRoot: View {
             Text("B exit samples: \(probe.bExitSamples)")
                 .accessibilityIdentifier("sample.nested-modal.b-samples")
         }
-        .routes { Sheet(NestedModalProbeSheetARoute.self, providesNavigation: false) }
+        .routes { Sheet(NestedModalProbeSheetARoute.self, priority: priority, providesNavigation: false) }
     }
 }
 
-private struct NestedModalProbeSheetARoute: Route {
+private struct NestedModalProbeSheetARoute: Route, Equatable {
     func destination() -> some View { NestedModalProbeSheetA() }
 }
 
@@ -106,9 +112,15 @@ private struct NestedModalProbeSheetA: View {
 
     var body: some View {
         NavigationStack {
-            Button("Push in A") { Task { await router.present(NestedModalProbeAPushRoute()) } }
-                .accessibilityIdentifier("sample.nested-modal.push-a")
-                .routes { Push(NestedModalProbeAPushRoute.self) }
+            VStack {
+                Button("Push in A") { Task { await router.present(NestedModalProbeAPushRoute()) } }
+                    .accessibilityIdentifier("sample.nested-modal.push-a")
+                Text("B minimum exit depth: \(probe.bMinimumExitDepth)")
+                    .accessibilityIdentifier("sample.nested-modal.retained-b-minimum-depth")
+                Text("B exit samples: \(probe.bExitSamples)")
+                    .accessibilityIdentifier("sample.nested-modal.retained-b-samples")
+            }
+            .routes { Push(NestedModalProbeAPushRoute.self) }
         }
         .background(NestedModalDepthSampler(isSheetA: true))
         .onAppear { probe.sheetARouter = router }
@@ -139,6 +151,7 @@ private struct NestedModalProbeSheetB: View {
 }
 
 private struct NestedModalProbeBPush: View {
+    @Environment(\.router) private var router
     private let probe = NestedModalProbeState.shared
 
     var body: some View {
@@ -152,6 +165,11 @@ private struct NestedModalProbeBPush: View {
                 Task { await probe.sheetARouter?.unwind(to: .root) }
             }
             .accessibilityIdentifier("sample.nested-modal.unwind")
+            Button("Present existing A") {
+                probe.beginExit()
+                Task { await router.present(NestedModalProbeSheetARoute()) }
+            }
+            .accessibilityIdentifier("sample.nested-modal.reuse-a")
         }
     }
 }

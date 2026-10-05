@@ -245,8 +245,7 @@ extension RouterEngine {
                 for: sourceScope,
                 payload: payload,
                 in: targetScope,
-                plan: plan,
-                preservesSnapshot: target != nil
+                plan: plan
             )
 
             return true
@@ -282,16 +281,11 @@ extension RouterEngine {
             keepThrough: targetPosition
         )
 
-        let removesModal = plan.removedScopes.contains {
-            $0.presentationDeclaration?.presentationKind.isModal == true
-        }
-
         await performPlannedUnwind(
             for: sourceScope,
             payload: payload,
             in: targetScope,
-            plan: plan,
-            preservesSnapshot: removesModal
+            plan: plan
         )
 
         return true
@@ -320,7 +314,10 @@ extension RouterEngine {
 
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
         let unwindPlan = routeAppendUnwindPlan(after: match)
-        let snapshotID = installRouteAppendPresentationSnapshot(for: unwindPlan)
+        let snapshotID = installUnwindPresentationSnapshot(
+            for: unwindPlan,
+            preservesModalPresentationBindings: false
+        )
         let removedScopes = prepareRouteAppendPath(unwindPlan)
 
         if removedScopes.isEmpty == false {
@@ -389,19 +386,14 @@ extension RouterEngine {
             return true
         }
 
-        let snapshotID = installRouteAppendPresentationSnapshot(for: unwindPlan)
-        await performAcceptedUnwind(
+        await performPlannedUnwind(
             for: sourceScope,
             payload: nil,
             in: targetScope,
-            removing: removedScopes,
-            logsCompletion: false,
-            afterScopesLeave: {
-                clearUnwindPresentationSnapshot(id: snapshotID)
-            }
-        ) {
-            applyUnwindPlan(unwindPlan)
-        }
+            plan: unwindPlan,
+            preservesModalPresentationBindings: false,
+            logsCompletion: false
+        )
         return true
     }
 
@@ -442,15 +434,14 @@ extension RouterEngine {
             return true
         }
 
-        await performAcceptedUnwind(
+        await performPlannedUnwind(
             for: sourceScope,
             payload: nil,
             in: targetScope,
-            removing: removedScopes,
+            plan: unwindPlan,
+            preservesModalPresentationBindings: false,
             logsCompletion: false
-        ) {
-            applyUnwindPlan(unwindPlan)
-        }
+        )
         return true
     }
 
@@ -585,7 +576,10 @@ extension RouterEngine {
 
         if let existingTree = routeForest.tree(for: priority) {
             let unwindPlan = routeForest.unwindPlan(for: .tree(existingTree))
-            let snapshotID = installRouteAppendPresentationSnapshot(for: unwindPlan)
+            let snapshotID = installUnwindPresentationSnapshot(
+                for: unwindPlan,
+                preservesModalPresentationBindings: false
+            )
             let removedScopes = prepareRouteAppendPath(unwindPlan)
 
             if removedScopes.isEmpty == false,
@@ -972,7 +966,7 @@ extension RouterEngine {
         payload: Any?,
         in targetScope: RouteScope?,
         plan: RouteForest.UnwindPlan,
-        preservesSnapshot: Bool = true,
+        preservesModalPresentationBindings: Bool = true,
         logsCompletion: Bool = true
     ) async {
         var snapshotID: UUID?
@@ -986,20 +980,21 @@ extension RouterEngine {
                 clearUnwindPresentationSnapshot(id: snapshotID)
             }
         ) {
-            if preservesSnapshot {
-                let snapshot = makeUnwindPresentationSnapshot(for: plan)
-                unwindPresentationSnapshot = snapshot
-                snapshotID = snapshot.id
-            }
-
+            snapshotID = installUnwindPresentationSnapshot(
+                for: plan,
+                preservesModalPresentationBindings: preservesModalPresentationBindings
+            )
             applyUnwindPlan(plan)
         }
     }
 
-    func installRouteAppendPresentationSnapshot(for plan: RouteForest.UnwindPlan) -> UUID? {
+    func installUnwindPresentationSnapshot(
+        for plan: RouteForest.UnwindPlan,
+        preservesModalPresentationBindings: Bool = true
+    ) -> UUID? {
         let snapshot = makeUnwindPresentationSnapshot(
             for: plan,
-            preservesModalPresentationBindings: false
+            preservesModalPresentationBindings: preservesModalPresentationBindings
         )
 
         guard snapshot.preservesPushPresentationBindings
@@ -1271,11 +1266,7 @@ extension RouterEngine {
             removing: plan.removedScopes,
             afterScopesLeave: { self.clearUnwindPresentationSnapshot(id: snapshotID) }
         ) {
-            let snapshot = makeUnwindPresentationSnapshot(for: plan)
-            if snapshot.preservesPushPresentationBindings {
-                unwindPresentationSnapshot = snapshot
-                snapshotID = snapshot.id
-            }
+            snapshotID = installUnwindPresentationSnapshot(for: plan)
             applyUnwindPlan(plan)
         }
     }
