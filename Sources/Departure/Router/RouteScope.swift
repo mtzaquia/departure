@@ -52,12 +52,12 @@ final class RouteScope: Identifiable {
         let selection: AnyRouteBranchSelection?
     }
     private struct WeakAttachment { weak var value: RouteScopeAttachment? }
+    private struct WeakReadiness { weak var value: RouteScopeReadiness? }
     @ObservationIgnored private var host: Host?
     @ObservationIgnored private var routingHosts = OrderedStorage<RoutePresentationHostID, RoutingHost>()
     @ObservationIgnored private var hookSources: [AnyHashable: [AnyHookDeclaration]] = [:]
     @ObservationIgnored private var attachments: [WeakAttachment] = []
-    @ObservationIgnored private var installationWaiters: [CheckedContinuation<Void, Never>] = []
-    @ObservationIgnored private var uninstallationWaiters: [CheckedContinuation<Void, Never>] = []
+    @ObservationIgnored private var readinessWaits: [WeakReadiness] = []
     @ObservationIgnored private(set) var hasEverInstalled = false
     @ObservationIgnored let sourceEnvironmentReference = RouteSourceEnvironment()
 
@@ -221,11 +221,11 @@ extension RouteScope {
         if becameReady {
             withMutation(keyPath: \.isInstalledInView) { host = Host(id: id, view: view) }
             hasEverInstalled = true
-            resume(&installationWaiters)
         } else {
             host = Host(id: id, view: view)
         }
         reconcileAttachments()
+        checkReadiness()
         return becameReady
     }
 
@@ -234,7 +234,7 @@ extension RouteScope {
         guard host?.id == id else { return false }
         withMutation(keyPath: \.isInstalledInView) { host = nil }
         reconcileAttachments()
-        resume(&uninstallationWaiters)
+        checkReadiness()
         return true
     }
 
@@ -383,21 +383,28 @@ extension RouteScope {
         for attachment in attachments { attachment.value?.reconcile() }
     }
 
-    func waitUntilInstalled() async {
-        guard !isInstalledInView else { return }
-        await withCheckedContinuation { installationWaiters.append($0) }
+    func observeReadiness(_ readiness: RouteScopeReadiness) {
+        readinessWaits.removeAll { $0.value?.isPending != true }
+        readinessWaits.append(WeakReadiness(value: readiness))
     }
 
-    func waitUntilUninstalled() async {
-        guard isInstalledInView else { return }
-        await withCheckedContinuation { uninstallationWaiters.append($0) }
+    private func checkReadiness() {
+        readinessWaits.removeAll { $0.value?.isPending != true }
+        for waiter in readinessWaits { waiter.value?.checkReadiness() }
     }
 
-    private func resume(_ waiters: inout [CheckedContinuation<Void, Never>]) {
-        let pending = waiters
-        waiters.removeAll()
-        pending.forEach { $0.resume() }
+    @discardableResult
+    func waitUntilInstalled(in engine: RouterEngine? = nil) async -> Bool {
+        let eligible: (() -> Bool)? = engine.map { engine in { engine.isNavigationEligible(self) } }
+        return await RouteScopeReadiness.wait(in: self, while: eligible) { self.isInstalledInView }
     }
+
+    @discardableResult
+    func waitUntilUninstalled() async -> Bool {
+        // Committed teardown owns its lifetime even if the requesting task cancels.
+        await RouteScopeReadiness.wait(in: self, cancellable: false) { !self.isInstalledInView }
+    }
+
 }
 
 final class RouteSourceEnvironment {

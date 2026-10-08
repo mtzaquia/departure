@@ -71,7 +71,7 @@ extension RouterEngine {
                         : targetSpace.currentRouteScope
 
                     if targetScope !== sourceScope || targetScope.isInstalledInView {
-                        await waitForRouteScopeToInstall(targetScope)
+                        guard await targetScope.waitUntilInstalled(in: self) else { return }
                     }
 
                     await performAction(action, hasRerouted: true, origin: RouteRequestOrigin(scope: targetScope))
@@ -88,10 +88,6 @@ extension RouterEngine {
 }
 
 private extension RouterEngine {
-    func waitForRouteScopeToInstall(_ routeScope: RouteScope) async {
-        await routeScope.waitUntilInstalled()
-    }
-
     func performAction<A: Action>(_ action: A, hasRerouted: Bool, origin: RouteRequestOrigin? = nil) async {
         guard let source = navigationSource(origin) else { return }
         if let binding = source.hookBinding(for: .actionInterceptor(ObjectIdentifier(A.self)), in: spaces) {
