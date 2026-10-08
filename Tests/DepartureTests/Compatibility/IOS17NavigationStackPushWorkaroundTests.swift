@@ -220,12 +220,12 @@ struct IOS17NavigationStackPushWorkaroundTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -236,7 +236,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -327,7 +327,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
         if let presentationHostID {
             router.root.bindRoutingHost(presentationHostID, automatic: false, environment: router.root.sourceEnvironment)
         }
-        let declarations = AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
+        let declarations = AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
         router.root.defineTestMap(
             id: nil,
             selection: nil,

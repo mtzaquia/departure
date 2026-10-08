@@ -79,14 +79,9 @@ import Testing
     @Test(arguments: [RoutePresentation.Style.push, .sheet, .cover(.slide), .cover(.fade), .replace])
     func bindingWriteBackIsAcceptedOnlyFromOwningHost(style: RoutePresentation.Style) async throws {
         let destination = RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }
-        let kind: AnyRouteDeclaration.Kind
-        switch style {
-        case .push: kind = .push
-        case .replace: kind = .replace
-        case .sheet: kind = .sheet(priority: .default)
-        case let .cover(transition): kind = .cover(priority: .default, transition: transition)
-        }
-        let engine = RouterEngine(routes: RootRouteMap { AnyRouteDeclaration(destination, kind: kind) })
+        let engine = RouterEngine(routes: RootRouteMap {
+            AnyRouteDeclaration(destination, presentation: .init(style: style, priority: .default))
+        })
         let owner = RoutePresentationHostID(), stranger = RoutePresentationHostID()
         engine.root.bindRoutingHost(owner, automatic: false, environment: engine.root.sourceEnvironment)
         await engine.present(NumberedRoute(number: 1))

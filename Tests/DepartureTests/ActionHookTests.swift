@@ -174,7 +174,7 @@ struct ActionHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -197,7 +197,7 @@ struct ActionHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -230,7 +230,7 @@ struct ActionHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 

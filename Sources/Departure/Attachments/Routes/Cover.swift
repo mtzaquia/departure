@@ -30,7 +30,7 @@ public struct Cover: RouteDeclaration, Sendable {
         id: AnyHashable? = nil,
         @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        declaration = AnyRouteDeclaration(destination, kind: .cover(priority: .default, transition: transition), id: id, children: children())
+        declaration = AnyRouteDeclaration(destination, presentation: .init(style: .cover(transition), priority: .default), id: id, children: children())
     }
     public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }

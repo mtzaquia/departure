@@ -30,7 +30,7 @@ public struct Push: RouteDeclaration, Sendable {
         id: AnyHashable? = nil,
         @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        declaration = AnyRouteDeclaration(destination, kind: .push, id: id, children: children())
+        declaration = AnyRouteDeclaration(destination, presentation: .init(style: .push, priority: .default), id: id, children: children())
     }
     public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }

@@ -28,24 +28,20 @@ struct RoutePresentationHostID: Hashable, Sendable {
 
 /// One occurrence in a map, with its destination and child definitions.
 public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
-    enum Kind: Hashable, Sendable {
-        case push
-        case replace
-        case sheet(priority: RoutePriority)
-        case cover(priority: RoutePriority, transition: Cover.Transition)
-    }
     let identity: UUID
     let routeType: any Route.Type
-    let kind: Kind
+    let presentation: RoutePresentation
     let scopeID: AnyHashable?
     let children: [RouteScopeDeclaration]
     let childScope: RouteDefinitions?
     let build: @MainActor @Sendable (any Route, RouteContext) -> AnyView
 
-    init<R: Route>(_ destination: RouteDestination<R>, kind: Kind, id: AnyHashable? = nil, children: [RouteScopeDeclaration] = []) {
+    init<R: Route>(_ destination: RouteDestination<R>, presentation: RoutePresentation, id: AnyHashable? = nil, children: [RouteScopeDeclaration] = []) {
+        precondition(presentation.style.isModal || presentation.priority == .default,
+                     "Only modal declarations can start a priority space.")
         identity = UUID()
         routeType = R.self
-        self.kind = kind
+        self.presentation = presentation
         scopeID = id
         self.children = children
         childScope = nil
@@ -55,10 +51,10 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
         }
     }
 
-    private init(copy: Self, kind: Kind, identity: UUID? = nil, childScope: RouteDefinitions? = nil) {
+    private init(copy: Self, presentation: RoutePresentation? = nil, identity: UUID? = nil, childScope: RouteDefinitions? = nil) {
         self.identity = identity ?? copy.identity
         routeType = copy.routeType
-        self.kind = kind
+        self.presentation = presentation ?? copy.presentation
         scopeID = copy.scopeID
         children = childScope == nil ? copy.children : []
         self.childScope = childScope ?? copy.childScope
@@ -66,37 +62,21 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
     }
 
     func compiled() -> Self {
-        Self(copy: self, kind: kind, identity: UUID(), childScope: childScope ?? RouteDefinitions(children, id: scopeID))
+        Self(copy: self, identity: UUID(), childScope: childScope ?? RouteDefinitions(children, id: scopeID))
     }
 
     func withPriority(_ priority: RoutePriority) -> Self {
-        switch kind {
-        case .sheet: return Self(copy: self, kind: .sheet(priority: priority))
-        case let .cover(_, transition): return Self(copy: self, kind: .cover(priority: priority, transition: transition))
-        case .push, .replace:
-            precondition(priority == .default, "Root priority builders accept only modal presentations.")
-            return self
-        }
+        precondition(presentation.style.isModal || priority == .default,
+                     "Root priority builders accept only modal presentations.")
+        return Self(copy: self, presentation: .init(style: presentation.style, priority: priority))
     }
 
     public var _routeDeclarations: [AnyRouteDeclaration] { [self] }
     public static func == (lhs: Self, rhs: Self) -> Bool { lhs.identity == rhs.identity }
     public nonisolated func hash(into hasher: inout Hasher) { hasher.combine(identity) }
 
-    var priority: RoutePriority {
-        switch kind {
-        case .push, .replace: .default
-        case let .sheet(priority), let .cover(priority, _): priority
-        }
-    }
-    var presentationKind: RoutePresentationKind {
-        switch kind {
-        case .push: .push
-        case .replace: .replace
-        case .sheet: .sheet
-        case let .cover(_, transition): .cover(transition)
-        }
-    }
+    var priority: RoutePriority { presentation.priority }
+    var presentationKind: RoutePresentationKind { presentation.style }
 }
 
 typealias RoutePresentationKind = RoutePresentation.Style

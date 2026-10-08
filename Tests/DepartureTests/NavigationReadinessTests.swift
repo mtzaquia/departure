@@ -224,8 +224,8 @@ struct NavigationReadinessTests {
     func resolutionFinishingDuringUnwindWaitsWithoutResolvingAgain(cancel: Bool) async throws {
         let router = RouterEngine()
         router.root.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(DelayedResolutionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(DelayedResolutionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
         ])
         await router.present(SettingsRoute())
         let old = try #require(router.defaultSpace.rootPath.last)

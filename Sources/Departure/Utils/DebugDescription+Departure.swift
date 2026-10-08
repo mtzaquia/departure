@@ -69,14 +69,14 @@ extension AnyRouteDeclaration {
     var departureDebugDescription: String {
         let presentationDescription: String
 
-        switch kind {
+        switch presentation.style {
         case .push:
             presentationDescription = "push"
         case .replace:
             presentationDescription = "replace"
-        case let .sheet(priority):
+        case .sheet:
             presentationDescription = "sheet@\(priority)"
-        case let .cover(priority, transition):
+        case let .cover(transition):
             presentationDescription = "cover.\(transition)@\(priority)"
         }
 

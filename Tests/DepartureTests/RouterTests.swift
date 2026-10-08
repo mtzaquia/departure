@@ -56,7 +56,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -116,7 +116,7 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -189,7 +189,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         router.mutateRouteGraph {
@@ -214,7 +214,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -252,12 +252,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -345,8 +345,8 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -357,7 +357,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -391,12 +391,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -407,7 +407,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -437,12 +437,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -453,7 +453,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -481,12 +481,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))
+                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -497,7 +497,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -507,7 +507,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(settingsScope, for: AppTab.wallet)
@@ -541,11 +541,11 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -556,7 +556,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -598,16 +598,16 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -618,7 +618,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -628,7 +628,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -666,16 +666,16 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -686,7 +686,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -738,11 +738,11 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -751,7 +751,7 @@ struct RouterTests {
             id: LoginRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -797,14 +797,14 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -813,12 +813,12 @@ struct RouterTests {
             id: LoginRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
 
-        let walletRouteDeclaration = try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations.first)
+        let walletRouteDeclaration = try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations.first)
         let modalDeclaration = try #require(
             router.root.definitions.routeAttachments.first {
                 $0.routeTypeID == ObjectIdentifier(MessageRoute.self)
@@ -889,11 +889,11 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -902,18 +902,18 @@ struct RouterTests {
             id: LoginRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
         walletRouteScope.attachPresentation(
             to: walletScope,
-            declaration: try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations.first)
+            declaration: try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations.first)
         )
         walletScope.path.replaceTestPath([walletRouteScope])
         modalScope.attachPresentation(
             to: router.root,
-            declaration: try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations.first)
+            declaration: try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations.first)
         )
         router.defaultSpace.rootPath.replaceTestPath([modalScope])
 
@@ -945,14 +945,14 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -993,7 +993,7 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                     }
                 )
             )
@@ -1002,13 +1002,13 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
         walletRouteScope.attachPresentation(
             to: walletScope,
-            declaration: try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations.first)
+            declaration: try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations.first)
         )
         walletScope.path.replaceTestPath([walletRouteScope])
 
@@ -1031,8 +1031,8 @@ struct RouterTests {
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let detailScope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute())
         let modalScope = RouteScope(id: MessageRoute().id, route: MessageRoute())
-        let pushDeclaration = try #require(AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations.first)
-        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations.first)
+        let pushDeclaration = try #require(AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations.first)
+        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations.first)
 
         landingScope.setActiveBranch(AnyHashable(AppTab.home))
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -1087,8 +1087,8 @@ struct RouterTests {
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let existingDetailScope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute())
         let modalScope = RouteScope(id: MessageRoute().id, route: MessageRoute())
-        let pushDeclaration = try #require(AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations.first)
-        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations.first)
+        let pushDeclaration = try #require(AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations.first)
+        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations.first)
 
         landingScope.setActiveBranch(AnyHashable(AppTab.home))
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -1128,11 +1128,11 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -1143,7 +1143,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -1155,7 +1155,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1180,11 +1180,11 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -1195,7 +1195,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -1217,7 +1217,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1238,11 +1238,11 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) // top-level (shared) sheet
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default)) // top-level (shared) sheet
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) // branch-local sheet
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default)) // branch-local sheet
                     }
                 )
             )
@@ -1254,8 +1254,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -1289,11 +1289,11 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade)) // top-level cover
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .default)) // top-level cover
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) // branch-local sheet
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default)) // branch-local sheet
                     }
                 )
             )
@@ -1304,8 +1304,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -1334,8 +1334,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1345,7 +1345,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1376,14 +1376,14 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -1394,9 +1394,9 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -1446,14 +1446,14 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -1464,9 +1464,9 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -1477,7 +1477,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1555,12 +1555,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -1571,7 +1571,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -1625,7 +1625,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1642,7 +1642,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(DroppedRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(DroppedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1658,7 +1658,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1684,7 +1684,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1713,7 +1713,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1742,8 +1742,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1757,7 +1757,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1805,13 +1805,13 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, kind: .push)
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -1822,7 +1822,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -1832,8 +1832,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -1844,7 +1844,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1872,8 +1872,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1918,7 +1918,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1941,7 +1941,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1963,7 +1963,7 @@ struct RouterTests {
         let modalScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let branchScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let detailScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
-        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations.first)
+        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations.first)
 
         router.root.defineTestMap(
             id: nil,
@@ -1988,8 +1988,8 @@ struct RouterTests {
         let retainedScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let coverScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let pushedScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
-        let coverDeclaration = try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations.first)
-        let pushDeclaration = try #require(AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations.first)
+        let coverDeclaration = try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations.first)
+        let pushDeclaration = try #require(AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations.first)
 
         coverScope.defineTestMap(
             id: LoginRoute().id,
@@ -2125,7 +2125,7 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -2136,7 +2136,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -2162,11 +2162,11 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -2177,8 +2177,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2210,13 +2210,13 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
-                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
+                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -2227,8 +2227,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2238,7 +2238,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -2272,14 +2272,14 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
-                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
+                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                     }
                 )
             )
@@ -2290,8 +2290,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -2301,8 +2301,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -2342,7 +2342,7 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -2353,7 +2353,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -2380,7 +2380,7 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -2391,7 +2391,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -2412,7 +2412,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -2446,8 +2446,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -2483,8 +2483,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
             ]
         )
 
@@ -2522,8 +2522,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -2561,9 +2561,9 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
             ]
         )
 
@@ -2617,7 +2617,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         let transaction = router.beginNavigationOperation()
@@ -2699,7 +2699,7 @@ struct RouterTests {
         let rootScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let loginScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let noticeScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
-        let noticeDeclaration = AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .high))._routeDeclarations[0]
+        let noticeDeclaration = AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .high))._routeDeclarations[0]
 
         router.defaultSpace.rootPath.replaceTestPath([rootScope])
         noticeScope.attachPresentation(to: loginScope, declaration: noticeDeclaration)
@@ -2740,7 +2740,7 @@ struct RouterTests {
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: Branch(AppTab.home) {
-                AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))
+                AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .default))
             }.routeScopeDeclarations
         )
 
@@ -2749,7 +2749,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2775,16 +2775,16 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -2795,7 +2795,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2805,7 +2805,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -2845,12 +2845,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))
+                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -2861,7 +2861,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2871,7 +2871,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -2906,7 +2906,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -2950,7 +2950,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
             ]
         )
         landingScope.setActiveBranch(AnyHashable(AppTab.home))
@@ -2958,7 +2958,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2996,14 +2996,14 @@ struct RouterTests {
             id: "root",
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         sheetScope.defineTestMap(
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         sheetScope.attachPresentation(
@@ -3040,14 +3040,14 @@ struct RouterTests {
             id: "root",
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         sheetA.defineTestMap(
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         sheetA.attachPresentation(
@@ -3087,14 +3087,14 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         sheetScope.defineTestMap(
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         sheetScope.attachPresentation(
@@ -3136,14 +3136,14 @@ struct RouterTests {
             id: paymentMethodsID,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddMethodRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddMethodRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
             ]
         )
         coverScope.defineTestMap(
             id: AddMethodRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddCardRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddCardRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         coverScope.attachPresentation(
@@ -3197,7 +3197,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachPresentation(
@@ -3210,7 +3210,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -3259,7 +3259,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachPresentation(
@@ -3271,7 +3271,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(settingsScope, for: AppTab.wallet)
@@ -3280,7 +3280,7 @@ struct RouterTests {
             id: LoginRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         authenticationScope.attachPresentation(
@@ -3334,8 +3334,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachPresentation(
@@ -3347,7 +3347,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(settingsScope, for: AppTab.wallet)
@@ -3356,7 +3356,7 @@ struct RouterTests {
             id: LoginRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         appearanceScope.attachPresentation(
@@ -3405,23 +3405,23 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         appearanceScope.defineTestMap(
             id: LoginRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         authenticationScope.defineTestMap(
             id: SettingsRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -3492,7 +3492,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(settingsScope, for: AppTab.wallet)
@@ -3533,15 +3533,15 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         appearanceScope.defineTestMap(
             id: LoginRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         appearanceScope.attachPresentation(
@@ -3602,12 +3602,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -3618,7 +3618,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -3628,7 +3628,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -3668,12 +3668,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))
+                        AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))
                     }
                 )
             )
@@ -3684,7 +3684,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -3694,7 +3694,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -3726,12 +3726,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -3742,7 +3742,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -3752,7 +3752,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -3785,7 +3785,7 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: Branch(AppTab.home) {
-                AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
             }.routeScopeDeclarations
         )
 
@@ -3794,7 +3794,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -3818,12 +3818,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                     }
                 )
             )
@@ -3834,7 +3834,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -3844,7 +3844,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -3901,7 +3901,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.defaultSpace.rootPath.replaceTestPath([ancestorScope, firstDescendant, secondDescendant])
@@ -3973,7 +3973,7 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: Branch(AppTab.home) {
-                AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))
+                AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))
             }.routeScopeDeclarations
         )
 
@@ -3982,7 +3982,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -4052,11 +4052,11 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                     }
                 )
             )
@@ -4067,7 +4067,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -4090,8 +4090,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -4111,8 +4111,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
 
@@ -4156,9 +4156,9 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .high))._routeDeclarations),
             ]
         )
 
@@ -4198,8 +4198,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                        + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                        + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .high))._routeDeclarations),
             ]
         )
 
@@ -4240,7 +4240,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
 
@@ -4250,7 +4250,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -4269,7 +4269,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
 
@@ -4279,7 +4279,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .default))._routeDeclarations),
             ]
         )
 
@@ -4299,7 +4299,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
 
@@ -4309,7 +4309,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -4352,7 +4352,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
 
@@ -4362,7 +4362,7 @@ struct RouterTests {
             id: LoginRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         await router.requestRoute(SettingsRoute())
@@ -4386,7 +4386,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
 
@@ -4411,8 +4411,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                        + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                        + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .high))._routeDeclarations),
             ]
         )
 
@@ -4437,8 +4437,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .critical, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .critical))._routeDeclarations),
             ]
         )
 
@@ -4476,8 +4476,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .critical, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .critical))._routeDeclarations),
             ]
         )
 
@@ -4500,9 +4500,9 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .critical, transition: .fade))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .critical, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .critical))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .critical))._routeDeclarations),
             ]
         )
 
@@ -4540,9 +4540,9 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .critical, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .critical))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -4564,7 +4564,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
 
@@ -4574,7 +4574,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .critical, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .critical))._routeDeclarations),
             ]
         )
 

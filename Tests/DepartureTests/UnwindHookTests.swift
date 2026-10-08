@@ -107,8 +107,8 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(ChallengeRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(LockRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .critical, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(ChallengeRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(LockRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .critical))._routeDeclarations),
             ]
         )
         router.root.installHookDeclarations(
@@ -143,7 +143,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(CardsListRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(CardsListRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -153,7 +153,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddMethodRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddMethodRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         cardsListScope.installHookDeclarations(
@@ -170,7 +170,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddCardRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddCardRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
             ]
         )
 
@@ -190,7 +190,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(CardsListRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(CardsListRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.installHookDeclarations(
@@ -207,7 +207,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddMethodRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddMethodRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         cardsListScope.installHookDeclarations(
@@ -224,7 +224,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddCardRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddCardRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
             ]
         )
 
@@ -293,8 +293,8 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(ChallengeRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(LockRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .critical, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(ChallengeRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(LockRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .critical))._routeDeclarations),
             ]
         )
         router.root.installHookDeclarations(
@@ -487,8 +487,8 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
 
@@ -498,7 +498,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         numberedScope.installHookDeclarations(
@@ -565,7 +565,7 @@ struct UnwindHookTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -574,7 +574,7 @@ struct UnwindHookTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -717,7 +717,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         parentScope.installHookDeclarations(
@@ -763,8 +763,8 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         parentScope.installHookDeclarations(
@@ -807,7 +807,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         parentScope.installHookDeclarations(
@@ -842,7 +842,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ]
         )
         parentScope.installHookDeclarations(
@@ -938,7 +938,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
         router.root.installHookDeclarations(
@@ -977,7 +977,7 @@ struct UnwindHookTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ]
         )
         router.root.installHookDeclarations(

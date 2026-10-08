@@ -110,7 +110,7 @@ struct WindowDestinationBuilderTests {
         let recorder = WindowDestinationRecorder()
 
         router.root.defineTestMap(id: nil, selection: nil, definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ])
 
         await router.requestRoute(LoginRoute())
@@ -147,7 +147,7 @@ struct WindowDestinationBuilderTests {
         environment.windowDestinationTestValue = "installed"
 
         router.root.defineTestMap(id: nil, selection: nil, definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ], environment: environment)
 
         await router.requestRoute(LoginRoute())
@@ -161,7 +161,7 @@ struct WindowDestinationBuilderTests {
 
     @Test func elevatedPresentationRetainsSourceEnvironmentAfterOriginScopeIsReleased() throws {
         let router = RouterEngine()
-        let declaration = AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations[0]
+        let declaration = AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations[0]
         let presentedScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         weak var releasedOrigin: RouteScope?
 
@@ -201,7 +201,7 @@ struct WindowDestinationBuilderTests {
         initialEnvironment.windowDestinationTestValue = "initial"
 
         router.root.defineTestMap(id: nil, selection: nil, definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ], environment: initialEnvironment)
 
         await router.requestRoute(LoginRoute())
@@ -218,7 +218,7 @@ struct WindowDestinationBuilderTests {
         var updatedEnvironment = EnvironmentValues()
         updatedEnvironment.windowDestinationTestValue = "updated"
         router.root.defineTestMap(id: nil, selection: nil, definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ], environment: updatedEnvironment)
 
         let updatedPresentation = try #require(router.elevatedRoutePresentationBinding(
@@ -242,8 +242,8 @@ struct WindowDestinationBuilderTests {
             )
         }
         let routeDeclarations = [
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
+            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
         ]
         var initialEnvironment = EnvironmentValues()
         initialEnvironment.windowDestinationTestValue = "initial"
@@ -287,7 +287,7 @@ struct WindowDestinationBuilderTests {
         environment.windowDestinationTestValue = "declaring"
 
         router.root.defineTestMap(id: nil, selection: nil, definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ], environment: environment)
 
         await router.requestRoute(LoginRoute())
@@ -311,18 +311,18 @@ struct WindowDestinationBuilderTests {
         router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(id: RootRoute().id, selection: AnyRouteBranchSelection(selection), definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branches { Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
                     } }
                 )
             ), environment: containerEnvironment)
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         homeScope.defineTestMap(id: AnyHashable(AppTab.home), selection: nil, definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ], environment: branchEnvironment)
         landingScope.attachTestBranch(homeScope, for: AppTab.home, environment: branchEnvironment)
 
@@ -354,7 +354,7 @@ struct WindowDestinationBuilderTests {
         #expect(host.windowDestinationBuilder.hasWindowDestination)
 
         router.root.defineTestMap(id: nil, selection: nil, definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
             ])
 
         await router.requestRoute(SettingsRoute())
@@ -398,7 +398,7 @@ struct WindowDestinationBuilderTests {
         let recorder = WindowDestinationRecorder()
 
         router.root.defineTestMap(id: nil, selection: nil, definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.fade), priority: .default))._routeDeclarations),
             ])
 
         await router.requestRoute(SettingsRoute())
