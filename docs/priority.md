@@ -16,6 +16,8 @@ let routes = RootRouteMap {
 
 Either additional builder may be omitted independently. Elevated base builders accept `Sheet`, `Cover`, and restricted `ModalRouteMap` compositions; unsupported expressions fail at compile time. Compose ordinary `RouteMap` values inside their nested builders. Child declarations use default local styles within that elevated flow; they inherit its effective priority. Priorities belong to the root builders, so `Push`, `Replace`, `Sheet`, and `Cover` have no priority argument.
 
+Only `RootRouteMap` declares high and critical entries. A high destination cannot declare or host a critical space inside its child map. It may request a critical entry from the owner's root catalog while high is top; the owner presents that independent critical space. A nested sheet inside high is local navigation within high and keeps the existing high root.
+
 | Priority | Presentation owner |
 | --- | --- |
 | `.default` | The matching local scope. |
@@ -40,6 +42,8 @@ await rootRouter.default.present(ProfileRoute())
 // Or remove every elevated space present when the call is accepted:
 await rootRouter.dismissSpaces()
 ```
+
+Dismissing the elevated entry's outer sheet or cover dismantles that entire space, including every branch and descendant. Final teardown of that entry's current managed root also removes the exact space if it remains live. A stale callback from an outgoing root cannot remove its replacement. Retained outgoing views have no routing authority after logical removal.
 
 Pending requests, transactions, and outgoing snapshots share one owner-level pipeline. After removal commits, the surviving top space becomes eligible immediately; its next presentation waits for required native teardown. A matched lower-space unwind handler runs before commit and can buffer that follow-up. A stored router from the removed space remains inactive.
 

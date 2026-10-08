@@ -98,6 +98,8 @@ Top-level declarations in `highPriority` and `criticalPriority` describe present
 
 A root presentation's nested declarations describe local navigation within that presentation. For example, `ResetPasswordRoute` pushes inside the presented Login destination; it does not become a separate root presentation because its definition is nested under `highPriority`.
 
+Only the owner's `RootRouteMap` can declare elevated catalogs. Its type cannot be embedded inside a route's child builder or a feature map. High-space sources can still request root-declared critical entries while eligible; the owner presents an independent space rather than nesting critical ownership inside high. Nested sheets and covers remain local to their existing space.
+
 The exact rules for replacing, dismissing, and resolving competing root presentations belong to the runtime routing specification.
 
 ## Router installation

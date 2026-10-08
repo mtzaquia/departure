@@ -75,6 +75,52 @@ import Testing
         #expect(engine.spaces.highSpace == nil)
     }
 
+    @Test func detachingAnElevatedRootRemovesItsEntireOwnedTreeWhileCovered() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
+        } highPriority: {
+            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
+                Branches(concurrent: true) {
+                    Branch("first") {
+                        Push(RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }) {
+                            Sheet(RouteDestination(MessageRoute.self) { _, _ in EmptyView() })
+                        }
+                    }
+                    Branch("second") { Push(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }) }
+                }
+            }
+        } criticalPriority: {
+            Cover(RouteDestination(AlertRoute.self) { _, _ in EmptyView() })
+        })
+        await engine.present(HomeDetailRoute())
+        let defaultDestination = try #require(engine.defaultSpace.rootPath.last)
+        await engine.present(LoginRoute())
+        let high = try #require(engine.spaces.highSpace)
+        let highRouter = Router(engine: engine, scope: high.root)
+        await highRouter.branch("first").present(NumberedRoute(number: 1))
+        await highRouter.branch("second").present(SettingsRoute())
+        let first = try #require(high.root.branchScopes["first"])
+        let second = try #require(high.root.branchScopes["second"])
+        let pushed = try #require(first.path.last)
+        await Router(engine: engine, scope: pushed).present(MessageRoute())
+        let modal = try #require(first.path.last)
+        // A request from high uses the owner's critical catalog, not high's tree.
+        await highRouter.present(AlertRoute())
+        let critical = try #require(engine.spaces.criticalSpace)
+        let host = UUID()
+        engine.hostDidAttach(high.root, view: nil, id: host)
+        engine.hostDidDetach(high.root, id: host)
+        #expect(engine.spaces.highSpace == nil)
+        #expect(engine.spaces.criticalSpace === critical)
+        #expect(engine.defaultSpace.rootPath.last === defaultDestination)
+        for removed in [high.root, first, second, pushed, modal] {
+            #expect(engine.spaces.routePath(containing: removed) == nil)
+        }
+        // Retained outgoing objects keep their owned tree without routing authority.
+        #expect(first.path.last === modal)
+        #expect(second.path.last?.route is SettingsRoute)
+    }
+
     @Test func canonicalHostEventsCompleteReadinessWaitersOnce() async {
         let engine = RouterEngine()
         let scope = engine.root

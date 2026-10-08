@@ -86,6 +86,9 @@ public struct RouteMap: Sendable {
 }
 
 /// All definitions for a routing owner, including optional elevated root presentations.
+/// Only this map declares elevated entries. Nested maps and route children declare
+/// local navigation within their destination's owning space. An eligible scoped
+/// router may request a higher-priority entry from this owner's root catalog.
 public struct RootRouteMap: Sendable {
     let scopeID: AnyHashable?
     let declarations: [RouteScopeDeclaration]
