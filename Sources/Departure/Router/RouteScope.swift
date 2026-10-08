@@ -56,6 +56,8 @@ final class RouteScope: Identifiable {
     @ObservationIgnored private var host: Host?
     @ObservationIgnored private var routingHosts = OrderedStorage<RoutePresentationHostID, RoutingHost>()
     @ObservationIgnored private var hookSources: [AnyHashable: [AnyHookDeclaration]] = [:]
+    // Overlapping unwinds share callback entry per receiving scope ID for this route instance.
+    @ObservationIgnored var unwindHandlerDeliveries: [AnyHashable: Task<Void, Never>] = [:]
     @ObservationIgnored private var attachments: [WeakAttachment] = []
     @ObservationIgnored private var readinessWaits: [WeakReadiness] = []
     @ObservationIgnored private(set) var hasEverInstalled = false

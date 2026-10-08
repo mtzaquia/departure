@@ -872,35 +872,62 @@ struct UnwindHookTests {
         #expect(recorder.events == ["handler"])
     }
 
-    @Test func staleDeliveredUnwindHandlerKeyDoesNotSuppressNewScope() async {
-        let router = RouterEngine()
-        let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
-        let sourceScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
+    @Test func repeatedRouteInstancesDeliverIndependently() async throws {
+        let owner = RootRouter()
+        _ = WithRouter(routes: RootRouteMap {
+            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+        }, router: owner) { EmptyView() }
         let recorder = UnwindRecorder()
-
-        parentScope.installHookDeclarations(
-            hookDeclarations: [
-                UnwindHandler(LoginRoute.self) {
-                    recorder.events.append("handler")
-                }.declaration,
-            ]
-        )
-
-        router.defaultSpace.rootPath.replaceTestPath([parentScope, sourceScope])
-        var staleSourceScope: RouteScope? = RouteScope(id: LoginRoute().id, route: LoginRoute())
-        let collidingKey = RouterEngine.UnwindHandlerDeliveryKey(
-            sourceScopeID: ObjectIdentifier(sourceScope),
-            targetScopeID: parentScope.id
-        )
-        router.deliveredUnwindHandlers[collidingKey] = RouterEngine.DeliveredUnwindHandler(
-            sourceScope: staleSourceScope, entry: Task {}
-        )
-        staleSourceScope = nil
-
-        #expect(await Router(engine: router, scope: sourceScope).unwind(to: .topmostAncestor))
+        owner.engine.root.installHookDeclarations(hookDeclarations: [
+            UnwindHandler(LoginRoute.self) { recorder.events.append("handler") }.declaration,
+        ])
+        await owner.default.present(LoginRoute())
+        let first = try #require(owner.engine.defaultSpace.rootPath.last)
+        #expect(await owner.current.unwind(to: .topmostAncestor))
         await recorder.waitForEventCount(1)
-
         #expect(recorder.events == ["handler"])
+
+        // Retain the outgoing instance while the same domain route is presented again.
+        await owner.default.present(LoginRoute())
+        let second = try #require(owner.engine.defaultSpace.rootPath.last)
+        #expect(first !== second)
+        #expect(first.id == second.id)
+        #expect(await owner.current.unwind(to: .topmostAncestor))
+        await recorder.waitForEventCount(2)
+        #expect(recorder.events == ["handler", "handler"])
+    }
+
+    @Test(arguments: [RoutePriority.default, .high, .critical])
+    func unwindDeliveryDoesNotRetainDepartingScopeWhileHandlerSuspends(priority: RoutePriority) async {
+        let owner = RootRouter()
+        let entry = Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+        _ = WithRouter(routes: RootRouteMap {
+            if priority == .default { entry }
+        } highPriority: {
+            if priority == .high { entry }
+        } criticalPriority: {
+            if priority == .critical { entry }
+        }, router: owner) { EmptyView() }
+        let recorder = UnwindRecorder()
+        owner.engine.root.installHookDeclarations(hookDeclarations: [
+            UnwindHandler(LoginRoute.self) {
+                recorder.events.append("handler")
+                await recorder.waitForRelease()
+                recorder.events.append("finished")
+            }.declaration,
+        ])
+
+        weak var departingScope: RouteScope?
+        await owner.current.present(LoginRoute())
+        departingScope = owner.engine.currentRouteScope
+        #expect(departingScope?.route is LoginRoute)
+        #expect(await owner.current.unwind(to: .topmostAncestor))
+        #expect(recorder.events == ["handler"])
+        #expect(departingScope == nil)
+
+        recorder.release()
+        await recorder.waitForEventCount(2)
+        #expect(recorder.events == ["handler", "finished"])
     }
 
     @Test func routerUnwindTriggersHandlerForHighPriorityPresentation() async throws {

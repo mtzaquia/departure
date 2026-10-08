@@ -23,16 +23,6 @@
 import Foundation
 
 extension RouterEngine {
-    struct UnwindHandlerDeliveryKey: Equatable, Hashable {
-        let sourceScopeID: ObjectIdentifier
-        let targetScopeID: AnyHashable
-    }
-
-    struct DeliveredUnwindHandler {
-        weak var sourceScope: RouteScope?
-        let entry: Task<Void, Never>
-    }
-
     @discardableResult
     func unwindAndWait(to target: UnwindTarget?, payload: Any? = nil, origin: RouteRequestOrigin? = nil) async -> Bool {
         #if DEBUG
@@ -620,14 +610,8 @@ extension RouterEngine {
             return
         }
 
-        deliveredUnwindHandlers = deliveredUnwindHandlers.filter { $0.value.sourceScope != nil }
-
-        let key = UnwindHandlerDeliveryKey(
-            sourceScopeID: ObjectIdentifier(sourceScope),
-            targetScopeID: match.scope.id
-        )
-        if let delivery = deliveredUnwindHandlers[key] {
-            await delivery.entry.value
+        if let entry = sourceScope.unwindHandlerDeliveries[match.scope.id] {
+            await entry.value
             return
         }
 
@@ -642,7 +626,7 @@ extension RouterEngine {
                 }
             }
         }
-        deliveredUnwindHandlers[key] = DeliveredUnwindHandler(sourceScope: sourceScope, entry: entry)
+        sourceScope.unwindHandlerDeliveries[match.scope.id] = entry
         await entry.value
     }
 

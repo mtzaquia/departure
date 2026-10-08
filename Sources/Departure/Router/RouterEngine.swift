@@ -47,9 +47,6 @@ final class RouterEngine: Identifiable, Equatable {
     }
 
     @ObservationIgnored
-    var deliveredUnwindHandlers: [UnwindHandlerDeliveryKey: DeliveredUnwindHandler] = [:]
-
-    @ObservationIgnored
     var routeGraphMutationDepth = 0
 
     @ObservationIgnored

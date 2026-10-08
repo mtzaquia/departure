@@ -165,3 +165,13 @@ Together the iPhone and iPad runs exercise all 41 UI cases. Older-system coverag
 Evidence: `/tmp/departure-checkpoint-full-iphone-27.log` (initial full run), `/tmp/departure-checkpoint-high-flow-baseline.log` (isolated reproduction), `/tmp/departure-checkpoint-high-flow-fixed.log` (isolated fix), `/tmp/departure-checkpoint-full-iphone-27-final.log` (full rerun), `/tmp/departure-checkpoint-ipad-27.log`, and `/tmp/departure-checkpoint-native-17.log`.
 
 Final XcodeBuildMCP result bundles are `test_sim_2026-10-08T17-02-49-496Z_pid63442_a39386f0.xcresult` (full iPhone), `test_sim_2026-10-08T17-26-10-698Z_pid66279_65ee2477.xcresult` (iPad), and `test_sim_2026-10-08T17-28-13-002Z_pid66757_29975caf.xcresult` (iOS 17.5 regressions).
+
+## Scope-owned unwind delivery on 2026-10-08
+
+Each source `RouteScope` owns its unwind-handler entry tasks, keyed by the receiving scope ID. This preserves deduplication for overlapping explicit and native unwinds while removing the engine's global delivery history, composite source/target keys, weak-source wrapper, and stale-source cleanup. Delivery state follows the source instance's lifetime, including when outgoing views retain that instance. Distinct instances of the same domain route never share delivery history.
+
+The callback still enters before commit. Overlapping unwinds await the same entry boundary without awaiting the asynchronous handler body. Handler presentations still wait for global teardown and recheck source membership and priority coverage. Handler lookup, payload delivery, and presentation-crawlback exclusions remain unchanged. The entry task does not retain its source scope, so a suspended callback does not prolong the removed scope's lifetime.
+
+Production Swift decreases from 7,759 lines at `81ba05a` to 7,742 lines: **17 fewer lines**. The regression that injected a stale global-history key is replaced with public routing that presents and unwinds two instances of the same route while retaining the first outgoing instance. A new lifetime regression verifies deallocation while a handler is suspended in default, high, and critical spaces. Existing overlap and timing assertions remain unchanged.
+
+Validation: **75 package tests in 8 affected suites passed** on the final code, covering unwind hooks, cross-priority notification and follow-ups, presentation-crawlback exclusions, hook composition and eligibility, action hooks, operation overlap, request completion, and outgoing snapshot policy. The final run has no compiler warnings. The full UI matrix was not repeated for this bookkeeping-only pass. Evidence: `/tmp/departure-scope-unwind-focused-final.log`.
