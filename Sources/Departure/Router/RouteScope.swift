@@ -163,6 +163,11 @@ extension RouteScope {
     var pathDepth: Int { previousRouteScope.map { $0.pathDepth + 1 } ?? parent?.pathDepth ?? 0 }
     var previousScopeInSpace: RouteScope? { previousRouteScope ?? parent }
 
+    // Includes this scope and follows X/Z ancestry within its space, including outgoing trees.
+    var ancestry: some Sequence<RouteScope> {
+        sequence(first: self) { $0.previousScopeInSpace }
+    }
+
     func belongs(to space: RouteSpace) -> Bool {
         if self === space.root { return anchorSpace === space }
         if let branchID, let parent {

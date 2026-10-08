@@ -143,16 +143,7 @@ extension RouterEngine {
     var nearestBranchPath: RoutePath? { nearestBranchPath(from: currentRouteScope) }
 
     func nearestBranchPath(from sourceScope: RouteScope) -> RoutePath? {
-        var scope: RouteScope? = sourceScope
-        while let current = scope {
-            if current.branchID != nil {
-                return current.path
-            }
-
-            scope = current.previousScopeInSpace
-        }
-
-        return nil
+        sourceScope.ancestry.first { $0.branchID != nil }?.path
     }
 
 }
@@ -176,11 +167,9 @@ extension RouterEngine {
     }
 
     private func activateScopeAncestors(_ scope: RouteScope) -> Bool {
-        var source = scope
-        var ancestry: [(RouteScope, AnyHashable)] = []
-        while let previous = source.previousScopeInSpace {
-            if let branch = source.branchID { ancestry.append((previous, branch)) }
-            source = previous
+        let ancestry: [(RouteScope, AnyHashable)] = scope.ancestry.compactMap { source in
+            guard let branch = source.branchID, let previous = source.previousScopeInSpace else { return nil }
+            return (previous, branch)
         }
         // Validate all bindings before writing any enclosing selection. Keep the
         // final presentation branch's activation at its existing staging boundary.

@@ -150,20 +150,14 @@ extension RouterEngine {
               let space = spaces.space(containing: path), space === spaces.activeSpace else { return .inactive }
         // A modal suspends scopes outside its subtree. Concurrent columns hosted
         // inside that modal still participate together.
-        if let deepestModal = space.currentModalScope {
-            var ancestor: RouteScope? = routeScope
-            while let current = ancestor, current !== deepestModal {
-                ancestor = current.previousScopeInSpace
-            }
-            guard ancestor === deepestModal else { return .inactive }
+        if let deepestModal = space.currentModalScope,
+           !routeScope.ancestry.contains(where: { $0 === deepestModal }) {
+            return .inactive
         }
-        var scope = routeScope
-        while let previous = scope.previousScopeInSpace {
-            if let branch = scope.branchID,
+        for scope in routeScope.ancestry {
+            if let branch = scope.branchID, let previous = scope.previousScopeInSpace,
                previous.participates(inBranch: branch) == false { return .inactive }
-            scope = previous
         }
-        let current = path.last?.activeLocalScope ?? path.owner?.activeLocalScope
-        return current === routeScope ? .active : .inactive
+        return path.owner?.activeLocalScope === routeScope ? .active : .inactive
     }
 }

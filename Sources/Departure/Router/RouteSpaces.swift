@@ -45,12 +45,9 @@ struct RouteSpaces {
                 $0.routePath.scopesRemoved(after: $0)
             }.map(ObjectIdentifier.init))
             self.retainedScopes = retained.filter { retainedScope in
-                var ancestor = retainedScope.routePath.owner
-                while let scope = ancestor {
-                    if detachedScopeIDs.contains(ObjectIdentifier(scope)) { return false }
-                    ancestor = scope.previousScopeInSpace
-                }
-                return true
+                retainedScope.routePath.owner?.ancestry.contains {
+                    detachedScopeIDs.contains(ObjectIdentifier($0))
+                } != true
             }
             // Descendants leave with their owner. Capture their outgoing paths
             // for snapshots and completion, without adding another tree mutation.
@@ -239,8 +236,9 @@ extension RouteSpaces {
 
 private extension RouteSpaces {
     func scopedDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
-        guard var source = origin.resolve(in: self) else { return nil }
-        while let path = routePath(containing: source), let space = space(containing: path) {
+        guard let originScope = origin.resolve(in: self) else { return nil }
+        for source in originScope.ancestry {
+            guard let path = routePath(containing: source), let space = space(containing: path) else { break }
             if origin.branches.isEmpty,
                let binding = source.firstBranchScopeRouteAttachment(for: routeType, in: source.activeBranch) {
                 return binding
@@ -252,16 +250,7 @@ private extension RouteSpaces {
                 lookupStrategy: source === defaultSpace.root ? .defaultRootDeclarations : .currentPath(spacePriority: space.priority)) {
                 return binding
             }
-            guard let previous = enclosingScope(before: source) else { break }
-            source = previous
         }
         return nil
-    }
-}
-
-extension RouteSpaces {
-    /// Navigation ancestry never crosses a priority space boundary.
-    func enclosingScope(before scope: RouteScope) -> RouteScope? {
-        scope.previousScopeInSpace
     }
 }

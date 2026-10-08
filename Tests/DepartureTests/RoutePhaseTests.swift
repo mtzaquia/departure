@@ -29,11 +29,12 @@ import Testing
 
         await Router(engine: engine, scope: engine.root).branch(AppTab.wallet).present(SettingsRoute())
         #expect(engine.root.activeBranch == AnyHashable(AppTab.wallet))
-        #expect(engine.pendingRoute?.operation?.presentation?.route is SettingsRoute)
-        // Eligibility does not bypass an unmounted branch's presentation readiness.
-        engine.resumePendingRoute(for: AppTab.wallet, in: engine.root)
+        // Awaiting presentation includes branch staging and destination insertion.
+        #expect(engine.pendingRoute == nil)
         let current = try #require(wallet.path.last)
         #expect(current.route is SettingsRoute)
+        #expect(engine.currentRouteScope === current)
+        #expect(engine.defaultSpace.currentRoutePath === wallet.path)
         #expect(engine.root.activeBranch == AnyHashable(AppTab.wallet))
         #expect(engine.routePhase(for: current) == .active)
         #expect(engine.routePhase(for: home.path.last!) == .inactive)

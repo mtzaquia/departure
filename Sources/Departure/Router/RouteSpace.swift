@@ -35,23 +35,8 @@ final class RouteSpace {
         root.anchorSpace = self
     }
 
-    var currentRoutePath: RoutePath {
-        let activeScope = rootPath.last?.activeLocalScope ?? root.activeLocalScope
-
-        // A branch root owns its navigation path rather than appearing inside it. Once that path
-        // contains a presented scope, the active scope's `owningPath` identifies the same path.
-        if activeScope.branchID != nil {
-            return activeScope.path
-        }
-
-        return activeScope.owningPath ?? rootPath
-    }
-
-    var currentRouteScope: RouteScope {
-        currentRoutePath.last?.activeLocalScope
-        ?? currentRoutePath.owner?.activeLocalScope
-        ?? root.activeLocalScope
-    }
+    var currentRouteScope: RouteScope { root.activeLocalScope }
+    var currentRoutePath: RoutePath { currentRouteScope.routePath }
 
     func contains(_ path: RoutePath) -> Bool { path.owner?.belongs(to: self) == true }
 

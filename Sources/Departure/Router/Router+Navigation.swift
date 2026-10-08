@@ -559,12 +559,7 @@ extension RouterEngine {
         // coalesces the path change into one visible pop.
         let removed = Set(plan.removedScopes.map(ObjectIdentifier.init))
         func isDeparting(_ scope: RouteScope?) -> Bool {
-            var ancestor = scope
-            while let scope = ancestor {
-                if removed.contains(ObjectIdentifier(scope)) { return true }
-                ancestor = scope.previousScopeInSpace
-            }
-            return false
+            scope?.ancestry.contains { removed.contains(ObjectIdentifier($0)) } == true
         }
         let containsDepartingModal = plan.removedScopes.contains {
             $0.presentationDeclaration?.presentationKind.isModal == true
@@ -777,16 +772,12 @@ private extension RouteScope {
     func firstUnwindHandlerBinding(for routeType: any Route.Type, in spaces: RouteSpaces,
                                   excluding removed: Set<ObjectIdentifier>) -> DeclarationBinding<UnwindHandlerMatch>? {
         guard spaces.routePath(containing: self) != nil else { return nil }
-        var scope: RouteScope? = self
-
-        while let currentScope = scope {
+        for currentScope in ancestry {
             if !removed.contains(ObjectIdentifier(currentScope)),
                let binding = currentScope.hookBinding(for: .unwindHandler(ObjectIdentifier(routeType)), in: spaces) {
                 guard let handler = binding.declaration?.unwindHandler(for: routeType) else { return .conflict }
                 return .declared(UnwindHandlerMatch(handler: handler, scope: currentScope))
             }
-
-            scope = currentScope.previousScopeInSpace
         }
 
         return nil

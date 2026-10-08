@@ -105,6 +105,8 @@ struct RouteSpaceTests {
         let changes = ObservationCount()
         withObservationTracking {
             #expect(engine.activeRouteScopeID == ObjectIdentifier(home))
+            #expect(engine.defaultSpace.currentRouteScope === home)
+            #expect(engine.defaultSpace.currentRoutePath === home.path)
         } onChange: {
             MainActor.assumeIsolated { changes.value += 1 }
         }
@@ -114,6 +116,8 @@ struct RouteSpaceTests {
         #expect(engine.root.setActiveBranch(AppTab.wallet))
         #expect(changes.value == 1)
         #expect(engine.activeRouteScopeID == ObjectIdentifier(wallet))
+        #expect(engine.defaultSpace.currentRouteScope === wallet)
+        #expect(engine.defaultSpace.currentRoutePath === wallet.path)
         #expect(engine.routePhase(for: wallet) == .active)
         #expect(engine.routePhase(for: home) == .active)
     }
@@ -145,6 +149,8 @@ struct RouteSpaceTests {
         let detail = try #require(scopes.first { $0.route is HomeDetailRoute })
         let cover = try #require(scopes.first { $0.route is AlertRoute })
         let inner = try #require(sheet.branchScopes["inner"])
+        #expect(engine.defaultSpace.currentRouteScope === cover)
+        #expect(engine.defaultSpace.currentRoutePath === path)
         #expect(engine.root.continuation === push)
         #expect(engine.root.lane.modal === sheet)
         #expect(sheet.continuation === detail)
@@ -156,6 +162,8 @@ struct RouteSpaceTests {
         #expect(await Router(engine: engine, scope: sheet).unwind(to: .topmostAncestor))
         #expect(path.scopes.count == 1)
         #expect(path.last === push)
+        #expect(engine.defaultSpace.currentRouteScope === push)
+        #expect(engine.defaultSpace.currentRoutePath === path)
         #expect(engine.root.lane.modal == nil)
         #expect(sheet.lane.modal == nil)
         #expect(sheet.continuation === detail)

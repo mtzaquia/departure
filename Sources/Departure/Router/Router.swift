@@ -160,14 +160,8 @@ final class RouteRequestOrigin: Equatable {
     func targeting(_ branch: AnyHashable, in forest: RouteSpaces?) -> RouteRequestOrigin? {
         guard let scope, let forest, forest.routePath(containing: scope) != nil else { return nil }
         if branches.isEmpty {
-            var candidate: RouteScope? = scope
-            while let owner = candidate {
-                if owner.branchContainer != nil {
-                    return RouteRequestOrigin(scope: owner, branches: [branch])
-                }
-                candidate = forest.enclosingScope(before: owner)
-            }
-            return nil
+            guard let owner = scope.ancestry.first(where: { $0.branchContainer != nil }) else { return nil }
+            return RouteRequestOrigin(scope: owner, branches: [branch])
         }
         return RouteRequestOrigin(scope: scope, branches: branches + [branch])
     }
