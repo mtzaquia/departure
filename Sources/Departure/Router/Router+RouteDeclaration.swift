@@ -84,7 +84,7 @@ extension RouterEngine {
             }
 
             log.departureDebug(.routeAcceptedReplaceElevatedPriority(route: resolvedRoute))
-            return await replaceElevatedSpace(priority, with: resolvedRoute, after: match)
+            return await replaceElevatedSpace(priority, with: resolvedRoute, after: match, origin: origin)
         }
     }
 

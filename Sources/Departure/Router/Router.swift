@@ -94,6 +94,9 @@ public struct Router: Equatable {
     ///
     /// Returns after routing state updates, without waiting for SwiftUI to display
     /// the destination. Rejected routes do not activate the targeted branch.
+    /// During an unfinished navigation operation, the latest presentation attempt
+    /// from a live scope waits for completion. Coverage is checked when it resumes;
+    /// a surviving higher-priority space causes the request to be dropped.
     /// - Parameter route: The route to resolve and present.
     public func present(_ route: any Route) async {
         guard let engine else { return }

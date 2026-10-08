@@ -148,7 +148,7 @@ extension RouterEngine {
 
         guard isNavigationEligible(sourceScope) else { return false }
         if let space = sourceScope.space, sourceScope === space.root {
-            return await dismissSpace(space, source: sourceScope)
+            return await dismissSpace(space, source: sourceScope, payload: payload)
         }
         guard
             let routePath = spaces.routePath(containing: sourceScope),
@@ -397,8 +397,10 @@ extension RouterEngine {
     func replaceElevatedSpace(
         _ priority: RoutePriority,
         with route: any Route,
-        after match: DeclarationMatch
-    ) async -> RouteSpace {
+        after match: DeclarationMatch,
+        origin: RouteRequestOrigin? = nil
+    ) async -> RouteSpace? {
+        let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         log.departureDebug(.elevatedPriorityReplacePreparing(route: route))
 
         // Commit the incoming root before awaiting native teardown: replacement
@@ -406,6 +408,13 @@ extension RouterEngine {
         let operation = beginNavigationOperation(plan: spaces.space(for: priority).map {
             spaces.unwindPlan(for: .space($0))
         })
+        if let outgoing = spaces.space(for: priority) {
+            await deliverUnwindHandlers(for: outgoing.root, payload: nil, in: nil, removing: operation.removedScopes)
+        }
+        guard !Task.isCancelled, navigationSource(origin) != nil else {
+            await finishNavigationOperation(operation)
+            return nil
+        }
         commitNavigationOperation(operation, preservesModalPresentationBindings: false)
         let scope = RouteScope(id: AnyHashable(route.id),
             route: route, definitions: match.declaration.childScope ?? .empty)
@@ -633,16 +642,23 @@ extension RouterEngine {
     }
 
     @discardableResult
-    func dismissSpace(_ space: RouteSpace, source: RouteScope? = nil) async -> Bool {
-        await dismissSpaces([space], source: source)
+    func dismissSpace(_ space: RouteSpace, source: RouteScope? = nil, payload: Any? = nil) async -> Bool {
+        await dismissSpaces([space], source: source, payload: payload)
     }
 
     @discardableResult
-    func dismissSpaces(_ candidates: [RouteSpace], source: RouteScope? = nil) async -> Bool {
+    func dismissSpaces(_ candidates: [RouteSpace], source: RouteScope? = nil, payload: Any? = nil) async -> Bool {
         let captured = candidates.filter { $0.priority != .default && spaces.space(for: $0.priority) === $0 }
         guard !captured.isEmpty, !Task.isCancelled,
               source.map(isNavigationEligible) ?? true else { return false }
         let operation = beginNavigationOperation(plan: spaces.unwindPlan(for: .combined(captured.map { .space($0) })))
+        for space in captured.sorted(by: { $0.priority > $1.priority }) {
+            await deliverUnwindHandlers(for: space.root, payload: payload, in: nil, removing: operation.removedScopes)
+        }
+        guard !Task.isCancelled, source.map(isNavigationEligible) ?? true else {
+            await finishNavigationOperation(operation)
+            return false
+        }
         commitNavigationOperation(operation)
         await waitForNavigationOperation(operation)
         await finishNavigationOperation(operation)
@@ -779,12 +795,12 @@ extension RouterEngine {
             return
         }
 
-        guard let sourceScope, let targetScope else {
+        guard let sourceScope else {
             return
         }
 
         guard let sourceRoute = sourceScope.route,
-              let match = targetScope.firstUnwindHandlerMatch(for: type(of: sourceRoute), in: spaces)
+              let match = unwindHandlerBinding(for: sourceScope, in: targetScope, removing: removedScopes)?.declaration
         else {
             return
         }
@@ -813,6 +829,26 @@ extension RouterEngine {
         }
         deliveredUnwindHandlers[key] = DeliveredUnwindHandler(sourceScope: sourceScope, entry: entry)
         await entry.value
+    }
+
+    private func unwindHandlerBinding(
+        for sourceScope: RouteScope?, in targetScope: RouteScope?, removing removedScopes: [RouteScope]
+    ) -> DeclarationBinding<RouteScope.UnwindHandlerMatch>? {
+        guard let sourceScope, let route = sourceScope.route, let sourceSpace = sourceScope.space,
+              spaces.routePath(containing: sourceScope) != nil else { return nil }
+        let removed = Set(removedScopes.map(ObjectIdentifier.init))
+        if let binding = targetScope?.firstUnwindHandlerBinding(for: type(of: route), in: spaces, excluding: removed) {
+            return binding
+        }
+        // Notification follows the nearest surviving lower space, without
+        // changing navigation ancestry or granting that space command authority.
+        for space in spaces.allSpaces.reversed()
+            where space.priority < sourceSpace.priority && !removed.contains(ObjectIdentifier(space.root)) {
+            if let binding = space.currentRouteScope.firstUnwindHandlerBinding(for: type(of: route), in: spaces, excluding: removed) {
+                return binding
+            }
+        }
+        return nil
     }
 
     func beginNavigationOperation(plan: RouteSpaces.UnwindPlan? = nil,
@@ -865,7 +901,9 @@ extension RouterEngine {
         origin: RouteRequestOrigin? = nil
     ) async -> RouteSpace? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
-        guard Task.isCancelled == false, navigationSource(origin) != nil else { return nil }
+        // A live lower-space handler can request its follow-up before unwind commits.
+        // Coverage is evaluated after the global operation completes.
+        guard Task.isCancelled == false, resolveRequestOrigin(origin) != nil else { return nil }
         guard isNavigating == false else {
             let request = PendingNavigation.Request(route: route, stage: stage, origin: origin)
             return await withTaskCancellationHandler {
@@ -888,6 +926,7 @@ extension RouterEngine {
             }
         }
 
+        guard navigationSource(origin) != nil else { return nil }
         switch stage {
         case .resolve:
             return await requestRoute(route, origin: origin)
@@ -901,8 +940,7 @@ extension RouterEngine {
         let operation = beginNavigationOperation(plan: plan)
         // Without a callback, native write-back can commit in this call stack.
         // With a callback, use the same before-commit boundary as explicit unwind.
-        guard let route = sourceScope?.route,
-              targetScope?.firstUnwindHandlerMatch(for: type(of: route), in: spaces) != nil else {
+        guard unwindHandlerBinding(for: sourceScope, in: targetScope, removing: operation.removedScopes)?.declaration != nil else {
             commitNavigationOperation(operation)
             Task { @MainActor in await completeUnwindOperation(operation, logsCompletion: false) }
             return
@@ -921,14 +959,16 @@ private extension RouteScope {
         let scope: RouteScope
     }
 
-    func firstUnwindHandlerMatch(for routeType: any Route.Type, in spaces: RouteSpaces) -> UnwindHandlerMatch? {
+    func firstUnwindHandlerBinding(for routeType: any Route.Type, in spaces: RouteSpaces,
+                                  excluding removed: Set<ObjectIdentifier>) -> DeclarationBinding<UnwindHandlerMatch>? {
         guard spaces.routePath(containing: self) != nil else { return nil }
         var scope: RouteScope? = self
 
         while let currentScope = scope {
-            if let binding = currentScope.hookBinding(for: .unwindHandler(ObjectIdentifier(routeType)), in: spaces) {
-                guard let handler = binding.declaration?.unwindHandler(for: routeType) else { return nil }
-                return UnwindHandlerMatch(handler: handler, scope: currentScope)
+            if !removed.contains(ObjectIdentifier(currentScope)),
+               let binding = currentScope.hookBinding(for: .unwindHandler(ObjectIdentifier(routeType)), in: spaces) {
+                guard let handler = binding.declaration?.unwindHandler(for: routeType) else { return .conflict }
+                return .declared(UnwindHandlerMatch(handler: handler, scope: currentScope))
             }
 
             scope = currentScope.previousScopeInSpace

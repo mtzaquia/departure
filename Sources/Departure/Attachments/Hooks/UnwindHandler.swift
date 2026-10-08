@@ -20,16 +20,22 @@
 //  SOFTWARE.
 //
 
-/// Handles a matching route when it unwinds to this scope.
+/// Handles a matching route when it unwinds.
 ///
 /// Unwinds can be requested with ``UnwindRouteAction`` from `@Environment(\.unwindRoute)` for
 /// captured route-scope dismissal, or with ``Router/unwind(to:)`` and
 /// ``Router/unwind(to:payload:)`` for explicit router-level targets.
 ///
+/// Lookup starts at the surviving landing scope and climbs to its space root.
+/// If no handler matches there, lookup continues from each surviving lower
+/// priority space's current scope, nearest priority first. A conflicting handler
+/// stops lookup. Covered scopes can receive notification without gaining routing authority.
+///
 /// Native and explicit unwinds enter the handler after acceptance and before the
 /// path changes. The router continues once the handler suspends; it does not wait
 /// for the asynchronous body to finish. A presentation requested by the handler
-/// waits until the active navigation has finished.
+/// waits until the active navigation has finished, then rechecks source membership
+/// and priority coverage. It is dropped if a higher space still covers its source.
 ///
 /// ```swift
 /// .hooks {

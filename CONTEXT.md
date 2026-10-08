@@ -20,6 +20,9 @@ The highest-priority space present in navigation state. It is the only space eli
 **Covered space**:
 A space below the top space in priority order. Its navigation is blocked while its retained paths and branches remain available when it becomes top again.
 
+**Unwind notification**:
+A before-commit callback for the unwinding route, found through surviving local ancestry and then surviving lower spaces in priority order. A covered scope can receive it; its presentation attempt waits for operation completion and then rechecks coverage.
+
 **Path (X)**:
 The ordered progression of destinations leading from an owner to the current position. Each accepted forward destination advances that progression by one, including a modal destination.
 

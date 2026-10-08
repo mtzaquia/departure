@@ -34,6 +34,8 @@ public struct RootRouter {
     ///
     /// Use this handle for deep links and notifications. Presentations, unwinds,
     /// and action dispatch are rejected while a high or critical space covers it.
+    /// Presentations attempted during an unfinished navigation operation wait
+    /// and check coverage when they resume.
     /// The captured router becomes inactive if its exact scope leaves navigation.
     public var `default`: Router { Router(engine: engine, scope: engine.defaultSpace.currentRouteScope) }
 

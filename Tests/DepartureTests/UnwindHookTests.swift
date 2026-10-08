@@ -129,7 +129,7 @@ struct UnwindHookTests {
 
         await router.unwind(to: .topmostAncestor, payload: "unlocked")
 
-        #expect(recorder.payloads.isEmpty)
+        #expect(recorder.payloads == ["unlocked"])
         #expect(router.spaces.criticalSpace == nil)
         #expect(router.spaces.highSpace?.rootPath.scopes.count == 0)
         #expect(router.spaces.highSpace?.currentRouteScope.route is ChallengeRoute)
@@ -312,7 +312,8 @@ struct UnwindHookTests {
 
         router.elevatedRoutePresentationBinding(priority: .critical, matching: .cover(.slide)).wrappedValue = nil
 
-        #expect(recorder.events.isEmpty)
+        await waitUntil { router.spaces.criticalSpace == nil }
+        #expect(recorder.events == ["root"])
         #expect(router.spaces.criticalSpace == nil)
         #expect(router.spaces.highSpace?.rootPath.scopes.count == 0)
         #expect(router.spaces.highSpace?.currentRouteScope.route is ChallengeRoute)
@@ -929,12 +930,12 @@ struct UnwindHookTests {
         }
 
         #expect(router.spaces.highSpace == nil)
-        #expect(recorder.events.isEmpty)
+        #expect(recorder.events == ["handler"])
 
         router.routeScopeDidLeaveView(dismissedScope)
         _ = await unwindTask.value
 
-        #expect(recorder.events.isEmpty)
+        #expect(recorder.events == ["handler"])
     }
 
     @Test func swiftUIDismissTriggersNoPayloadHandlerForHighPriorityPresentation() async throws {
@@ -961,14 +962,14 @@ struct UnwindHookTests {
         router.routeScopeDidInstallInView(dismissedScope)
 
         router.elevatedRoutePresentationBinding(priority: .high, matching: .cover(.slide)).wrappedValue = nil
-        await Task.yield()
+        await waitUntil { router.spaces.highSpace == nil }
 
         #expect(router.spaces.highSpace == nil)
-        #expect(recorder.events.isEmpty)
+        #expect(recorder.events == ["handler"])
 
         router.routeScopeDidLeaveView(dismissedScope)
 
-        #expect(recorder.events.isEmpty)
+        #expect(recorder.events == ["handler"])
     }
 }
 
