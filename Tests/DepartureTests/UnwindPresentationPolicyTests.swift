@@ -5,6 +5,87 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct UnwindPresentationPolicyTests {
+    @Test(arguments: [RoutePriority.default, .high, .critical])
+    func oldNativeBindingCannotDismissANewInstanceWithTheSameRouteID(priority: RoutePriority) async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+        } highPriority: {
+            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+        } criticalPriority: {
+            Sheet(RouteDestination(AlertRoute.self) { _, _ in EmptyView() })
+        })
+        let owner = RootRouter(engine: engine)
+        let route: any Route = switch priority {
+        case .default: LoginRoute()
+        case .high: SettingsRoute()
+        case .critical: AlertRoute()
+        }
+        await owner.current.present(route)
+        let original = try #require(engine.spaces.space(for: priority)?.currentRouteScope)
+        engine.routeScopeDidInstallInView(original)
+        let target: RouterEngine.PresentationTarget = priority == .default ? .local(engine.root, nil) : .priority(priority)
+        let binding = engine.presentationBinding(for: target, matching: .sheet)
+        #expect(binding.wrappedValue?.scope === original)
+        binding.wrappedValue = nil
+        engine.routeScopeDidLeaveView(original)
+        await owner.current.present(route)
+        let replacement = try #require(binding.wrappedValue?.scope)
+        #expect(replacement !== original)
+        #expect(replacement.id == original.id)
+        binding.wrappedValue = nil
+        #expect(binding.wrappedValue?.scope === replacement)
+        #expect(engine.isNavigationEligible(replacement))
+    }
+
+    @Test func outgoingBranchBindingsKeepTheirCapturedEnvironmentWithoutRoutingAuthority() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Push(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
+                Branches(concurrent: true) {
+                    Branch("modal") {
+                        Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }) {
+                            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
+                        }
+                    }
+                }
+            }
+        })
+        let owner = RootRouter(engine: engine)
+        await owner.current.present(LoginRoute())
+        let container = try #require(engine.defaultSpace.rootPath.last)
+        let branch = try #require(container.branchScopes["modal"])
+        var environment = EnvironmentValues()
+        environment.locale = Locale(identifier: "nl_NL")
+        branch.updateSourceEnvironment(environment)
+        await owner.current.branch("modal").present(SettingsRoute())
+        let sheet = try #require(branch.path.last)
+        environment.locale = Locale(identifier: "de_DE")
+        sheet.updateSourceEnvironment(environment)
+        await owner.current.present(HomeDetailRoute())
+        let push = try #require(branch.path.last)
+        for scope in [container, sheet, push] { engine.routeScopeDidInstallInView(scope) }
+        let sheetBinding = engine.routePresentationBinding(from: branch, matching: .sheet)
+        let pushBinding = engine.routePresentationBinding(from: sheet, matching: .push)
+        let unwind = Task { await owner.current.unwind(to: .root) }
+        for _ in 0..<1000 where !engine.defaultSpace.rootPath.isEmpty { await Task.yield() }
+        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(sheetBinding.wrappedValue?.scope === sheet)
+        #expect(pushBinding.wrappedValue?.scope === push)
+        environment.locale = Locale(identifier: "fr_FR")
+        branch.updateSourceEnvironment(environment)
+        sheet.updateSourceEnvironment(environment)
+        #expect(sheetBinding.wrappedValue?.sourceEnvironment.locale.identifier == "nl_NL")
+        #expect(pushBinding.wrappedValue?.sourceEnvironment.locale.identifier == "de_DE")
+        sheetBinding.wrappedValue = nil
+        pushBinding.wrappedValue = nil
+        #expect(engine.navigationOperations.count == 1)
+        #expect(!engine.isNavigationEligible(sheet))
+        #expect(!engine.isNavigationEligible(push))
+        for scope in [container, sheet, push] { engine.routeScopeDidLeaveView(scope) }
+        #expect(await unwind.value)
+        #expect(sheetBinding.wrappedValue == nil)
+        #expect(pushBinding.wrappedValue == nil)
+    }
+
     enum PushJump: String, CaseIterable, Sendable {
         case ancestor
         case id

@@ -28,20 +28,14 @@ struct RouteDestinationSnapshot {
 
     init(route: PresentedRoute) {
         self.route = route
-        self.destination = AnyView(Self.routeView(for: route))
+        self.destination = AnyView(RouteView(scope: route.scope))
     }
 
     init(route: PresentedRoute, destinationBuilder: WindowDestinationBuilder) {
         self.route = route
         self.destination = destinationBuilder.build(
-            Self.routeView(for: route),
+            RouteView(scope: route.scope),
             route.sourceEnvironment
-        )
-    }
-
-    private static func routeView(for route: PresentedRoute) -> RouteView {
-        RouteView(
-            scope: route.scope
         )
     }
 }

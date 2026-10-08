@@ -40,17 +40,19 @@ struct ElevatedPriorityHost: View {
 
     @ViewBuilder
     private func presenter(for presentation: RouteDestinationSnapshot, onDismiss: @escaping @MainActor () -> Void) -> some View {
-        switch presentation.route.declaration.presentationKind {
-        case .sheet, .cover(.slide):
-            ElevatedSystemPresenter(style: presentation.route.declaration.presentationKind, destination: presentation.destination, onDismiss: onDismiss)
-        case .cover(.fade):
-            #if canImport(UIKit)
-            ElevatedPriorityCoverFadePresenter(presentation: presentation, router: router, onDismiss: onDismiss)
-            #else
-            ElevatedSystemPresenter(style: .sheet, destination: presentation.destination, onDismiss: onDismiss)
-            #endif
-        case .push, .replace:
-            EmptyView()
+        if let style = presentation.route.scope.routePresentation?.style {
+            switch style {
+            case .sheet, .cover(.slide):
+                ElevatedSystemPresenter(style: style, destination: presentation.destination, onDismiss: onDismiss)
+            case .cover(.fade):
+                #if canImport(UIKit)
+                ElevatedPriorityCoverFadePresenter(presentation: presentation, router: router, onDismiss: onDismiss)
+                #else
+                ElevatedSystemPresenter(style: .sheet, destination: presentation.destination, onDismiss: onDismiss)
+                #endif
+            case .push, .replace:
+                EmptyView()
+            }
         }
     }
 }

@@ -107,9 +107,7 @@ private func detachModalSubtree() async throws -> (RouterEngine, RoutingOwnershi
 private func snapshotDetachedModalSubtree() async throws -> (RouterEngine, RouteDestinationSnapshot, RoutingOwnershipProbe) {
     let (engine, container, modal) = try await modalSubtree()
     let probe = RoutingOwnershipProbe(engine: engine, scope: modal)
-    let snapshot = RouteDestinationSnapshot(route: .init(
-        scope: container, declaration: try #require(container.presentationDeclaration)
-    ))
+    let snapshot = RouteDestinationSnapshot(route: .init(scope: container))
     engine.defaultSpace.rootPath.keepThrough(engine.root)
     return (engine, snapshot, probe)
 }

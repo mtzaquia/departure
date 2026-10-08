@@ -35,7 +35,7 @@ extension RouterEngine {
         }
 
         struct Outgoing {
-            let projection: ResolvedRoutePresentation
+            let presentation: PresentedRoute
             let retainsBinding: Bool
             let disablesAnimation: Bool
         }

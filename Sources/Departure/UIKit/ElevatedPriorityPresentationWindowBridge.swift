@@ -279,11 +279,12 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
                 clearRoute?()
             }
 
-            if presentsPendingRoute, let pendingPresentation {
+            if presentsPendingRoute, let pendingPresentation,
+               let priority = pendingPresentation.route.scope.routePresentation?.priority {
                 self.pendingPresentation = nil
                 present(
                     pendingPresentation,
-                    priority: pendingPresentation.route.declaration.priority,
+                    priority: priority,
                     sourceScenePhase: latestSourceScenePhase ?? pendingPresentation.route.sourceEnvironment.scenePhase
                 )
             }

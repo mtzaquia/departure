@@ -591,93 +591,37 @@ extension RouterEngine {
         // transition. Keep that stack bound until the modal has left. For a push-only unwind,
         // every binding clears together, but only the outermost removed push animates so SwiftUI
         // coalesces the path change into one visible pop.
-        let containsDepartingModal = plan.removedScopes.contains {
-            guard let presentationKind = $0.presentationDeclaration?.presentationKind else {
-                return false
+        let removed = Set(plan.removedScopes.map(ObjectIdentifier.init))
+        func isDeparting(_ scope: RouteScope?) -> Bool {
+            var ancestor = scope
+            while let scope = ancestor {
+                if removed.contains(ObjectIdentifier(scope)) { return true }
+                ancestor = scope.previousScopeInSpace
             }
-
-            return presentationKind.isModal
+            return false
         }
-        let animatedPushPresentationScopeIDs = containsDepartingModal
-            ? []
-            : outermostPushPresentationScopeIDs(in: plan)
-        let removedPushPresentationScopeIDs = Set(plan.removedScopes.compactMap { routeScope in
-            routeScope.presentationDeclaration?.presentationKind == .push
-                ? ObjectIdentifier(routeScope)
-                : nil
-        })
-        let departingHostScopeIDs = departingPresentationHostScopeIDs(in: plan)
-        let unanimatedPushPresentationScopeIDs = containsDepartingModal
-            ? []
-            : removedPushPresentationScopeIDs.subtracting(animatedPushPresentationScopeIDs)
+        let containsDepartingModal = plan.removedScopes.contains {
+            $0.presentationDeclaration?.presentationKind.isModal == true
+        }
 
         var presentations: [PresentationKey: NavigationOperation.Outgoing] = [:]
         for path in plan.preservedPaths {
+            let animatesFirstPush = !containsDepartingModal && !isDeparting(path.routePath.owner)
             for scope in path.scopes {
                 guard let host = scope.presentationOrigin, let declaration = scope.presentationDeclaration,
-                      shouldHostLocally(declaration, in: path.routePath) else { continue }
+                      shouldHostLocally(scope) else { continue }
                 let key = PresentationKey(host, declaration.presentationKind)
                 guard presentations[key] == nil else { continue }
-                let retainsBinding = containsDepartingModal && departingHostScopeIDs.contains(ObjectIdentifier(host))
+                let retainsBinding = containsDepartingModal && isDeparting(host)
                     && (!declaration.presentationKind.isModal || preservesModalPresentationBindings)
                 presentations[key] = .init(
-                    projection: .init(presentation: .init(scope: scope, declaration: declaration, sourceEnvironment: host.sourceEnvironment),
-                        routePath: path.routePath, isLive: false),
+                    presentation: .init(scope: scope, sourceEnvironment: host.sourceEnvironment),
                     retainsBinding: retainsBinding,
-                    disablesAnimation: unanimatedPushPresentationScopeIDs.contains(ObjectIdentifier(scope)))
+                    disablesAnimation: !containsDepartingModal && declaration.presentationKind == .push
+                        && (!animatesFirstPush || scope !== path.scopes.first))
             }
         }
         return presentations
-    }
-
-    func departingPresentationHostScopeIDs(
-        in plan: RouteSpaces.UnwindPlan
-    ) -> Set<ObjectIdentifier> {
-        let removedScopeIDs = Set(plan.removedScopes.map(ObjectIdentifier.init))
-        let departingPresentationHostScopeIDs = plan.removedScopes.compactMap { removedScope -> ObjectIdentifier? in
-            guard let host = removedScope.presentationOrigin else {
-                return nil
-            }
-
-            var hostOrAncestorScope: RouteScope? = host
-            while let currentScope = hostOrAncestorScope {
-                if removedScopeIDs.contains(ObjectIdentifier(currentScope)) {
-                    return ObjectIdentifier(host)
-                }
-
-                hostOrAncestorScope = currentScope.previousScopeInSpace
-            }
-
-            return nil
-        }
-
-        return Set(departingPresentationHostScopeIDs)
-    }
-
-    func outermostPushPresentationScopeIDs(
-        in plan: RouteSpaces.UnwindPlan
-    ) -> Set<ObjectIdentifier> {
-        let removedScopeIDs = Set(plan.removedScopes.map(ObjectIdentifier.init))
-
-        return Set(plan.preservedPaths.compactMap { preservedPath in
-            guard
-                let firstRemovedScope = preservedPath.scopes.first,
-                firstRemovedScope.presentationDeclaration?.presentationKind == .push
-            else {
-                return nil
-            }
-
-            var ancestorScope = preservedPath.routePath.owner
-            while let currentScope = ancestorScope {
-                if removedScopeIDs.contains(ObjectIdentifier(currentScope)) {
-                    return nil
-                }
-
-                ancestorScope = currentScope.previousScopeInSpace
-            }
-
-            return ObjectIdentifier(firstRemovedScope)
-        })
     }
 
     func deliverUnwindHandlers(

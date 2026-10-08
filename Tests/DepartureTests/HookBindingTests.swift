@@ -133,9 +133,7 @@ struct HookBindingTests {
         await root.present(LoginRoute())
         let source = try #require(engine.defaultSpace.rootPath.last)
         let branch = try #require(source.branchScopes["tab"])
-        let snapshot = RouteDestinationSnapshot(route: .init(
-            scope: source, declaration: try #require(source.presentationDeclaration)
-        ))
+        let snapshot = RouteDestinationSnapshot(route: .init(scope: source))
         let sourceRouter = Router(engine: engine, scope: source)
         let hook = ActionInterceptor(HookBindingAction.self) { _ in probe.events.append("outgoing") }.declaration
         source.installHookDeclarations(hookDeclarations: [hook])

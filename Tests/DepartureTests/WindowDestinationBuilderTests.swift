@@ -70,9 +70,9 @@ struct WindowDestinationBuilderTests {
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "source"
 
-        let route = PresentedRoute(scope: RouteScope(id: RootRoute().id, route: RootRoute()), declaration: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations[0])
+        let route = PresentedRoute(scope: RouteScope(id: RootRoute().id, route: RootRoute()))
         let snapshot = RouteDestinationSnapshot(
-            route: PresentedRoute(scope: route.scope, declaration: route.declaration, sourceEnvironment: environment),
+            route: PresentedRoute(scope: route.scope, sourceEnvironment: environment),
             destinationBuilder: host.windowDestinationBuilder
         )
 
@@ -93,7 +93,7 @@ struct WindowDestinationBuilderTests {
         }
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "redirected"
-        let route = PresentedRoute(scope: RouteScope(id: RootRoute().id, route: RootRoute()), declaration: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations[0], sourceEnvironment: environment)
+        let route = PresentedRoute(scope: RouteScope(id: RootRoute().id, route: RootRoute()), sourceEnvironment: environment)
 
         _ = RouteDestinationSnapshot(
             route: route,
@@ -134,7 +134,7 @@ struct WindowDestinationBuilderTests {
         }
 
         _ = RouteDestinationSnapshot(
-            route: PresentedRoute(scope: presentation.scope, declaration: presentation.declaration, sourceEnvironment: environment),
+            route: PresentedRoute(scope: presentation.scope, sourceEnvironment: environment),
             destinationBuilder: destinationBuilder
         )
 
@@ -373,7 +373,7 @@ struct WindowDestinationBuilderTests {
         let recorder = WindowDestinationRecorder()
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "macOS elevated"
-        let presentation = PresentedRoute(scope: RouteScope(id: SettingsRoute().id, route: SettingsRoute()), declaration: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .high))._routeDeclarations[0], sourceEnvironment: environment)
+        let presentation = PresentedRoute(scope: RouteScope(id: SettingsRoute().id, route: SettingsRoute()), sourceEnvironment: environment)
         let builder = WindowDestinationBuilder { destination, environment in
             RecordingWindowDestinationView(
                 destination: destination, environment: environment, recorder: recorder
@@ -418,7 +418,7 @@ struct WindowDestinationBuilderTests {
         }
 
         _ = RouteDestinationSnapshot(
-            route: PresentedRoute(scope: presentation.scope, declaration: presentation.declaration, sourceEnvironment: environment),
+            route: PresentedRoute(scope: presentation.scope, sourceEnvironment: environment),
             destinationBuilder: destinationBuilder
         )
 

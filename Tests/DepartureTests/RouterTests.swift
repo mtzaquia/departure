@@ -1670,7 +1670,7 @@ struct RouterTests {
         ).wrappedValue)
 
         #expect(presentation.scope === router.defaultSpace.rootPath.last)
-        #expect(presentation.declaration.routeTypeID == ObjectIdentifier(SettingsRoute.self))
+        #expect(presentation.scope.presentationDeclaration?.routeTypeID == ObjectIdentifier(SettingsRoute.self))
 
         router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue = nil
 
@@ -2727,7 +2727,7 @@ struct RouterTests {
         #expect(router.hasOutgoingPresentations)
         let presentation = router.routePresentation(from: loginScope, matching: .sheet)
         #expect(presentation?.scope === noticeScope)
-        #expect(presentation?.declaration.priority == .high)
+        #expect(presentation?.scope.presentationDeclaration?.priority == .high)
 
         router.routeScopeDidLeaveView(loginScope)
         router.routeScopeDidLeaveView(noticeScope)
@@ -4000,7 +4000,7 @@ struct RouterTests {
         ).wrappedValue
 
         #expect(presentation?.scope === router.spaces.highSpace?.currentRouteScope)
-        #expect(presentation?.declaration.routeTypeID == ObjectIdentifier(LoginRoute.self))
+        #expect(presentation?.scope.presentationDeclaration?.routeTypeID == ObjectIdentifier(LoginRoute.self))
     }
 
     @Test func pendingElevatedPresentationBlocksLowerPriorityBeforeTreeStarts() async {
@@ -4085,7 +4085,7 @@ struct RouterTests {
         ).wrappedValue
 
         #expect(presentation?.scope === router.spaces.highSpace?.currentRouteScope)
-        #expect(presentation?.declaration.routeTypeID == ObjectIdentifier(LoginRoute.self))
+        #expect(presentation?.scope.presentationDeclaration?.routeTypeID == ObjectIdentifier(LoginRoute.self))
     }
 
     @Test func defaultRouteBeforeActiveHighTreeIsDropped() async {
@@ -4142,9 +4142,9 @@ struct RouterTests {
         #expect(router.spaces.highSpace?.currentRouteScope.route is LoginRoute)
         #expect(router.spaces.highSpace?.root.route is LoginRoute)
         #expect(defaultPresentation?.scope === defaultScope)
-        #expect(defaultPresentation?.declaration.priority == .default)
+        #expect(defaultPresentation?.scope.presentationDeclaration?.priority == .default)
         #expect(highPresentation?.scope === router.spaces.highSpace?.currentRouteScope)
-        #expect(highPresentation?.declaration.priority == .high)
+        #expect(highPresentation?.scope.presentationDeclaration?.priority == .high)
 
         router.elevatedRoutePresentationBinding(priority: .high, matching: .cover(.slide)).wrappedValue = nil
 
@@ -4189,9 +4189,9 @@ struct RouterTests {
         #expect(router.spaces.highSpace?.rootPath.scopes.contains { $0.route is LoginRoute } == false)
         #expect(router.spaces.highSpace?.root.route is AlertRoute)
         #expect(defaultPresentation?.scope === defaultScope)
-        #expect(defaultPresentation?.declaration.priority == .default)
+        #expect(defaultPresentation?.scope.presentationDeclaration?.priority == .default)
         #expect(highPresentation?.scope === router.spaces.highSpace?.currentRouteScope)
-        #expect(highPresentation?.declaration.priority == .high)
+        #expect(highPresentation?.scope.presentationDeclaration?.priority == .high)
     }
 
     @Test func highPriorityReplacementClearsAndWaitsForOwnedBranchPaths() async throws {
@@ -4432,7 +4432,7 @@ struct RouterTests {
         #expect(router.spaces.highSpace?.rootPath.count == 0)
         #expect(router.spaces.highSpace?.currentRouteScope.route is AlertRoute)
         #expect(presentation?.scope === router.spaces.highSpace?.currentRouteScope)
-        #expect(presentation?.declaration.routeTypeID == ObjectIdentifier(AlertRoute.self))
+        #expect(presentation?.scope.presentationDeclaration?.routeTypeID == ObjectIdentifier(AlertRoute.self))
     }
 
     @Test func criticalPriorityPresentationOverlaysHighPriorityPresentation() async {
@@ -4469,9 +4469,9 @@ struct RouterTests {
         #expect(router.spaces.highSpace?.root === highScope)
         #expect(router.spaces.criticalSpace?.root === router.spaces.criticalSpace?.currentRouteScope)
         #expect(highPresentation?.scope === highScope)
-        #expect(highPresentation?.declaration.priority == .high)
+        #expect(highPresentation?.scope.presentationDeclaration?.priority == .high)
         #expect(criticalPresentation?.scope === router.spaces.criticalSpace?.currentRouteScope)
-        #expect(criticalPresentation?.declaration.priority == .critical)
+        #expect(criticalPresentation?.scope.presentationDeclaration?.priority == .critical)
     }
 
     @Test func unwindingHighPriorityRoutePreservesCriticalTreeAnchoredToAncestor() async throws {
@@ -4535,7 +4535,7 @@ struct RouterTests {
         #expect(router.spaces.criticalSpace?.root === router.spaces.criticalSpace?.currentRouteScope)
         #expect(highPresentation?.scope === highScope)
         #expect(criticalPresentation?.scope === router.spaces.criticalSpace?.currentRouteScope)
-        #expect(criticalPresentation?.declaration.priority == .critical)
+        #expect(criticalPresentation?.scope.presentationDeclaration?.priority == .critical)
     }
 
     @Test func lowerPriorityRouteBeforeActiveCriticalTreeIsDropped() async {

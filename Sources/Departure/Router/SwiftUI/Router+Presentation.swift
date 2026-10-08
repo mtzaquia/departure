@@ -24,22 +24,14 @@ import SwiftUI
 
 struct PresentedRoute: Identifiable, Hashable {
     let scope: RouteScope
-    let declaration: AnyRouteDeclaration
     let sourceEnvironment: EnvironmentValues
-    init(scope: RouteScope, declaration: AnyRouteDeclaration, sourceEnvironment: EnvironmentValues = EnvironmentValues()) {
+    init(scope: RouteScope, sourceEnvironment: EnvironmentValues = EnvironmentValues()) {
         self.scope = scope
-        self.declaration = declaration
         self.sourceEnvironment = sourceEnvironment
     }
     var id: AnyHashable { ObjectIdentifier(scope) }
     static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
-}
-
-struct ResolvedRoutePresentation {
-    let presentation: PresentedRoute
-    let routePath: RoutePath
-    let isLive: Bool
 }
 
 extension RouterEngine {
@@ -66,12 +58,12 @@ extension RouterEngine {
         case let .priority(priority):
             _ = spaces.space(for: priority)?.rootPath.scopes
         }
-        let expectedID = resolvePresentation(for: target, matching: style)?.presentation.id
+        let expectedID = resolvePresentation(for: target, matching: style)?.id
         return Binding(
-            get: { self.resolvePresentation(for: target, matching: style)?.presentation },
+            get: { self.resolvePresentation(for: target, matching: style) },
             set: { value in
                 guard value == nil, let expectedID,
-                      self.resolvePresentation(for: target, matching: style)?.presentation.id == expectedID else { return }
+                      self.resolvePresentation(for: target, matching: style)?.id == expectedID else { return }
                 self.dismissPresentation(for: target, matching: style)
             }
         )
@@ -84,34 +76,31 @@ extension RouterEngine {
         presentationBinding(for: .priority(priority), matching: style)
     }
     func routePresentation(from scope: RouteScope, matching style: RoutePresentationKind, hostedBy host: RoutePresentationHostID? = nil) -> PresentedRoute? {
-        resolvePresentation(for: .local(scope, host), matching: style)?.presentation
+        resolvePresentation(for: .local(scope, host), matching: style)
     }
     func elevatedRoutePresentation(priority: RoutePriority, matching style: RoutePresentationKind) -> PresentedRoute? {
-        resolvePresentation(for: .priority(priority), matching: style)?.presentation
+        resolvePresentation(for: .priority(priority), matching: style)
     }
 
-    private func resolvePresentation(for target: PresentationTarget, matching style: RoutePresentationKind?) -> ResolvedRoutePresentation? {
+    private func resolvePresentation(for target: PresentationTarget, matching style: RoutePresentationKind?) -> PresentedRoute? {
         switch target {
         case let .priority(priority):
             guard let space = spaces.space(for: priority),
                   priority != .default, let metadata = space.root.presentation,
                   style == nil || metadata.declaration.presentationKind == style else { return nil }
-            return ResolvedRoutePresentation(presentation: PresentedRoute(scope: space.root, declaration: metadata.declaration,
-                sourceEnvironment: metadata.sourceEnvironment.values), routePath: space.rootPath, isLive: true)
+            return PresentedRoute(scope: space.root, sourceEnvironment: metadata.sourceEnvironment.values)
 
         case let .local(host, hostID):
             guard !host.hasConflictingPresentationHosts, let style, host.canDrivePresentation(matching: style),
                   hostID == nil || host.presentationHostID == hostID else { return nil }
             if let path = spaces.routePath(containing: host),
                let scope = path.scopes.first(where: { $0.attachedPresentationDeclaration(presentedBy: host, matching: style, hostedBy: hostID) != nil }),
-               let declaration = scope.presentationDeclaration,
-               shouldHostLocally(declaration, in: path) {
-                return ResolvedRoutePresentation(presentation: PresentedRoute(scope: scope, declaration: declaration,
-                    sourceEnvironment: host.sourceEnvironment), routePath: path, isLive: true)
+               shouldHostLocally(scope) {
+                return PresentedRoute(scope: scope, sourceEnvironment: host.sourceEnvironment)
             }
             guard host !== root, let outgoing = outgoingPresentation(for: PresentationKey(host, style)),
                   outgoing.retainsBinding else { return nil }
-            return outgoing.projection
+            return outgoing.presentation
         }
     }
 
@@ -121,8 +110,8 @@ extension RouterEngine {
         return outgoingPresentation(for: PresentationKey(scope, .push))?.disablesAnimation == true
     }
 
-    func shouldHostLocally(_ declaration: AnyRouteDeclaration, in path: RoutePath) -> Bool {
-        guard let space = path.owner?.space else { return false }
+    func shouldHostLocally(_ scope: RouteScope) -> Bool {
+        guard let declaration = scope.presentationDeclaration, let space = scope.space else { return false }
         return declaration.priority <= space.priority
     }
 
@@ -134,16 +123,16 @@ extension RouterEngine {
     }
 
     private func dismissPresentation(for target: PresentationTarget, matching style: RoutePresentationKind?) {
-        guard let projection = resolvePresentation(for: target, matching: style), projection.isLive else { return }
-        let scope = projection.presentation.scope
-        guard isNavigationEligible(scope) else { return }
-        if ios17NavigationStackPushWorkaround?.interceptDismissal(of: projection.presentation,
-            matching: projection.presentation.declaration.presentationKind, in: self) == true { return }
+        guard let presentation = resolvePresentation(for: target, matching: style) else { return }
+        let scope = presentation.scope
+        guard isNavigationEligible(scope), let declaration = scope.presentationDeclaration else { return }
+        if ios17NavigationStackPushWorkaround?.interceptDismissal(of: presentation,
+            matching: declaration.presentationKind, in: self) == true { return }
         let plan: RouteSpaces.UnwindPlan
         let retained: RouteScope?
         switch target {
         case .local:
-            guard let previous = projection.routePath.scope(before: scope) else { return }
+            guard let previous = scope.routePath.scope(before: scope) else { return }
             plan = RouteSpaces.UnwindPlan(retaining: [previous])
             retained = previous
         case let .priority(priority):
