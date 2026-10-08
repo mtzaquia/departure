@@ -49,11 +49,7 @@ struct ExampleApp: App {
   }
 }
 
-struct SettingsRoute: Route {
-  func destination() -> some View {
-    SettingsView()
-  }
-}
+struct SettingsRoute: Route {}
 
 struct SettingsView: View {
   var body: some View { Text("Settings") }
@@ -61,13 +57,16 @@ struct SettingsView: View {
 
 struct HomeView: View {
   @Environment(\.router) private var router
+  private static let settings = RouteDestination(SettingsRoute.self) { _, _ in
+    SettingsView()
+  }
 
   var body: some View {
     Button("Settings") {
       Task { await router.present(SettingsRoute()) }
     }
     .routes {
-      Sheet(SettingsRoute.self)
+      Sheet(Self.settings)
     }
   }
 }
@@ -75,9 +74,25 @@ struct HomeView: View {
 
 That’s the core idea: the screen that owns the presentation declares it; the screen that starts the flow simply asks for the route.
 
-Routes may also omit `destination()` and let a feature module supply the view through
-`RouteViewProviding`. See [Routing](docs/routing.md#supply-a-view-from-a-feature-module) for the
-module layout and fallback behavior.
+Routes may also omit `destination()` and let a feature module bind a typed destination:
+
+```swift
+let settings = RouteDestination(SettingsRoute.self) { route, context in
+  SettingsView()
+}
+
+// On the owning view:
+.routes { Sheet(settings) }
+```
+
+The builder receives route data, scoped routing actions, presentation style and priority,
+and the destination's environment. See [Routing](docs/routing.md#supply-a-view-from-a-feature-module)
+for the module layout and migration from the deprecated `RouteViewProviding` protocol.
+Existing `Route.destination()` implementations remain functional but are deprecated too;
+route-type declarations remain supported.
+
+> [!NOTE]
+> `RouteDestination` is available on this development branch and is not yet in the v2.1.0 release.
 
 > [!NOTE]
 > Declare `Push(...)` inside a `NavigationStack`.

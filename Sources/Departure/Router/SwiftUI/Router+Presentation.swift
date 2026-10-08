@@ -22,7 +22,7 @@
 
 import SwiftUI
 
-struct RoutePresentation: Identifiable, Hashable {
+struct PresentedRoute: Identifiable, Hashable {
     let scope: RouteScope
     let declaration: AnyRouteDeclaration
     let sourceEnvironment: EnvironmentValues
@@ -45,7 +45,7 @@ struct RoutePresentation: Identifiable, Hashable {
         declaration.providesNavigation
     }
 
-    static func == (lhs: RoutePresentation, rhs: RoutePresentation) -> Bool {
+    static func == (lhs: PresentedRoute, rhs: PresentedRoute) -> Bool {
         lhs.id == rhs.id
     }
 
@@ -55,13 +55,13 @@ struct RoutePresentation: Identifiable, Hashable {
 }
 
 private struct ResolvedRoutePresentation {
-    let presentation: RoutePresentation
+    let presentation: PresentedRoute
     let routePath: RoutePath
     let isLive: Bool
 }
 
 extension RouterEngine {
-    private subscript(presentation projection: RoutePresentationProjection) -> RoutePresentation? {
+    private subscript(presentation projection: RoutePresentationProjection) -> PresentedRoute? {
         get {
             routePresentation(
                 from: projection.routeScope ?? root,
@@ -82,7 +82,7 @@ extension RouterEngine {
         }
     }
 
-    private subscript(elevatedPresentation projection: ElevatedRoutePresentationProjection) -> RoutePresentation? {
+    private subscript(elevatedPresentation projection: ElevatedRoutePresentationProjection) -> PresentedRoute? {
         get {
             elevatedRoutePresentation(
                 priority: projection.priority,
@@ -133,7 +133,7 @@ extension RouterEngine {
         from routeScope: RouteScope?,
         matching presentationKind: RoutePresentationKind,
         hostedBy presentationHostID: RoutePresentationHostID? = nil
-    ) -> Binding<RoutePresentation?> {
+    ) -> Binding<PresentedRoute?> {
         let routeScope = routeScope ?? root
         if let routePath = routeForest.routePath(containing: routeScope) {
             _ = routePath.scopes
@@ -154,7 +154,7 @@ extension RouterEngine {
         from routeScope: RouteScope,
         matching presentationKind: RoutePresentationKind,
         hostedBy presentationHostID: RoutePresentationHostID? = nil
-    ) -> RoutePresentation? {
+    ) -> PresentedRoute? {
         resolvedRoutePresentation(
             from: routeScope,
             matching: presentationKind,
@@ -219,7 +219,7 @@ extension RouterEngine {
     func elevatedRoutePresentationBinding(
         priority: RoutePriority,
         matching presentationKind: RoutePresentationKind
-    ) -> Binding<RoutePresentation?> {
+    ) -> Binding<PresentedRoute?> {
         _ = routeForest.tree(for: priority)?.rootPath.scopes
 
         @Bindable var router = self
@@ -259,7 +259,7 @@ private extension RouterEngine {
         matching presentationKind: RoutePresentationKind,
         hostedBy presentationHostID: RoutePresentationHostID?,
         in routePath: RoutePath
-    ) -> RoutePresentation? {
+    ) -> PresentedRoute? {
         guard host.canDrivePresentation(matching: presentationKind) else {
             return nil
         }
@@ -294,7 +294,7 @@ private extension RouterEngine {
             return nil
         }
 
-        return RoutePresentation(
+        return PresentedRoute(
             scope: presentedScope,
             declaration: declaration,
             sourceEnvironment: host.sourceEnvironment
@@ -333,7 +333,7 @@ private extension RouterEngine {
         hostedBy presentationHostID: RoutePresentationHostID?,
         inPreservedPath path: RouteForest.PreservedRoutePath,
         snapshot: UnwindPresentationSnapshot
-    ) -> RoutePresentation? {
+    ) -> PresentedRoute? {
         guard host.canDrivePresentation(matching: presentationKind) else {
             return nil
         }
@@ -357,7 +357,7 @@ private extension RouterEngine {
                 continue
             }
 
-            return RoutePresentation(
+            return PresentedRoute(
                 scope: presentedScope,
                 declaration: declaration,
                 sourceEnvironment: host.sourceEnvironment
@@ -442,7 +442,7 @@ private extension RouterEngine {
     func elevatedRoutePresentation(
         priority: RoutePriority,
         matching presentationKind: RoutePresentationKind
-    ) -> RoutePresentation? {
+    ) -> PresentedRoute? {
         guard
             let tree = routeForest.tree(for: priority),
             let routeScope = tree.elevatedRouteScope,
@@ -453,7 +453,7 @@ private extension RouterEngine {
             return nil
         }
 
-        return RoutePresentation(
+        return PresentedRoute(
             scope: routeScope,
             declaration: origin.declaration,
             sourceEnvironment: origin.sourceEnvironment.values

@@ -46,6 +46,25 @@ public struct Sheet: RouteDeclaration, Sendable {
         )
     }
 
+    /// Binds a feature destination to a sheet declaration.
+    ///
+    /// - Parameters:
+    ///   - destination: The typed builder used for this declaration.
+    ///   - priority: The presentation priority, using the existing routing rules.
+    ///   - providesNavigation: Whether Departure wraps the view in a `NavigationStack`.
+    ///     Defaults to `true`, matching the route-type initializer.
+    public init<R: Route>(
+        _ destination: RouteDestination<R>,
+        priority: RoutePriority = .normal,
+        providesNavigation: Bool = true
+    ) {
+        self.declaration = AnyRouteDeclaration(
+            routeType: R.self,
+            kind: .sheet(priority: priority, providesNavigation: providesNavigation),
+            destination: destination.destination
+        )
+    }
+
     public var _routeDeclarations: [AnyRouteDeclaration] {
         [declaration]
     }

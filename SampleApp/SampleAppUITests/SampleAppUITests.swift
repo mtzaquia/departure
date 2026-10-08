@@ -38,6 +38,18 @@ final class SampleAppUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
     }
 
+    func testRouteDestinationContextBuildsAndDismissesSheet() {
+        for _ in 0..<2 {
+            tap(A11y.startShowInfoButton)
+            assertExists(A11y.startInfoText)
+            assertLabel(A11y.startInfoPresentation, contains: "Presentation: sheet")
+            assertLabel(A11y.startInfoPresentation, contains: "Priority: normal")
+            tap(A11y.startInfoDismissButton)
+            assertGone(A11y.startInfoText)
+            assertExists(A11y.startButton)
+        }
+    }
+
     func testSheetKeepsTwoPushesDuringRootUnwind() {
         assertSheetKeepsTwoPushesDuringDismissal("sample.dismissal-probe.unwind")
     }
@@ -1030,6 +1042,7 @@ private extension XCUIElement {
 private enum A11y {
     static let startButton = "sample.start.button"
     static let startShowInfoButton = "sample.start.show-info"
+    static let startInfoPresentation = "sample.start-info.presentation"
     static let startInfoText = "sample.start-info.text"
     static let startInfoDismissButton = "sample.start-info.dismiss"
     static let landing = "sample.landing"

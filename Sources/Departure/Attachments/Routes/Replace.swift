@@ -43,6 +43,19 @@ public struct Replace: RouteDeclaration, Sendable {
         self.declaration = AnyRouteDeclaration(routeType: routeType, kind: .replace)
     }
 
+    /// Binds a feature destination to an in-place replacement declaration.
+    ///
+    /// - Parameter destination: The typed builder used for this declaration.
+    public init<R: Route>(
+        _ destination: RouteDestination<R>
+    ) {
+        self.declaration = AnyRouteDeclaration(
+            routeType: R.self,
+            kind: .replace,
+            destination: destination.destination
+        )
+    }
+
     public var _routeDeclarations: [AnyRouteDeclaration] {
         [declaration]
     }

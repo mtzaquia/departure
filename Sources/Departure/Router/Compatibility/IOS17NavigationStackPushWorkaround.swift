@@ -31,7 +31,7 @@ protocol IOS17NavigationStackPushWorkaroundHandling: AnyObject {
     /// Returns true when a newer route request superseded the append during preparation.
     func prepareAppend(after match: RouterEngine.DeclarationMatch, in router: RouterEngine) async -> Bool
     func interceptDismissal(
-        of presentation: RoutePresentation,
+        of presentation: PresentedRoute,
         matching presentationKind: RoutePresentationKind,
         in router: RouterEngine
     ) -> Bool
@@ -110,7 +110,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
     }
 
     func interceptDismissal(
-        of presentation: RoutePresentation,
+        of presentation: PresentedRoute,
         matching presentationKind: RoutePresentationKind,
         in router: RouterEngine
     ) -> Bool {

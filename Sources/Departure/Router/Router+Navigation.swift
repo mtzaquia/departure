@@ -657,7 +657,8 @@ extension RouterEngine {
                 let appendedScope = RouteScope(id: route.id, route: route)
                 appendedScope.attachPresentation(
                     to: presentationOrigin,
-                    declaration: presentationDeclaration
+                    declaration: presentationDeclaration,
+                    priority: priority
                 )
                 routePath.append(appendedScope)
                 routeForest.setElevatedTree(tree, for: priority)
@@ -669,7 +670,8 @@ extension RouterEngine {
             let appendedScope = RouteScope(id: route.id, route: route)
             appendedScope.attachPresentation(
                 to: presentationOrigin,
-                declaration: presentationDeclaration
+                declaration: presentationDeclaration,
+                priority: match.tree.priority
             )
 
             match.presentationLocation.path.append(appendedScope)

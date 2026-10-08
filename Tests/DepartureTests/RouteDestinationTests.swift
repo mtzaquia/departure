@@ -61,6 +61,101 @@ struct RouteDestinationTests {
 
         #expect(buildCount == 1)
     }
+
+    @Test func explicitDomainDestinationReceivesTypedRouteData() async throws {
+        let recorder = DestinationRecorder()
+        let destination = RouteDestination(NumberedRoute.self) { route, context in
+            recorder.number = route.number
+            recorder.context = context
+            return EmptyView()
+        }
+        let engine = RouterEngine()
+        engine.root.installRouteDeclarations(id: nil, branchSelection: nil,
+            routeDeclarations: [RouteScopeDeclaration(routes: Push(destination)._routeDeclarations)])
+        await engine.present(NumberedRoute(number: 42))
+        let scope = try #require(engine.normalTree.rootPath.last)
+        let declaration = try #require(scope.presentationDeclaration)
+        let builder = try #require(declaration.destination)
+        let context = RouteContext(router: Router(engine: engine, scope: scope),
+            unwindRoute: UnwindRouteAction(router: engine, routeScope: scope),
+            presentation: .init(style: .push, priority: .normal), environment: EnvironmentValues())
+        _ = builder.build(try #require(scope.route), context)
+        #expect(recorder.number == 42)
+        #expect(recorder.context?.router == context.router)
+        #expect(await context.unwindRoute())
+        #expect(engine.normalTree.rootPath.isEmpty)
+    }
+
+    @Test func destinationBindingsSurviveBranchAdoptionAndHosting() throws {
+        let destination = RouteDestination(DomainOnlyRoute.self) { _, _ in EmptyView() }
+        let branch = Branch(AppTab.home) { Push(destination) }.routeScopeDeclarations
+        let discovery = try #require(branch.first?.routes.first)
+        #expect(discovery.destination === destination.destination)
+        #expect(!discovery.drivesPresentation)
+        let hosted = discovery.drivingPresentation(true).hosted(by: RoutePresentationHostID())
+        #expect(hosted.destination === destination.destination)
+        #expect(hosted.drivesPresentation)
+    }
+
+    @Test func destinationInitializersPreserveExistingPresentationDefaults() {
+        let destination = RouteDestination(DomainOnlyRoute.self) { _, _ in EmptyView() }
+        #expect(Push(destination).declaration.kind == Push(DomainOnlyRoute.self).declaration.kind)
+        #expect(Replace(destination).declaration.kind == Replace(DomainOnlyRoute.self).declaration.kind)
+        #expect(Sheet(destination).declaration.kind == Sheet(DomainOnlyRoute.self).declaration.kind)
+        #expect(Cover(destination).declaration.kind == Cover(DomainOnlyRoute.self).declaration.kind)
+        #expect(Sheet(destination, priority: .high, providesNavigation: false).declaration.kind
+            == Sheet(DomainOnlyRoute.self, priority: .high, providesNavigation: false).declaration.kind)
+        #expect(Cover(destination, priority: .critical, transition: .fade, providesNavigation: false).declaration.kind
+            == Cover(DomainOnlyRoute.self, priority: .critical, transition: .fade, providesNavigation: false).declaration.kind)
+        #expect(Push(destination).declaration == Push(destination).declaration)
+        #expect(Set([Push(destination).declaration, Push(destination).declaration]).count == 1)
+        let other = RouteDestination(DomainOnlyRoute.self) { _, _ in EmptyView() }
+        #expect(Push(destination).declaration != Push(other).declaration)
+    }
+
+    @Test func nearestDeclarationSelectsItsOwnBuilder() async throws {
+        let recorder = DestinationRecorder()
+        let outer = RouteDestination(NumberedRoute.self) { route, _ in
+            recorder.number = -route.number
+            return EmptyView()
+        }
+        let inner = RouteDestination(NumberedRoute.self) { route, _ in
+            recorder.number = route.number
+            return EmptyView()
+        }
+        let engine = RouterEngine()
+        engine.root.installRouteDeclarations(id: nil, branchSelection: nil,
+            routeDeclarations: [RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations
+                + Sheet(outer)._routeDeclarations)])
+        await engine.present(HomeDetailRoute())
+        let parent = try #require(engine.normalTree.rootPath.last)
+        parent.installRouteDeclarations(id: nil, branchSelection: nil,
+            routeDeclarations: [RouteScopeDeclaration(routes: Push(inner)._routeDeclarations)])
+        await Router(engine: engine, scope: parent).present(NumberedRoute(number: 7))
+        let selected = try #require(engine.normalTree.rootPath.last)
+        #expect(selected.presentationDeclaration?.destination === inner.destination)
+        #expect(selected.presentationDeclaration?.presentationKind == .push)
+    }
+
+    @Test(arguments: [RoutePriority.high, .critical])
+    func childrenKeepEffectivePriorityDuringOutgoingSnapshots(priority: RoutePriority) async throws {
+        let engine = RouterEngine()
+        engine.root.installRouteDeclarations(id: nil, branchSelection: nil,
+            routeDeclarations: [RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: priority)._routeDeclarations)])
+        await engine.present(LoginRoute())
+        let tree = try #require(engine.routeForest.tree(for: priority))
+        let parent = try #require(tree.rootPath.last)
+        parent.installRouteDeclarations(id: nil, branchSelection: nil,
+            routeDeclarations: [RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations)])
+        await Router(engine: engine, scope: parent).present(HomeDetailRoute())
+        let child = try #require(tree.rootPath.last)
+        #expect(child.presentation?.priority == priority)
+        #expect(child.presentationDeclaration?.presentationKind == .push)
+        #expect(await engine.unwind(to: .root))
+        #expect(engine.routeForest.tree(for: priority) == nil)
+        #expect(child.presentation?.priority == priority)
+    }
+
 }
 
 private struct LegacyDestinationRoute: Route {
@@ -79,4 +174,10 @@ private struct DestinationBuildProbe: View {
     var body: some View {
         EmptyView()
     }
+}
+
+@MainActor
+private final class DestinationRecorder {
+    var number: Int?
+    var context: RouteContext?
 }

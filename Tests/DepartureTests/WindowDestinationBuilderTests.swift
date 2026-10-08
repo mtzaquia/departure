@@ -70,12 +70,12 @@ struct WindowDestinationBuilderTests {
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "source"
 
-        let route = RoutePresentation(
+        let route = PresentedRoute(
             scope: RouteScope(id: RootRoute().id, route: RootRoute()),
             declaration: Push(RootRoute.self)._routeDeclarations[0]
         )
         let snapshot = RouteDestinationSnapshot(
-            route: RoutePresentation(
+            route: PresentedRoute(
                 scope: route.scope,
                 declaration: route.declaration,
                 sourceEnvironment: environment
@@ -100,7 +100,7 @@ struct WindowDestinationBuilderTests {
         }
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "redirected"
-        let route = RoutePresentation(
+        let route = PresentedRoute(
             scope: RouteScope(id: RootRoute().id, route: RootRoute()),
             declaration: Push(RootRoute.self)._routeDeclarations[0],
             sourceEnvironment: environment
@@ -149,7 +149,7 @@ struct WindowDestinationBuilderTests {
         }
 
         _ = RouteDestinationSnapshot(
-            route: RoutePresentation(
+            route: PresentedRoute(
                 scope: presentation.scope,
                 declaration: presentation.declaration,
                 sourceEnvironment: environment
@@ -447,7 +447,7 @@ struct WindowDestinationBuilderTests {
         let recorder = WindowDestinationRecorder()
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "macOS elevated"
-        let presentation = RoutePresentation(
+        let presentation = PresentedRoute(
             scope: RouteScope(id: SettingsRoute().id, route: SettingsRoute()),
             declaration: Sheet(SettingsRoute.self, priority: .high)._routeDeclarations[0],
             sourceEnvironment: environment
@@ -500,7 +500,7 @@ struct WindowDestinationBuilderTests {
         }
 
         _ = RouteDestinationSnapshot(
-            route: RoutePresentation(
+            route: PresentedRoute(
                 scope: presentation.scope,
                 declaration: presentation.declaration,
                 sourceEnvironment: environment

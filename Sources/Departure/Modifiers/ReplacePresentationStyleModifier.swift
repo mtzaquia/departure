@@ -46,7 +46,7 @@ struct ReplacePresentationStyleModifier: ViewModifier {
     }
 
     @ViewBuilder
-    private func renderedContent(_ content: Content, presentation: RoutePresentation?) -> some View {
+    private func renderedContent(_ content: Content, presentation: PresentedRoute?) -> some View {
         if let presentation {
             RouteView(scope: presentation.scope, providesNavigation: false)
                 .id(presentation.id)

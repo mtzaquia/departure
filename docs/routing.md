@@ -26,7 +26,7 @@ public struct SettingsRoute: Route {
 }
 ```
 
-The feature module imports Domain and supplies the destination:
+The feature module imports Domain and binds the route to a view:
 
 ```swift
 // SettingsFeature module
@@ -34,22 +34,81 @@ import Departure
 import Domain
 import SwiftUI
 
-extension SettingsRoute: RouteViewProviding {
-  public func destination() -> some View {
-    SettingsView()
-  }
+let settings = RouteDestination(SettingsRoute.self) { route, context in
+  SettingsView()
+}
+
+// On the owning view:
+.routes {
+  Sheet(settings)
 }
 ```
 
-Departure chooses a destination in this order:
+`Push`, `Replace`, `Sheet`, and `Cover` infer the route type from the destination value.
+Requests still use domain instances: `await router.present(SettingsRoute())`. Builders can
+capture feature dependencies, and the same route type can have different builders in
+different declaration scopes. The matched declaration selects the builder; there is no
+global registry or extra conformance.
 
-1. `RouteViewProviding.destination()` when the route conforms to `RouteViewProviding`.
-2. The route's existing `Route.destination()` implementation.
-3. A diagnostic view naming the route type in Debug builds, or `EmptyView` in Release builds.
+`RouteDestination` and its context are available on this development branch; they are not
+yet part of the v2.1.0 release.
 
-Only one module can add the `RouteViewProviding` conformance for a route type. Modules in the same
-package use the extension above. Add `@retroactive` to the conformance only when the route belongs
-to a different package.
+### Destination context
+
+Each builder receives typed route data and a `RouteContext`:
+
+| Value | Purpose |
+| --- | --- |
+| `context.router` | Routes from this destination's own scope. |
+| `context.unwindRoute` | Unwinds this exact scope, optionally delivering a payload. |
+| `context.presentation.style` | `.push`, `.replace`, `.sheet`, or `.cover(transition)`. |
+| `context.presentation.priority` | Effective priority, including the enclosing elevated flow. |
+| `context.environment` | Environment snapshot for this rendering, including local routing values. |
+
+A push inside a high-priority cover reports `.push` and `.high`. Metadata describes the
+matched presentation after route resolution. Use it to configure your feature's controls:
+
+```swift
+let editProfile = RouteDestination(EditProfileRoute.self) { route, context in
+  EditProfileView(
+    userID: route.userID,
+    showsCloseButton: context.presentation.style != .push,
+    onClose: { await context.unwindRoute() }
+  )
+}
+```
+
+`EditProfileView` and its parameters are illustrative feature APIs. The context and the
+view's environment refer to the same destination scope. Captured routers and unwind actions
+remain tied to that scope and become inactive when it leaves the routing graph.
+
+The builder runs on the main actor. Read environment values during builder evaluation;
+environment changes reevaluate it. Copy individual values when you need them later, rather
+than retaining the context for later environment reads. Read route phase through
+`context.environment.routePhase`.
+Local presentations inherit their host's environment. Detached hosts retain the existing
+`WithRouter(windowDestination:)` forwarding mechanism for custom values; forward those values
+onto the supplied destination so its view and context receive the same environment.
+
+### Migrate a provider conformance
+
+`RouteViewProviding` is deprecated. Replace its conformance with a `RouteDestination` value
+in the feature module, then change `Sheet(SettingsRoute.self)` to `Sheet(settings)` (or the
+corresponding `Push`, `Cover`, or `Replace` declaration). Remove the provider extension when
+all its declaration sites use explicit destination values.
+
+Existing APIs continue to build destinations in this order:
+
+1. The matched declaration's explicit `RouteDestination` builder.
+2. `RouteViewProviding.destination()` when the route conforms to that protocol.
+3. The route's existing `Route.destination()` implementation.
+4. A diagnostic view naming the route type in Debug builds, or an empty view in Release builds,
+   when the route uses the default `destination()` implementation.
+
+`Route.destination()` (including its default implementation) and `RouteViewProviding` are
+deprecated but remain functional. Route-type declaration initializers remain supported without
+deprecation. Destination-value initializers preserve the existing `priority:`, `transition:`,
+and `providesNavigation:` options and defaults, including automatic modal navigation stacks.
 
 ## Styles
 
