@@ -2,7 +2,7 @@ import Departure
 import SwiftUI
 
 struct SplitBranchesRoute: Route {
-    func destination() -> some View { SplitBranchesView() }
+
 }
 
 struct SplitBranchesView: View {
@@ -13,28 +13,20 @@ struct SplitBranchesView: View {
         NavigationSplitView(columnVisibility: $visibility, preferredCompactColumn: $column) {
             NavigationStack {
                 SplitBranchPane(column: .sidebar)
-                    .routeBranch(NavigationSplitViewColumn.sidebar)
+                    .routing(NavigationSplitViewColumn.sidebar)
             }
         } content: {
             NavigationStack {
                 SplitBranchPane(column: .content)
-                    .routeBranch(NavigationSplitViewColumn.content)
+                    .routing(NavigationSplitViewColumn.content)
             }
         } detail: {
             NavigationStack {
                 SplitBranchPane(column: .detail)
-                    .routeBranch(NavigationSplitViewColumn.detail)
+                    .routing(NavigationSplitViewColumn.detail)
             }
         }
-        .routes(branch: $column, concurrent: true) {
-            Branch(.sidebar) { Push(SplitPaneRoute.self) }
-            Branch(.content) { Push(SplitPaneRoute.self) }
-            Branch(.detail) {
-                Push(SplitPaneRoute.self)
-                Replace(SplitSelectionRoute.self)
-                Cover(SplitPreviewRoute.self, providesNavigation: false)
-            }
-        }
+        .routing(branch: $column)
     }
 }
 
@@ -81,7 +73,7 @@ private struct SplitBranchPane: View {
 
 private struct SplitPaneRoute: Route, Equatable {
     let column: NavigationSplitViewColumn
-    func destination() -> some View { SplitPaneDestination(column: column) }
+
 }
 
 private struct SplitPaneDestination: View {
@@ -111,7 +103,7 @@ private struct SplitPaneDestination: View {
 
 private struct SplitSelectionRoute: Route, Equatable {
     let number: Int
-    func destination() -> some View { SplitSelectionDestination(number: number) }
+
 }
 
 private struct SplitSelectionDestination: View {
@@ -137,13 +129,13 @@ private struct SplitSelectionDestination: View {
             }
         }
         .navigationTitle("Selected detail")
-        .routes { Push(SplitSelectionChildRoute.self) }
+        .routing()
     }
 }
 
 private struct SplitSelectionChildRoute: Route, Equatable {
     let number: Int
-    func destination() -> some View { SplitSelectionChildDestination(number: number) }
+
 }
 
 private struct SplitSelectionChildDestination: View {
@@ -165,7 +157,7 @@ private struct SplitSelectionChildDestination: View {
 }
 
 private struct SplitPreviewRoute: Route {
-    func destination() -> some View { SplitPreview() }
+
 }
 
 private struct SplitPreview: View {
@@ -179,5 +171,43 @@ private struct SplitPreview: View {
                 .accessibilityIdentifier(SampleAppAccessibility.splitCoverDone)
         }
         .padding()
+    }
+}
+
+
+private enum SplitDestinations {
+    static let splitBranchesRoute = RouteDestination(SplitBranchesRoute.self) { route, context in
+        SplitBranchesView()
+    }
+    static let splitPaneRoute = RouteDestination(SplitPaneRoute.self) { route, context in
+        let column = route.column
+        SplitPaneDestination(column: column)
+    }
+    static let splitSelectionRoute = RouteDestination(SplitSelectionRoute.self) { route, context in
+        let number = route.number
+        SplitSelectionDestination(number: number)
+    }
+    static let splitSelectionChildRoute = RouteDestination(SplitSelectionChildRoute.self) { route, context in
+        let number = route.number
+        SplitSelectionChildDestination(number: number)
+    }
+    static let splitPreviewRoute = RouteDestination(SplitPreviewRoute.self) { route, context in
+        SplitPreview()
+    }
+}
+
+
+enum SplitBranchMap {
+    static let destination = RouteDestination(SplitBranchesRoute.self) { _, _ in SplitBranchesView() }
+    static let routes = RouteMap {
+        Branches(concurrent: true) {
+            Branch(NavigationSplitViewColumn.sidebar) { Push(SplitDestinations.splitPaneRoute) }
+            Branch(NavigationSplitViewColumn.content) { Push(SplitDestinations.splitPaneRoute) }
+            Branch(NavigationSplitViewColumn.detail) {
+                Push(SplitDestinations.splitPaneRoute)
+                Replace(SplitDestinations.splitSelectionRoute) { Push(SplitDestinations.splitSelectionChildRoute) }
+                Cover(SplitDestinations.splitPreviewRoute)
+            }
+        }
     }
 }

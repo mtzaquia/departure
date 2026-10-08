@@ -91,10 +91,7 @@ struct LoginView: View {
         }
         .navigationTitle("Login")
         .navigationBarTitleDisplayMode(.inline)
-        .routes {
-            Push(LoginDetailRoute.self)
-            Sheet(LoginNoticeRoute.self, priority: .high, providesNavigation: false)
-        }
+        .routing()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Probe", systemImage: "hand.tap") { presentationProbeCount += 1 }

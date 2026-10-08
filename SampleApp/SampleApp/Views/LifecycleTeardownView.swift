@@ -60,10 +60,6 @@ struct LifecycleTeardownView: View {
 }
 
 private struct RoutedScrollProbe: View {
-    private enum ProbeBranch: nonisolated Hashable {
-        case content
-    }
-
     let generation: Int
     @State private var selection = ProbeBranch.content
 
@@ -83,14 +79,10 @@ private struct RoutedScrollProbe: View {
                     .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
-            .routeBranch(ProbeBranch.content)
+            .routing(ProbeBranch.content)
         }
         .frame(maxHeight: 430)
-        .routes(branch: $selection) {
-            Branch(ProbeBranch.content) {
-                Sheet(TopLevelSheetRoute.self, providesNavigation: false)
-            }
-        }
+        .routing(branch: $selection)
     }
 }
 
@@ -107,3 +99,12 @@ private struct RoutedScrollStatus: View {
         }
     }
 }
+
+
+enum LifecycleTeardownMap {
+    static let routes = RouteMap {
+        Branches { Branch(ProbeBranch.content) { Sheet(Destinations.topLevelSheetRoute) } }
+    }
+}
+
+private enum ProbeBranch: nonisolated Hashable, Sendable { case content }

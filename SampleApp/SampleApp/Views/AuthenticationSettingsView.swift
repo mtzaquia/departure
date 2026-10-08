@@ -51,9 +51,9 @@ struct AuthenticationSettingsView: View {
                 @Bindable var routeState = state
                 Toggle(isOn: $routeState.attachesLocalRoute) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Label("Attach local sheet declaration", systemImage: "paperclip")
+                        Label("Rebuild route controls", systemImage: "arrow.clockwise")
                             .font(.subheadline.weight(.semibold))
-                        Text("Shows nearest-declaration routing")
+                        Text("Local routes stay available as this view updates")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -80,11 +80,7 @@ struct AuthenticationSettingsView: View {
         }
         .navigationTitle("Authentication")
         .navigationBarTitleDisplayMode(.inline)
-        .routes {
-            if state.attachesLocalRoute {
-                Sheet(TopLevelSheetRoute.self, providesNavigation: false)
-            }
-        }
+        .routing()
         .environment(\.samplePresentationSource, "authentication settings scope")
     }
 

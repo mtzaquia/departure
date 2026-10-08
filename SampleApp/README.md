@@ -8,7 +8,7 @@ Open a link in the booted simulator with:
 xcrun simctl openurl booted 'departure-sample://route/message'
 ```
 
-Deep links use the routing graph exactly as it currently exists. The app does not unwind, reset tabs, or construct presentation stacks itself. The nearest installed declaration therefore continues to decide the presentation owner and style. Open links whose owner is `Landing` after entering the sample, and open nested links while their owner is presented.
+Deep links use the routing graph exactly as it currently exists. The app does not unwind, reset tabs, or construct presentation stacks itself. The nearest eligible mapped declaration therefore continues to decide the presentation owner and style. Open links whose owner is `Landing` after entering the sample, and open nested links while their owner is presented.
 
 Each concrete route also has a failable `init?(url:)` through `SampleDeepLinkRoute`:
 
@@ -23,25 +23,25 @@ let route = MessageRoute(url: url)
 | --- | --- | --- |
 | `LandingRoute` | `departure-sample://route/landing` | Start |
 | `StartInfoRoute` | `departure-sample://route/start-info` | Start |
-| `LoginRoute` | `departure-sample://route/login` | Landing; high-priority cover |
-| `LoginReplacementRoute` | `departure-sample://route/login-replacement` | Landing; high-priority replacement cover |
+| `LoginRoute` | `departure-sample://route/login` | Router root; high-priority cover |
+| `LoginReplacementRoute` | `departure-sample://route/login-replacement` | Router root; high-priority replacement cover |
 | `LoginDetailRoute` | `departure-sample://route/login-detail` | Login; push |
-| `LoginNoticeRoute` | `departure-sample://route/login-notice` | Login; high-priority sheet |
+| `LoginNoticeRoute` | `departure-sample://route/login-notice` | Login; local sheet in the high-priority flow |
 | `ProfileRoute` | `departure-sample://route/profile` | Home branch; reroutes to Login while signed out |
 | `AuthenticationSettingsRoute` | `departure-sample://route/authentication-settings` | Settings branch; push |
 | `LocalDetailRoute` | `departure-sample://route/local-detail` | Settings branch; local push that shares its scope with inherited push hosts |
-| `TopLevelSheetRoute` | `departure-sample://route/top-level-sheet` | Nearest installed declaration; normally Landing |
+| `TopLevelSheetRoute` | `departure-sample://route/top-level-sheet` | Nearest eligible mapped declaration; normally Landing |
 | `TopLevelCoverRoute` | `departure-sample://route/top-level-cover` | Landing; cover |
 | `TopLevelReplacementCoverRoute` | `departure-sample://route/top-level-replacement-cover` | Landing; replacement cover |
-| `HighPriorityPassthroughSheetRoute` | `departure-sample://route/high-priority-passthrough-sheet` | Landing; high-priority sheet with background interaction |
-| `HighPriorityBlockingSheetRoute` | `departure-sample://route/high-priority-blocking-sheet` | Landing; blocking high-priority sheet |
-| `PendingPriorityRoute` | `departure-sample://route/pending-priority` | Settings branch; high-priority cover |
+| `HighPriorityPassthroughSheetRoute` | `departure-sample://route/high-priority-passthrough-sheet` | Router root; high-priority sheet with background interaction |
+| `HighPriorityBlockingSheetRoute` | `departure-sample://route/high-priority-blocking-sheet` | Router root; blocking high-priority sheet |
+| `PendingPriorityRoute` | `departure-sample://route/pending-priority` | Router root; high-priority cover |
 | `NavigationBarFadeOcclusionRoute` | `departure-sample://route/navigation-bar-fade-occlusion` | Home branch; fade cover |
 | `LifecycleTeardownRoute` | `departure-sample://route/lifecycle-teardown` | Home branch; routed `ScrollView` lifecycle regression fixture |
 | `AppearanceSettingsRoute` | `departure-sample://route/appearance-settings` | Settings branch; push |
-| `AlertRoute` | `departure-sample://route/alert` | Landing; high-priority fade cover |
-| `CriticalRoute` | `departure-sample://route/critical` | Landing; critical fade cover |
-| `CriticalReplacementRoute` | `departure-sample://route/critical-replacement` | Landing; critical replacement cover |
+| `AlertRoute` | `departure-sample://route/alert` | Router root; high-priority fade cover |
+| `CriticalRoute` | `departure-sample://route/critical` | Router root; critical fade cover |
+| `CriticalReplacementRoute` | `departure-sample://route/critical-replacement` | Router root; critical replacement cover |
 | `MessageRoute` | `departure-sample://route/message` | Home branch; fade cover |
 | `DismissProbeRoute` | `departure-sample://route/dismiss-probe` | Home branch; sheet |
 | `NestedModalRoute` | `departure-sample://route/nested-modal` | Dismiss Probe; nested sheet |
@@ -55,7 +55,7 @@ let route = MessageRoute(url: url)
 ## Query parameters
 
 - `departure-sample://route/login?next=profile` sets `LoginRoute.nextRoute`. `next` accepts any catalogue path.
-- `departure-sample://route/authentication-settings?local-route=true` starts with its optional local sheet declaration attached. Accepted values are `true`, `false`, `1`, and `0`.
+- `departure-sample://route/authentication-settings?local-route=true` starts with the route-controls rebuild toggle enabled; definitions remain fixed. Accepted values are `true`, `false`, `1`, and `0`.
 - `departure-sample://route/appearance-settings?value=01234567-89AB-CDEF-0123-456789ABCDEF` supplies the route's optional UUID value.
 
 Invalid schemes, hosts, paths, UUIDs, and Boolean parameter values are ignored.
@@ -63,7 +63,7 @@ Invalid schemes, hosts, paths, UUIDs, and Boolean parameter values are ignored.
 ## Routed scroll lifecycle regression
 
 Open **Lifecycle teardown** from the Home branch. The fixture replaces a visible `ScrollView`
-that owns branched `.routes` declarations, forcing its lifecycle representable to dismantle while
+that binds predefined branches, forcing its lifecycle representable to dismantle while
 `routePhase` is observed. Repeatedly tap **Replace routed scroll**, then send the simulator Home and
 bring Departure back to the foreground between replacements. The generation must advance, the
 nested route phase must return to `active`, the background-transition counter must advance, and
@@ -72,8 +72,8 @@ the app must remain running without a Swift exclusivity trap.
 ## Concurrent split-view branches
 
 Choose **Split-view lab** on the start screen. The three-column layout uses ordinary
-`NavigationSplitView` and `NavigationStack` views with `concurrent: true` on the existing
-branch modifier. **Show content** and **Show detail** address a sibling explicitly through
+`NavigationSplitView` and `NavigationStack` views with `Branches(concurrent: true)` in its
+route map. The view connects selection with `.routing(branch: $column)`. **Show content** and **Show detail** address a sibling explicitly through
 `router.branch(...)`. On compact layouts the preferred compact column reveals the target;
 on iPad the other columns retain their paths. **Cover from detail** demonstrates the
 existing full-screen cover behavior and captured `unwindRoute` dismissal.

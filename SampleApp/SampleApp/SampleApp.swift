@@ -80,7 +80,7 @@ extension EnvironmentValues {
 
 @main
 struct DepartureSampleApp: App {
-    @State private var router = Router()
+    @State private var router = RootRouter()
 
     init() {
         Departure.debug = .trace
@@ -88,20 +88,24 @@ struct DepartureSampleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if ProcessInfo.processInfo.arguments.contains("--nested-modal-probe") {
-                WithRouter(router: router) {
+            if ProcessInfo.processInfo.arguments.contains("--independent-space-probe") {
+                WithRouter(routes: IndependentSpaceProbeMap.root(owner: router), router: router) {
+                    RoutedNavigationStack { IndependentSpaceProbeRoot() }
+                }
+            } else if ProcessInfo.processInfo.arguments.contains("--nested-modal-probe") {
+                WithRouter(routes: NestedModalProbeMap.root, router: router) {
                     NavigationStack {
-                        NestedModalProbeRoot()
+                        NestedModalProbeRoot().routing()
                     }
                 }
             } else if ProcessInfo.processInfo.arguments.contains("--dismissal-stack-probe") {
-                WithRouter(router: router) {
+                WithRouter(routes: DismissalStackProbeMap.root, router: router) {
                     NavigationStack {
-                        DismissalStackProbeRoot()
+                        DismissalStackProbeRoot().routing()
                     }
                 }
             } else {
-                WithRouter(router: router) {
+                WithRouter(routes: AppRouteMaps.root, router: router) {
                     NavigationStack {
                         StartView().modifier(SampleRoutingContext())
                     }
@@ -120,7 +124,7 @@ struct DepartureSampleApp: App {
                     let route = link.route
                     print("[deeplink] accepted | \(url) → \(route)")
                     Task {
-                        await SampleDeepLink.router(for: route, from: Storage.shared.activeRouter ?? router).present(route)
+                        await SampleDeepLink.router(for: route, from: Storage.shared.activeRouter ?? router.current).present(route)
                     }
                 }
             }

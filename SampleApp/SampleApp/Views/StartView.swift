@@ -98,11 +98,7 @@ struct StartView: View {
             }
             .padding(24)
         }
-        .routes(id: SampleAppAccessibility.startScopeID) {
-            Cover(LandingRoute.self, providesNavigation: false)
-            Cover(SplitBranchesRoute.self, providesNavigation: false)
-            Sheet(StartInfoRoute.self, providesNavigation: false)
-        }
+        .routing()
         .hooks {
             UnwindHandler(AuthenticationSettingsRoute.self) {
                 Storage.shared.rootUnwindHookCount += 1

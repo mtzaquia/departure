@@ -77,26 +77,20 @@ struct DismissalStackProbeRoot: View {
             Text("First depth drop: \(probe.firstDepthDropMilliseconds)")
                 .accessibilityIdentifier("sample.dismissal-probe.first-drop")
         }
-        .routes { Sheet(DismissalStackProbeSheetRoute.self, providesNavigation: false) }
+        .routing()
     }
 }
 
 private struct DismissalStackProbeSheetRoute: Route {
-    func destination() -> some View {
-        DismissalStackProbeSheet()
-    }
+
 }
 
 private struct DismissalStackProbeFirstRoute: Route {
-    func destination() -> some View {
-        DismissalStackProbeFirst()
-    }
+
 }
 
 private struct DismissalStackProbeSecondRoute: Route {
-    func destination() -> some View {
-        DismissalStackProbeSecond()
-    }
+
 }
 
 private struct DismissalStackProbeSheet: View {
@@ -108,7 +102,7 @@ private struct DismissalStackProbeSheet: View {
         NavigationStack {
             Button("Push first") { Task { await router.present(DismissalStackProbeFirstRoute()) } }
                 .accessibilityIdentifier("sample.dismissal-probe.push-first")
-                .routes { Push(DismissalStackProbeFirstRoute.self) }
+                .routing()
         }
         .background(DismissalStackDepthSampler())
         .onAppear {
@@ -124,7 +118,7 @@ private struct DismissalStackProbeFirst: View {
     var body: some View {
         Button("Push second") { Task { await router.present(DismissalStackProbeSecondRoute()) } }
             .accessibilityIdentifier("sample.dismissal-probe.push-second")
-            .routes { Push(DismissalStackProbeSecondRoute.self) }
+            .routing()
     }
 }
 
@@ -197,3 +191,27 @@ private final class DismissalStackDepthController: UIViewController {
     }
 }
 
+
+
+private enum DismissalStackDestinations {
+    static let dismissalStackProbeSheetRoute = RouteDestination(DismissalStackProbeSheetRoute.self) { route, context in
+        DismissalStackProbeSheet()
+    }
+    static let dismissalStackProbeFirstRoute = RouteDestination(DismissalStackProbeFirstRoute.self) { route, context in
+        DismissalStackProbeFirst()
+    }
+    static let dismissalStackProbeSecondRoute = RouteDestination(DismissalStackProbeSecondRoute.self) { route, context in
+        DismissalStackProbeSecond()
+    }
+}
+
+
+enum DismissalStackProbeMap {
+    static let root = RootRouteMap {
+        Sheet(DismissalStackDestinations.dismissalStackProbeSheetRoute) {
+            Push(DismissalStackDestinations.dismissalStackProbeFirstRoute) {
+                Push(DismissalStackDestinations.dismissalStackProbeSecondRoute)
+            }
+        }
+    }
+}

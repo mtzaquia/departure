@@ -38,6 +38,36 @@ final class SampleAppUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
     }
 
+    func testElevatedRootResetAndRemovalThenNormalPresentation() {
+        app.terminate()
+        app.launchArguments = ["--independent-space-probe"]
+        app.launch()
+        tap("sample.spaces.open-high")
+        assertExists("sample.spaces.high-root")
+        tap("sample.spaces.push")
+        tap("sample.spaces.reset")
+        assertGone("sample.spaces.reset")
+        assertExists("sample.spaces.high-root")
+        tap("sample.spaces.chain")
+        assertGone("sample.spaces.high-root")
+        assertExists("sample.spaces.normal")
+    }
+
+    func testOwnerRemovalOfCoveredHighLeavesCriticalVisible() {
+        app.terminate()
+        app.launchArguments = ["--independent-space-probe"]
+        app.launch()
+        tap("sample.spaces.open-high")
+        tap("sample.spaces.open-critical")
+        assertExists("sample.spaces.critical-root")
+        tap("sample.spaces.remove-covered-high")
+        assertGone("sample.spaces.high-root")
+        assertExists("sample.spaces.critical-root")
+        tap("sample.spaces.close-critical")
+        assertGone("sample.spaces.critical-root")
+        assertExists("sample.spaces.open-high")
+    }
+
     func testSheetKeepsTwoPushesDuringRootUnwind() {
         assertSheetKeepsTwoPushesDuringDismissal("sample.dismissal-probe.unwind")
     }
@@ -379,7 +409,7 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.authenticationPresentTopLevelSheetButton)
         assertExists(A11y.topLevelSheetText)
-        assertLabel(A11y.topLevelSheetPresentationSource, contains: "top-level branched scope")
+        assertLabel(A11y.topLevelSheetPresentationSource, contains: "authentication settings scope")
 
         tap(A11y.topLevelSheetDismissButton)
         assertGone(A11y.topLevelSheetText)

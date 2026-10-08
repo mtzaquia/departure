@@ -41,7 +41,7 @@ struct LandingView: View {
                     legacySheet = LegacySheet()
                 }
                 .modifier(SampleRoutingContext())
-                .routeBranch(TabItem.home)
+                .routing(TabItem.home)
             }
             .tabItem {
                 Label("Home", systemImage: "house")
@@ -54,7 +54,7 @@ struct LandingView: View {
                     legacySheet = LegacySheet()
                 }
                 .modifier(SampleRoutingContext())
-                .routeBranch(TabItem.settings)
+                .routing(TabItem.settings)
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")
@@ -69,34 +69,7 @@ struct LandingView: View {
                 LegacySheetView()
             }
         }
-        .routes(branch: $tab) {
-            Cover(LoginRoute.self, priority: .high)
-            Cover(LoginReplacementRoute.self, priority: .high)
-            Cover(AlertRoute.self, priority: .high, transition: .fade, providesNavigation: false)
-            Cover(CriticalRoute.self, priority: .critical, transition: .fade, providesNavigation: false)
-            Cover(CriticalReplacementRoute.self, priority: .critical, transition: .fade, providesNavigation: false)
-            Sheet(HighPriorityPassthroughSheetRoute.self, priority: .high, providesNavigation: false)
-            Sheet(HighPriorityBlockingSheetRoute.self, priority: .high, providesNavigation: false)
-            Sheet(TopLevelSheetRoute.self, providesNavigation: false)
-            Cover(TopLevelCoverRoute.self, providesNavigation: false)
-            Cover(TopLevelReplacementCoverRoute.self, providesNavigation: false)
-
-            Branch(.home) {
-                Push(LifecycleTeardownRoute.self)
-                Sheet(ProfileRoute.self)
-                Sheet(DismissProbeRoute.self, providesNavigation: false)
-                Cover(MessageRoute.self, transition: .fade, providesNavigation: false)
-                Cover(NavigationBarFadeOcclusionRoute.self, transition: .fade)
-            }
-
-            Branch(.settings) {
-                Push(AppearanceSettingsRoute.self)
-                Push(AuthenticationSettingsRoute.self)
-                Cover(PendingPriorityRoute.self, priority: .high, providesNavigation: false)
-                Sheet(SettingsModalRoute.self, providesNavigation: false)
-                Sheet(RerouteChainFinalRoute.self, providesNavigation: false)
-            }
-        }
+        .routing(branch: $tab)
         .hooks {
             UnwindHandler(AuthenticationSettingsRoute.self) {
                 Storage.shared.landingContainerUnwindHookCount += 1
@@ -130,6 +103,6 @@ private struct LegacySheetView: View {
         .padding(32)
         .navigationTitle("External presentation")
         // This inherits the presenting scope, but must not replace its declarations.
-        .routes { Sheet(TopLevelSheetRoute.self) }
+        .routing()
     }
 }

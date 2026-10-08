@@ -78,9 +78,7 @@ struct SettingsView: View {
                 Storage.shared.settingsBranchUnwindHookCount += 1
             }
         }
-        .routes {
-            Push(LocalDetailRoute.self)
-        }
+        .routing()
     }
 
     private func action(

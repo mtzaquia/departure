@@ -86,24 +86,24 @@ struct NestedModalProbeRoot: View {
             Text("B exit samples: \(probe.bExitSamples)")
                 .accessibilityIdentifier("sample.nested-modal.b-samples")
         }
-        .routes { Sheet(NestedModalProbeSheetARoute.self, priority: priority, providesNavigation: false) }
+        .routing()
     }
 }
 
 private struct NestedModalProbeSheetARoute: Route, Equatable {
-    func destination() -> some View { NestedModalProbeSheetA() }
+
 }
 
 private struct NestedModalProbeAPushRoute: Route {
-    func destination() -> some View { NestedModalProbeAPush() }
+
 }
 
 private struct NestedModalProbeSheetBRoute: Route {
-    func destination() -> some View { NestedModalProbeSheetB() }
+
 }
 
 private struct NestedModalProbeBPushRoute: Route {
-    func destination() -> some View { NestedModalProbeBPush() }
+
 }
 
 private struct NestedModalProbeSheetA: View {
@@ -120,7 +120,7 @@ private struct NestedModalProbeSheetA: View {
                 Text("B exit samples: \(probe.bExitSamples)")
                     .accessibilityIdentifier("sample.nested-modal.retained-b-samples")
             }
-            .routes { Push(NestedModalProbeAPushRoute.self) }
+            .routing()
         }
         .background(NestedModalDepthSampler(isSheetA: true))
         .onAppear { probe.sheetARouter = router }
@@ -133,7 +133,7 @@ private struct NestedModalProbeAPush: View {
     var body: some View {
         Button("Present sheet B") { Task { await router.present(NestedModalProbeSheetBRoute()) } }
             .accessibilityIdentifier("sample.nested-modal.present-b")
-            .routes { Sheet(NestedModalProbeSheetBRoute.self, providesNavigation: false) }
+            .routing()
     }
 }
 
@@ -144,7 +144,7 @@ private struct NestedModalProbeSheetB: View {
         NavigationStack {
             Button("Push in B") { Task { await router.present(NestedModalProbeBPushRoute()) } }
                 .accessibilityIdentifier("sample.nested-modal.push-b")
-                .routes { Push(NestedModalProbeBPushRoute.self) }
+                .routing()
         }
         .background(NestedModalDepthSampler(isSheetA: false))
     }
@@ -227,5 +227,48 @@ private final class NestedModalDepthController: UIViewController {
         return ([own] + controller.children.map { deepestNavigationController(in: $0) })
             .compactMap { $0 }
             .max { $0.viewControllers.count < $1.viewControllers.count }
+    }
+}
+
+
+private enum NestedModalDestinations {
+    static let nestedModalProbeSheetARoute = RouteDestination(NestedModalProbeSheetARoute.self) { route, context in
+        NestedModalProbeSheetA()
+    }
+    static let nestedModalProbeAPushRoute = RouteDestination(NestedModalProbeAPushRoute.self) { route, context in
+        NestedModalProbeAPush()
+    }
+    static let nestedModalProbeSheetBRoute = RouteDestination(NestedModalProbeSheetBRoute.self) { route, context in
+        NestedModalProbeSheetB()
+    }
+    static let nestedModalProbeBPushRoute = RouteDestination(NestedModalProbeBPushRoute.self) { route, context in
+        NestedModalProbeBPush()
+    }
+}
+
+
+enum NestedModalProbeMap {
+    private static let nested = RouteMap {
+        Push(NestedModalDestinations.nestedModalProbeAPushRoute) {
+            Sheet(NestedModalDestinations.nestedModalProbeSheetBRoute) {
+                Push(NestedModalDestinations.nestedModalProbeBPushRoute)
+            }
+        }
+    }
+    static var root: RootRouteMap {
+        let arguments = ProcessInfo.processInfo.arguments
+        return RootRouteMap {
+            if !arguments.contains("--nested-modal-high") && !arguments.contains("--nested-modal-critical") {
+                Sheet(NestedModalDestinations.nestedModalProbeSheetARoute) { nested }
+            }
+        } highPriority: {
+            if arguments.contains("--nested-modal-high") {
+                Sheet(NestedModalDestinations.nestedModalProbeSheetARoute) { nested }
+            }
+        } criticalPriority: {
+            if arguments.contains("--nested-modal-critical") {
+                Sheet(NestedModalDestinations.nestedModalProbeSheetARoute) { nested }
+            }
+        }
     }
 }

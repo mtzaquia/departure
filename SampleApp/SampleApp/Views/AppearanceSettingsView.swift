@@ -63,7 +63,7 @@ struct AppearanceSettingsView: View {
         }
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
-        .routes { Push(AuthenticationSettingsRoute.self) }
+        .routing()
         .hooks {
             ActionInterceptor(SaveAppearanceSettingsAction.self) { invocation in
                 try? await invocation()
