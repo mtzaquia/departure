@@ -1051,7 +1051,7 @@ struct RouterTests {
             declaringScope: landingScope,
             branchID: AnyHashable(AppTab.home),
             declaration: pushDeclaration,
-            lookupStrategy: .rootPath(spacePriority: .default)
+            lookupStrategy: .currentPath(spacePriority: .default)
         )
         let requestTask = Task {
             await router.reuseEquivalentRoute(HomeDetailRoute(), at: detailScope,
@@ -1897,23 +1897,18 @@ struct RouterTests {
     }
 
     @Test func removingPresentedRouteScopeSynchronizesRouterPath() async throws {
-        let router = RouterEngine()
+        let root = RootRouter()
+        _ = WithRouter(routes: RootRouteMap {
+            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
+        }, router: root) { EmptyView() }
 
-        router.root.defineTestMap(
-            id: nil,
-            selection: nil,
-            definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
-            ]
-        )
+        await root.current.present(HomeDetailRoute())
+        let pushedScope = try #require(root.engine.defaultSpace.rootPath.last)
+        #expect(await root.current.unwind(to: .topmostAncestor))
 
-        await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.defaultSpace.rootPath.last)
-
-        router.removeFromPath(pushedScope)
-
-        #expect(router.defaultSpace.rootPath.isEmpty)
-        #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue == nil)
+        #expect(root.engine.spaces.routePath(containing: pushedScope) == nil)
+        #expect(root.engine.defaultSpace.rootPath.isEmpty)
+        #expect(root.engine.routePresentationBinding(from: root.engine.root, matching: .push).wrappedValue == nil)
     }
 
     @Test func routeScopeLeavingViewUninstallsWithoutRemovingRouterPath() async throws {

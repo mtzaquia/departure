@@ -122,8 +122,6 @@ extension RouterEngine {
     struct ResolvedRouteTarget {
         enum LookupStrategy: Equatable {
             case currentPath(spacePriority: RoutePriority)
-            case ancestorPath(spacePriority: RoutePriority)
-            case rootPath(spacePriority: RoutePriority)
             case defaultRootActiveBranchScope
             case defaultRootDeclarations
         }

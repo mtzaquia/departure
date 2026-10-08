@@ -70,10 +70,6 @@ final class RouteScope: Identifiable {
 
     @ObservationIgnored private(set) var presentation: RouteScopePresentation?
 
-    #if DEBUG
-    @ObservationIgnored var debugKind = DebugKind.root
-    #endif
-
     var isInstalledInView: Bool {
         access(keyPath: \.isInstalledInView)
         return host != nil
@@ -151,16 +147,6 @@ extension RouteScope {
         sourceEnvironmentReference.update(sourceEnvironment)
     }
 }
-
-#if DEBUG
-extension RouteScope {
-    enum DebugKind {
-        case root
-        case branch
-    }
-}
-#endif
-
 
 // MARK: - X/Y/Z Ownership
 

@@ -80,8 +80,7 @@ extension AnyRouteDeclaration {
             presentationDescription = "cover.\(transition)@\(priority)"
         }
 
-        let drivesPresentationDescription = ""
-        return "\(departureDebugName(for: routeType))[\(presentationDescription)\(drivesPresentationDescription)]"
+        return "\(departureDebugName(for: routeType))[\(presentationDescription)]"
     }
 }
 
@@ -95,11 +94,9 @@ extension RouteScope {
             return "routeScope#\(id.departureDebugDescription)(\(route.departureDebugDescription))"
         }
 
-        #if DEBUG
-        if debugKind == .branch {
+        if branchID != nil {
             return "branchScope#\(id.departureDebugDescription)"
         }
-        #endif
 
         let branchDescription = isFlatScope ? "" : ", active=\(activeBranch.departureDebugDescription)"
         return "rootScope#\(id.departureDebugDescription)\(branchDescription)"

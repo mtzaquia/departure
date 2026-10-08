@@ -94,8 +94,6 @@ enum DepartureLogEvent {
     case elevatedSpaceCleared
     case elevatedSpaceStarted
     case pathCleared(removedCount: Int)
-    case pathRemovalRequested(scope: RouteScope)
-    case pathRemovalSkipped(scope: RouteScope)
     case pathTrimmed(keepThrough: RouteScope, removedCount: Int)
     case pathUnchanged(keepThrough: RouteScope)
     case pendingRouteResuming(route: any Route)
@@ -183,8 +181,6 @@ extension DepartureLogEvent {
              .actionNoInterceptor,
 
              .pathCleared,
-             .pathRemovalRequested,
-             .pathRemovalSkipped,
              .pathTrimmed,
              .pathUnchanged,
              .ios17PushDismissalDeferred,
@@ -231,8 +227,6 @@ extension DepartureLogEvent {
             "branch"
 
         case .pathCleared,
-             .pathRemovalRequested,
-             .pathRemovalSkipped,
              .pathTrimmed,
              .pathUnchanged:
             "path"
@@ -291,7 +285,6 @@ extension DepartureLogEvent {
              .branchActivationRejected,
              .branchActivationSkipped,
 
-             .pathRemovalSkipped,
              .routeAppendSuperseded,
              .routeBlockedByElevatedPriority,
              .routeDroppedBranchActivationFailed,
@@ -345,10 +338,6 @@ extension DepartureLogEvent {
             "started elevated-priority route space"
         case let .pathCleared(removedCount):
             "path cleared | removed=\(removedCount)"
-        case let .pathRemovalRequested(scope):
-            "path removal requested | scope=\(scope.departureDebugDescription)"
-        case let .pathRemovalSkipped(scope):
-            "path removal skipped | reason=scope not in path | scope=\(scope.departureDebugDescription)"
         case let .pathTrimmed(keepThrough, removedCount):
             "path trimmed | keepThrough=\(keepThrough.unwindDebugDescription) | removed=\(removedCount)"
         case let .pathUnchanged(keepThrough):
@@ -451,10 +440,6 @@ private extension RouterEngine.ResolvedRouteTarget.LookupStrategy {
         switch self {
         case let .currentPath(spacePriority):
             "current route path in \(spacePriority) space, nearest scope first"
-        case let .ancestorPath(spacePriority):
-            "enclosing branch path in \(spacePriority) space, nearest scope first"
-        case let .rootPath(spacePriority):
-            "root path in \(spacePriority) space, nearest scope first"
         case .defaultRootActiveBranchScope:
             "active branch scope under default root"
         case .defaultRootDeclarations:

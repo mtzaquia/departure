@@ -372,7 +372,9 @@ extension RouterEngine {
         guard space === spaces.activeSpace,
               spaces.routePath(containing: match.presentingScope) != nil,
               !match.presentingScope.hasConflictingPresentationHosts,
-              match.presentingScope.routeAttachments.contains(match.declaration) else { operation.discardPresentation(); return }
+              match.presentingScope.definitions.routeBinding(for: match.declaration.routeType)?.declaration == match.declaration else {
+            operation.discardPresentation(); return
+        }
         let appendedPath = match.presentationPath
         let scope = RouteScope(id: AnyHashable(route.id),
             route: route, definitions: match.declaration.childScope ?? .empty)
@@ -395,20 +397,8 @@ extension RouterEngine {
         guard takePendingPresentation(operation) else { return }
         guard presentation.match.space === spaces.activeSpace else { operation.discardPresentation(); return }
         log.departureDebug(.pendingRouteResuming(route: presentation.route))
-        prepareRouteAppendPath(after: presentation.match)
+        applyUnwindPlan(spaces.presentationUnwindPlan(after: presentation.match))
         appendOrPendRoute(operation)
-    }
-
-    @discardableResult
-    func prepareRouteAppendPath(after match: ResolvedRouteTarget) -> [RouteScope] {
-        prepareRouteAppendPath(spaces.presentationUnwindPlan(after: match))
-    }
-
-    @discardableResult
-    func prepareRouteAppendPath(_ plan: RouteSpaces.UnwindPlan) -> [RouteScope] {
-        let removedScopes = plan.removedScopes
-        applyUnwindPlan(plan)
-        return removedScopes
     }
 
     func applyUnwindPlan(_ plan: RouteSpaces.UnwindPlan) {
@@ -441,20 +431,6 @@ extension RouterEngine {
                 ))
             }
         }
-    }
-
-    func removeFromPath(_ routeScope: RouteScope) {
-        guard isNavigationEligible(routeScope) else { return }
-        guard
-            let routePath = spaces.routePath(containing: routeScope),
-            let retained = routePath.scope(before: routeScope)
-        else {
-            log.departureDebug(.pathRemovalSkipped(scope: routeScope))
-            return
-        }
-
-        log.departureDebug(.pathRemovalRequested(scope: routeScope))
-        applyUnwindPlan(RouteSpaces.UnwindPlan(retaining: [retained]))
     }
 
     func hostDidAttach(_ scope: RouteScope, view: PlatformView?, id: UUID) {

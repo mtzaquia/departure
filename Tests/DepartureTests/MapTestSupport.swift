@@ -71,9 +71,6 @@ extension RouteScope {
         branchScopes[branch] = scope
         scope.parent = self
         scope.branchID = branch
-        #if DEBUG
-        scope.debugKind = .branch
-        #endif
         if let presentationHostID { scope.bindRoutingHost(presentationHostID, automatic: false, environment: scope.sourceEnvironment) }
         if let environment { scope.updateSourceEnvironment(environment) }
         return didChange
@@ -82,7 +79,7 @@ extension RouteScope {
         guard branchScopes[branch] === scope else { return }
         branchScopes[branch] = nil
         scope.parent = nil
-        scope.branchID = nil
+        // Its structural branch identity survives detachment, as it does in outgoing trees.
     }
 }
 

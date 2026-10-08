@@ -352,3 +352,17 @@ The 2026-10-06 audit results above are historical evidence. This section records
 | iPhone/iOS 17.5 native regressions | All 3 passed: Back/re-push, replacement, and root unwind preserving the outgoing sheet stack. |
 
 Production and sample source remained unchanged throughout these ownership-fix checks. They predate the priority semantics in specification 5; that specification records the combined implementation and its validation.
+
+## Compiled presentation hosts on 2026-10-08
+
+`RouteDefinitions` compiles the presentation styles of its valid route bindings once. Each scope's styles exclude conflicting keys and remain separate from its branch and destination child maps. `.routing` consumes that immutable set directly, removing runtime declaration-group reconstruction and repeated array flattening. Deferred insertion validates the exact declaration through the compiled type index rather than rebuilding and scanning the declaration list.
+
+One native modifier handles push, sheet, and sliding-cover presentation. Its style is fixed in each independent host slot. The four background positions, conditional presence of navigation destinations, iOS 17 push identity, push-dismissal animation suppression, and macOS sheet fallback remain intact. Replace still wraps the actual content, and fade retains its platform-specific host. Binding authority, environment capture, host callbacks, branch mounting waits, and outgoing snapshots are unchanged.
+
+Unused lookup cases, the stored debug scope classification, path-preparation forwarding helpers, and a test-only direct path-removal entry point are removed with their unused log events. Branch debug names derive from structural branch identity. The outgoing fixture now retains that identity on detachment; its existing debug assertion remains unchanged. The direct-removal regression now uses `RootRouter`, `WithRouter`, public presentation, and scoped unwind, additionally checking that the removed destination leaves the live tree.
+
+Production Swift decreases from 7,904 lines at `454ed01` to 7,759 lines: **145 fewer lines**. Existing declaration tests additionally verify style isolation between parent and child maps, pre-mount branch styles, and exclusion of conflicting keys from installed host styles. The affected package run passes **319 tests in 19 suites**; the Release build and all five mounted macOS tests pass, including both elevated fade priorities.
+
+Three unchanged iOS 27 UI cases pass for branch crawl and stack persistence, local push and sheet navigation inside high priority, and outgoing sheet-stack retention during ancestor unwind. Both unchanged iOS 17.5 cases pass for native Back/re-push and replacement without a Back entry and with child-navigation cleanup. Library, sample, and UI-test source stayed unchanged during final validation. This is focused coverage; the full UI matrix was not repeated after the preceding checkpoint recorded in specification 6.
+
+Evidence: `/tmp/departure-compiled-hosts-focused-final.log`, `/tmp/departure-compiled-hosts-release.log`, `/tmp/departure-compiled-hosts-mounted-macos.log`, `/tmp/departure-compiled-hosts-native-27.log`, and `/tmp/departure-compiled-hosts-native-17.log`. XcodeBuildMCP bundles are `test_sim_2026-10-08T17-42-03-882Z_pid68509_4eff518f.xcresult` (iOS 27) and `test_sim_2026-10-08T17-45-10-399Z_pid69279_4d2c2420.xcresult` (iOS 17.5).
