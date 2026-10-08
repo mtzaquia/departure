@@ -66,7 +66,7 @@ RouteDestination(EditorRoute.self) { route, context in
 
 ## Find the nearest eligible declaration
 
-A scoped request searches its own branch and enclosing scopes. The same type may occur in several scopes; the nearest eligible owner wins. Within a scope, the first declaration for a type wins and later duplicates warn.
+A scoped request searches its own branch and enclosing scopes. The same type may occur in several scopes; the nearest eligible owner wins. Duplicate route types at one scope report a diagnostic and disable that key, just like duplicate hooks. A conflict stops lookup; it cannot fall back to an ancestor or sibling declaration. Duplicate branch values disable that branch. Distinct declarations remain available.
 
 When no local match exists, discovery can select another mapped branch before that branch's view is built. It does not search arbitrary destination scopes in sibling stacks. `router.branch(...)` chooses a branch explicitly and never falls back to siblings. Knowing a nested definition does not make it available before its parent destination exists.
 

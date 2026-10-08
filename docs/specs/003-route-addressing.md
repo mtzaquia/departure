@@ -93,7 +93,7 @@ The branch handle selects the lookup context without changing selection merely b
 
 ## Duplicate declarations
 
-Within the same declaration scope, the first declaration for a route type wins; later duplicates are ignored and produce a diagnostic. Retain this current duplicate policy without introducing ambiguity errors, public location keys, or a new tie-breaking rule.
+Within the same declaration scope, duplicate route types report a diagnostic and disable that key. A conflict stops lookup rather than falling back to another owner. This uniform route/hook policy was accepted in specification 7 and supersedes the original first-declaration-wins rule. Repeating a route type at separate scope occurrences remains valid.
 
 Different scopes can declare the same type with different presentation styles, destination builders, or children. Their requesting scope determines precedence. Independent branches remain distinct declaration scopes.
 

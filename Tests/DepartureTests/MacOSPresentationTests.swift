@@ -52,7 +52,7 @@ struct MacOSPresentationTests {
             router.engine.root.branchScopes["detail"]?
                 .firstRouteAttachment(for: MacOSPresentingRoute.self) != nil
         })
-        #expect(router.engine.root.definitions.routeAttachment(for: MacOSPresentingRoute.self) == nil)
+        #expect(router.engine.root.definitions.routeBinding(for: MacOSPresentingRoute.self) == nil)
     }
 
     @Test func nonDeparturePresentationCannotReplacePresentingBranchDeclarations() async throws {

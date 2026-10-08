@@ -100,7 +100,7 @@ final class RouteScope: Identifiable {
     func useDefinitions(_ definitions: RouteDefinitions) {
         self.definitions = definitions
         for branch in definitions.branches.keys where branchScopes[branch] == nil {
-            guard let definition = definitions.branches[branch] else { continue }
+            guard let definition = definitions.branches[branch]?.declaration else { continue }
             let scope = RouteScope(id: branch, route: nil, parent: self, definitions: definition.scope)
             scope.branchID = branch
             branchScopes[branch] = scope
@@ -263,20 +263,10 @@ extension RouteScope {
         }
     }
 
-    enum HookBinding {
-        case declared(AnyHookDeclaration)
-        case conflict
-
-        var declaration: AnyHookDeclaration? {
-            if case let .declared(declaration) = self { return declaration }
-            return nil
-        }
-    }
-
     // Sources own captured closures. Resolution is derived, so updates and removal
     // cannot leave a second cache or an implicit mount-order winner behind.
-    private var hookBindings: [HookDeclarationIdentity: HookBinding] {
-        var bindings: [HookDeclarationIdentity: HookBinding] = [:]
+    private var hookBindings: [HookDeclarationIdentity: DeclarationBinding<AnyHookDeclaration>] {
+        var bindings: [HookDeclarationIdentity: DeclarationBinding<AnyHookDeclaration>] = [:]
         for declarations in hookSources.values {
             for declaration in declarations {
                 let identity = declaration.identity
@@ -286,7 +276,7 @@ extension RouteScope {
         return bindings
     }
 
-    func hookBinding(for identity: HookDeclarationIdentity, in spaces: RouteSpaces) -> HookBinding? {
+    func hookBinding(for identity: HookDeclarationIdentity, in spaces: RouteSpaces) -> DeclarationBinding<AnyHookDeclaration>? {
         guard spaces.routePath(containing: self) != nil else { return nil }
         return hookBindings[identity]
     }

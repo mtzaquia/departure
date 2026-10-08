@@ -35,7 +35,7 @@ struct NestedBranchLookupTests {
         ])
         outer.setActiveBranch("inner")
 
-        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self))
+        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
         #expect(match.presentationHost === outer)
         #expect(match.lookupStrategy == .currentPath(spacePriority: .normal))
         #if DEBUG
@@ -60,7 +60,7 @@ struct NestedBranchLookupTests {
             RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations),
         ])
 
-        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self))
+        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
         #expect(match.presentationHost === inner)
         await router.present(SettingsRoute())
         #expect(inner.path.last?.route is SettingsRoute)
@@ -70,7 +70,7 @@ struct NestedBranchLookupTests {
 
     @Test func lazyDeclarationRemainsAvailableWithoutLocalOverride() async throws {
         let (router, outer, inner) = makeNestedBranches(hasLazyDeclaration: true)
-        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self))
+        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
         #expect(match.presentationHost === outer)
         await router.present(SettingsRoute())
         #expect(outer.path.last?.route is SettingsRoute)
@@ -92,7 +92,7 @@ struct NestedBranchLookupTests {
         }
 
         #expect(router.currentRouteScope === inner)
-        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self))
+        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
         #expect(match.presentationHost === container)
         await router.present(SettingsRoute())
         #expect(outer.path.first === container)

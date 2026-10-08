@@ -65,10 +65,74 @@ import Testing
         #expect(engine.root.participates(inBranch: AppTab.home))
         #expect(engine.root.participates(inBranch: AppTab.wallet))
     }
-    @Test func duplicateTypeUsesFirstDeclarationWithinScope() {
-        let engine = RouterEngine(routes: RootRouteMap { Sheet(settings); Push(settings) })
+    @Test(arguments: [false, true])
+    func duplicateTypeDisablesOnlyConflictingKey(reverse: Bool) async {
+        let conflicting = RouteMap { Sheet(settings); Push(settings) }
+        let reversed = RouteMap { Push(settings); Sheet(settings) }
+        let engine = RouterEngine(routes: RootRouteMap {
+            if reverse { reversed } else { conflicting }
+            Push(detail)
+        })
+        let router = Router(engine: engine, scope: engine.root)
         #expect(engine.root.routeAttachments.count == 1)
-        #expect(engine.root.firstRouteAttachment(for: SettingsRoute.self)?.declaration.presentationKind == .sheet)
+        guard case .conflict? = engine.root.firstRouteAttachment(for: SettingsRoute.self) else {
+            Issue.record("A conflicting route key must remain a lookup barrier")
+            return
+        }
+        await router.present(SettingsRoute())
+        #expect(engine.normalSpace.rootPath.isEmpty)
+        await router.present(HomeDetailRoute())
+        #expect(engine.normalSpace.rootPath.last?.route is HomeDetailRoute)
+    }
+
+    @Test func conflictingRouteDoesNotFallBackToAncestorOrSibling() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Sheet(settings)
+            Push(detail) {
+                Branches {
+                    Branch("conflicting") { Push(settings); Sheet(settings) }
+                    Branch("valid") { Sheet(settings) }
+                }
+            }
+        })
+        let root = Router(engine: engine, scope: engine.root)
+        await root.present(HomeDetailRoute())
+        let scope = try #require(engine.normalSpace.rootPath.last)
+        await Router(engine: engine, scope: scope).present(SettingsRoute())
+        #expect(engine.normalSpace.rootPath.last === scope)
+        #expect(scope.branchScopes.values.allSatisfy { $0.path.isEmpty })
+        #expect(scope.activeBranch == AnyHashable("conflicting"))
+    }
+
+    @Test func conflictingBranchHasNoRuntimeScopeOrMountOrderWinner() async {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Branches {
+                Branch("duplicate") { Sheet(settings) }
+                Branch("duplicate") { Push(detail) }
+                Branch("valid") { Push(detail) }
+            }
+        })
+        #expect(engine.root.branchScopes["duplicate"] == nil)
+        #expect(engine.root.branchScopes.keys == [AnyHashable("valid")])
+        await Router(engine: engine, scope: engine.root).branch("duplicate").present(HomeDetailRoute())
+        #expect(engine.root.branchScopes["valid"]?.path.isEmpty == true)
+    }
+
+    @Test func duplicateTypeAcrossPriorityCatalogsIsAlsoAConflict() async {
+        let engine = RouterEngine(routes: RootRouteMap { Sheet(settings) } highPriority: { Sheet(settings) })
+        await Router(engine: engine, scope: engine.root).present(SettingsRoute())
+        #expect(engine.root.routeAttachments.isEmpty)
+        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(engine.spaces.highSpace == nil)
+    }
+
+    @Test func duplicateTypeIsRecordedAsConflictWithinScope() {
+        let engine = RouterEngine(routes: RootRouteMap { Sheet(settings); Push(settings) })
+        #expect(engine.root.routeAttachments.isEmpty)
+        guard case .conflict? = engine.root.firstRouteAttachment(for: SettingsRoute.self) else {
+            Issue.record("Expected a conflicting declaration")
+            return
+        }
     }
     @Test func routeInstancesShareDefinitionsAndKeepIndependentBranchState() async throws {
         let engine = RouterEngine(routes: RootRouteMap {

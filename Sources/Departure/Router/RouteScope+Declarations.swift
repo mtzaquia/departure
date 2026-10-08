@@ -53,23 +53,23 @@ extension RouteScope {
         definitions.routeAttachments
     }
 
-    func firstRouteAttachment(for routeType: (some Route).Type, includingOtherBranches: Bool = true) -> RouteAttachmentMatch? {
+    func firstRouteAttachment(for routeType: (some Route).Type, includingOtherBranches: Bool = true) -> DeclarationBinding<RouteAttachmentMatch>? {
         if includingOtherBranches, branchContainer != nil,
-           let declaration = branchScopes[activeBranch]?.definitions.routeAttachment(for: routeType) {
-            return RouteAttachmentMatch(branchID: activeBranch, declaration: declaration)
+           let binding = branchScopes[activeBranch]?.definitions.routeBinding(for: routeType) {
+            return binding.map { RouteAttachmentMatch(branchID: activeBranch, declaration: $0) }
         }
 
-        if let declaration = definitions.routeAttachment(for: routeType) {
-            return RouteAttachmentMatch(branchID: nil, declaration: declaration)
+        if let binding = definitions.routeBinding(for: routeType) {
+            return binding.map { RouteAttachmentMatch(branchID: nil, declaration: $0) }
         }
 
         if includingOtherBranches, branchContainer != nil {
             for branchID in branchScopes.keys where branchID != activeBranch {
-                guard let declaration = branchScopes[branchID]?.definitions.routeAttachment(for: routeType) else {
+                guard let binding = branchScopes[branchID]?.definitions.routeBinding(for: routeType) else {
                     continue
                 }
 
-                return RouteAttachmentMatch(branchID: branchID, declaration: declaration)
+                return binding.map { RouteAttachmentMatch(branchID: branchID, declaration: $0) }
             }
         }
 
@@ -79,20 +79,20 @@ extension RouteScope {
     func firstBranchScopeRouteAttachment(
         for routeType: (some Route).Type,
         in branch: AnyHashable
-    ) -> RouteAttachmentMatch? {
+    ) -> DeclarationBinding<RouteAttachmentMatch>? {
         guard
             let branchScope = branchScopes[branch]?.activeLocalScope,
             branchScope !== branchScopes[branch],
-            let match = branchScope.firstRouteAttachment(for: routeType)
+            let binding = branchScope.firstRouteAttachment(for: routeType)
         else {
             return nil
         }
 
-        return RouteAttachmentMatch(
+        return binding.map { RouteAttachmentMatch(
             branchID: branch,
-            declaration: match.declaration,
+            declaration: $0.declaration,
             presentationAnchor: .activeLocalScope
-        )
+        ) }
     }
 
     func attachedPresentationDeclaration(

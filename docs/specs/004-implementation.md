@@ -130,7 +130,7 @@ Snapshot-rendered destinations retain the context for their outgoing instance. A
 
 Resolve a request using the map, current navigation state, and its captured origin context. Search the nearest eligible definition scope and follow the unchanged discoverability rules from specification 3.
 
-The accumulated prefix supplies scope and ancestor information that currently has to be recovered from installed declaration sources. It must not enable a new global search, alter same-scope duplicate precedence, or change branch targeting boundaries.
+The accumulated prefix supplies scope and ancestor information that currently has to be recovered from installed declaration sources. It must not enable a new global search or change branch targeting boundaries. Same-scope duplicate handling follows the later accepted conflict policy in specification 7.
 
 Matching a declaration does not wait for that declaration to be installed by a view. Waiting may still be needed for the corresponding presentation host to become ready after a branch selection or another transition.
 

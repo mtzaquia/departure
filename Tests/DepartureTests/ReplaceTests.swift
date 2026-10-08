@@ -291,7 +291,7 @@ struct ReplaceTests {
         fixture.engine.mutateRouteGraph { selected.attachTestBranch(nested, for: "nested") }
         await fixture.local(nested).present(ChildRoute())
         let match = try #require(fixture.engine.spaces.firstDeclaration(
-            including: ElevatedRoute.self, origin: fixture.local(selected).origin))
+            including: ElevatedRoute.self, origin: fixture.local(selected).origin)?.declaration)
         // Construct the context through the canonical elevated transition. A normal
         // replacement would be blocked while the high-priority context is active.
         await fixture.engine.replaceElevatedSpace(.high, with: ElevatedRoute(), after: match)

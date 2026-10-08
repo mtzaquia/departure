@@ -57,6 +57,10 @@ extension RouterEngine {
             log.departureWarning(.routeDroppedNoDeclaration(routeType: routeType))
             return
 
+        case .dropConflictingDeclaration(let routeType):
+            log.departureWarning("Route `\(routeType)` was ignored because its declarations conflict.")
+            return
+
         case .dropBlockedByElevatedPriority(let match):
             logMatchedRoute(resolvedRoute, to: match)
             log.departureDebug(.routeBlockedByElevatedPriority(route: resolvedRoute))
@@ -107,9 +111,10 @@ extension RouterEngine {
             routeType: routeType,
             activePath: spaces.activeSpace.currentRoutePath.departureDebugPathDescription
         ))
-        guard let match = spaces.firstDeclaration(including: routeType, origin: origin) else {
+        guard let binding = spaces.firstDeclaration(including: routeType, origin: origin) else {
             return .dropNoDeclaration(routeType: routeType)
         }
+        guard let match = binding.declaration else { return .dropConflictingDeclaration(routeType: routeType) }
 
         if match.declaration.priority == .normal, let source = resolveRequestOrigin(origin),
            let currentRoute = source.route, currentRoute._isEqual(to: route),
@@ -140,6 +145,7 @@ extension RouterEngine {
     enum RouteTransitionPlan {
         case noOp(currentRoute: any Route)
         case dropNoDeclaration(routeType: any Route.Type)
+        case dropConflictingDeclaration(routeType: any Route.Type)
         case dropBlockedByElevatedPriority(match: DeclarationMatch)
         case append(match: DeclarationMatch)
         case replaceElevatedSpace(priority: RoutePriority, match: DeclarationMatch)

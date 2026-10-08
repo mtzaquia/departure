@@ -44,7 +44,12 @@ extension RouteScope {
     func attachTestBranch(_ scope: RouteScope, for branch: AnyHashable, environment: EnvironmentValues? = nil, presentationHostID: RoutePresentationHostID? = nil) -> Bool {
         let didChange = branchScopes[branch] !== scope
         if didChange, let compiled = branchScopes[branch] {
-            scope.useDefinitions(RouteDefinitions([RouteScopeDeclaration(routes: scope.routeAttachments + compiled.routeAttachments)]))
+            // These legacy scenarios supply an explicit branch map in place of
+            // the compiled fixture branch. Fill only missing keys from that map;
+            // constructing this test topology must not invent duplicate declarations.
+            let explicitTypes = Set(scope.routeAttachments.map { ObjectIdentifier($0.routeType) })
+            let inherited = compiled.routeAttachments.filter { !explicitTypes.contains(ObjectIdentifier($0.routeType)) }
+            scope.useDefinitions(RouteDefinitions([RouteScopeDeclaration(routes: scope.routeAttachments + inherited)]))
             for id in compiled.branchScopes.keys where scope.branchScopes[id] == nil {
                 scope.branchScopes[id] = compiled.branchScopes[id]
                 scope.branchScopes[id]?.parent = scope

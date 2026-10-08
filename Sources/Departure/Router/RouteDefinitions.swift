@@ -28,27 +28,29 @@ final class RouteDefinitions: Sendable {
     }
 
     static let empty = RouteDefinitions([])
-    private let routesByType: OrderedStorage<ObjectIdentifier, AnyRouteDeclaration>
-    let branches: OrderedStorage<AnyHashable, Branch>
+    private let routesByType: OrderedStorage<ObjectIdentifier, DeclarationBinding<AnyRouteDeclaration>>
+    let branches: OrderedStorage<AnyHashable, DeclarationBinding<Branch>>
 
     init(_ declarations: [RouteScopeDeclaration]) {
-        var routes = OrderedStorage<ObjectIdentifier, AnyRouteDeclaration>()
-        var branches = OrderedStorage<AnyHashable, Branch>()
+        var routes = OrderedStorage<ObjectIdentifier, DeclarationBinding<AnyRouteDeclaration>>()
+        var branches = OrderedStorage<AnyHashable, DeclarationBinding<Branch>>()
         for declaration in declarations {
             if let branch = declaration.branch {
                 guard branches[branch] == nil else {
-                    log.departureWarning("Duplicate branch declaration; the first definition will be used.")
+                    branches[branch] = .conflict
+                    log.departureWarning("Conflicting branch declarations for `\(branch)`; the branch is disabled.")
                     continue
                 }
-                branches[branch] = Branch(scope: RouteDefinitions(declaration.children), concurrent: declaration.concurrent)
+                branches[branch] = .declared(Branch(scope: RouteDefinitions(declaration.children), concurrent: declaration.concurrent))
             } else {
                 for route in declaration.routes {
                     let type = ObjectIdentifier(route.routeType)
                     guard routes[type] == nil else {
-                        log.departureWarning("Duplicate route declaration for `\(route.routeType)`; the first definition will be used.")
+                        routes[type] = .conflict
+                        log.departureWarning("Conflicting route declarations for `\(route.routeType)`; the route is disabled in this scope.")
                         continue
                     }
-                    routes[type] = route.compiled()
+                    routes[type] = .declared(route.compiled())
                 }
             }
         }
@@ -56,6 +58,6 @@ final class RouteDefinitions: Sendable {
         self.branches = branches
     }
 
-    var routeAttachments: [AnyRouteDeclaration] { routesByType.values }
-    func routeAttachment(for type: any Route.Type) -> AnyRouteDeclaration? { routesByType[ObjectIdentifier(type)] }
+    var routeAttachments: [AnyRouteDeclaration] { routesByType.values.compactMap(\.declaration) }
+    func routeBinding(for type: any Route.Type) -> DeclarationBinding<AnyRouteDeclaration>? { routesByType[ObjectIdentifier(type)] }
 }
