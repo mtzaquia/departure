@@ -50,41 +50,51 @@ extension RouterEngine {
     func presentResolvedRoute(_ resolvedRoute: any Route, origin: RouteRequestOrigin? = nil) async -> RouteScope? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         guard let source = navigationSource(origin), !Task.isCancelled else { return nil }
-        switch transitionPlan(for: resolvedRoute, origin: origin) {
-        case .noOp(let currentRoute):
+        let routeType = type(of: resolvedRoute)
+        log.departureDebug(.routeLookupStarted(
+            routeType: routeType,
+            activePath: spaces.activeSpace.currentRoutePath.departureDebugPathDescription
+        ))
+        guard let binding = spaces.firstDeclaration(including: routeType, origin: origin) else {
+            log.departureWarning(.routeDroppedNoDeclaration(routeType: routeType))
+            return nil
+        }
+        guard let match = binding.declaration else {
+            log.departureWarning("Route `\(routeType)` was ignored because its declarations conflict.")
+            return nil
+        }
+
+        let priority = match.declaration.priority
+        if priority == .default, let currentRoute = source.route, currentRoute._isEqual(to: resolvedRoute),
+           source.attachedPresentationDeclaration(presentedBy: match.presentingScope,
+                matching: match.declaration.presentationKind, hostedBy: match.presentationHostID) != nil {
             guard activateOrigin(origin) else { return nil }
             log.departureDebug(.routeNoOpEquivalent(route: resolvedRoute, currentRoute: currentRoute))
             return source
+        }
 
-        case .dropNoDeclaration(let routeType):
-            log.departureWarning(.routeDroppedNoDeclaration(routeType: routeType))
-            return nil
-
-        case .dropConflictingDeclaration(let routeType):
-            log.departureWarning("Route `\(routeType)` was ignored because its declarations conflict.")
-            return nil
-
-        case .dropBlockedByElevatedPriority(let match):
-            logMatchedRoute(resolvedRoute, to: match)
+        guard priority == .default
+            ? match.space === spaces.activeSpace
+            : priority >= spaces.activeSpace.priority else {
+            log.departureDebug(.routeMatched(route: resolvedRoute, match: match))
             log.departureDebug(.routeBlockedByElevatedPriority(route: resolvedRoute))
             return nil
+        }
 
-        case .append(let match):
+        if priority == .default {
             guard activatePresentationOwner(match) else { return nil }
-            logMatchedRoute(resolvedRoute, to: match)
+            log.departureDebug(.routeMatched(route: resolvedRoute, match: match))
             log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
             return await appendRoute(resolvedRoute, after: match, origin: origin)
-
-        case .replaceElevatedSpace(let priority, let match):
-            logMatchedRoute(resolvedRoute, to: match)
-            if let space = spaces.space(for: priority), space.root.route?._isEqual(to: resolvedRoute) == true {
-                return await reuseEquivalentRoute(resolvedRoute, at: space.root,
-                    plan: spaces.rootUnwindPlan(in: space))
-            }
-
-            log.departureDebug(.routeAcceptedReplaceElevatedPriority(route: resolvedRoute))
-            return await replaceElevatedSpace(priority, with: resolvedRoute, after: match, origin: origin)
         }
+
+        log.departureDebug(.routeMatched(route: resolvedRoute, match: match))
+        if let space = spaces.space(for: priority), space.root.route?._isEqual(to: resolvedRoute) == true {
+            return await reuseEquivalentRoute(resolvedRoute, at: space.root,
+                plan: spaces.rootUnwindPlan(in: space))
+        }
+        log.departureDebug(.routeAcceptedReplaceElevatedPriority(route: resolvedRoute))
+        return await replaceElevatedSpace(priority, with: resolvedRoute, after: match, origin: origin)
     }
 
     private func resolveRouteChain(startingWith route: any Route) async -> (any Route)? {
@@ -106,58 +116,9 @@ extension RouterEngine {
             }
         }
     }
-
-    private func transitionPlan(for route: any Route, origin: RouteRequestOrigin? = nil) -> RouteTransitionPlan {
-        let routeType = type(of: route)
-        log.departureDebug(.routeLookupStarted(
-            routeType: routeType,
-            activePath: spaces.activeSpace.currentRoutePath.departureDebugPathDescription
-        ))
-        guard let binding = spaces.firstDeclaration(including: routeType, origin: origin) else {
-            return .dropNoDeclaration(routeType: routeType)
-        }
-        guard let match = binding.declaration else { return .dropConflictingDeclaration(routeType: routeType) }
-
-        if match.declaration.priority == .default, let source = resolveRequestOrigin(origin),
-           let currentRoute = source.route, currentRoute._isEqual(to: route),
-           source.attachedPresentationDeclaration(presentedBy: match.presentingScope,
-                matching: match.declaration.presentationKind, hostedBy: match.presentationHostID) != nil {
-            return .noOp(currentRoute: currentRoute)
-        }
-
-        return switch priorityDecision(for: match) {
-        case .drop:
-            .dropBlockedByElevatedPriority(match: match)
-
-        case .append:
-            .append(match: match)
-
-        case .replaceElevatedSpace(let priority):
-            .replaceElevatedSpace(priority: priority, match: match)
-        }
-    }
-
-    private func logMatchedRoute(_ route: any Route, to match: ResolvedRouteTarget) {
-        log.departureDebug(.routeMatched(route: route, match: match))
-    }
 }
 
 extension RouterEngine {
-    enum RouteTransitionPlan {
-        case noOp(currentRoute: any Route)
-        case dropNoDeclaration(routeType: any Route.Type)
-        case dropConflictingDeclaration(routeType: any Route.Type)
-        case dropBlockedByElevatedPriority(match: ResolvedRouteTarget)
-        case append(match: ResolvedRouteTarget)
-        case replaceElevatedSpace(priority: RoutePriority, match: ResolvedRouteTarget)
-    }
-
-    enum PriorityDecision {
-        case append
-        case replaceElevatedSpace(RoutePriority)
-        case drop
-    }
-
     struct ResolvedRouteTarget {
         enum LookupStrategy: Equatable {
             case currentPath(spacePriority: RoutePriority)
@@ -177,18 +138,6 @@ extension RouterEngine {
         var presentationPath: RoutePath { presentingScope.routePath }
         var declaringPath: RoutePath { declaringScope.routePath }
         var presentationHostID: RoutePresentationHostID? { presentingScope.presentationHostID }
-    }
-
-    func priorityDecision(for match: ResolvedRouteTarget) -> PriorityDecision {
-        if match.declaration.priority == .default {
-            return match.space === spaces.activeSpace ? .append : .drop
-        }
-
-        if spaces.activeSpace.priority > match.declaration.priority {
-            return .drop
-        }
-
-        return .replaceElevatedSpace(match.declaration.priority)
     }
 
     /// The path owned by the branch nearest to the current position, or `nil` when the current
