@@ -62,8 +62,8 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
     struct PendingDismissal {
         let id = UUID()
         let scope: RouteScope
-        let routePath: RoutePath
-        let targetPosition: RoutePath.Position
+        let retainedScope: RouteScope
+        var routePath: RoutePath { scope.routePath }
         let unwindPlan: RouteSpaces.UnwindPlan
         let presentationOriginID: ObjectIdentifier?
     }
@@ -90,15 +90,15 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
                 from: match.presentingScope, matching: .replace, hostedBy: match.presentationHostID
               )?.scope,
               let path = router.spaces.routePath(containing: replacing),
-              let position = path.position(of: replacing),
-              path.scopesRemovedAfter(position).contains(where: {
+              path.contains(replacing),
+              path.scopesRemoved(after: replacing).contains(where: {
                 $0.presentationDeclaration?.presentationKind == .push
               })
         else { return false }
 
         // iOS 17 cannot reliably remove a pushed child and replace its enclosing selection
         // in the same graph update. Pop the child first and preserve latest-request semantics.
-        let plan = router.spaces.unwindPlan(for: .scoped(routePath: path, after: position))
+        let plan = RouteSpaces.UnwindPlan(retaining: [replacing])
         let operation = router.beginNavigationOperation(plan: plan)
         router.commitNavigationOperation(operation, preservesModalPresentationBindings: false)
         await router.waitForNavigationOperation(operation)
@@ -230,7 +230,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         guard
             let routePath = router.spaces.routePath(containing: presentationScope),
             routePath.scopes.contains(where: { $0 === presentationScope }),
-            let targetPosition = routePath.positionBefore(presentationScope),
+            let retained = routePath.scope(before: presentationScope),
             presentationScope.presentationDeclaration?.presentationKind == .push,
             isActivePresentationPath(routePath, in: router)
         else {
@@ -239,12 +239,8 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
 
         return PendingDismissal(
             scope: presentationScope,
-            routePath: routePath,
-            targetPosition: targetPosition,
-            unwindPlan: router.spaces.unwindPlan(for: .scoped(
-                routePath: routePath,
-                after: targetPosition
-            )),
+            retainedScope: retained,
+            unwindPlan: RouteSpaces.UnwindPlan(retaining: [retained]),
             presentationOriginID: presentationScope.presentationOrigin.map(ObjectIdentifier.init)
         )
     }
@@ -253,7 +249,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         let scope = dismissal.scope
         guard router.spaces.routePath(containing: scope) === dismissal.routePath,
               dismissal.routePath.scopes.contains(where: { $0 === scope }),
-              dismissal.routePath.positionBefore(scope) == dismissal.targetPosition,
+              dismissal.routePath.scope(before: scope) === dismissal.retainedScope,
               scope.presentationDeclaration?.presentationKind == .push,
               scope.presentationOrigin.map(ObjectIdentifier.init) == dismissal.presentationOriginID,
               isActivePresentationPath(dismissal.routePath, in: router)
@@ -261,10 +257,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
             return false
         }
 
-        let currentPlan = router.spaces.unwindPlan(for: .scoped(
-            routePath: dismissal.routePath,
-            after: dismissal.targetPosition
-        ))
+        let currentPlan = RouteSpaces.UnwindPlan(retaining: [dismissal.retainedScope])
         return hasSameStructure(dismissal.unwindPlan, currentPlan)
     }
 
@@ -300,7 +293,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
     private func complete(_ dismissal: PendingDismissal, in router: RouterEngine) {
         router.performPresentationDismissalUnwind(
             for: dismissal.scope,
-            in: dismissal.routePath.scope(at: dismissal.targetPosition),
+            in: dismissal.retainedScope,
             plan: dismissal.unwindPlan
         )
     }
@@ -314,21 +307,16 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         _ second: RouteSpaces.UnwindPlan
     ) -> Bool {
         guard first.spacesToRemove.elementsEqual(second.spacesToRemove, by: { $0 === $1 }),
-              first.pathTrims.count == second.pathTrims.count,
+              first.retainedScopes.count == second.retainedScopes.count,
               first.preservedPaths.count == second.preservedPaths.count,
               first.removedScopes.elementsEqual(second.removedScopes, by: { $0 === $1 })
         else {
             return false
         }
 
-        let trimsMatch = first.pathTrims.allSatisfy { trim in
-            second.pathTrims.contains {
-                $0.path === trim.path && $0.keepThrough == trim.keepThrough
-            }
-        }
-        guard trimsMatch else {
-            return false
-        }
+        guard first.retainedScopes.allSatisfy({ retained in
+            second.retainedScopes.contains { $0 === retained }
+        }) else { return false }
 
         return first.preservedPaths.allSatisfy { path in
             second.preservedPaths.contains {

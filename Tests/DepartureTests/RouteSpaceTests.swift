@@ -6,6 +6,27 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct RouteSpaceTests {
+    @Test func scopeAnchorsCaptureAnOutgoingSubtreeWithoutRedundantBranchCuts() async throws {
+        let (engine, _, container) = try await nestedBranchFixture(rootIsBranched: false)
+        let active = try #require(container.branchScopes["active"])
+        let inactive = try #require(container.branchScopes["inactive"])
+        let activePush = try #require(active.path.last)
+        let inactivePush = try #require(inactive.path.last)
+        let plan = RouteSpaces.UnwindPlan(retaining: [active, engine.root, inactive])
+        #expect(plan.retainedScopes.count == 1)
+        #expect(plan.retainedScopes.first === engine.root)
+        #expect(plan.removedScopes.count == 3)
+        engine.applyUnwindPlan(plan)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(plan.removedScopes.contains { $0 === container })
+        #expect(plan.preservedPaths.first { $0.routePath === active.path }?.scopes.first === activePush)
+        #expect(plan.preservedPaths.first { $0.routePath === inactive.path }?.scopes.first === inactivePush)
+        #expect(active.path.last === activePush)
+        #expect(inactive.path.last === inactivePush)
+        #expect(!activePush.belongs(to: engine.defaultSpace))
+        #expect(!inactivePush.belongs(to: engine.defaultSpace))
+    }
+
     @Test(arguments: [false, true])
     func rootUnwindRetainsOnlyBranchesWhoseContainerSurvives(rootIsBranched: Bool) async throws {
         let (engine, _, container) = try await nestedBranchFixture(rootIsBranched: rootIsBranched)
@@ -14,11 +35,11 @@ struct RouteSpaceTests {
         let activePush = try #require(active.path.last)
         let inactivePush = try #require(inactive.path.last)
         let captured = Router(engine: engine, scope: inactivePush)
-        let plan = engine.spaces.unwindPlan(for: .root(engine.defaultSpace))
+        let plan = engine.spaces.rootUnwindPlan(in: engine.defaultSpace)
         #expect(plan.removedScopes.contains { $0 === activePush })
         #expect(plan.removedScopes.contains { $0 === inactivePush })
         #expect(plan.preservedPaths.contains { $0.routePath === inactive.path })
-        #expect(!plan.pathTrims.contains { $0.path === active.path || $0.path === inactive.path })
+        #expect(!plan.retainedScopes.contains { $0 === active || $0 === inactive })
         #expect(await Router(engine: engine, scope: container).unwind(to: .root))
         #expect(!container.belongs(to: engine.defaultSpace))
         #expect(!activePush.belongs(to: engine.defaultSpace))
@@ -48,7 +69,7 @@ struct RouteSpaceTests {
         let inactive = try #require(container.branchScopes["inactive"])
 
         // Detach the owning edge; retained outgoing objects need not be emptied.
-        outerPath.keepThrough(.owner)
+        outerPath.keepThrough(try #require(outerPath.owner))
 
         #expect(active.path.last?.route is HomeDetailRoute)
         #expect(inactive.path.last?.route is MessageRoute)
@@ -323,6 +344,6 @@ private final class BranchLifetimeProbe {
 private func detachBranchSubtree() async throws -> (RouterEngine, BranchLifetimeProbe) {
     let (engine, path, container) = try await nestedBranchFixture(rootIsBranched: false)
     let probe = BranchLifetimeProbe(container: container)
-    path.keepThrough(.owner)
+    path.keepThrough(try #require(path.owner))
     return (engine, probe)
 }

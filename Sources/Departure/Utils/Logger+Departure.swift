@@ -88,7 +88,6 @@ enum DepartureLogEvent {
     case actionRerouteRequested(action: any Action, route: any Route)
     case actionRunning(action: any Action, currentRoute: (any Route.Type)?)
     case branchActivated(from: AnyHashable, to: AnyHashable, scope: RouteScope)
-    case branchActivationFailed(position: RoutePath.Position)
     case branchActivationRejected(from: AnyHashable, to: AnyHashable, scope: RouteScope)
     case branchActivationSkipped(branch: AnyHashable, scope: RouteScope)
     case elevatedPriorityReplacePreparing(route: any Route)
@@ -97,8 +96,8 @@ enum DepartureLogEvent {
     case pathCleared(removedCount: Int)
     case pathRemovalRequested(scope: RouteScope)
     case pathRemovalSkipped(scope: RouteScope)
-    case pathTrimmed(keepThrough: RoutePath.Position, removedCount: Int)
-    case pathUnchanged(keepThrough: RoutePath.Position)
+    case pathTrimmed(keepThrough: RouteScope, removedCount: Int)
+    case pathUnchanged(keepThrough: RouteScope)
     case pendingRouteResuming(route: any Route)
     case ios17PushDismissalDeferred(scope: RouteScope)
     case ios17PushDismissalDropped(scope: RouteScope)
@@ -123,8 +122,8 @@ enum DepartureLogEvent {
     case viewExitWaitSkipped
     case viewExitWaitStarted(installed: Int)
     case ios17ViewExitWaitTimedOut(scope: RouteScope)
-    case unwindAccepted(keepThrough: RoutePath.Position, removing: Int)
-    case unwindAcceptedAncestorTarget(keepThrough: RoutePath.Position, removing: Int)
+    case unwindAccepted(keepThrough: RouteScope, removing: Int)
+    case unwindAcceptedAncestorTarget(keepThrough: RouteScope, removing: Int)
     case unwindCompleted(path: String)
     case unwindDroppedTargetNotFound(target: RouterEngine.UnwindTarget?)
     case unwindPreviousRequested
@@ -227,7 +226,6 @@ extension DepartureLogEvent {
             "action"
 
         case .branchActivated,
-             .branchActivationFailed,
              .branchActivationRejected,
              .branchActivationSkipped:
             "branch"
@@ -290,7 +288,6 @@ extension DepartureLogEvent {
         case .actionDirectInvocationEnded,
              .actionFailed,
              .actionRerouteDropped,
-             .branchActivationFailed,
              .branchActivationRejected,
              .branchActivationSkipped,
 
@@ -336,8 +333,6 @@ extension DepartureLogEvent {
             "running \(action.departureDebugDescription) from \(currentRoute.map { String(reflecting: $0) } ?? "root")"
         case let .branchActivated(previousBranch, branch, scope):
             "switched from \(previousBranch.departureDebugDescription) to \(branch.departureDebugDescription) in \(scope.departureDebugDescription)"
-        case let .branchActivationFailed(position):
-            "could not activate branch — no scope at \(position)"
         case let .branchActivationRejected(previousBranch, branch, scope):
             "kept \(previousBranch.departureDebugDescription); \(branch.departureDebugDescription) was rejected by \(scope.departureDebugDescription)"
         case let .branchActivationSkipped(branch, scope):
@@ -355,9 +350,9 @@ extension DepartureLogEvent {
         case let .pathRemovalSkipped(scope):
             "path removal skipped | reason=scope not in path | scope=\(scope.departureDebugDescription)"
         case let .pathTrimmed(keepThrough, removedCount):
-            "path trimmed | keepThrough=\(keepThrough) | removed=\(removedCount)"
+            "path trimmed | keepThrough=\(keepThrough.unwindDebugDescription) | removed=\(removedCount)"
         case let .pathUnchanged(keepThrough):
-            "path unchanged | keepThrough=\(keepThrough)"
+            "path unchanged | keepThrough=\(keepThrough.unwindDebugDescription)"
         case let .pendingRouteResuming(route):
             "resuming pending \(route.departureDebugDescription)"
         case let .ios17PushDismissalDeferred(scope):
@@ -409,9 +404,9 @@ extension DepartureLogEvent {
         case let .ios17ViewExitWaitTimedOut(scope):
             "iOS 17 view exit wait timed out — forcing reconciliation | scope=\(scope.departureDebugDescription)"
         case let .unwindAccepted(keepThrough, removing):
-            "removing \(removing) route scope\(removing == 1 ? "" : "s") through \(String(describing: keepThrough))"
+            "removing \(removing) route scope\(removing == 1 ? "" : "s") through \(keepThrough.unwindDebugDescription)"
         case let .unwindAcceptedAncestorTarget(keepThrough, removing):
-            "removing \(removing) route scope\(removing == 1 ? "" : "s") to ancestor target \(String(describing: keepThrough))"
+            "removing \(removing) route scope\(removing == 1 ? "" : "s") to ancestor target \(keepThrough.unwindDebugDescription)"
         case let .unwindCompleted(path):
             "completed\n  path: \(path)"
         case let .unwindDroppedTargetNotFound(target):
@@ -436,13 +431,18 @@ extension RouterEngine.ResolvedRouteTarget {
 
         let description = "\(declaration.departureDebugDescription) • \(placementDescription)"
             + " • lookup=\(lookupStrategy.departureDebugDescription)"
-        guard presentationPath !== declaringPath
-            || presentationPosition != declaringPosition
+        guard presentingScope !== declaringScope
         else {
             return description
         }
 
-        return "\(description) • declared at \(declaringPosition) • presents at \(presentationPosition)"
+        return "\(description) • declared at \(declaringScope.unwindDebugDescription) • presents at \(presentingScope.unwindDebugDescription)"
+    }
+}
+
+private extension RouteScope {
+    var unwindDebugDescription: String {
+        owningPath == nil ? "owner" : "scope(\(departureDebugDescription))"
     }
 }
 

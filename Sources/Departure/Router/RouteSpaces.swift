@@ -24,57 +24,49 @@ struct RouteSpaces {
     struct PreservedRoutePath {
         let routePath: RoutePath
         let scopes: [RouteScope]
-
-        init(_ routePath: RoutePath, after position: RoutePath.Position) {
-            self.routePath = routePath
-            self.scopes = routePath.scopesRemovedAfter(position)
-        }
     }
 
     struct UnwindPlan {
         let removedScopes: [RouteScope]
-        let pathTrims: [RoutePathTrim]
+        let retainedScopes: [RouteScope]
         let preservedPaths: [PreservedRoutePath]
         let spacesToRemove: [RouteSpace]
 
-        init(
-            pathTrims: [RoutePathTrim],
-            spacesToRemove: [RouteSpace] = []
-        ) {
-            let merged = pathTrims.filter { trim in
-                !spacesToRemove.contains { trim.path.owner?.belongs(to: $0) == true }
-            }.mergingByPath()
-            let detachedScopeIDs = Set(merged.flatMap(\.removedScopes).map(ObjectIdentifier.init))
-            self.pathTrims = merged.filter { trim in
-                var ancestor = trim.path.owner
+        init(retaining scopes: [RouteScope] = [], removing spaces: [RouteSpace] = []) {
+            var retained: [RouteScope] = []
+            for scope in scopes where !spaces.contains(where: { scope.routePath.owner?.belongs(to: $0) == true }) {
+                if let index = retained.firstIndex(where: { $0.routePath === scope.routePath }) {
+                    if scope.pathDepth < retained[index].pathDepth { retained[index] = scope }
+                } else {
+                    retained.append(scope)
+                }
+            }
+            let detachedScopeIDs = Set(retained.flatMap {
+                $0.routePath.scopesRemoved(after: $0)
+            }.map(ObjectIdentifier.init))
+            self.retainedScopes = retained.filter { retainedScope in
+                var ancestor = retainedScope.routePath.owner
                 while let scope = ancestor {
                     if detachedScopeIDs.contains(ObjectIdentifier(scope)) { return false }
                     ancestor = scope.previousScopeInSpace
                 }
                 return true
             }
-            // Descendants leave with their owner. Enumerate them for snapshots and
-            // completion, without turning each outgoing path into another mutation.
-            let outgoingPaths = self.pathTrims.flatMap { trim in
-                [trim] + trim.removedScopes.flatMap { $0.branchPaths() }.map {
-                    RoutePathTrim(path: $0, keepThrough: .owner)
-                }
-            } + spacesToRemove.flatMap { space in
-                space.allRoutePaths.map { RoutePathTrim(path: $0, keepThrough: .owner) }
+            // Descendants leave with their owner. Capture their outgoing paths
+            // for snapshots and completion, without adding another tree mutation.
+            let outgoingPaths = self.retainedScopes.flatMap { scope in
+                let removed = scope.routePath.scopesRemoved(after: scope)
+                return [PreservedRoutePath(routePath: scope.routePath, scopes: removed)]
+                    + removed.flatMap { $0.branchPaths() }.map {
+                        PreservedRoutePath(routePath: $0, scopes: $0.scopes)
+                    }
+            } + spaces.flatMap { space in
+                space.allRoutePaths.map { PreservedRoutePath(routePath: $0, scopes: $0.scopes) }
             }
-            self.preservedPaths = outgoingPaths.map {
-                PreservedRoutePath($0.path, after: $0.keepThrough)
-            }.filter { $0.scopes.isEmpty == false }
-            self.removedScopes = spacesToRemove.map(\.root) + self.preservedPaths.flatMap(\.scopes)
-            self.spacesToRemove = spacesToRemove
+            self.preservedPaths = outgoingPaths.filter { !$0.scopes.isEmpty }
+            self.removedScopes = spaces.map(\.root) + self.preservedPaths.flatMap(\.scopes)
+            self.spacesToRemove = spaces
         }
-    }
-
-    indirect enum UnwindPlanRequest {
-        case root(RouteSpace)
-        case scoped(routePath: RoutePath, after: RoutePath.Position)
-        case space(RouteSpace)
-        case combined([UnwindPlanRequest])
     }
 
     let defaultSpace: RouteSpace
@@ -112,68 +104,28 @@ struct RouteSpaces {
         return space.routePath(containing: routeScope)
     }
 
-    private func inactiveBranchModalTrims(
-        in space: RouteSpace, excluding clearedPaths: [RoutePath]
-    ) -> [(path: RoutePath, keepThrough: RoutePath.Position)] {
-        var handledPaths = Set(clearedPaths.map(ObjectIdentifier.init))
-        var trims: [(path: RoutePath, keepThrough: RoutePath.Position)] = []
-        do {
-            var lane = space.root.lane
-            while let modal = lane.modal {
-                if let path = modal.owningPath, path.owner?.branchID != nil,
-                   handledPaths.insert(ObjectIdentifier(path)).inserted {
-                    trims.append((path, path.positionBefore(modal) ?? .owner))
-                }
-                lane = modal.lane
+    func rootUnwindPlan(in space: RouteSpace) -> UnwindPlan {
+        let paths = space.activeBranchPaths()
+        var retained = [space.root] + paths.compactMap(\.owner)
+        var handledPaths = Set(paths.map(ObjectIdentifier.init))
+        var lane = space.root.lane
+        while let modal = lane.modal {
+            if let path = modal.owningPath, path.owner?.branchID != nil,
+               handledPaths.insert(ObjectIdentifier(path)).inserted,
+               let previous = modal.previousRouteScope {
+                retained.append(previous)
             }
+            lane = modal.lane
         }
-        return trims
+        return UnwindPlan(retaining: retained)
     }
 
-    func unwindPlan(for request: UnwindPlanRequest) -> UnwindPlan {
-        switch request {
-        case .root(let space):
-            let paths = space.activeBranchPaths()
-            let trims = [RoutePathTrim(path: space.rootPath, keepThrough: .owner)]
-                + paths.map { RoutePathTrim(path: $0, keepThrough: .owner) }
-                + inactiveBranchModalTrims(in: space, excluding: paths).map {
-                    RoutePathTrim(path: $0.path, keepThrough: $0.keepThrough)
-                }
-            return UnwindPlan(pathTrims: trims)
-        case let .scoped(path, position):
-            return UnwindPlan(pathTrims: [.init(path: path, keepThrough: position)])
-        case .space(let space):
-            return UnwindPlan(pathTrims: [], spacesToRemove: [space])
-        case .combined(let requests):
-            let plans = requests.map { unwindPlan(for: $0) }
-            return UnwindPlan(pathTrims: plans.flatMap(\.pathTrims),
-                spacesToRemove: plans.flatMap(\.spacesToRemove))
-        }
-    }
-
-    func ancestorUnwindResolution(
-        from routePath: RoutePath,
-        to target: RouterEngine.UnwindTarget?
-    ) -> (path: RoutePath, position: RoutePath.Position)? {
-        guard case .id = target else {
-            return nil
-        }
-
+    func ancestorUnwindScope(from routePath: RoutePath, withID id: AnyHashable) -> RouteScope? {
         var scope = routePath.owner?.parent
-        while let ancestorScope = scope {
-            if let ancestorPath = self.routePath(containing: ancestorScope) {
-                switch ancestorPath.unwindResolution(to: target) {
-                case let .keepPathThrough(position):
-                    return (ancestorPath, position)
-
-                case .noRouteToUnwind, .targetNotFound:
-                    break
-                }
-            }
-
-            scope = ancestorScope.parent
+        while let ancestor = scope {
+            if let target = self.routePath(containing: ancestor)?.scope(withID: id) { return target }
+            scope = ancestor.parent
         }
-
         return nil
     }
 
@@ -255,68 +207,21 @@ struct RouteSpaces {
     #endif
 }
 
-private extension [RoutePathTrim] {
-    func mergingByPath() -> [RoutePathTrim] {
-        var trims: [RoutePathTrim] = []
-
-        for trim in self {
-            guard let existingIndex = trims.firstIndex(where: { $0.path === trim.path }) else {
-                trims.append(trim)
-                continue
-            }
-
-            let existing = trims[existingIndex]
-            trims[existingIndex] = .init(
-                path: existing.path,
-                keepThrough: existing.path.shallower(existing.keepThrough, trim.keepThrough)
-            )
-        }
-
-        return trims
-    }
-}
-
 extension RouteSpaces {
-    enum PresentationTransition {
-        case append
-        case keepEquivalent(through: RoutePath.Position)
-    }
-
-    func presentationTransitionPlan(
+    func presentationUnwindPlan(
         after match: RouterEngine.ResolvedRouteTarget,
-        transition: PresentationTransition
+        retaining equivalent: RouteScope? = nil
     ) -> UnwindPlan {
-        var requests: [UnwindPlanRequest] = []
-
-        switch transition {
-        case .keepEquivalent(let targetPosition):
-            requests.append(.scoped(
-                routePath: match.presentationPath,
-                after: targetPosition
-            ))
-
-        case .append where !match.declaration.presentationKind.isModal:
-            requests.append(.scoped(
-                routePath: match.presentationPath,
-                after: match.presentationPosition
-            ))
-
-        case .append:
-            let presentationOrigin = match.presentingScope
-
-            if let modal = presentationOrigin.lane.modal, let path = modal.owningPath {
-                requests.append(.scoped(routePath: path, after: path.positionBefore(modal) ?? .owner))
-            }
+        var retained: [RouteScope] = []
+        if let equivalent {
+            retained.append(equivalent)
+        } else if !match.declaration.presentationKind.isModal {
+            retained.append(match.presentingScope)
+        } else if let previous = match.presentingScope.lane.modal?.previousRouteScope {
+            retained.append(previous)
         }
-
-        if match.presentationPath !== match.declaringPath {
-            requests.append(.scoped(
-                routePath: match.declaringPath,
-                after: match.declaringPosition
-            ))
-        }
-
-        return unwindPlan(for: .combined(requests))
+        if match.presentationPath !== match.declaringPath { retained.append(match.declaringScope) }
+        return UnwindPlan(retaining: retained)
     }
 
     func firstDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin? = nil) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {

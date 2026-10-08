@@ -78,8 +78,8 @@ extension RouterEngine {
         case .replaceElevatedSpace(let priority, let match):
             logMatchedRoute(resolvedRoute, to: match)
             if let space = spaces.space(for: priority), space.root.route?._isEqual(to: resolvedRoute) == true {
-                return await reuseEquivalentRoute(resolvedRoute, in: space.rootPath, through: .owner,
-                    plan: spaces.unwindPlan(for: .root(space)))
+                return await reuseEquivalentRoute(resolvedRoute, at: space.root,
+                    plan: spaces.rootUnwindPlan(in: space))
             }
 
             log.departureDebug(.routeAcceptedReplaceElevatedPriority(route: resolvedRoute))
@@ -174,10 +174,8 @@ extension RouterEngine {
         let declaration: AnyRouteDeclaration
         let lookupStrategy: LookupStrategy
 
-        var presentationPath: RoutePath { presentingScope.owningPath ?? presentingScope.path }
-        var presentationPosition: RoutePath.Position { presentationPath.position(of: presentingScope) ?? .owner }
-        var declaringPath: RoutePath { declaringScope.owningPath ?? declaringScope.path }
-        var declaringPosition: RoutePath.Position { declaringPath.position(of: declaringScope) ?? .owner }
+        var presentationPath: RoutePath { presentingScope.routePath }
+        var declaringPath: RoutePath { declaringScope.routePath }
         var presentationHostID: RoutePresentationHostID? { presentingScope.presentationHostID }
     }
 

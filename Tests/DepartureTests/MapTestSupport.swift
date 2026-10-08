@@ -100,7 +100,7 @@ extension RouterEngine {
 // Fixture construction uses the same topology operations as production mutations.
 extension RoutePath {
     func replaceTestPath(_ scopes: [RouteScope]) {
-        keepThrough(.owner)
+        if let owner { keepThrough(owner) }
         for scope in scopes { append(scope) }
     }
 }

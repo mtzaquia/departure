@@ -57,7 +57,7 @@ final class RouteSpace {
 
     func routePath(containing scope: RouteScope) -> RoutePath? {
         guard scope.belongs(to: self) else { return nil }
-        return scope === root ? rootPath : scope.branchID != nil ? scope.path : scope.owningPath
+        return scope.routePath
     }
 
     func activeBranchPaths() -> [RoutePath] {

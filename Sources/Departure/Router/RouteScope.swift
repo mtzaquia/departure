@@ -171,6 +171,7 @@ extension RouteScope {
     }
 
     var space: RouteSpace? { anchorSpace ?? previousRouteScope?.space ?? parent?.space }
+    var routePath: RoutePath { owningPath ?? path }
     var pathDepth: Int { previousRouteScope.map { $0.pathDepth + 1 } ?? parent?.pathDepth ?? 0 }
     var previousScopeInSpace: RouteScope? { previousRouteScope ?? parent }
 

@@ -143,12 +143,12 @@ extension RouterEngine {
         let retained: RouteScope?
         switch target {
         case .local:
-            guard let position = projection.routePath.positionBefore(scope) else { return }
-            plan = spaces.unwindPlan(for: .scoped(routePath: projection.routePath, after: position))
-            retained = projection.routePath.scope(at: position)
+            guard let previous = projection.routePath.scope(before: scope) else { return }
+            plan = RouteSpaces.UnwindPlan(retaining: [previous])
+            retained = previous
         case let .priority(priority):
             guard let space = spaces.space(for: priority) else { return }
-            plan = spaces.unwindPlan(for: .space(space))
+            plan = RouteSpaces.UnwindPlan(removing: [space])
             retained = nil
         }
         performPresentationDismissalUnwind(for: scope, in: retained, plan: plan)

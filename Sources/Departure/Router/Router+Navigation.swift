@@ -46,100 +46,58 @@ extension RouterEngine {
         log.departureDebug(.unwindRequested(target: target))
         guard let sourceScope = navigationSource(origin) else { return false }
 
+        let retained: RouteScope
+        let handlerScope: RouteScope?
+        let plan: RouteSpaces.UnwindPlan
         switch target {
         case nil, .topmostAncestor:
             return await unwindPrevious(from: sourceScope, payload: payload)
-        default: break
-        }
 
-        if case .root = target {
+        case .root:
             guard let space = sourceScope.space else { return false }
-            let plan = spaces.unwindPlan(for: .root(space))
-            guard plan.removedScopes.isEmpty == false else {
+            retained = space.root
+            handlerScope = retained
+            plan = spaces.rootUnwindPlan(in: space)
+            guard !plan.removedScopes.isEmpty else {
                 log.departureDebug(.unwindSkippedNoRoute)
                 return false
             }
 
-            log.departureDebug(.unwindAccepted(
-                keepThrough: .owner,
-                removing: plan.removedScopes.count
-            ))
-
-            return await performPlannedUnwind(
-                for: sourceScope,
-                payload: payload,
-                in: space.root,
-                operation: beginNavigationOperation(plan: plan)
-            )
-        }
-
-        // Non-root targets differ only by which path they clear. `.nearestBranch` resolves against
-        // the enclosing branch path. Everything else resolves against the current path.
-        let routePath: RoutePath
-        switch target {
-        case .root:
-            routePath = defaultSpace.rootPath
-
         case .nearestBranch:
-            guard let branchPath = nearestBranchPath(from: sourceScope) else {
-                // Not inside a branch — there is nothing nearer to unwind to.
+            guard let branchRoot = nearestBranchPath(from: sourceScope)?.owner else {
                 log.departureDebug(.unwindSkippedNotInsideBranch)
                 return false
             }
-            routePath = branchPath
+            retained = branchRoot
+            // Branch reset notifies its container. An explicit branch-root ID
+            // remains the opt-in target for a handler on the branch root itself.
+            handlerScope = branchRoot.parent
+            plan = RouteSpaces.UnwindPlan(retaining: [retained])
 
-        case nil, .topmostAncestor, .id:
-            routePath = spaces.routePath(containing: sourceScope) ?? spaces.activeSpace.currentRoutePath
-        }
-
-        switch routePath.unwindResolution(to: target) {
-        case .noRouteToUnwind:
-            log.departureDebug(.unwindSkippedNoRoute)
-            return false
-
-        case .targetNotFound:
-            guard let ancestorResolution = spaces.ancestorUnwindResolution(from: routePath, to: target) else {
-                log.departureDebug(.unwindDroppedTargetNotFound(target: target))
-                return false
+        case .id(let id):
+            let path = spaces.routePath(containing: sourceScope) ?? spaces.activeSpace.currentRoutePath
+            if let local = path.scope(withID: id) {
+                retained = local
+                handlerScope = local
+                plan = RouteSpaces.UnwindPlan(retaining: [local])
+            } else {
+                guard let ancestor = spaces.ancestorUnwindScope(from: path, withID: id),
+                      let owner = path.owner else {
+                    log.departureDebug(.unwindDroppedTargetNotFound(target: target))
+                    return false
+                }
+                let ancestorPlan = RouteSpaces.UnwindPlan(retaining: [owner, ancestor])
+                log.departureDebug(.unwindAcceptedAncestorTarget(
+                    keepThrough: ancestor, removing: ancestorPlan.removedScopes.count
+                ))
+                return await performPlannedUnwind(for: sourceScope, payload: payload, in: ancestor,
+                    operation: beginNavigationOperation(plan: ancestorPlan))
             }
-
-            let plan = spaces.unwindPlan(for: .combined([
-                .scoped(routePath: routePath, after: .owner),
-                .scoped(routePath: ancestorResolution.path, after: ancestorResolution.position),
-            ]))
-            log.departureDebug(.unwindAcceptedAncestorTarget(
-                keepThrough: ancestorResolution.position,
-                removing: plan.removedScopes.count
-            ))
-
-            let targetScope = ancestorResolution.path.scope(at: ancestorResolution.position)
-            return await performPlannedUnwind(
-                for: sourceScope,
-                payload: payload,
-                in: targetScope,
-                operation: beginNavigationOperation(plan: plan)
-            )
-
-        case let .keepPathThrough(targetPosition):
-            let plan = spaces.unwindPlan(for: .scoped(routePath: routePath, after: targetPosition))
-            log.departureDebug(.unwindAccepted(
-                keepThrough: targetPosition,
-                removing: plan.removedScopes.count
-            ))
-
-            let targetScope = unwindHandlerScope(
-                for: target,
-                in: routePath,
-                keepThrough: targetPosition
-            )
-
-            return await performPlannedUnwind(
-                for: sourceScope,
-                payload: payload,
-                in: targetScope,
-                operation: beginNavigationOperation(plan: plan)
-            )
         }
+
+        log.departureDebug(.unwindAccepted(keepThrough: retained, removing: plan.removedScopes.count))
+        return await performPlannedUnwind(for: sourceScope, payload: payload, in: handlerScope,
+            operation: beginNavigationOperation(plan: plan))
     }
 
     @discardableResult
@@ -152,33 +110,27 @@ extension RouterEngine {
         }
         guard
             let routePath = spaces.routePath(containing: sourceScope),
-            let targetPosition = routePath.positionBefore(sourceScope)
+            let retained = routePath.scope(before: sourceScope)
         else {
             log.departureDebug(.unwindSkippedNoRoute)
             return false
         }
 
-        let plan = spaces.unwindPlan(for: .scoped(routePath: routePath, after: targetPosition))
+        let plan = RouteSpaces.UnwindPlan(retaining: [retained])
         guard plan.removedScopes.isEmpty == false else {
             log.departureDebug(.unwindSkippedNoRoute)
             return false
         }
 
         log.departureDebug(.unwindAccepted(
-            keepThrough: targetPosition,
+            keepThrough: retained,
             removing: plan.removedScopes.count
         ))
-
-        let targetScope = unwindHandlerScope(
-            for: nil,
-            in: routePath,
-            keepThrough: targetPosition
-        )
 
         return await performPlannedUnwind(
             for: sourceScope,
             payload: payload,
-            in: targetScope,
+            in: retained,
             operation: beginNavigationOperation(plan: plan)
         )
     }
@@ -194,14 +146,14 @@ extension RouterEngine {
         // Preparation may remove the requesting child. Its captured presentation anchor
         // must remain in the live top space for the accepted navigation to continue.
         guard isNavigationEligible(match.presentingScope), !Task.isCancelled else { return nil }
-        if let position = equivalentRouteMatch(to: route, after: match) {
+        if let equivalent = equivalentRouteMatch(to: route, after: match) {
             guard activateBranch(for: match) else { return nil }
-            return await reuseEquivalentRoute(route, in: match.presentationPath, through: position,
-                plan: spaces.presentationTransitionPlan(after: match, transition: .keepEquivalent(through: position)))
+            return await reuseEquivalentRoute(route, at: equivalent,
+                plan: spaces.presentationUnwindPlan(after: match, retaining: equivalent))
         }
 
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
-        return await commitPresentation(route, after: match, unwinding: routeAppendUnwindPlan(after: match))
+        return await commitPresentation(route, after: match, unwinding: spaces.presentationUnwindPlan(after: match))
     }
 
     private func commitPresentation(
@@ -243,8 +195,8 @@ extension RouterEngine {
         appendOrPendRoute(operation, waitsForBranchActivation: waitsForBranchActivation)
     }
 
-    func reuseEquivalentRoute(_ route: any Route, in path: RoutePath, through position: RoutePath.Position, plan: RouteSpaces.UnwindPlan) async -> RouteScope? {
-        guard let destination = path.scope(at: position), !Task.isCancelled else { return nil }
+    func reuseEquivalentRoute(_ route: any Route, at destination: RouteScope, plan: RouteSpaces.UnwindPlan) async -> RouteScope? {
+        guard !Task.isCancelled else { return nil }
         if plan.removedScopes.isEmpty {
             if let current = destination.route { log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: current)) }
         } else {
@@ -258,46 +210,46 @@ extension RouterEngine {
     func equivalentRouteMatch(
         to route: any Route,
         after match: ResolvedRouteTarget
-    ) -> RoutePath.Position? {
+    ) -> RouteScope? {
         // Replacement equality belongs to the selected slot, not an equal route
         // that happens to be pushed farther down the same path.
         if match.declaration.presentationKind == .replace {
             guard let presentation = routePresentation(from: match.presentingScope, matching: .replace,
                     hostedBy: match.presentationHostID),
                   presentation.scope.route?._isEqual(to: route) == true,
-                  let position = match.presentationPath.position(of: presentation.scope)
+                  match.presentationPath.contains(presentation.scope)
             else { return nil }
-            return position
+            return presentation.scope
         }
         return equivalentRouteMatch(
             to: route,
             in: match.presentationPath,
-            startingAt: match.presentationPosition
+            startingAt: match.presentingScope
         )
     }
 
     func equivalentRouteMatch(
         to route: any Route,
         in routePath: RoutePath,
-        startingAt position: RoutePath.Position? = nil
-    ) -> RoutePath.Position? {
+        startingAt anchor: RouteScope? = nil
+    ) -> RouteScope? {
         for scope in routePath.scopes.reversed() {
             if scope.route?._isEqual(to: route) == true {
-                return .scope(scope)
+                return scope
             }
 
-            if position == .scope(scope) {
+            if anchor === scope {
                 return nil
             }
         }
 
-        guard (position == nil || position == .owner),
+        guard (anchor == nil || anchor === routePath.owner),
               routePath.owner?.route?._isEqual(to: route) == true
         else {
             return nil
         }
 
-        return .owner
+        return routePath.owner
     }
 
     func waitsForBranchActivation(for match: ResolvedRouteTarget) -> Bool {
@@ -386,7 +338,7 @@ extension RouterEngine {
         // Commit the incoming root before awaiting native teardown: replacement
         // never exposes a temporary lower space or leaves a logical closing root.
         let operation = beginNavigationOperation(plan: spaces.space(for: priority).map {
-            spaces.unwindPlan(for: .space($0))
+            RouteSpaces.UnwindPlan(removing: [$0])
         })
         commitNavigationOperation(operation, preservesModalPresentationBindings: false)
         let scope = RouteScope(id: AnyHashable(route.id),
@@ -449,7 +401,7 @@ extension RouterEngine {
 
     @discardableResult
     func prepareRouteAppendPath(after match: ResolvedRouteTarget) -> [RouteScope] {
-        prepareRouteAppendPath(routeAppendUnwindPlan(after: match))
+        prepareRouteAppendPath(spaces.presentationUnwindPlan(after: match))
     }
 
     @discardableResult
@@ -460,13 +412,13 @@ extension RouterEngine {
     }
 
     func applyUnwindPlan(_ plan: RouteSpaces.UnwindPlan) {
-        let pathTrimEffects = plan.pathTrims.map { trim in
-            (trim: trim, removedCount: trim.removedScopes.count)
+        let effects = plan.retainedScopes.map { scope in
+            (scope: scope, removedCount: scope.routePath.scopesRemoved(after: scope).count)
         }
 
         mutateRouteGraph {
-            for effect in pathTrimEffects where effect.removedCount > 0 {
-                effect.trim.path.keepThrough(effect.trim.keepThrough)
+            for effect in effects where effect.removedCount > 0 {
+                effect.scope.routePath.keepThrough(effect.scope)
             }
 
             for space in plan.spacesToRemove where spaces.space(for: space.priority) === space {
@@ -474,42 +426,35 @@ extension RouterEngine {
             }
         }
 
-        for effect in pathTrimEffects {
+        for effect in effects {
             guard effect.removedCount > 0 else {
-                log.departureDebug(.pathUnchanged(keepThrough: effect.trim.keepThrough))
+                log.departureDebug(.pathUnchanged(keepThrough: effect.scope))
                 continue
             }
 
-            if effect.trim.keepThrough == .owner {
+            if effect.scope === effect.scope.routePath.owner {
                 log.departureDebug(.pathCleared(removedCount: effect.removedCount))
             } else {
                 log.departureDebug(.pathTrimmed(
-                    keepThrough: effect.trim.keepThrough,
+                    keepThrough: effect.scope,
                     removedCount: effect.removedCount
                 ))
             }
         }
     }
 
-    func routeAppendUnwindPlan(after match: ResolvedRouteTarget) -> RouteSpaces.UnwindPlan {
-        spaces.presentationTransitionPlan(after: match, transition: .append)
-    }
-
     func removeFromPath(_ routeScope: RouteScope) {
         guard isNavigationEligible(routeScope) else { return }
         guard
             let routePath = spaces.routePath(containing: routeScope),
-            let positionBeforeRemovedScope = routePath.positionBefore(routeScope)
+            let retained = routePath.scope(before: routeScope)
         else {
             log.departureDebug(.pathRemovalSkipped(scope: routeScope))
             return
         }
 
         log.departureDebug(.pathRemovalRequested(scope: routeScope))
-        applyUnwindPlan(spaces.unwindPlan(for: .scoped(
-            routePath: routePath,
-            after: positionBeforeRemovedScope
-        )))
+        applyUnwindPlan(RouteSpaces.UnwindPlan(retaining: [retained]))
     }
 
     func hostDidAttach(_ scope: RouteScope, view: PlatformView?, id: UUID) {
@@ -540,7 +485,7 @@ extension RouterEngine {
             }
 
             log.departureDebug(.elevatedSpaceCleared)
-            applyUnwindPlan(spaces.unwindPlan(for: .space(space)))
+            applyUnwindPlan(RouteSpaces.UnwindPlan(removing: [space]))
         }
     }
 
@@ -563,22 +508,6 @@ extension RouterEngine {
             log.departureDebug(.viewExitWaitProgress(
                 remaining: installedRouteScopes.count - index - 1
             ))
-        }
-    }
-
-    func unwindHandlerScope(
-        for target: UnwindTarget?,
-        in routePath: RoutePath,
-        keepThrough position: RoutePath.Position
-    ) -> RouteScope? {
-        switch target {
-        case .nearestBranch:
-            // `.nearestBranch` targets the container that owns the branch. An explicit
-            // `.id(branchRootID)` is the opt-in path for hooks on the branch root itself.
-            return routePath.owner?.parent
-
-        default:
-            return routePath.scope(at: position)
         }
     }
 
@@ -617,7 +546,7 @@ extension RouterEngine {
         let captured = candidates.filter { $0.priority != .default && spaces.space(for: $0.priority) === $0 }
         guard !captured.isEmpty, !Task.isCancelled,
               source.map(isNavigationEligible) ?? true else { return false }
-        let operation = beginNavigationOperation(plan: spaces.unwindPlan(for: .combined(captured.map { .space($0) })))
+        let operation = beginNavigationOperation(plan: RouteSpaces.UnwindPlan(removing: captured))
         for space in captured.sorted(by: { $0.priority > $1.priority }) {
             await deliverUnwindHandlers(for: space.root, payload: payload, in: nil, removing: operation.removedScopes)
         }
@@ -819,7 +748,7 @@ extension RouterEngine {
 
     func beginNavigationOperation(plan: RouteSpaces.UnwindPlan? = nil,
         presentation: NavigationOperation.Presentation? = nil) -> NavigationOperation {
-        let operation = NavigationOperation(plan: plan ?? spaces.unwindPlan(for: .combined([])), presentation: presentation)
+        let operation = NavigationOperation(plan: plan ?? RouteSpaces.UnwindPlan(), presentation: presentation)
         navigationOperations.append(operation)
         return operation
     }

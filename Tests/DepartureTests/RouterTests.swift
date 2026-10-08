@@ -833,14 +833,14 @@ struct RouterTests {
         router.defaultSpace.rootPath.replaceTestPath([modalScope])
 
         let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
-        let unwindPlan = router.routeAppendUnwindPlan(after: match)
+        let unwindPlan = router.spaces.presentationUnwindPlan(after: match)
 
         #expect(match.lookupStrategy == .defaultRootActiveBranchScope)
         #expect(match.declaration.presentationKind == .push)
         #expect(match.presentationPath === walletScope.path)
-        #expect(match.presentationPosition == .scope(walletRouteScope))
+        #expect(match.presentingScope === walletRouteScope)
         #expect(match.declaringPath === router.defaultSpace.rootPath)
-        #expect(match.declaringPosition == .owner)
+        #expect(match.declaringScope === router.root)
         #expect(unwindPlan.removedScopes.count == 1)
         #expect(unwindPlan.removedScopes.first === modalScope)
 
@@ -968,14 +968,14 @@ struct RouterTests {
         router.defaultSpace.rootPath.replaceTestPath([modalScope])
 
         let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
-        let unwindPlan = router.routeAppendUnwindPlan(after: match)
+        let unwindPlan = router.spaces.presentationUnwindPlan(after: match)
 
         #expect(match.lookupStrategy == .defaultRootDeclarations)
         #expect(match.declaration.presentationKind == .push)
         #expect(match.presentationPath === walletScope.path)
-        #expect(match.presentationPosition == .owner)
+        #expect(match.presentingScope === walletScope)
         #expect(match.declaringPath === router.defaultSpace.rootPath)
-        #expect(match.declaringPosition == .owner)
+        #expect(match.declaringScope === router.root)
         #expect(unwindPlan.removedScopes.count == 2)
         #expect(unwindPlan.removedScopes.contains { $0 === walletRouteScope })
         #expect(unwindPlan.removedScopes.contains { $0 === modalScope })
@@ -1054,9 +1054,8 @@ struct RouterTests {
             lookupStrategy: .rootPath(spacePriority: .default)
         )
         let requestTask = Task {
-            await router.reuseEquivalentRoute(HomeDetailRoute(), in: match.presentationPath,
-                through: .scope(detailScope), plan: router.spaces.presentationTransitionPlan(after: match,
-                    transition: .keepEquivalent(through: .scope(detailScope))))
+            await router.reuseEquivalentRoute(HomeDetailRoute(), at: detailScope,
+                plan: router.spaces.presentationUnwindPlan(after: match, retaining: detailScope))
         }
 
         for _ in 0..<10 {
@@ -2095,13 +2094,10 @@ struct RouterTests {
         let thirdScope = RouteScope(id: AlertRoute().id, route: AlertRoute())
         router.defaultSpace.rootPath.replaceTestPath([firstScope, secondScope, thirdScope])
 
-        let plan = router.spaces.unwindPlan(for: .combined([
-            .scoped(routePath: router.defaultSpace.rootPath, after: .scope(secondScope)),
-            .scoped(routePath: router.defaultSpace.rootPath, after: .scope(firstScope)),
-        ]))
+        let plan = RouteSpaces.UnwindPlan(retaining: [secondScope, firstScope])
 
-        #expect(plan.pathTrims.count == 1)
-        #expect(plan.pathTrims.first?.keepThrough == .scope(firstScope))
+        #expect(plan.retainedScopes.count == 1)
+        #expect(plan.retainedScopes.first === firstScope)
         #expect(plan.removedScopes.count == 2)
         #expect(plan.removedScopes[0] === secondScope)
         #expect(plan.removedScopes[1] === thirdScope)
@@ -2668,9 +2664,9 @@ struct RouterTests {
         router.routeScopeDidInstallInView(firstDismissedScope)
         router.routeScopeDidInstallInView(secondDismissedScope)
         router.performPresentationDismissalUnwind(for: firstDismissedScope, in: nil,
-            plan: router.spaces.unwindPlan(for: .space(firstSpace)))
+            plan: RouteSpaces.UnwindPlan(removing: [firstSpace]))
         router.performPresentationDismissalUnwind(for: secondDismissedScope, in: nil,
-            plan: router.spaces.unwindPlan(for: .space(secondSpace)))
+            plan: RouteSpaces.UnwindPlan(removing: [secondSpace]))
 
         let presentationTask = Task {
             await router.present(SettingsRoute())
@@ -3916,14 +3912,14 @@ struct RouterTests {
         router.defaultSpace.rootPath.replaceTestPath([ancestorScope, firstDescendant, secondDescendant])
 
         let match = try #require(router.spaces.firstDeclaration(including: MessageRoute.self)?.declaration)
-        let plan = router.routeAppendUnwindPlan(after: match)
+        let plan = router.spaces.presentationUnwindPlan(after: match)
         let expectedDescription = "MessageRoute[push] • local scope"
             + " • lookup=current route path in default space, nearest scope first"
 
         #expect(match.lookupStrategy == .currentPath(spacePriority: .default))
         #expect(match.departureDebugDescription == expectedDescription)
-        #expect(plan.pathTrims.count == 1)
-        #expect(plan.pathTrims.first?.keepThrough == .scope(ancestorScope))
+        #expect(plan.retainedScopes.count == 1)
+        #expect(plan.retainedScopes.first === ancestorScope)
         #expect(plan.removedScopes.count == 2)
         #expect(plan.removedScopes[0] === firstDescendant)
         #expect(plan.removedScopes[1] === secondDescendant)
