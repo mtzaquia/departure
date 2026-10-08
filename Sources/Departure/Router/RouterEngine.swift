@@ -78,8 +78,7 @@ final class RouterEngine: Identifiable, Equatable {
         let root = RouteScope(id: UUID(), route: nil)
         if let routes {
             isConfigured = true
-            if let id = routes.scopeID { root.id = id }
-            root.useDefinitions(RouteDefinitions(routes.declarations))
+            root.useDefinitions(RouteDefinitions(routes.declarations, id: routes.scopeID))
         }
         let defaultSpace = RouteSpace(priority: .default, root: root)
         self.spaces = RouteSpaces(defaultSpace: defaultSpace)
@@ -88,8 +87,7 @@ final class RouterEngine: Identifiable, Equatable {
     func configureMap(_ map: RootRouteMap) {
         guard !isConfigured else { return }
         isConfigured = true
-        if let id = map.scopeID { root.id = id }
-        root.useDefinitions(RouteDefinitions(map.declarations))
+        root.useDefinitions(RouteDefinitions(map.declarations, id: map.scopeID))
     }
 
     /// Requests a route presentation.

@@ -26,6 +26,8 @@ import SwiftUI
 /// Stored routers retain their source identity and become inactive when that scope
 /// leaves navigation. Read ``RootRouter/default`` for external entry points or
 /// ``RootRouter/current`` to capture a source in the top space.
+/// Live scopes in that space may issue commands even when their ``RoutePhase`` is
+/// inactive. Covered or removed scopes cannot issue commands.
 public struct Router: Equatable {
     /// A destination for ``Router/unwind(to:)``.
     public enum UnwindTarget {
@@ -45,7 +47,7 @@ public struct Router: Equatable {
         /// ``UnwindRouteAction`` captured from that scope.
         case topmostAncestor
 
-        /// Unwinds to the mapped scope with a matching declaration ID.
+        /// Unwinds to a scope named by a map or presentation declaration ID.
         case id(AnyHashable)
     }
 
@@ -101,7 +103,7 @@ public struct Router: Equatable {
     /// Unwinds from this router's scope, to an explicit target in its priority space.
     ///
     /// `.root` retains this space's root. Use `dismissSpace()` for whole-space removal.
-    /// - Returns: Whether an unwind target was found for an active scope.
+    /// - Returns: Whether an unwind target was found for a live scope in the top space.
     @discardableResult
     public func unwind(to target: UnwindTarget) async -> Bool {
         guard let engine else { return false }
@@ -109,7 +111,7 @@ public struct Router: Equatable {
     }
 
     /// Unwinds from this router's scope, and delivers a payload to a matching handler.
-    /// - Returns: Whether an unwind target was found for an active scope.
+    /// - Returns: Whether an unwind target was found for a live scope in the top space.
     @discardableResult
     public func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {
         guard let engine else { return false }

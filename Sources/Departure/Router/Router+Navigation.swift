@@ -407,7 +407,7 @@ extension RouterEngine {
             spaces.unwindPlan(for: .space($0))
         })
         commitNavigationOperation(operation, preservesModalPresentationBindings: false)
-        let scope = RouteScope(id: match.declaration.scopeID ?? AnyHashable(route.id),
+        let scope = RouteScope(id: AnyHashable(route.id),
             route: route, definitions: match.declaration.childScope ?? .empty)
         scope.attachPresentation(to: root, declaration: match.declaration, priority: priority)
         let space = RouteSpace(priority: priority, root: scope)
@@ -438,7 +438,7 @@ extension RouterEngine {
         let appendedPath = match.presentationLocation.path
         mutateRouteGraph {
             let declaration = presentationHost.declaration
-            let scope = RouteScope(id: declaration.scopeID ?? AnyHashable(route.id),
+            let scope = RouteScope(id: AnyHashable(route.id),
                 route: route, definitions: declaration.childScope ?? .empty)
             scope.attachPresentation(to: presentationHost.scope, declaration: declaration, priority: match.space.priority)
             appendedPath.append(scope)

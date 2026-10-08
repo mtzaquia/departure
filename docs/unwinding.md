@@ -18,11 +18,15 @@ Name a mapped scope to target it explicitly:
 
 ```swift
 RootRouteMap(id: "app-root") {
-  Sheet(SettingsFeature.destination, id: "settings-flow") {
-    Push(SettingsFeature.advancedDestination)
+  Sheet(SettingsFeature.destination) {
+    RouteMap(id: "settings-flow") {
+      Push(SettingsFeature.advancedDestination)
+    }
   }
 }
 ```
+
+A map ID names its receiving root, branch root, or destination; it adds no navigation scope. Use distinct IDs to distinguish repeated route types in an ancestry. One scope accepts one explicit ID, including an ID supplied on its containing root or presentation declaration. Conflicting IDs disable the explicit target and report a diagnostic; its destinations remain usable.
 
 `unwind(to:)` returns whether it found a target. Await it before continuing a flow.
 

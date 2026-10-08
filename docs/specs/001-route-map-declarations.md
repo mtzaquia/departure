@@ -14,6 +14,10 @@ Presentation declarations accept typed `RouteDestination` values, as defined in 
 
 `RouteMap` describes reusable declarations that can be inserted into a map builder or a route's child builder. Composition contributes those declarations to the receiving scope; it does not introduce a new scope by itself.
 
+`RouteMap(id:)` optionally names that receiving scope for `.unwind(to: .id(...))`. A scope accepts one explicit ID across its root/presentation declaration and composed maps. Unnamed fragments compose freely. Multiple explicit IDs report a diagnostic and disable the explicit target while leaving the route definitions available.
+
+`ModalRouteMap` is the restricted composition type for elevated entries. Its builder accepts sheets, covers, and other modal maps. Ordinary `RouteMap` values belong in the main builder or inside an entry modal.
+
 Only `RootRouteMap` exposes the priority builders. A `RouteMap` cannot define high- or critical-priority root presentations, and a `RootRouteMap` cannot be embedded as a feature subtree.
 
 ## Root declaration
@@ -160,7 +164,7 @@ Nested `Push` declarations do not cause Departure to infer or create a stack. `R
 
 ## Branched scopes
 
-`Branches` groups the named child scopes of a branch container. Each `Branch` has its own declarations and navigation state within an instance of the owning scope. `RouteMap` composition remains transparent: inserting a reusable map within a branch contributes declarations to that branch rather than creating another scope.
+`Branches` groups the named child scopes of a branch container. Its `BranchDeclarationBuilder` accepts only `Branch` expressions, including conditional and loop-generated branches. Other route declarations are siblings of the group in the enclosing map. Each `Branch` has its own declarations and navigation state within an instance of the owning scope. `RouteMap` composition remains transparent: inserting a reusable map within a branch contributes declarations to that branch rather than creating another scope.
 
 Branches split the X path into independent sub-paths while sharing the Y modal lane. They do not create independent modal presentation capacity. Each lane can own at most one modal, which creates the next lane. The complete X/Y/Z mental model is recorded in [Route lookup and navigation semantics](003-route-addressing.md).
 
@@ -224,4 +228,4 @@ Knowing a nested definition does not by itself construct missing ancestor route 
 
 ### Elevated entry builder constraint (2026-10-08)
 
-The base `highPriority` and `criticalPriority` closures use `ModalRouteDeclarationBuilder`: only `Sheet` and `Cover` expressions are accepted. `Push`, `Replace`, and branch containers belong inside an entry modal's ordinary nested route builder. The entry modal is the origin and logical root of that priority space. Composable `RouteMap` values remain available inside those nested builders. Unsupported entry expressions fail at compile time.
+The base `highPriority` and `criticalPriority` closures use `ModalRouteDeclarationBuilder`: `Sheet`, `Cover`, and restricted `ModalRouteMap` compositions are accepted. `Push`, `Replace`, and branch containers belong inside an entry modal's ordinary nested route builder. The entry modal is the origin and logical root of that priority space. Composable `RouteMap` values remain available inside those nested builders; an ID on such a map names the entry's scope. Unsupported entry expressions fail at compile time.

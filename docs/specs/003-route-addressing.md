@@ -103,7 +103,7 @@ Each placement in the map needs an internal identity so its presentation metadat
 
 Keep definition identity separate from domain route identity and runtime scope identity. Internal definition identity must not impose a new requirement on callers or override route equality semantics.
 
-The earlier `RouteLocation`, declaration `id:`, and command `at:` addressing proposal is superseded. The baseline API does not require those additions for presentation disambiguation. Addressing unwind targets remains a separate capability whose new API can be designed independently.
+The earlier `RouteLocation` and command `at:` addressing proposal is superseded. Presentation discovery remains type-based. Unwind targeting is explicit: `RootRouteMap(id:)`, `RouteMap(id:)`, or a presentation declaration's `id:` names its receiving scope. Use distinct names to distinguish repeated route types along an ancestry. Composition creates no additional scope, and a scope accepts one explicit ID; conflicting IDs diagnose and disable its explicit target while retaining its definitions.
 
 ## Equality and existing presentations
 
@@ -120,7 +120,7 @@ Carry forward the following navigation requirements, alongside the architectural
 - Route resolution, allow/drop/reroute behavior, and resolution of rerouted requests.
 - Unwinding descendants to the matched presentation owner before appending when the requested presentation changes that path.
 - Equality reuse, no-op behavior, and stopping after an equal-route unwind.
-- Unwinding to the root, a branch root, a local dismissal boundary, or an identified ancestor. Root unwind clears all priorities; exact public target names remain designable.
+- Unwinding to the root, a branch root, a local dismissal boundary, or an identified ancestor. Root unwind resets only the receiving space and retains its root; whole-space removal is a separate operation.
 - Scope-bound router and unwind actions, including their behavior after the originating scope leaves navigation state.
 - Unwind payload delivery and scope-appropriate handlers. SwiftUI dismissals must reconcile navigation state and deliver the applicable unwind handlers.
 - Independent branch X paths and concurrent participation, with Y modal lanes shared across branches and at most one modal owned per lane.

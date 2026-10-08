@@ -90,6 +90,8 @@ Validate the entity model with public routing through two branches sharing one m
 
 Compile and normalize the complete root map when its routing owner is initialized, including every route child and branch subtree. Associate every declaration occurrence with its destination builder and compiled children. Compose reusable maps without introducing artificial scopes.
 
+Compiled definitions also carry the receiving scope's optional explicit ID. Root, presentation, and inlined map IDs are validated together: one ID names that scope; multiple IDs use the same conflict representation as other invalid declarations. Branch selection values remain independent of their scope's unwind name.
+
 All runtime instances of one declaration occurrence share its immutable `RouteDefinitions` node. Each instance creates its own branch scopes, selections, and paths. Repeated composition of the same feature map creates distinct declaration occurrences, while repeatedly presenting one occurrence does not recompile it.
 
 Definition structure stays stable for that owner's lifetime. SwiftUI reevaluating a body does not reinstall the map. Runtime replacement of the complete map is outside the current scope.

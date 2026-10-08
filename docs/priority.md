@@ -14,7 +14,7 @@ let routes = RootRouteMap {
 }
 ```
 
-Either additional builder may be omitted independently. Elevated base builders accept only `Sheet` and `Cover`; unsupported expressions fail at compile time. Compose `RouteMap` values inside their nested builders. Child declarations use default local styles within that elevated flow; they inherit its effective priority. Priorities belong to the root builders, so `Push`, `Replace`, `Sheet`, and `Cover` have no priority argument.
+Either additional builder may be omitted independently. Elevated base builders accept `Sheet`, `Cover`, and restricted `ModalRouteMap` compositions; unsupported expressions fail at compile time. Compose ordinary `RouteMap` values inside their nested builders. Child declarations use default local styles within that elevated flow; they inherit its effective priority. Priorities belong to the root builders, so `Push`, `Replace`, `Sheet`, and `Cover` have no priority argument.
 
 | Priority | Presentation owner |
 | --- | --- |

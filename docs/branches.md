@@ -1,5 +1,7 @@
 # Branches
 
+`Branches` accepts only `Branch` declarations. Put routes shared by the container beside the group in its enclosing map; declare branch-local routes inside each `Branch`.
+
 A branch owns an independent navigation path. `Branches(concurrent:)` declares whether one branch or several branches participate at once; all branches share their enclosing modal lane.
 
 ## Map tabs and connect selection

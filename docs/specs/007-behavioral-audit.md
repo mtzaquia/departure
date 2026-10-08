@@ -23,21 +23,23 @@ The X/Y/Z ownership constraints, consumer-facing navigation choices, and native 
 
 The three accepted decisions above were implemented on 2026-10-08. Other recommendations remain unapproved and do not change runtime behavior. Ordinary app background work is outside router command authority. An already-running asynchronous action is not forcibly cancelled when covered, but further dispatch, deferred invocation, and routing continuation must revalidate authority.
 
+A second accepted pass implements D3, D6, D9, O2, and O5: restricted modal-map composition, one explicit map ID per receiving scope, a Branch-only group builder, `default` flow terminology, and the distinction between live command authority and active phase.
+
 ## 1. Maps, route identity, and configuration
 
 Evidence: [route builders](../../Sources/Departure/Attachments/Declarations/RouteDeclaration+Builders.swift), [compiled definitions](../../Sources/Departure/Router/RouteDefinitions.swift), [engine configuration](../../Sources/Departure/Router/RouterEngine.swift), [route protocol](../../Sources/Departure/Protocols/Route.swift), and `DeclarationTests` / `RouteDestinationTests`.
 
 | ID | Current behavior | Review point |
 | --- | --- | --- |
-| D1 | `RootRouteMap` supplies default definitions and optional high/critical entry builders. Higher-priority builders accept only `Sheet` and `Cover` expressions; their children accept the full builder. | Keep the explicit modal-only origin requirement. |
+| D1 | `RootRouteMap` supplies default definitions and optional high/critical entry builders. Higher-priority builders accept `Sheet`, `Cover`, and restricted `ModalRouteMap` composition; their children accept the full builder. | Keep the explicit modal-only origin requirement. |
 | D2 | `RouteMap` composition flattens declarations into the insertion scope. It adds no runtime scope or lookup boundary. | Keep; make the distinction between composition and scope creation clear. |
-| D3 | The modal-only base builders cannot directly insert an unrestricted `RouteMap`, even when that map contains only modals. Reusable modal declarations can be supplied as `Sheet`/`Cover` values; maps can compose inside their children. | Decide whether the composition restriction is the intended public contract. |
+| D3 | Elevated builders compose `ModalRouteMap` values, whose base grammar accepts only sheets, covers, and other modal maps. Their child builders accept ordinary maps and all local styles. | Accepted: retain compile-time modal restrictions with a restricted composition type. |
 | D4 | Route and branch definitions exist independently of view installation. Runtime branch roots are created from definitions, and destination instances receive their own child definitions when inserted. | Keep as the map model's foundation. |
 | D5 | The owner accepts its map once. A later `WithRouter` using the same owner does not replace its definitions; conditional map expressions are evaluated when the supplied map is constructed, not continuously reconciled into the owner. | Document static configuration, or design an explicit reconfiguration operation. |
-| D6 | Declaration matching is by exact route type, independent of the route's `id` or `Equatable` value. The default route ID identifies its type; declaration IDs can override unwind-scope IDs. | Separate type lookup, public unwind IDs, value equality, and runtime instance identity explicitly. |
+| D6 | Declaration matching is by exact route type. `RootRouteMap(id:)`, `RouteMap(id:)`, and presentation declaration IDs explicitly name receiving scopes for unwinding. One explicit ID is allowed per scope; conflicts diagnose and disable that explicit target without disabling destinations. | Accepted map-level IDs: distinguish repeated route types with explicit scope names; composition adds no scope. |
 | D7 | The same route type can appear at different map occurrences. At one scope, duplicate route types report a diagnostic and disable that key. Default, high, and critical root declarations are concatenated into one root definition set, so the same type repeated across those catalogs also conflicts. | Accepted: one conflict policy with hooks; no declaration-order winner and no ancestor/sibling fallback past a conflict. |
 | D8 | Duplicate branch values report a diagnostic and disable that branch; no runtime scope is created for it. Inserting the same reusable map at different occurrences compiles independent declaration occurrences. | Accepted duplicate policy; keep occurrence identity. |
-| D9 | `Branches` uses the general route builder and checks at runtime that every expression is a branch. A `Push` inside `Branches` can therefore be a precondition failure rather than a builder-type error. | Consider making the accepted grammar explicit at compile time. |
+| D9 | `Branches` uses `BranchDeclarationBuilder`, accepting only `Branch` expressions with conditional and loop composition. Other declarations are siblings of the group in the enclosing map. | Accepted: invalid branch-group expressions fail at compile time. |
 | D10 | Destination view factories are captured by the compiled map. Environment/context values are refreshed when building the view, but changing a later map value does not replace the original factory. Hook callbacks, by contrast, refresh with their installed modifier source. | Document the lifetime of captured definitions versus live context. |
 
 ## 2. Owners, scopes, and command sources
@@ -47,10 +49,10 @@ Evidence: [RootRouter](../../Sources/Departure/Router/RootRouter.swift), [Router
 | ID | Current behavior | Review point |
 | --- | --- | --- |
 | O1 | `RootRouter` owns the engine. `Router` is a weak, scope-bound handle; environment defaults outside `WithRouter` are inactive. Captured routers do not keep their scopes or owners alive. | Keep exact ownership and harmless default handles. |
-| O2 | `RootRouter.current` captures the top space's current source at access time; `default` captures the default flow's current source even while covered. Stored values retain exact source identity. | Accepted explicit default-flow access for deep links and notifications. Use current only when deliberately acting in the top space. |
+| O2 | `RootRouter.current` captures the top space's current source at access time; `default` captures the default flow's current source even while covered. Stored values retain exact source identity. | Accepted: `default` names the ordinary flow throughout the library, including `RoutePriority.default`. Use current deliberately for top-space authority. |
 | O3 | Current-scope selection follows the continuation and selected branch of the highest-priority space. Modal-lane occupancy is calculated separately. | Stress-test a modal on one concurrent branch while another branch becomes selected; define what `current` should mean. |
 | O4 | A removed scope's router never falls back to a surviving ancestor or replacement instance. An outgoing retained view is already inactive for routing. | Keep; this prevents stale callbacks from redirecting navigation. |
-| O5 | Navigation eligibility requires live membership in the top priority space. It does not require `routePhase == .active`. Background ancestors and unselected branches in that space may issue scoped commands. | Decide whether this is intended authority or an implicit convenience. |
+| O5 | Command authority requires live membership in the top space, independent of phase or host installation. Inactive ancestors and unselected branches there may issue commands; lookup, branch activation, and readiness rules still apply. Active phase means a current endpoint within a participating path and current modal subtree; concurrent branches may each be active. Covered and removed scopes are always inactive and ineligible. | Accepted and documented: membership determines command authority; phase describes foreground position. |
 | O6 | A branch router captures the owning container and an ordered branch address. It resolves that address's active local scope when a command runs; it survives dismissal of the destination that requested the handle, but not removal of its container. | Keep explicit branch targeting; distinguish it from a fixed destination handle. |
 | O7 | Getting a branch handle does not select the branch. Missing or removed branch addresses are inactive; chained `branch` calls address nested branch containers and do not fall back to an ancestor's similarly named branch. | Keep no-retargeting and explicit target boundaries. |
 
@@ -238,6 +240,8 @@ Current validation (2026-10-08): every run below passed with no failures. The co
 | Mounted macOS presentation | 5 tests / 6 cases passed | [Log](/tmp/departure-decisions-hosted-macos-final2.log) |
 
 All 108 Swift source, test, and sample files matched the recorded snapshot throughout the native validation. A later test-only cleanup explicitly discarded 19 unused internal results in `RouterTests`; it changed neither runtime source nor assertions. The macOS and both iOS package reruns after that cleanup also passed without compiler warnings; the table records those final package runs.
+
+The subsequent map/identity/terminology/phase pass uses bounded validation rather than repeating that full UI matrix. [Focused package validation](/tmp/departure-map-decisions-focused.log) passes 75 tests across `DeclarationTests`, `RoutePhaseTests`, `SpaceAuthorityTests`, `RouteDestinationTests`, `IndependentPriorityTests`, `ScopedRouterTests`, and `UnwindPresentationPolicyTests`. [Public API grammar checks](/tmp/departure-map-typechecks.log) accept the supported composition and reject ten invalid modal-map or branch-group expressions. The [iOS sample build](/tmp/departure-map-decisions-ios-build.log) also succeeds. The earlier full native results above apply to the preceding implementation; no full UI rerun is claimed for this pass.
 
 Focused scenarios to establish next:
 

@@ -48,6 +48,8 @@ RootRouteMap {
 
 Destinations explicitly construct stacks when needed. A replacement clears its descendants and keeps other branch paths. Fade covers use detached hosts; forward custom environment values through `WithRouter`'s `windowDestination` as described in [Priority](priority.md).
 
+Reusable `RouteMap` values compose in ordinary builders. Use `ModalRouteMap` to compose high/critical entries: only sheets, covers, and other modal maps can appear in its base builder. Their children still support pushes, replacements, branches, and ordinary maps.
+
 ## Use destination context
 
 The builder receives route data and `RouteContext`:
@@ -89,6 +91,8 @@ Make a route `Equatable` when its value identifies a destination. An equal curre
 
 ## Observe route phase
 
-Read `@Environment(\.routePhase)` to determine whether a scope is current in its participating branch. Concurrent branches may each be active; a shared modal suspends scopes outside its subtree. Route phase does not imply focus or visibility.
+Read `@Environment(\.routePhase)` to determine whether a scope is a current endpoint of a participating path in the top space. Concurrent branches may each have an active endpoint. A shared modal makes scopes outside its subtree inactive; covered and removed scopes are always inactive.
+
+Live membership and phase answer different questions. Any live scope in the top space may issue commands, including inactive ancestors and unselected branches. Covered and removed scopes cannot. Neither command eligibility nor phase requires a mounted host, and phase does not imply focus or physical visibility.
 
 Next: [Actions](actions.md) · [Unwinding](unwinding.md)

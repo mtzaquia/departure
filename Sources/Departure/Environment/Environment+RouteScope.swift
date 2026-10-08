@@ -65,12 +65,16 @@ public struct UnwindRouteAction: Equatable {
     public static func == (lhs: Self, rhs: Self) -> Bool { lhs.router == rhs.router }
 }
 
-/// The current routing phase for a view's local route scope.
+/// Whether a scope is a current endpoint of a participating path in the top space.
+///
+/// Phase describes foreground navigation position, not command authority or host
+/// installation. Inactive live scopes in the top space may still issue commands.
 public enum RoutePhase: Equatable, Sendable {
-    /// This view's route scope is current within its participating branch.
+    /// This scope is current within its participating branch and modal subtree.
+    /// Concurrent branches may each have an active endpoint.
     case active
 
-    /// This view's scope is behind another destination or belongs to an unselected exclusive branch.
+    /// This scope is covered, removed, behind a destination or modal, or in an unselected branch.
     case inactive
 }
 
@@ -115,9 +119,13 @@ public extension EnvironmentValues {
 
     /// The current routing phase for this view's local route scope.
     ///
-    /// This value is local to the view hierarchy it is read from. The current route destination,
-    /// branch root, or root content reads ``RoutePhase/active``; installed scopes behind another
-    /// route read ``RoutePhase/inactive``.
+    /// Current endpoints in participating paths of the top space read ``RoutePhase/active``.
+    /// Concurrent branches can each be active. A modal makes scopes outside its subtree
+    /// inactive; a covered or removed scope is always inactive.
+    ///
+    /// Command authority requires live membership in the top space, rather than an
+    /// active phase. An inactive ancestor or unselected branch there can still navigate.
+    /// Neither phase nor command authority requires a mounted presentation host.
     @Entry var routePhase = RoutePhase.inactive
 }
 

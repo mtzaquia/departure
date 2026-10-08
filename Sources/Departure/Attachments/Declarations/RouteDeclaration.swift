@@ -66,7 +66,7 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
     }
 
     func compiled() -> Self {
-        Self(copy: self, kind: kind, identity: UUID(), childScope: childScope ?? RouteDefinitions(children))
+        Self(copy: self, kind: kind, identity: UUID(), childScope: childScope ?? RouteDefinitions(children, id: scopeID))
     }
 
     func withPriority(_ priority: RoutePriority) -> Self {
@@ -103,22 +103,33 @@ typealias RoutePresentationKind = RoutePresentation.Style
 
 /// Priority of a presentation. Elevated presentations are anchored at the routing root.
 public enum RoutePriority: Int, Comparable, Hashable, Sendable {
-    case `default`, high, critical
+    /// The permanent application flow, covered while an elevated space exists.
+    case `default`
+    /// A modal space presented above the default flow.
+    case high
+    /// The highest-priority modal space.
+    case critical
     public nonisolated static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 
 /// A declaration group in a map. Branch groups preserve their own child definitions.
 public struct RouteScopeDeclaration: Sendable, Hashable {
+    let scopeID: AnyHashable?
     let branch: AnyHashable?
     let routes: [AnyRouteDeclaration]
     let children: [RouteScopeDeclaration]
-    let concurrent: Bool
+    var concurrent: Bool
     init(routes: [AnyRouteDeclaration]) {
-        branch = nil; self.routes = routes; children = []; concurrent = false
+        scopeID = nil; branch = nil; self.routes = routes; children = []; concurrent = false
     }
     init<Selection: Hashable>(branch: Selection, children: [RouteScopeDeclaration], concurrent: Bool = false) {
+        scopeID = nil
         self.branch = AnyHashable(branch)
         routes = []; self.children = children; self.concurrent = concurrent
+    }
+    init(scopeID: AnyHashable) {
+        self.scopeID = scopeID
+        branch = nil; routes = []; children = []; concurrent = false
     }
     func withPriority(_ priority: RoutePriority) -> Self {
         precondition(branch == nil, "Root priority builders cannot contain branches.")

@@ -99,6 +99,11 @@ final class RouteScope: Identifiable {
     /// Installs the owner's compiled map before any views mount.
     func useDefinitions(_ definitions: RouteDefinitions) {
         self.definitions = definitions
+        switch definitions.scopeID {
+        case .declared(let id): self.id = id
+        case .conflict: self.id = UUID()
+        case nil: break
+        }
         for branch in definitions.branches.keys where branchScopes[branch] == nil {
             guard let definition = definitions.branches[branch]?.declaration else { continue }
             let scope = RouteScope(id: branch, route: nil, parent: self, definitions: definition.scope)

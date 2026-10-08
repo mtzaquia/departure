@@ -28,14 +28,22 @@ final class RouteDefinitions: Sendable {
     }
 
     static let empty = RouteDefinitions([])
+    let scopeID: DeclarationBinding<AnyHashable>?
     private let routesByType: OrderedStorage<ObjectIdentifier, DeclarationBinding<AnyRouteDeclaration>>
     let branches: OrderedStorage<AnyHashable, DeclarationBinding<Branch>>
 
-    init(_ declarations: [RouteScopeDeclaration]) {
+    init(_ declarations: [RouteScopeDeclaration], id: AnyHashable? = nil) {
+        var scopeID = id.map { DeclarationBinding.declared($0) }
         var routes = OrderedStorage<ObjectIdentifier, DeclarationBinding<AnyRouteDeclaration>>()
         var branches = OrderedStorage<AnyHashable, DeclarationBinding<Branch>>()
         for declaration in declarations {
-            if let branch = declaration.branch {
+            if let id = declaration.scopeID {
+                if scopeID == nil { scopeID = .declared(id) }
+                else {
+                    scopeID = .conflict
+                    log.departureWarning("A scope accepts one explicit map ID; conflicting IDs disable its unwind target.")
+                }
+            } else if let branch = declaration.branch {
                 guard branches[branch] == nil else {
                     branches[branch] = .conflict
                     log.departureWarning("Conflicting branch declarations for `\(branch)`; the branch is disabled.")
@@ -55,6 +63,7 @@ final class RouteDefinitions: Sendable {
             }
         }
         routesByType = routes
+        self.scopeID = scopeID
         self.branches = branches
     }
 

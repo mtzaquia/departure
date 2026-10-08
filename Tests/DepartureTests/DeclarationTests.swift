@@ -49,6 +49,125 @@ import Testing
         #expect(engine.root.branchScopes.keys.isEmpty)
         #expect(engine.root.path.isEmpty)
     }
+    @Test func modalMapsComposeAndKeepChildrenLocal() {
+        let nested = ModalRouteMap { Cover(login) { Push(detail) } }
+        let entries = ModalRouteMap { nested; Sheet(settings) }
+        let engine = RouterEngine(routes: RootRouteMap {} highPriority: { entries }
+            criticalPriority: { ModalRouteMap { Sheet(alert) } })
+        #expect(engine.root.routeAttachments.map(\.priority) == [.high, .high, .critical])
+        let children = engine.root.firstRouteAttachment(for: LoginRoute.self)?.declaration?.declaration.childScope
+        #expect(children?.routeBinding(for: HomeDetailRoute.self)?.declaration?.priority == .default)
+        #expect(engine.root.branchScopes.keys.isEmpty)
+    }
+
+    @Test func mapIDsDistinguishRepeatedRouteTypesInOnePath() async throws {
+        let numbered = RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }
+        let engine = RouterEngine(routes: RootRouteMap(id: "app") {
+            Push(numbered) {
+                RouteMap(id: "outer-detail") {
+                    Push(numbered) {
+                        RouteMap(id: "inner-detail") { Push(settings) }
+                    }
+                }
+            }
+        })
+        await engine.present(NumberedRoute(number: 1))
+        await engine.present(NumberedRoute(number: 2))
+        let outer = try #require(engine.defaultSpace.rootPath.first)
+        let inner = try #require(engine.defaultSpace.rootPath.last)
+        #expect(outer !== inner)
+        #expect(outer.id == AnyHashable("outer-detail"))
+        #expect(inner.id == AnyHashable("inner-detail"))
+        await engine.present(SettingsRoute())
+        #expect(await engine.unwind(to: .id("inner-detail")))
+        #expect(engine.defaultSpace.rootPath.last === inner)
+        #expect(await engine.unwind(to: .id("outer-detail")))
+        #expect(engine.defaultSpace.rootPath.scopes.count == 1)
+        #expect(engine.defaultSpace.rootPath.last === outer)
+    }
+
+    @Test func mapIDsNameRootsAndBranchesWithoutCreatingScopes() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            RouteMap(id: "app") {
+                Branches {
+                    Branch(AppTab.home) {
+                        RouteMap(id: "home-flow") { Push(detail) }
+                    }
+                }
+                Sheet(settings)
+            }
+        })
+        #expect(engine.root.id == AnyHashable("app"))
+        let home = try #require(engine.root.branchScopes[AppTab.home])
+        #expect(home.id == AnyHashable("home-flow"))
+        #expect(home.branchID == AnyHashable(AppTab.home))
+        #expect(engine.root.routeAttachments.count == 1)
+        await Router(engine: engine, scope: engine.root).branch(AppTab.home).present(HomeDetailRoute())
+        #expect(await engine.unwind(to: .id("home-flow")))
+        #expect(home.path.isEmpty)
+        #expect(engine.root.branchScopes[AppTab.home] === home)
+    }
+
+    @Test func mapIDsNameElevatedRoots() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {} highPriority: {
+            ModalRouteMap { Sheet(login) { RouteMap(id: "authentication") { Push(detail) } } }
+        })
+        await engine.present(LoginRoute())
+        let space = try #require(engine.spaces.highSpace)
+        #expect(space.root.id == AnyHashable("authentication"))
+        await engine.present(HomeDetailRoute())
+        #expect(await engine.unwind(to: .id("authentication")))
+        #expect(engine.spaces.highSpace === space)
+        #expect(space.rootPath.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func conflictingMapIDsDisableTheIDTargetButKeepDefinitions(sameID: Bool) async {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Push(detail) {
+                RouteMap(id: "first") { Push(settings) }
+                RouteMap(id: sameID ? "first" : "second") {}
+            }
+        })
+        await engine.present(HomeDetailRoute())
+        let scope = engine.defaultSpace.rootPath.last!
+        #expect(scope.id != AnyHashable("first"))
+        #expect(scope.id != AnyHashable("second"))
+        #expect(scope.id != AnyHashable(HomeDetailRoute().id))
+        await engine.present(SettingsRoute())
+        #expect(!((await engine.unwind(to: .id("first")))))
+        #expect(!((await engine.unwind(to: .id("second")))))
+        #expect(engine.defaultSpace.rootPath.scopes.count == 2)
+    }
+
+    @Test func mapIDConflictsWithASecondExplicitRootOrDestinationID() {
+        let root = RouterEngine(routes: RootRouteMap(id: "root") { RouteMap(id: "other") {} })
+        guard case .conflict? = root.root.definitions.scopeID else {
+            Issue.record("A root and an inlined map cannot both name one scope")
+            return
+        }
+        let destination = RouteDefinitions([.init(routes: Push(detail, id: "route") {
+            RouteMap(id: "map") {}
+        }._routeDeclarations)]).routeBinding(for: HomeDetailRoute.self)?.declaration?.childScope
+        guard case .conflict? = destination?.scopeID else {
+            Issue.record("A destination and its map cannot both name one scope")
+            return
+        }
+    }
+
+    @Test func branchBuilderSupportsControlFlowAndSiblingRoutes() {
+        let branches = [AppTab.home, .wallet]
+        let engine = RouterEngine(routes: RootRouteMap {
+            Sheet(settings)
+            Branches(concurrent: true) {
+                for branch in branches { Branch(branch) { Push(detail) } }
+                if false { Branch("unused") {} }
+            }
+        })
+        #expect(engine.root.routeAttachments.count == 1)
+        #expect(engine.root.branchScopes.keys == branches.map(AnyHashable.init))
+        #expect(engine.root.isConcurrent)
+    }
     @Test func branchDefinitionsExistBeforeAnyHostIsMounted() throws {
         let engine = RouterEngine(routes: RootRouteMap {
             Branches { Branch(AppTab.home) { Push(detail) }; Branch(AppTab.wallet) { Sheet(settings) } }

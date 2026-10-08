@@ -32,6 +32,15 @@ An independently retained sub-path owned by a branch container; its lifetime is 
 **Scope**:
 A particular routing position with its own definition context and enclosing navigation ancestry. A root, branch root, or live destination can establish a scope.
 
+**Map ID**:
+An explicit name for the scope receiving a map, used to target that scope during unwinding. Composition contributes definitions to a scope; it does not create another routing position.
+
+**Live scope**:
+A scope still belonging to its space's navigation tree. Being live is independent of being current or having a presentation host.
+
+**Active scope**:
+A current endpoint of a participating path within the top space and its current modal subtree. Concurrent branches can each have an active endpoint; a covered space has none.
+
 **Route instance**:
 One accepted occurrence of a route in navigation state. Its identity is distinct from route equality, declaration identity, and its current position along the axes.
 
@@ -42,7 +51,7 @@ The physical view or native container that presents a scope's content. Its lifet
 One accepted navigation change and its completion. Logical navigation changes when committed; outgoing presentations may finish later before a requested destination continues.
 
 **Routing owner (`RootRouter`)**:
-Owns all priority spaces and one global transition pipeline. Explicit whole-space removal belongs here; `current` captures an ordinary scoped navigation handle.
+Owns all priority spaces and one global transition pipeline. `default` captures the default flow; `current` captures the top space.
 
 **Scoped router (`Router`)**:
 A weak handle to one live scope. It keeps that source identity across suspension and can navigate only while its space is top.

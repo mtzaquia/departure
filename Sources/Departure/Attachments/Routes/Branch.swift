@@ -34,10 +34,13 @@ public struct Branch<Selection: Hashable & Sendable>: Sendable {
 /// Branches have independent paths and share the enclosing modal lane.
 public struct Branches: Sendable {
     let declarations: [RouteScopeDeclaration]
-    public init(concurrent: Bool = false, @RouteDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration]) {
+    /// Creates independent branch paths with optional concurrent participation.
+    /// Put push, replace, sheet, and cover declarations beside this group in its map.
+    public init(concurrent: Bool = false, @BranchDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration]) {
         self.declarations = declarations().map { declaration in
-            precondition(declaration.branch != nil, "Branches accepts Branch declarations.")
-            return .init(branch: declaration.branch!, children: declaration.children, concurrent: concurrent)
+            var branch = declaration
+            branch.concurrent = concurrent
+            return branch
         }
     }
 }
