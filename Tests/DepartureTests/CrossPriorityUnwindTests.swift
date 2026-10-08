@@ -202,7 +202,7 @@ import Testing
         #expect(owner.engine.spaces.criticalSpace === critical)
     }
 
-    @Test func elevatedReplacementNotifiesWithoutExposingDefaultNavigation() async {
+    @Test func elevatedReplacementDoesNotNotifyLowerHandlers() async {
         let owner = fixture()
         let probe = Probe()
         owner.engine.root.installHookDeclarations(hookDeclarations: [
@@ -215,8 +215,7 @@ import Testing
         ])
         await owner.current.present(LoginRoute())
         await owner.current.present(OtherHighRoot())
-        await waitFor { probe.events.count == 2 }
-        #expect(probe.events == ["handler", "completed"])
+        #expect(probe.events.isEmpty)
         #expect(owner.engine.spaces.highSpace?.root.route is OtherHighRoot)
         #expect(owner.engine.defaultSpace.rootPath.isEmpty)
     }

@@ -68,6 +68,8 @@ await unwindRoute(payload: SaveResult.saved)
 
 SwiftUI’s `dismiss()` follows the same payload-free unwind path and triggers a matching handler.
 
+Handlers report explicit unwind or dismissal requests, including native Back and explicit whole-space removal. Presenting a route does not notify handlers, even when finding its declaration, reusing an equal destination, or replacing a presentation removes existing destinations.
+
 Native and explicit unwinds enter the matching handler before committing the path change, while the outgoing source is still live. The handler may start asynchronous work; the unwind continues once it suspends and does not wait for that work to finish. A presentation requested by the handler waits for unwind completion and then rechecks its captured source and routing rules. A default-flow presentation proceeds after the higher space is removed; it is dropped if a reset or partial unwind leaves that space covering its source.
 
 Handlers are found from the surviving landing scope toward its space root, then from each surviving lower space's current scope toward its root, nearest priority first. Only the first matching handler receives the notification and payload. Whole-space removal starts directly with lower spaces; a combined removal skips spaces being removed by that operation. Covered scopes can receive this notification without gaining navigation authority.

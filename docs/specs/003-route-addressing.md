@@ -113,6 +113,8 @@ Do not make equality a global deduplication rule across every map definition, br
 
 `Replace` keeps its existing selected-slot equality rule. An equal route pushed elsewhere does not satisfy a request to replace a slot. An equal route already occupying the selected slot retains that scope and unwinds its descendants.
 
+Removal required by a presentation never invokes unwind handlers, including ancestor crawlback, equality reuse, and replacement. Handler notification belongs to explicit unwind/removal requests and native Back or dismissal. This distinction was accepted in audit E6 and supersedes the original reuse notification behavior.
+
 ## Navigation requirements
 
 Carry forward the following navigation requirements, alongside the architectural decisions recorded in specifications 1 and 2:

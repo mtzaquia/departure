@@ -64,6 +64,10 @@ struct UnwindPresentationPolicyTests {
         await Router(engine: engine, scope: engine.root).present(LoginRoute())
         let space = try #require(engine.spaces.space(for: priority))
         let retained = space.priority == .default ? try #require(space.rootPath.last) : space.root
+        let notifications = PolicyNotifications()
+        retained.installHookDeclarations(hookDeclarations: [
+            UnwindHandler(HomeDetailRoute.self) { notifications.count += 1 }.declaration,
+        ])
         retained.defineTestMap(
             id: nil,
             selection: nil,
@@ -88,11 +92,15 @@ struct UnwindPresentationPolicyTests {
         #expect(engine.hasOutgoingPresentations)
         #expect(engine.routePresentationBinding(from: retained, matching: .sheet).wrappedValue == nil)
         #expect(engine.routePresentationBinding(from: sheet, matching: .push).wrappedValue?.scope === push)
+        #expect(notifications.count == 0)
 
         engine.routeScopeDidLeaveView(sheet)
         engine.routeScopeDidLeaveView(push)
         await request.value
         #expect(space.rootPath.scopes.elementsEqual(space.priority == .default ? [retained] : [], by: { $0 === $1 }))
         #expect(engine.hasOutgoingPresentations == false)
+        #expect(notifications.count == 0)
     }
 }
+
+@MainActor private final class PolicyNotifications { var count = 0 }

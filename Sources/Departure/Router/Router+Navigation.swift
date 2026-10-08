@@ -276,8 +276,10 @@ extension RouterEngine {
             if let current = path.scope(at: position)?.route { log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: current)) }
             return true
         }
-        await performPlannedUnwind(for: plan.removedScopes.last, payload: nil, in: path.scope(at: position), operation: beginNavigationOperation(plan: plan),
-            preservesModalPresentationBindings: false, logsCompletion: false)
+        guard !Task.isCancelled else { return true }
+        let operation = beginNavigationOperation(plan: plan)
+        commitNavigationOperation(operation, preservesModalPresentationBindings: false)
+        await completeUnwindOperation(operation, logsCompletion: false)
         return true
     }
 
@@ -401,6 +403,7 @@ extension RouterEngine {
         origin: RouteRequestOrigin? = nil
     ) async -> RouteSpace? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
+        guard !Task.isCancelled, navigationSource(origin) != nil else { return nil }
         log.departureDebug(.elevatedPriorityReplacePreparing(route: route))
 
         // Commit the incoming root before awaiting native teardown: replacement
@@ -408,13 +411,6 @@ extension RouterEngine {
         let operation = beginNavigationOperation(plan: spaces.space(for: priority).map {
             spaces.unwindPlan(for: .space($0))
         })
-        if let outgoing = spaces.space(for: priority) {
-            await deliverUnwindHandlers(for: outgoing.root, payload: nil, in: nil, removing: operation.removedScopes)
-        }
-        guard !Task.isCancelled, navigationSource(origin) != nil else {
-            await finishNavigationOperation(operation)
-            return nil
-        }
         commitNavigationOperation(operation, preservesModalPresentationBindings: false)
         let scope = RouteScope(id: AnyHashable(route.id),
             route: route, definitions: match.declaration.childScope ?? .empty)
@@ -619,17 +615,15 @@ extension RouterEngine {
         for sourceScope: RouteScope?,
         payload: Any?,
         in targetScope: RouteScope?,
-        operation: NavigationOperation,
-        preservesModalPresentationBindings: Bool = true,
-        logsCompletion: Bool = true
+        operation: NavigationOperation
     ) async -> Bool {
         await deliverUnwindHandlers(for: sourceScope, payload: payload, in: targetScope, removing: operation.removedScopes)
         guard sourceScope.map(isNavigationEligible) ?? true, !Task.isCancelled else {
             await finishNavigationOperation(operation)
             return false
         }
-        commitNavigationOperation(operation, preservesModalPresentationBindings: preservesModalPresentationBindings)
-        await completeUnwindOperation(operation, logsCompletion: logsCompletion)
+        commitNavigationOperation(operation)
+        await completeUnwindOperation(operation, logsCompletion: true)
         return true
     }
 

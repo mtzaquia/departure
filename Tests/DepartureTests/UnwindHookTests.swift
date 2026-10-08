@@ -479,7 +479,7 @@ struct UnwindHookTests {
         #expect(UnwindRouteAction(router: router, routeScope: scope) != UnwindRouteAction())
     }
 
-    @Test func autoUnwindToEquivalentRouteTriggersTargetScopeHandlerForDismissedRoute() async throws {
+    @Test func presentationReuseDoesNotTriggerTargetScopeHandlerForDismissedRoute() async throws {
         let router = RouterEngine()
         let recorder = UnwindRecorder()
 
@@ -516,6 +516,10 @@ struct UnwindHookTests {
 
         #expect(router.defaultSpace.rootPath.count == 1)
         #expect(router.defaultSpace.rootPath.last === numberedScope)
+        #expect(recorder.events.isEmpty)
+
+        await router.present(SettingsRoute())
+        #expect(await router.unwind(to: .topmostAncestor))
         #expect(recorder.events == ["numbered"])
     }
 

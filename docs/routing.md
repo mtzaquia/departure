@@ -89,6 +89,8 @@ Resolution may `.allow`, `.reroute`, or `.drop`. Every rerouted value is resolve
 
 Make a route `Equatable` when its value identifies a destination. An equal current route stops; an eligible equal ancestor is retained and its descendants unwind. Replacement equality is limited to the selected slot, so an equal push elsewhere does not become that replacement.
 
+Removal performed to present a route does not invoke unwind handlers. This includes ancestor crawlback, equality reuse, and replacement. The retained equal destination keeps its existing route value and view instance.
+
 ## Observe route phase
 
 Read `@Environment(\.routePhase)` to determine whether a scope is a current endpoint of a participating path in the top space. Concurrent branches may each have an active endpoint. A shared modal makes scopes outside its subtree inactive; covered and removed scopes are always inactive.

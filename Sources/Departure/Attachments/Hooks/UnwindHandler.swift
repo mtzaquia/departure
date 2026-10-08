@@ -25,6 +25,9 @@
 /// Unwinds can be requested with ``UnwindRouteAction`` from `@Environment(\.unwindRoute)` for
 /// captured route-scope dismissal, or with ``Router/unwind(to:)`` and
 /// ``Router/unwind(to:payload:)`` for explicit router-level targets.
+/// Explicit whole-space removal and native Back or dismissal also notify handlers.
+/// Presenting a route never notifies them: ancestor crawlback, equality reuse,
+/// and replacement can remove destinations without being an unwind request.
 ///
 /// Lookup starts at the surviving landing scope and climbs to its space root.
 /// If no handler matches there, lookup continues from each surviving lower
