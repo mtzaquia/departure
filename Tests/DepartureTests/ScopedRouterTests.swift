@@ -80,8 +80,8 @@ struct ScopedRouterTests {
         let fixture = Fixture(concurrent: false)
         await fixture.root.branch("detail").present(MessageRoute())
         #expect(fixture.selection.value == "detail")
-        #expect(fixture.detail.path.isEmpty)
-        #expect(fixture.engine.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable("detail"))
+        #expect(fixture.detail.path.last?.route is MessageRoute)
+        #expect(fixture.engine.pendingRoute == nil)
         fixture.engine.resumePendingRoute(for: "detail", in: fixture.engine.root)
         #expect(fixture.detail.path.last?.route is MessageRoute)
         #expect(fixture.engine.pendingRoute == nil)
@@ -283,12 +283,7 @@ struct ScopedRouterTests {
         await router.present(SettingsRoute())
         #expect(selection.value == "detail")
         #expect(detail.isInstalledInView == false)
-        if concurrent {
-            #expect(engine.pendingRoute == nil)
-        } else {
-            #expect(engine.pendingRoute != nil)
-            engine.resumePendingRoute(for: "detail", in: engine.root)
-        }
+        engine.resumePendingRoute(for: "detail", in: engine.root)
         #expect(engine.pendingRoute == nil)
         #expect(detail.path.last?.route is SettingsRoute)
         #expect(engine.defaultSpace.rootPath.isEmpty)

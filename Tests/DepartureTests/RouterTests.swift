@@ -265,14 +265,14 @@ struct RouterTests {
 
         await router.requestRoute(HomeDetailRoute())
 
-        // An unmounted host has no scheduled resume. Extra turns must leave the request pending
-        // for the host's registration path to resume.
+        // Completion includes the staged insertion. A later native host refresh
+        // cannot insert the destination again.
         await Task.yield()
         await Task.yield()
 
         #expect(selectedTab() == .home)
         #expect(router.defaultSpace.rootPath.isEmpty)
-        #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute == nil)
 
         let homeScope = router.root.branchScopes[AppTab.home]!
         router.resumePendingRoute(for: AppTab.home, in: router.root)
@@ -416,7 +416,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.defaultSpace.rootPath.isEmpty)
-        #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute == nil)
 
         let homeScope = router.root.branchScopes[AppTab.home]!
         router.resumePendingRoute(for: AppTab.home, in: router.root)
@@ -516,7 +516,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.defaultSpace.rootPath.count == 1)
-        #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute == nil)
 
         router.resumePendingRoute(for: AppTab.home, in: landingScope)
 
@@ -1054,10 +1054,9 @@ struct RouterTests {
             lookupStrategy: .rootPath(spacePriority: .default)
         )
         let requestTask = Task {
-            await router.unwindToExistingEquivalentRouteIfNeeded(
-                HomeDetailRoute(),
-                after: match
-            )
+            await router.reuseEquivalentRoute(HomeDetailRoute(), in: match.presentationPath,
+                through: .scope(detailScope), plan: router.spaces.presentationTransitionPlan(after: match,
+                    transition: .keepEquivalent(through: .scope(detailScope))))
         }
 
         for _ in 0..<10 {
@@ -1074,7 +1073,7 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: landingScope, matching: .sheet).wrappedValue == nil)
 
         router.routeScopeDidLeaveView(modalScope)
-        #expect(await requestTask.value)
+        #expect(await requestTask.value === detailScope)
 
         #expect(router.defaultSpace.rootPath.count == 1)
         #expect(router.defaultSpace.rootPath.last === landingScope)
@@ -1599,7 +1598,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .wallet)
         #expect(router.defaultSpace.rootPath.isEmpty)
-        #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.wallet))
+        #expect(router.pendingRoute == nil)
 
         router.resumePendingRoute(for: AppTab.wallet, in: router.root)
 

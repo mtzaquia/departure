@@ -23,10 +23,10 @@
 import Foundation
 
 extension RouterEngine {
-    // Return the matched space so action retry cannot acquire an unrelated
-    // foreground space's authority after resolution or queued work is rejected.
+    // Preserve the exact reached destination across resolution, native staging
+    // and queued work. Action retries must not infer it from the foreground path.
     @discardableResult
-    func requestRoute(_ route: some Route, origin: RouteRequestOrigin? = nil) async -> RouteSpace? {
+    func requestRoute(_ route: some Route, origin: RouteRequestOrigin? = nil) async -> RouteScope? {
         #if DEBUG
         guard DepartureLogTrace.id != nil else {
             return await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "r")) {
@@ -47,14 +47,14 @@ extension RouterEngine {
     }
 
     @discardableResult
-    func presentResolvedRoute(_ resolvedRoute: any Route, origin: RouteRequestOrigin? = nil) async -> RouteSpace? {
+    func presentResolvedRoute(_ resolvedRoute: any Route, origin: RouteRequestOrigin? = nil) async -> RouteScope? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         guard let source = navigationSource(origin), !Task.isCancelled else { return nil }
         switch transitionPlan(for: resolvedRoute, origin: origin) {
         case .noOp(let currentRoute):
             guard activateOrigin(origin) else { return nil }
             log.departureDebug(.routeNoOpEquivalent(route: resolvedRoute, currentRoute: currentRoute))
-            return source.space
+            return source
 
         case .dropNoDeclaration(let routeType):
             log.departureWarning(.routeDroppedNoDeclaration(routeType: routeType))
@@ -73,14 +73,13 @@ extension RouterEngine {
             guard activatePresentationOwner(match) else { return nil }
             logMatchedRoute(resolvedRoute, to: match)
             log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
-            await appendRoute(resolvedRoute, after: match, origin: origin)
-            return Task.isCancelled ? nil : match.space
+            return await appendRoute(resolvedRoute, after: match, origin: origin)
 
         case .replaceElevatedSpace(let priority, let match):
             logMatchedRoute(resolvedRoute, to: match)
-            let existingSpace = spaces.space(for: priority)
-            if await unwindToExistingEquivalentRouteInPrioritySpaceIfNeeded(resolvedRoute, priority: priority) {
-                return existingSpace
+            if let space = spaces.space(for: priority), space.root.route?._isEqual(to: resolvedRoute) == true {
+                return await reuseEquivalentRoute(resolvedRoute, in: space.rootPath, through: .owner,
+                    plan: spaces.unwindPlan(for: .root(space)))
             }
 
             log.departureDebug(.routeAcceptedReplaceElevatedPriority(route: resolvedRoute))
@@ -224,6 +223,7 @@ extension RouterEngine {
     /// A reroute to a common ancestor activates that destination's owner, rather
     /// than revealing the originally requested branch underneath it.
     private func activatePresentationOwner(_ match: ResolvedRouteTarget) -> Bool {
+        if let branch = match.branchID, !canActivateBranch(branch, in: match.declaringScope) { return false }
         let source = match.branchID == nil
             ? match.presentingScope
             : match.declaringScope
@@ -237,6 +237,9 @@ extension RouterEngine {
             if let branch = source.branchID { ancestry.append((previous, branch)) }
             source = previous
         }
+        // Validate all bindings before writing any enclosing selection. Keep the
+        // final presentation branch's activation at its existing staging boundary.
+        guard ancestry.allSatisfy({ canActivateBranch($0.1, in: $0.0) }) else { return false }
         for (owner, branch) in ancestry.reversed() {
             guard activateBranch(branch, in: owner) else { return false }
         }

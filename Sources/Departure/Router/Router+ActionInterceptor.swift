@@ -63,12 +63,8 @@ extension RouterEngine {
                 log.departureDebug(.actionRerouteRequested(action: action, route: route))
                 Task {
                     let sourceScope = source
-                    let continuationOwner = origin == nil ? nil : (nearestBranchPath(from: source)?.owner ?? source.space?.root)
-                    guard let targetSpace = await requestRouteWhenReady(route, origin: origin),
-                          targetSpace === spaces.activeSpace else { return }
-                    let targetScope = continuationOwner?.space === targetSpace
-                        ? continuationOwner?.activeLocalScope ?? targetSpace.currentRouteScope
-                        : targetSpace.currentRouteScope
+                    guard let targetScope = await requestRouteWhenReady(route, origin: origin),
+                          isNavigationEligible(targetScope) else { return }
 
                     if targetScope !== sourceScope || targetScope.isInstalledInView {
                         guard await targetScope.waitUntilInstalled(in: self) else { return }

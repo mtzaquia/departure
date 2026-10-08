@@ -43,19 +43,20 @@ extension RouterEngine {
         enum Stage {
             case preparingUnwind(RouteSpaces.UnwindPlan)
             case preparingPresentation(RouteSpaces.UnwindPlan, Presentation)
-            case unwinding(RouteSpaces.UnwindPlan)
+            case unwinding(RouteSpaces.UnwindPlan, destination: RouteScope?)
             case unwindingForPresentation(RouteSpaces.UnwindPlan, Presentation)
             case awaitingHost(Presentation)
-            case finished
+            case finished(RouteScope?)
         }
 
         @ObservationIgnored private(set) var stage: Stage
+        @ObservationIgnored private var completion: CheckedContinuation<RouteScope?, Never>?
         var outgoing: [PresentationKey: Outgoing] = [:]
 
         var plan: RouteSpaces.UnwindPlan? {
             switch stage {
             case .preparingUnwind(let plan), .preparingPresentation(let plan, _),
-                 .unwinding(let plan), .unwindingForPresentation(let plan, _): plan
+                 .unwinding(let plan, _), .unwindingForPresentation(let plan, _): plan
             case .awaitingHost, .finished: nil
             }
         }
@@ -70,6 +71,13 @@ extension RouterEngine {
 
         var removedScopes: [RouteScope] { plan?.removedScopes ?? [] }
 
+        private var destination: RouteScope? {
+            switch stage {
+            case .unwinding(_, let scope), .finished(let scope): scope
+            default: nil
+            }
+        }
+
         init(plan: RouteSpaces.UnwindPlan, presentation: Presentation? = nil) {
             if let presentation { stage = .preparingPresentation(plan, presentation) }
             else { stage = .preparingUnwind(plan) }
@@ -81,7 +89,7 @@ extension RouterEngine {
         func commit() -> RouteSpaces.UnwindPlan? {
             switch stage {
             case .preparingUnwind(let plan):
-                stage = .unwinding(plan)
+                stage = .unwinding(plan, destination: nil)
                 return plan
             case .preparingPresentation(let plan, let presentation):
                 stage = .unwindingForPresentation(plan, presentation)
@@ -93,15 +101,37 @@ extension RouterEngine {
         func discardPresentation() {
             switch stage {
             case .preparingPresentation(let plan, _): stage = .preparingUnwind(plan)
-            case .unwindingForPresentation(let plan, _): stage = .unwinding(plan)
-            case .awaitingHost: stage = .finished
+            case .unwindingForPresentation(let plan, _): stage = .unwinding(plan, destination: nil)
+            case .awaitingHost: stage = .finished(nil)
             default: break
             }
+            resumeCompletion()
         }
 
         func finishTeardown(awaitingHost: Bool) {
             if awaitingHost, let presentation { stage = .awaitingHost(presentation) }
-            else { stage = .finished }
+            else { stage = .finished(destination) }
+            resumeCompletion()
+        }
+
+        func completePresentation(at scope: RouteScope) {
+            if let plan { stage = .unwinding(plan, destination: scope) }
+            else { stage = .finished(scope) }
+            resumeCompletion()
+        }
+
+        /// Teardown can finish before branch installation. The original caller
+        /// stays attached to this operation through that native staging boundary.
+        func waitForPresentation() async -> RouteScope? {
+            if case .finished(let scope) = stage { return scope }
+            return await withCheckedContinuation { completion = $0 }
+        }
+
+        private func resumeCompletion() {
+            guard case .finished(let scope) = stage else { return }
+            let continuation = completion
+            completion = nil
+            continuation?.resume(returning: scope)
         }
 
     }
@@ -112,8 +142,8 @@ extension RouterEngine {
             let route: any Route
             let stage: RouteRequestStage
             let origin: RouteRequestOrigin
-            var continuation: CheckedContinuation<RouteSpace?, Never>?
-            var execution: Task<RouteSpace?, Never>?
+            var continuation: CheckedContinuation<RouteScope?, Never>?
+            var execution: Task<RouteScope?, Never>?
 
             init(route: any Route, stage: RouteRequestStage, origin: RouteRequestOrigin) {
                 self.route = route
@@ -121,10 +151,10 @@ extension RouterEngine {
                 self.origin = origin
             }
 
-            func resume(_ targetSpace: RouteSpace? = nil) {
+            func resume(_ destination: RouteScope? = nil) {
                 let continuation = self.continuation
                 self.continuation = nil
-                continuation?.resume(returning: targetSpace)
+                continuation?.resume(returning: destination)
             }
         }
 

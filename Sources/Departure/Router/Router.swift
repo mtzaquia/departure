@@ -92,8 +92,10 @@ public struct Router: Equatable {
 
     /// Resolves and presents a route from this router's scope, within its priority space.
     ///
-    /// Returns after routing state updates, without waiting for SwiftUI to display
-    /// the destination. Rejected routes do not activate the targeted branch.
+    /// Returns after the destination is inserted or reused in routing state, or the
+    /// request is dropped, superseded or cancelled. Any required parent-host staging completes
+    /// first; this does not wait for SwiftUI to display the destination.
+    /// Rejected routes do not activate the targeted branch.
     /// During an unfinished navigation operation, the latest presentation attempt
     /// from a live scope waits for completion. Coverage is checked when it resumes;
     /// a surviving higher-priority space causes the request to be dropped.

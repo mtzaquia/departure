@@ -92,8 +92,8 @@ final class RouterEngine: Identifiable, Equatable {
 
     /// Requests a route presentation.
     ///
-    /// This method returns after the request has resolved and the router has updated its routing state.
-    /// It does not wait for SwiftUI to mount or display the destination view.
+    /// Returns after insertion or reuse, including deferred parent-host staging, or when the
+    /// request ends without presentation. It does not wait for the destination view to mount.
     func present(_ route: any Route) async {
         await requestRouteWhenReady(route)
     }

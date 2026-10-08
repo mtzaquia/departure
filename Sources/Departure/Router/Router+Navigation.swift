@@ -183,104 +183,76 @@ extension RouterEngine {
         )
     }
 
-    func appendRoute(_ route: any Route, after match: ResolvedRouteTarget, origin: RouteRequestOrigin? = nil) async {
+    func appendRoute(_ route: any Route, after match: ResolvedRouteTarget, origin: RouteRequestOrigin? = nil) async -> RouteScope? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         guard navigationSource(origin) != nil, !match.presentingScope.hasConflictingPresentationHosts,
-              !Task.isCancelled else { return }
+              !Task.isCancelled else { return nil }
         if await ios17NavigationStackPushWorkaround?.prepareAppend(after: match, in: self) == true {
-            return
+            return nil
         }
 
         // Preparation may remove the requesting child. Its captured presentation anchor
         // must remain in the live top space for the accepted navigation to continue.
-        guard isNavigationEligible(match.presentingScope), !Task.isCancelled else { return }
-        if await unwindToExistingEquivalentRouteIfNeeded(route, after: match) {
-            return
+        guard isNavigationEligible(match.presentingScope), !Task.isCancelled else { return nil }
+        if let position = equivalentRouteMatch(to: route, after: match) {
+            guard activateBranch(for: match) else { return nil }
+            return await reuseEquivalentRoute(route, in: match.presentationPath, through: position,
+                plan: spaces.presentationTransitionPlan(after: match, transition: .keepEquivalent(through: position)))
         }
 
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
-        await commitPresentation(route, after: match, unwinding: routeAppendUnwindPlan(after: match))
+        return await commitPresentation(route, after: match, unwinding: routeAppendUnwindPlan(after: match))
     }
 
     private func commitPresentation(
         _ route: any Route,
         after match: ResolvedRouteTarget,
         unwinding plan: RouteSpaces.UnwindPlan
-    ) async {
+    ) async -> RouteScope? {
         let operation = beginNavigationOperation(plan: plan, presentation: .init(route: route, match: match))
-        commitNavigationOperation(operation, preservesModalPresentationBindings: false)
-        if operation.removedScopes.contains(where: \.isInstalledInView) {
-            replacePendingRoute(.presentation(operation))
-            await withTaskCancellationHandler {
+        return await withTaskCancellationHandler {
+            commitNavigationOperation(operation, preservesModalPresentationBindings: false)
+            if operation.removedScopes.contains(where: \.isInstalledInView) {
+                replacePendingRoute(.presentation(operation))
                 await waitForNavigationOperation(operation, releasesAfterModal: true)
                 if takePendingPresentation(operation) {
                     if !Task.isCancelled { appendPreparedRoute(operation) }
                 } else if operation.presentation != nil {
                     log.departureDebug(.routeAppendSuperseded(route: route))
                 }
-            } onCancel: {
-                Task { @MainActor [weak self] in
-                    self?.cancelPendingPresentation(operation)
-                }
+            } else {
+                operation.outgoing = [:]
+                appendPreparedRoute(operation)
             }
-        } else {
-            operation.outgoing = [:]
-            appendPreparedRoute(operation)
+            await finishNavigationOperation(operation)
+            let destination = await operation.waitForPresentation()
+            return !Task.isCancelled ? destination : nil
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.cancelPendingPresentation(operation)
+            }
         }
-        await finishNavigationOperation(operation)
     }
 
     func appendPreparedRoute(_ operation: NavigationOperation) {
         guard let presentation = operation.presentation,
-              presentation.match.space === spaces.activeSpace else { return }
+              presentation.match.space === spaces.activeSpace else { operation.discardPresentation(); return }
         let match = presentation.match
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
-        guard activateBranch(for: match) else { return }
+        guard activateBranch(for: match) else { operation.discardPresentation(); return }
         appendOrPendRoute(operation, waitsForBranchActivation: waitsForBranchActivation)
     }
 
-    func unwindToExistingEquivalentRouteIfNeeded(_ route: any Route, after match: ResolvedRouteTarget) async -> Bool {
-        guard let equivalentRouteMatch = equivalentRouteMatch(to: route, after: match) else {
-            return false
+    func reuseEquivalentRoute(_ route: any Route, in path: RoutePath, through position: RoutePath.Position, plan: RouteSpaces.UnwindPlan) async -> RouteScope? {
+        guard let destination = path.scope(at: position), !Task.isCancelled else { return nil }
+        if plan.removedScopes.isEmpty {
+            if let current = destination.route { log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: current)) }
+        } else {
+            let operation = beginNavigationOperation(plan: plan)
+            commitNavigationOperation(operation, preservesModalPresentationBindings: false)
+            await completeUnwindOperation(operation, logsCompletion: false)
         }
-
-        guard activateBranch(for: match) else {
-            if let branchID = match.branchID {
-                log.departureDebug(.routeDroppedBranchActivationFailed(branch: branchID))
-            }
-            return true
-        }
-
-        return await reuseEquivalentRoute(route, in: match.presentationPath,
-            through: equivalentRouteMatch,
-            plan: spaces.presentationTransitionPlan(after: match, transition: .keepEquivalent(through: equivalentRouteMatch)))
-    }
-
-    func unwindToExistingEquivalentRouteInPrioritySpaceIfNeeded(
-        _ route: any Route,
-        priority: RoutePriority
-    ) async -> Bool {
-        guard
-            let space = spaces.space(for: priority),
-            space.root.route?._isEqual(to: route) == true
-        else {
-            return false
-        }
-
-        return await reuseEquivalentRoute(route, in: space.rootPath, through: .owner,
-            plan: spaces.unwindPlan(for: .root(space)))
-    }
-
-    private func reuseEquivalentRoute(_ route: any Route, in path: RoutePath, through position: RoutePath.Position, plan: RouteSpaces.UnwindPlan) async -> Bool {
-        guard !plan.removedScopes.isEmpty else {
-            if let current = path.scope(at: position)?.route { log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: current)) }
-            return true
-        }
-        guard !Task.isCancelled else { return true }
-        let operation = beginNavigationOperation(plan: plan)
-        commitNavigationOperation(operation, preservesModalPresentationBindings: false)
-        await completeUnwindOperation(operation, logsCompletion: false)
-        return true
+        return isNavigationEligible(destination) && !Task.isCancelled ? destination : nil
     }
 
     func equivalentRouteMatch(
@@ -348,7 +320,7 @@ extension RouterEngine {
     }
 
     func activateBranch(_ branchID: AnyHashable, in scope: RouteScope) -> Bool {
-        guard isNavigationEligible(scope), !scope.hasConflictingBranchSelection else { return false }
+        guard canActivateBranch(branchID, in: scope) else { return false }
         guard scope.activeBranch != branchID else {
             log.departureDebug(.branchActivationSkipped(branch: branchID, scope: scope))
             return true
@@ -369,10 +341,16 @@ extension RouterEngine {
         return didActivate
     }
 
+    func canActivateBranch(_ branchID: AnyHashable, in scope: RouteScope) -> Bool {
+        isNavigationEligible(scope) && !scope.hasConflictingBranchSelection
+            && (scope.activeBranch == branchID || scope.branchSelection?.acceptsValue(branchID) != false)
+    }
+
     /// Gives an already-mounted branch host a turn to observe the selection update before resuming
     /// the request. A missing host resumes from its registration path instead.
-    func schedulePendingRouteResume(for match: ResolvedRouteTarget) {
+    func schedulePendingRouteResume(_ operation: NavigationOperation) {
         guard
+            let match = operation.presentation?.match,
             let branch = match.branchID,
             match.declaringScope.branchScopes[branch] != nil
         else {
@@ -383,7 +361,10 @@ extension RouterEngine {
         Task { @MainActor [weak self, weak declaringScope] in
             await Task.yield()
 
-            guard let self, let declaringScope, declaringScope.activeBranch == branch else {
+            guard let self, isPendingPresentation(operation) else { return }
+            guard let declaringScope, declaringScope.activeBranch == branch,
+                  declaringScope.branchScopes[branch] != nil else {
+                cancelPendingPresentation(operation)
                 return
             }
 
@@ -397,7 +378,7 @@ extension RouterEngine {
         with route: any Route,
         after match: ResolvedRouteTarget,
         origin: RouteRequestOrigin? = nil
-    ) async -> RouteSpace? {
+    ) async -> RouteScope? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         guard !Task.isCancelled, navigationSource(origin) != nil else { return nil }
         log.departureDebug(.elevatedPriorityReplacePreparing(route: route))
@@ -418,7 +399,7 @@ extension RouterEngine {
         log.departureDebug(.elevatedSpaceStarted)
         await waitForNavigationOperation(operation)
         await finishNavigationOperation(operation)
-        return space
+        return isNavigationEligible(scope) && !Task.isCancelled ? scope : nil
     }
 
     func appendOrPendRoute(_ operation: NavigationOperation, waitsForBranchActivation: Bool = false) {
@@ -430,7 +411,7 @@ extension RouterEngine {
                 log.departureDebug(.routePendingWaitingForActivatedBranchHost(route: route, branch: branchID))
             }
             replacePendingRoute(.presentation(operation))
-            schedulePendingRouteResume(for: match)
+            schedulePendingRouteResume(operation)
             return
         }
 
@@ -439,17 +420,17 @@ extension RouterEngine {
         guard space === spaces.activeSpace,
               spaces.routePath(containing: match.presentingScope) != nil,
               !match.presentingScope.hasConflictingPresentationHosts,
-              match.presentingScope.routeAttachments.contains(match.declaration) else { return }
+              match.presentingScope.routeAttachments.contains(match.declaration) else { operation.discardPresentation(); return }
         let appendedPath = match.presentationPath
+        let scope = RouteScope(id: AnyHashable(route.id),
+            route: route, definitions: match.declaration.childScope ?? .empty)
         mutateRouteGraph {
             let declaration = match.declaration
-            let scope = RouteScope(id: AnyHashable(route.id),
-                route: route, definitions: declaration.childScope ?? .empty)
             scope.attachPresentation(to: match.presentingScope, declaration: declaration, priority: space.priority)
             appendedPath.append(scope)
         }
         log.departureDebug(.routeAppended(route: route, path: appendedPath.departureDebugPathDescription))
-        operation.discardPresentation()
+        operation.completePresentation(at: scope)
     }
 
     func resumePendingRoute(for branch: AnyHashable, in declaringScope: RouteScope) {
@@ -459,7 +440,8 @@ extension RouterEngine {
               presentation.match.declaringScope === declaringScope,
               declaringScope.branchScopes[branch] != nil else { return }
 
-        guard takePendingPresentation(operation), presentation.match.space === spaces.activeSpace else { return }
+        guard takePendingPresentation(operation) else { return }
+        guard presentation.match.space === spaces.activeSpace else { operation.discardPresentation(); return }
         log.departureDebug(.pendingRouteResuming(route: presentation.route))
         prepareRouteAppendPath(after: presentation.match)
         appendOrPendRoute(operation)
@@ -868,9 +850,9 @@ extension RouterEngine {
             await requestRouteWhenReady(request.route, stage: request.stage, origin: request.origin)
         }
         request.execution = execution
-        let targetSpace = await execution.value
+        let destination = await execution.value
         request.execution = nil
-        request.resume(targetSpace)
+        request.resume(destination)
     }
 
     private func isPendingPresentation(_ operation: NavigationOperation) -> Bool {
@@ -901,7 +883,7 @@ extension RouterEngine {
         _ route: any Route,
         stage: RouteRequestStage = .resolve,
         origin: RouteRequestOrigin? = nil
-    ) async -> RouteSpace? {
+    ) async -> RouteScope? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         // A live lower-space handler can request its follow-up before unwind commits.
         // Coverage is evaluated after the global operation completes.

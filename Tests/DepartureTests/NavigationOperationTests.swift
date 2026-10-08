@@ -5,6 +5,35 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct NavigationOperationTests {
+    @Test(arguments: [false, true])
+    func branchContinuationKeepsItsCallerUntilInsertionOrSupersession(insert: Bool) async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Branches { Branch("host") { Push(destination(SettingsRoute.self)) } }
+        })
+        let branch = try #require(engine.root.branchScopes["host"])
+        let match = try #require(engine.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        let operation = RouterEngine.NavigationOperation(awaitingHost: .init(route: SettingsRoute(), match: match))
+        engine.replacePendingRoute(.presentation(operation))
+        var started = false, completed = false
+        let caller = Task {
+            started = true
+            let destination = await operation.waitForPresentation()
+            completed = true
+            return destination
+        }
+        for _ in 0..<1000 where !started { await Task.yield() }
+        #expect(!completed)
+        if insert { engine.routeScopeDidInstallInView(branch) }
+        else { engine.replacePendingRoute(nil) }
+        let destination = await caller.value
+        #expect(completed)
+        #expect(destination === (insert ? branch.path.last : nil))
+        #expect(branch.path.count == (insert ? 1 : 0))
+        engine.resumePendingRoute(for: "host", in: engine.root)
+        #expect(branch.path.count == (insert ? 1 : 0))
+        #expect(engine.pendingRoute == nil)
+    }
+
     @Test(arguments: [RoutePriority.high, .critical])
     func overlappingOwnerRemovalsKeepEachOutgoingStackUntilItsOwnCompletion(firstToFinish: RoutePriority) async throws {
         let owner = RootRouter()
