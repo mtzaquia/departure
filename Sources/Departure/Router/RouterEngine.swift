@@ -30,7 +30,9 @@ final class RouterEngine: Identifiable, Equatable {
     /// Stable identity for this router instance.
     @ObservationIgnored let id = UUID()
 
-    var routeForest: RouteForest
+    @ObservationIgnored private var isConfigured = false
+
+    var spaces: RouteSpaces
 
     @ObservationIgnored
     var pendingRoute: PendingRoute?
@@ -47,42 +49,43 @@ final class RouterEngine: Identifiable, Equatable {
     var routeGraphMutationDepth = 0
 
     @ObservationIgnored
-    private(set) var didWarnAboutUnscopedRouter = false
-
-    @ObservationIgnored
     var ios17NavigationStackPushWorkaround: (any IOS17NavigationStackPushWorkaroundHandling)? =
         IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform()
 
     @ObservationIgnored
     var windowDestinationBuilder = WindowDestinationBuilder.passthrough
 
-    var activeRouteScopeID: ObjectIdentifier
+    var activeRouteScopeID: ObjectIdentifier { ObjectIdentifier(currentRouteScope) }
 
     var root: RouteScope {
-        routeForest.normalTree.root
+        spaces.normalSpace.root
     }
 
-    var normalTree: RouteTree {
-        routeForest.normalTree
+    var normalSpace: RouteSpace {
+        spaces.normalSpace
     }
 
     var currentRouteScope: RouteScope {
-        routeForest.activeTree.currentRouteScope
-    }
-
-    func warnAboutUnscopedRouterIfNeeded() {
-        guard didWarnAboutUnscopedRouter == false else { return }
-        didWarnAboutUnscopedRouter = true
-        log.departureWarning(.unscopedRouterUsed)
+        spaces.activeSpace.currentRouteScope
     }
 
     /// Creates an empty router.
-    init() {
+    init(routes: RootRouteMap? = nil) {
         let root = RouteScope(id: UUID(), route: nil)
-        let rootPath = RoutePath(owner: root)
-        let normalTree = RouteTree(priority: .normal, root: root, rootPath: rootPath)
-        self.routeForest = RouteForest(normalTree: normalTree)
-        self.activeRouteScopeID = normalTree.activeRouteScopeID
+        if let routes {
+            isConfigured = true
+            if let id = routes.scopeID { root.id = id }
+            root.useDefinitions(RouteDefinitions(routes.declarations))
+        }
+        let normalSpace = RouteSpace(priority: .normal, root: root)
+        self.spaces = RouteSpaces(normalSpace: normalSpace)
+    }
+
+    func configureMap(_ map: RootRouteMap) {
+        guard !isConfigured else { return }
+        isConfigured = true
+        if let id = map.scopeID { root.id = id }
+        root.useDefinitions(RouteDefinitions(map.declarations))
     }
 
     /// Requests a route presentation.
@@ -133,14 +136,6 @@ extension RouterEngine {
     struct NavigationTransaction {
         struct Token: Hashable {
             let id = UUID()
-
-            static func == (lhs: Self, rhs: Self) -> Bool {
-                lhs.id == rhs.id
-            }
-
-            func hash(into hasher: inout Hasher) {
-                hasher.combine(id)
-            }
         }
 
         private var activeTokens: Set<Token> = []
@@ -168,24 +163,34 @@ extension RouterEngine {
 
         if routeGraphMutationDepth == 0 {
             ios17NavigationStackPushWorkaround?.routeGraphDidMutate(in: self)
-            reconcileActiveRouteScopeID()
             #if DEBUG
-            routeForest.validateInvariants()
+            spaces.validateInvariants()
             #endif
         }
     }
 
-    /// Resolves a command's captured origin; an absent origin is the internal
-    /// current-scope lookup used by engine operations.
-    func resolveRequestOrigin(_ origin: RouteRequestOrigin?) -> RouteRequestOrigin.Target? {
-        if let origin { return origin.resolve(in: routeForest) }
-        return .scope(currentRouteScope)
+    func isNavigationEligible(_ scope: RouteScope) -> Bool {
+        scope.belongs(to: spaces.activeSpace)
     }
 
-    private func reconcileActiveRouteScopeID() {
-        let routeScopeID = routeForest.activeTree.activeRouteScopeID
-        if activeRouteScopeID != routeScopeID {
-            activeRouteScopeID = routeScopeID
+    func bindBranchSelection(_ selection: AnyRouteBranchSelection, in scope: RouteScope) {
+        guard isNavigationEligible(scope) else {
+            _ = selection.setValue(scope.activeBranch)
+            return
         }
+        scope.bindBranchSelection(selection)
     }
+
+    func navigationSource(_ origin: RouteRequestOrigin?) -> RouteScope? {
+        guard let scope = resolveRequestOrigin(origin), isNavigationEligible(scope) else { return nil }
+        return scope
+    }
+
+    /// Resolves a command's captured origin; an absent origin is the internal
+    /// current-scope lookup used by engine operations.
+    func resolveRequestOrigin(_ origin: RouteRequestOrigin?) -> RouteScope? {
+        if let origin { return origin.resolve(in: spaces) }
+        return currentRouteScope
+    }
+
 }

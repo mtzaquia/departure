@@ -25,7 +25,7 @@ import SwiftUI
 struct SheetPresentationStyleModifier: ViewModifier {
     let presentationHostID: RoutePresentationHostID
 
-    @Environment(RouterEngine.self) private var router
+    @RouterEnvironment private var router
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
@@ -38,56 +38,8 @@ struct SheetPresentationStyleModifier: ViewModifier {
         content
             .sheet(item: presentation) { route in
                 RouteView(
-                    scope: route.scope,
-                    providesNavigation: route.providesNavigation
+                    scope: route.scope
                 )
-            }
-    }
-}
-
-struct ElevatedPrioritySheetHost: View {
-    @Environment(RouterEngine.self) private var router
-    @Environment(\.scenePhase) private var scenePhase
-    let priority: RoutePriority
-    let windowDestinationBuilder: WindowDestinationBuilder
-
-    var body: some View {
-        let presentation = router.elevatedRoutePresentationBinding(priority: priority, matching: .sheet)
-
-        ElevatedPriorityPresentationWindowBridge(
-            priority: priority,
-            route: presentation,
-            sourceScenePhase: scenePhase,
-            windowDestinationBuilder: windowDestinationBuilder
-        ) { presentation, onDismiss in
-            ElevatedPrioritySheetPresenter(
-                onDismiss: onDismiss,
-                destination: presentation.destination
-            )
-            .environment(router)
-        }
-        .allowsHitTesting(false)
-    }
-}
-
-// MARK: - Private
-
-struct ElevatedPrioritySheetPresenter: View {
-    let onDismiss: @MainActor () -> Void
-    let destination: AnyView
-
-    @State private var isPresented = false
-
-    var body: some View {
-        Color.clear
-            .ignoresSafeArea()
-            .sheet(isPresented: $isPresented, onDismiss: onDismiss) {
-                destination
-            }
-            .onLifecycleEvent { _, _, event in
-                if case .installedInWindow(isInitial: true) = event {
-                    isPresented = true
-                }
             }
     }
 }

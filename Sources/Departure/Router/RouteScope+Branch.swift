@@ -26,8 +26,23 @@ import SwiftUI
 // MARK: - Derived State
 
 extension RouteScope {
+    // Enumerate owned branch paths for unwind plans and presentation projections.
+    func branchPaths(includingInactive: Bool = true) -> [RoutePath] {
+        let branches = branchScopes.keys.compactMap { branch in
+            includingInactive || participates(inBranch: branch) ? branchScopes[branch] : nil
+        }
+        return branches.flatMap { [$0.path] + $0.branchPaths(includingInactive: includingInactive) }
+            + path.scopes.flatMap { $0.branchPaths(includingInactive: includingInactive) }
+    }
+
     var activeBranch: AnyHashable {
-        branchContainer?.activeBranch ?? id
+        access(keyPath: \.branchContainer)
+        return branchContainer?.activeBranch ?? id
+    }
+
+    var isConcurrent: Bool {
+        access(keyPath: \.branchContainer)
+        return branchContainer?.isConcurrent == true
     }
 
     var activeLocalScope: RouteScope {
@@ -37,8 +52,7 @@ extension RouteScope {
     }
 
     func participates(inBranch branch: AnyHashable) -> Bool {
-        _ = participation.isConcurrent
-        return branchContainer?.isConcurrent == true || activeBranch == branch
+        return isConcurrent || activeBranch == branch
     }
 
     func canDrivePresentation(matching presentationKind: RoutePresentationKind) -> Bool {
@@ -59,90 +73,24 @@ extension RouteScope {
 extension RouteScope {
     @discardableResult
     func setActiveBranch(_ branch: AnyHashable) -> Bool {
-        guard var branchContainer else {
-            branchContainer = BranchContainerState(
-                defaultBranch: branch,
-                selection: nil
-            )
-            return true
+        var container = branchContainer ?? BranchContainerState(selectedBranch: branch, selection: nil)
+        var didSet = false
+        let update = {
+            didSet = container.setActiveBranch(branch)
+            self.branchContainer = container
         }
-
-        let didSet = branchContainer.setActiveBranch(branch)
-        self.branchContainer = branchContainer
+        if activeBranch != branch { withMutation(keyPath: \.branchContainer, update) }
+        else { update() }
         return didSet
     }
-}
 
-// MARK: - Branch Scopes
-
-extension RouteScope {
-    @discardableResult
-    func registerBranchScope(
-        _ routeScope: RouteScope,
-        for branch: AnyHashable,
-        sourceEnvironment: EnvironmentValues? = nil,
-        presentationHostID: RoutePresentationHostID? = nil
-    ) -> Bool {
-        #if DEBUG
-        routeScope.debugKind = .branch
-        #endif
-        if let sourceEnvironment {
-            routeScope.updateSourceEnvironment(sourceEnvironment)
-        }
-
-        if let previousParent = routeScope.parent, previousParent !== self,
-           let previousBranch = routeScope.branchID {
-            previousParent.unregisterBranchScope(routeScope, for: previousBranch)
-        }
-
-        for previousBranch in ledger.branches(containing: routeScope) where previousBranch != branch {
-            unregisterBranchScope(routeScope, for: previousBranch)
-        }
-
-        let previous = branchScopes[branch]
-        ledger.setBranchSource(
-            .init(scope: routeScope, environment: sourceEnvironment,
-                presentationHostID: presentationHostID),
-            for: branch
-        )
-        updateActiveBranchSource(for: branch)
-        return branchScopes[branch] !== previous
-    }
-
-    func unregisterBranchScope(_ routeScope: RouteScope, for branch: AnyHashable) {
-        guard ledger.removeBranchSource(routeScope, for: branch) else {
-            log.departureDebug(.branchUnregisterSkipped(branch: branch, scope: routeScope))
-            return
-        }
-
-        updateActiveBranchSource(for: branch)
-    }
-
-    private func updateActiveBranchSource(for branch: AnyHashable) {
-        let previous = branchScopes[branch]
-        let active = ledger.activeBranchSource(for: branch)
-        if previous !== active?.scope {
-            if let previous {
-                previous.participation.isBranchHostRegistered = false
-                previous.parent = nil
-                previous.branchID = nil
-                previous.adoptedRoutePresentationHostID = nil
-                log.departureDebug(.branchUnregistered(branch: branch, scope: previous))
-            }
-            branchScopes[branch] = active?.scope
-            if let active {
-                active.scope.parent = self
-                active.scope.branchID = branch
-                active.scope.participation.isBranchHostRegistered = true
-                log.departureDebug(.branchRegistered(branch: branch, parent: self, scope: active.scope))
-            }
-        }
-
-        if let active {
-            active.scope.adoptedRoutePresentationHostID = active.presentationHostID
-            if let environment = active.environment {
-                active.scope.updateSourceEnvironment(environment)
-            }
-        }
+    func bindBranchSelection(_ selection: AnyRouteBranchSelection) {
+        guard var container = branchContainer else { return }
+        container.selection = selection
+        container.selectedBranch = selection.value()
+        let update = { self.branchContainer = container }
+        if activeBranch != container.activeBranch || isConcurrent != container.isConcurrent {
+            withMutation(keyPath: \.branchContainer, update)
+        } else { update() }
     }
 }

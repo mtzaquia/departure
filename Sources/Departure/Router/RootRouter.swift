@@ -20,24 +20,26 @@
 //  SOFTWARE.
 //
 
-import SwiftUI
+/// Owns one routing container and its global transition coordinator.
+public struct RootRouter {
+    let engine: RouterEngine
 
-struct MissingRouteDestination: View {
-    let routeType: Any.Type
+    public init() { engine = RouterEngine() }
+    init(engine: RouterEngine) { self.engine = engine }
 
-    @ViewBuilder
-    var body: some View {
-#if DEBUG
-        ContentUnavailableView {
-            Label("No route view provided", systemImage: "rectangle.slash")
-        } description: {
-            Text(
-                verbatim: "Add destination() to \(String(reflecting: routeType)) "
-                    + "or conform it to RouteViewProviding."
-            )
-        }
-#else
-        EmptyView()
-#endif
+    /// Captures the current scope of the top space for ordinary navigation.
+    public var current: Router { Router(engine: engine, scope: engine.currentRouteScope) }
+
+    /// Removes the captured elevated space, including a covered space, and awaits native teardown.
+    @discardableResult
+    public func dismissSpace(_ priority: RoutePriority) async -> Bool {
+        guard let space = engine.spaces.space(for: priority) else { return false }
+        return await engine.dismissSpace(space)
+    }
+
+    /// Removes all elevated spaces present when this operation is accepted.
+    @discardableResult
+    public func dismissSpaces() async -> Bool {
+        await engine.dismissSpaces(engine.spaces.allSpaces.filter { $0.priority != .normal })
     }
 }

@@ -20,30 +20,17 @@
 //  SOFTWARE.
 //
 
-/// Declares a route that replaces the declaring view’s content in place.
-///
-/// In a ``Branch`` map, replaces that branch’s selected destination and clears
-/// its descendant navigation. Other branches retain their paths. The destination
-/// does not create a Back entry; it can still declare pushes inside a surrounding
-/// SwiftUI `NavigationStack`.
-///
-/// ```swift
-/// Branch(AppColumn.detail) { Replace(MessageRoute.self) }
-/// ```
-///
-/// Use the contextual ``UnwindRouteAction`` or unwind to the nearest branch to
-/// clear the selection and reveal the original content. Requests use normal
-/// priority and retain the existing route discovery and branch activation rules.
+import SwiftUI
+
+/// Declares a replace destination with optional child definitions.
 public struct Replace: RouteDeclaration, Sendable {
     let declaration: AnyRouteDeclaration
-
-    /// Creates an in-place replacement declaration.
-    /// - Parameter routeType: The destination to select in the declaring view’s slot.
-    public init<R: Route>(_ routeType: R.Type) {
-        self.declaration = AnyRouteDeclaration(routeType: routeType, kind: .replace)
+    public init<R: Route>(
+        _ destination: RouteDestination<R>,
+        id: AnyHashable? = nil,
+        @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
+    ) {
+        declaration = AnyRouteDeclaration(destination, kind: .replace, id: id, children: children())
     }
-
-    public var _routeDeclarations: [AnyRouteDeclaration] {
-        [declaration]
-    }
+    public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }

@@ -24,264 +24,87 @@ import SwiftUI
 import Testing
 @testable import Departure
 
-@MainActor
-@Suite
-struct PresentationHostOwnershipTests {
-    @Test func localPushOwnsPresentationAndWriteBackAheadOfDistinctInheritedPush() async throws {
-        let setup = makeBranchSetup(
-            inherited: Push(TransactionRoute.self)._routeDeclarations,
-            local: Push(SettingsRoute.self)._routeDeclarations
-        )
-
-        await setup.router.requestRoute(SettingsRoute())
-        let presentedScope = try #require(setup.branchScope.path.last)
-        let inheritedBinding = setup.binding(matching: .push, hostedBy: setup.inheritedHostID)
-        let localBinding = setup.binding(matching: .push, hostedBy: setup.localHostID)
-
-        #expect(inheritedBinding.wrappedValue == nil)
-        #expect(localBinding.wrappedValue?.scope === presentedScope)
-
-        inheritedBinding.wrappedValue = nil
-
-        #expect(setup.branchScope.path.last === presentedScope)
-        #expect(localBinding.wrappedValue?.scope === presentedScope)
-
-        localBinding.wrappedValue = nil
-
-        #expect(setup.branchScope.path.isEmpty)
-        #expect(localBinding.wrappedValue == nil)
+@MainActor @Suite struct PresentationHostOwnershipTests {
+    @Test func explicitPhysicalHostWinsAndRestoresAutomaticHost() {
+        let scope = RouteScope(id: "root", route: nil)
+        let automatic = RoutePresentationHostID(), explicit = RoutePresentationHostID()
+        var original = EnvironmentValues(), nested = EnvironmentValues()
+        original.routeScope = scope
+        let nestedScope = RouteScope(id: "nested", route: nil)
+        nested.routeScope = nestedScope
+        scope.bindRoutingHost(explicit, automatic: false, environment: nested)
+        scope.bindRoutingHost(automatic, automatic: true, environment: original)
+        #expect(scope.presentationHostID == explicit)
+        #expect(scope.sourceEnvironment.routeScope === nested.routeScope)
+        scope.unbindRoutingHost(explicit)
+        #expect(scope.presentationHostID == automatic)
+        #expect(scope.sourceEnvironment.routeScope === scope)
+        scope.unbindRoutingHost(automatic)
+        #expect(scope.presentationHostID == nil)
     }
 
-    @Test func inheritedBranchPushStillPresentsFromItsAdoptingHost() async throws {
-        let setup = makeBranchSetup(
-            inherited: Push(TransactionRoute.self)._routeDeclarations,
-            local: Push(SettingsRoute.self)._routeDeclarations
-        )
-
-        await setup.router.requestRoute(TransactionRoute())
-        let presentedScope = try #require(setup.branchScope.path.last)
-
-        #expect(
-            setup.binding(matching: .push, hostedBy: setup.inheritedHostID)
-                .wrappedValue?.scope === presentedScope
-        )
-        #expect(setup.binding(matching: .push, hostedBy: setup.localHostID).wrappedValue == nil)
+    @Test(arguments: [RoutePresentation.Style.push, .sheet, .cover(.slide), .cover(.fade), .replace])
+    func bindingWriteBackIsAcceptedOnlyFromOwningHost(style: RoutePresentation.Style) async throws {
+        let destination = RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }
+        let kind: AnyRouteDeclaration.Kind
+        switch style {
+        case .push: kind = .push
+        case .replace: kind = .replace
+        case .sheet: kind = .sheet(priority: .normal)
+        case let .cover(transition): kind = .cover(priority: .normal, transition: transition)
+        }
+        let engine = RouterEngine(routes: RootRouteMap { AnyRouteDeclaration(destination, kind: kind) })
+        let owner = RoutePresentationHostID(), stranger = RoutePresentationHostID()
+        engine.root.bindRoutingHost(owner, automatic: false, environment: engine.root.sourceEnvironment)
+        await engine.present(NumberedRoute(number: 1))
+        let scope = try #require(engine.normalSpace.rootPath.last)
+        // An unseen iOS 17 push rejects nil intentionally. Model an actual
+        // destination that has appeared and is now leaving its native host.
+        engine.routeScopeDidInstallInView(scope)
+        engine.routeScopeDidLeaveView(scope)
+        let foreign = engine.routePresentationBinding(from: engine.root, matching: style, hostedBy: stranger)
+        #expect(foreign.wrappedValue == nil)
+        foreign.wrappedValue = nil
+        #expect(engine.normalSpace.rootPath.last === scope)
+        let binding = engine.routePresentationBinding(from: engine.root, matching: style, hostedBy: owner)
+        #expect(binding.wrappedValue?.scope === scope)
+        binding.wrappedValue = nil
+        #expect(engine.normalSpace.rootPath.isEmpty)
     }
-
-    @Test func inactiveBranchDeclarationUsesHostThatAdoptsItAfterSelectionChanges() async throws {
-        let router = RouterEngine()
-        router.ios17NavigationStackPushWorkaround = nil
-        let (selection, selectedTab) = tabSelection(.home)
-        let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        let homeHostID = RoutePresentationHostID()
-        let walletHostID = RoutePresentationHostID()
-
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: AnyRouteBranchSelection(selection),
-            routeDeclarations: [
-                RouteScopeDeclaration(
-                    branch: AppTab.home,
-                    routes: Push(HomeDetailRoute.self)._routeDeclarations.drivingPresentation(false)
-                ),
-                RouteScopeDeclaration(
-                    branch: AppTab.wallet,
-                    routes: Push(TransactionRoute.self)._routeDeclarations.drivingPresentation(false)
-                ),
-            ]
-        )
-        router.root.registerBranchScope(
-            homeScope,
-            for: AppTab.home,
-            presentationHostID: homeHostID
-        )
-        router.root.registerBranchScope(
-            walletScope,
-            for: AppTab.wallet,
-            presentationHostID: walletHostID
-        )
-
-        await router.requestRoute(TransactionRoute())
-        router.resumePendingRoute(for: AppTab.wallet, in: router.root)
-        let presentedScope = try #require(walletScope.path.last)
-
-        #expect(selectedTab() == .wallet)
-        #expect(
-            router.routePresentationBinding(
-                from: walletScope,
-                matching: .push,
-                hostedBy: walletHostID
-            ).wrappedValue?.scope === presentedScope
-        )
-        #expect(
-            router.routePresentationBinding(
-                from: walletScope,
-                matching: .push,
-                hostedBy: homeHostID
-            ).wrappedValue == nil
-        )
+    @Test func staleNormalDismissalCannotClearReplacement() async throws {
+        let engine = RouterEngine(routes: RootRouteMap { Sheet(RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }) })
+        await engine.present(NumberedRoute(number: 1))
+        let oldBinding = engine.routePresentationBinding(from: engine.root, matching: .sheet)
+        await engine.present(NumberedRoute(number: 2))
+        let replacement = try #require(engine.normalSpace.rootPath.last)
+        oldBinding.wrappedValue = nil
+        #expect(engine.normalSpace.rootPath.last === replacement)
     }
-
-    @Test func equalLocalAndInheritedPushDeclarationsStillPreferLocalHost() async throws {
-        let declaration = Push(SettingsRoute.self)._routeDeclarations
-        let setup = makeBranchSetup(inherited: declaration, local: declaration)
-
-        #expect(
-            declaration.hosted(by: setup.inheritedHostID)
-                == declaration.hosted(by: setup.localHostID)
-        )
-
-        await setup.router.requestRoute(SettingsRoute())
-        let presentedScope = try #require(setup.branchScope.path.last)
-        let inheritedBinding = setup.binding(matching: .push, hostedBy: setup.inheritedHostID)
-        let localBinding = setup.binding(matching: .push, hostedBy: setup.localHostID)
-
-        #expect(inheritedBinding.wrappedValue == nil)
-        #expect(localBinding.wrappedValue?.scope === presentedScope)
-
-        inheritedBinding.wrappedValue = nil
-        #expect(setup.branchScope.path.last === presentedScope)
+    @Test(arguments: [RoutePriority.high, .critical])
+    func staleElevatedDismissalCannotClearReplacement(priority: RoutePriority) async throws {
+        let destination = RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }
+        let engine = RouterEngine(routes: RootRouteMap {} highPriority: {
+            if priority == .high { Sheet(destination) }
+        } criticalPriority: {
+            if priority == .critical { Sheet(destination) }
+        })
+        await engine.present(NumberedRoute(number: 1))
+        let old = engine.elevatedRoutePresentationBinding(priority: priority, matching: .sheet)
+        await engine.present(NumberedRoute(number: 2))
+        let replacement = try #require(engine.spaces.space(for: priority)?.root)
+        old.wrappedValue = nil
+        #expect(engine.spaces.space(for: priority)?.root === replacement)
     }
-
-    @Test func sheetWriteBackIsAcceptedOnlyFromOwningHost() async throws {
-        let setup = makeBranchSetup(
-            inherited: Sheet(MessageRoute.self)._routeDeclarations,
-            local: Sheet(LoginRoute.self)._routeDeclarations
-        )
-
-        await assertLocalOwnership(
-            in: setup,
-            localRoute: LoginRoute(),
-            inheritedRoute: MessageRoute(),
-            matching: .sheet
-        )
-    }
-
-    @Test func slideCoverWriteBackIsAcceptedOnlyFromOwningHost() async throws {
-        let setup = makeBranchSetup(
-            inherited: Cover(MessageRoute.self)._routeDeclarations,
-            local: Cover(AlertRoute.self)._routeDeclarations
-        )
-
-        await assertLocalOwnership(
-            in: setup,
-            localRoute: AlertRoute(),
-            inheritedRoute: MessageRoute(),
-            matching: .cover(.slide)
-        )
-    }
-
-    @Test func fadeCoverWriteBackIsAcceptedOnlyFromOwningHost() async throws {
-        let setup = makeBranchSetup(
-            inherited: Cover(ChallengeRoute.self, transition: .fade)._routeDeclarations,
-            local: Cover(LockRoute.self, transition: .fade)._routeDeclarations
-        )
-
-        await assertLocalOwnership(
-            in: setup,
-            localRoute: LockRoute(),
-            inheritedRoute: ChallengeRoute(),
-            matching: .cover(.fade)
-        )
-    }
-
-    private func assertLocalOwnership(
-        in setup: BranchSetup,
-        localRoute: some Route,
-        inheritedRoute: some Route,
-        matching presentationKind: RoutePresentationKind
-    ) async {
-        await setup.router.requestRoute(localRoute)
-        let presentedScope = setup.branchScope.path.last
-        let inheritedBinding = setup.binding(
-            matching: presentationKind,
-            hostedBy: setup.inheritedHostID
-        )
-        let localBinding = setup.binding(
-            matching: presentationKind,
-            hostedBy: setup.localHostID
-        )
-
-        #expect(presentedScope != nil)
-        #expect(inheritedBinding.wrappedValue == nil)
-        #expect(localBinding.wrappedValue?.scope === presentedScope)
-
-        inheritedBinding.wrappedValue = nil
-        #expect(setup.branchScope.path.last === presentedScope)
-
-        localBinding.wrappedValue = nil
-        #expect(setup.branchScope.path.isEmpty)
-
-        await setup.router.requestRoute(inheritedRoute)
-        let inheritedScope = setup.branchScope.path.last
-
-        #expect(inheritedScope != nil)
-        #expect(inheritedBinding.wrappedValue?.scope === inheritedScope)
-        #expect(localBinding.wrappedValue == nil)
-
-        inheritedBinding.wrappedValue = nil
-        #expect(setup.branchScope.path.isEmpty)
-    }
-
-    private func makeBranchSetup(
-        inherited: [AnyRouteDeclaration],
-        local: [AnyRouteDeclaration]
-    ) -> BranchSetup {
-        let router = RouterEngine()
-        router.ios17NavigationStackPushWorkaround = nil
-        let (selection, _) = tabSelection(.wallet)
-        let branchScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        let inheritedHostID = RoutePresentationHostID()
-        let localHostID = RoutePresentationHostID()
-
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: AnyRouteBranchSelection(selection),
-            routeDeclarations: [
-                RouteScopeDeclaration(
-                    branch: AppTab.wallet,
-                    routes: inherited.drivingPresentation(false)
-                ),
-            ]
-        )
-        branchScope.installRouteDeclarations(
-            id: AnyHashable(AppTab.wallet),
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: local.hosted(by: localHostID)),
-            ]
-        )
-        router.root.registerBranchScope(
-            branchScope,
-            for: AppTab.wallet,
-            presentationHostID: inheritedHostID
-        )
-
-        return BranchSetup(
-            router: router,
-            branchScope: branchScope,
-            inheritedHostID: inheritedHostID,
-            localHostID: localHostID
-        )
-    }
-}
-
-@MainActor
-private struct BranchSetup {
-    let router: RouterEngine
-    let branchScope: RouteScope
-    let inheritedHostID: RoutePresentationHostID
-    let localHostID: RoutePresentationHostID
-
-    func binding(
-        matching presentationKind: RoutePresentationKind,
-        hostedBy presentationHostID: RoutePresentationHostID
-    ) -> Binding<RoutePresentation?> {
-        router.routePresentationBinding(
-            from: branchScope,
-            matching: presentationKind,
-            hostedBy: presentationHostID
-        )
+    @Test func branchDeclarationsUseTheBranchBindingHost() async throws {
+        let engine = RouterEngine(routes: RootRouteMap { Branches { Branch(AppTab.home) {
+            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+        } } })
+        let branch = try #require(engine.root.branchScopes[AppTab.home])
+        let host = RoutePresentationHostID()
+        branch.bindRoutingHost(host, automatic: false, environment: branch.sourceEnvironment)
+        await Router(engine: engine, scope: branch).present(SettingsRoute())
+        let scope = try #require(branch.path.last)
+        #expect(engine.routePresentationBinding(from: branch, matching: .sheet, hostedBy: host).wrappedValue?.scope === scope)
+        #expect(engine.routePresentationBinding(from: engine.root, matching: .sheet).wrappedValue == nil)
     }
 }

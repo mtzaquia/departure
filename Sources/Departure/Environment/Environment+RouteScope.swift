@@ -35,26 +35,13 @@ import SwiftUI
 /// }
 /// ```
 public struct UnwindRouteAction: Equatable {
-    private enum Identity: Equatable {
-        case inactive
-        case routeScope(routerID: UUID, routeScopeID: ObjectIdentifier)
-    }
-
-    private let identity: Identity
-    private let handler: Handler?
+    private let router: Router
 
     /// Creates an inactive unwind action.
-    public init() {
-        self.identity = .inactive
-        self.handler = nil
-    }
+    public init() { router = .inactive }
 
     init(router: RouterEngine, routeScope: RouteScope) {
-        self.identity = .routeScope(
-            routerID: router.id,
-            routeScopeID: ObjectIdentifier(routeScope)
-        )
-        self.handler = Handler(router: router, routeScope: routeScope)
+        self.router = Router(engine: router, scope: routeScope)
     }
 
     /// Unwinds the captured route scope.
@@ -63,7 +50,7 @@ public struct UnwindRouteAction: Equatable {
     /// and any removed installed route scopes have left the view hierarchy.
     @discardableResult
     public func callAsFunction() async -> Bool {
-        await handler?.unwind(payload: nil) ?? false
+        await router.unwind(to: .topmostAncestor)
     }
 
     /// Unwinds the captured route scope and delivers a payload to a matching ``UnwindHandler``.
@@ -72,30 +59,10 @@ public struct UnwindRouteAction: Equatable {
     /// and any removed installed route scopes have left the view hierarchy.
     @discardableResult
     public func callAsFunction<Payload>(payload: Payload) async -> Bool {
-        await handler?.unwind(payload: payload) ?? false
+        await router.unwind(to: .topmostAncestor, payload: payload)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.identity == rhs.identity
-    }
-
-    private final class Handler {
-        let router: RouterEngine
-        weak var routeScope: RouteScope?
-
-        init(router: RouterEngine, routeScope: RouteScope) {
-            self.router = router
-            self.routeScope = routeScope
-        }
-
-        func unwind(payload: Any?) async -> Bool {
-            guard let routeScope else {
-                return false
-            }
-
-            return await router.unwindPrevious(from: routeScope, payload: payload)
-        }
-    }
+    public static func == (lhs: Self, rhs: Self) -> Bool { lhs.router == rhs.router }
 }
 
 /// The current routing phase for a view's local route scope.
@@ -107,9 +74,36 @@ public enum RoutePhase: Equatable, Sendable {
     case inactive
 }
 
+private struct RoutingEnvironmentReference {
+    weak var engine: RouterEngine?
+    weak var scope: RouteScope?
+}
+
+@propertyWrapper
+struct RouterEnvironment: DynamicProperty {
+    @Environment(\.routerEngine) private var engine
+
+    var wrappedValue: RouterEngine {
+        guard let engine else {
+            preconditionFailure("A routing view requires a live WithRouter owner.")
+        }
+        return engine
+    }
+}
+
 extension EnvironmentValues {
-    @Entry var routeScope: RouteScope?
-    @Entry var unscopedRouter = Router.inactive
+    @Entry private var routingReference = RoutingEnvironmentReference()
+
+    var routeScope: RouteScope? {
+        get { routingReference.scope }
+        set { routingReference.scope = newValue }
+    }
+
+    var routerEngine: RouterEngine? {
+        get { routingReference.engine }
+        set { routingReference.engine = newValue }
+    }
+
 }
 
 public extension EnvironmentValues {
@@ -127,18 +121,6 @@ public extension EnvironmentValues {
     @Entry var routePhase = RoutePhase.inactive
 }
 
-public extension Environment where Value == Router {
-    /// Reads the unscoped router using the legacy type-based spelling.
-    ///
-    /// Unlike `@Environment(\.router)`, this router searches without a captured
-    /// view scope. Both spellings are inactive outside `WithRouter`.
-    /// - Parameter type: The router type identifying the compatibility lookup.
-    @available(*, deprecated, message: "Use @Environment(\\.router) instead.")
-    init(_ type: Router.Type) {
-        self.init(\.unscopedRouter)
-    }
-}
-
 extension View {
     func routeScopeEnvironment(_ routeScope: RouteScope) -> some View {
         environment(\.routeScope, routeScope)
@@ -148,7 +130,6 @@ extension View {
         self
             .environment(\.routeScope, routeScope)
             .environment(\.router, Router(engine: router, scope: routeScope))
-            .environment(\.unscopedRouter, Router(engine: router))
             .environment(\.routePhase, router.routePhase(for: routeScope))
             .environment(\.unwindRoute, UnwindRouteAction(router: router, routeScope: routeScope))
     }
@@ -157,20 +138,19 @@ extension View {
 extension RouterEngine {
     func routePhase(for routeScope: RouteScope) -> RoutePhase {
         _ = activeRouteScopeID
-        _ = routeScope.participation.isBranchHostRegistered
-        guard let path = routeForest.routePath(containing: routeScope),
-              let tree = routeForest.tree(containing: path), tree === routeForest.activeTree else { return .inactive }
+        guard let path = spaces.routePath(containing: routeScope),
+              let space = spaces.space(containing: path), space === spaces.activeSpace else { return .inactive }
         // A modal suspends scopes outside its subtree. Concurrent columns hosted
         // inside that modal still participate together.
-        if let deepestModal = tree.currentModalScope {
+        if let deepestModal = space.currentModalScope {
             var ancestor: RouteScope? = routeScope
             while let current = ancestor, current !== deepestModal {
-                ancestor = current.previousScopeInTree
+                ancestor = current.previousScopeInSpace
             }
             guard ancestor === deepestModal else { return .inactive }
         }
         var scope = routeScope
-        while let previous = scope.previousScopeInTree {
+        while let previous = scope.previousScopeInSpace {
             if let branch = scope.branchID,
                previous.participates(inBranch: branch) == false { return .inactive }
             scope = previous

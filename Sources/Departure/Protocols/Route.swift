@@ -20,75 +20,20 @@
 //  SOFTWARE.
 //
 
-import SwiftUI
+import Foundation
 
-/// A request to present a destination view.
-///
-/// Declare route types with ``SwiftUICore/View/routes(id:_:)``, then request instances with
-/// ``Router``.
-///
-/// ```swift
-/// struct SettingsRoute: Route {
-///     func destination() -> some View {
-///         SettingsView()
-///     }
-/// }
-///
-/// await router.present(SettingsRoute())
-/// ```
+/// Domain data identifying a navigation request. Views are supplied by a `RouteDestination`.
 public protocol Route: Identifiable where ID == ObjectIdentifier {
-    /// Returns the resolution result whenever attempting to present this route.
-    ///
-    /// Despite asynchronous, routing is suspended until this function returns. On a re-route, the target route is also evaluated.
-    /// Provide a quick resolution to avoid the app standing idle. The implementer is also responsible for ensuring no recursion occurs.
-    ///
-    /// ```swift
-    /// func resolveRoute() async -> RouteResolution {
-    ///     isLoggedIn ? .allow : .reroute(LoginRoute())
-    /// }
-    /// ```
-    ///
-    /// - Returns: A route evaluation resolution.
     func resolveRoute() async -> RouteResolution
-
-    /// The view shown for this route.
-    associatedtype Destination: View
-
-    /// Builds this route's destination.
-    @ViewBuilder func destination() -> Destination
 }
 
 public extension Route {
-    /// A type-based identity for routes that do not need instance identity.
-    ///
-    /// - Important: Override this when multiple instances of the same ``Route`` type should
-    ///   be treated as different presentations.
-    nonisolated var id: ObjectIdentifier {
-        ObjectIdentifier(Self.self)
-    }
-
-    func resolveRoute() async -> RouteResolution {
-        .allow
-    }
-
-    /// Builds the fallback shown when this route does not provide a destination.
-    ///
-    /// Debug builds show a diagnostic with the route type. Release builds render an empty view.
-    /// Implement ``RouteViewProviding/destination()`` in another module to supply the destination
-    /// separately from the route declaration.
-    func destination() -> some View {
-        MissingRouteDestination(routeType: Self.self)
-    }
+    nonisolated var id: ObjectIdentifier { ObjectIdentifier(Self.self) }
+    func resolveRoute() async -> RouteResolution { .allow }
 }
 
-// MARK: - Supporting types
-
-/// The result of a ``Route/resolveRoute()`` evaluation.
 public enum RouteResolution {
-    /// The router is allowed to present the requested route.
     case allow
-    /// The router should present a different route instead.
     case reroute(any Route)
-    /// The router should ignore the request.
     case drop
 }

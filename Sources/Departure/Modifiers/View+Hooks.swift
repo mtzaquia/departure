@@ -26,6 +26,11 @@ import SwiftUI
 public extension View {
     /// Declares hooks for the current route scope.
     ///
+    /// Multiple modifiers in one scope compose handlers for distinct action and route types.
+    /// Duplicate declarations for the same type disable that hook and report a diagnostic until
+    /// only one declaration remains. Hooks stop participating when their scope leaves navigation,
+    /// including while an outgoing view is retained for dismissal.
+    ///
     /// ```swift
     /// DetailView()
     ///     .hooks {

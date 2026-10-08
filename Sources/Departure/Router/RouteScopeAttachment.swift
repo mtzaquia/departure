@@ -28,16 +28,14 @@ import Foundation
 @MainActor
 final class RouteScopeAttachment {
     enum Kind: String {
-        case routes = ".routes"
         case hooks = ".hooks"
-        case branch = ".routeBranch"
+        case routing = ".routing"
     }
 
     let id = AnyHashable(UUID())
     private let kind: Kind
     private weak var view: PlatformView?
     private var target: RouteScope?
-    private var key: AnyHashable?
     private var installed: RouteScope?
     private var apply: ((RouteScope) -> Void)?
     private var remove: ((RouteScope) -> Void)?
@@ -49,17 +47,15 @@ final class RouteScopeAttachment {
 
     func update(
         target: RouteScope?,
-        key: AnyHashable? = nil,
         view: PlatformView?,
         apply: @escaping (RouteScope) -> Void,
         remove: @escaping (RouteScope) -> Void
     ) {
         let currentView = view ?? self.view
-        if self.target !== target || self.key != key {
+        if self.target !== target {
             detach()
             self.target = target
-            self.key = key
-            target?.ledger.observe(self)
+            target?.observe(self)
         }
 
         self.view = currentView
@@ -73,9 +69,8 @@ final class RouteScopeAttachment {
             remove?(installed)
         }
         installed = nil
-        target?.ledger.stopObserving(self)
+        target?.stopObserving(self)
         target = nil
-        key = nil
         view = nil
         apply = nil
         remove = nil
@@ -86,7 +81,7 @@ final class RouteScopeAttachment {
             return
         }
 
-        switch target.ledger.ownership(of: view) {
+        switch target.ownership(of: view) {
         case .pending:
             // An anchor can disappear during a transient bridge replacement.
             // Retain an existing registration until the attachment itself ends.

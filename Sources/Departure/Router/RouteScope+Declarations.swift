@@ -36,81 +36,36 @@ extension RouteScope {
         let branchID: AnyHashable?
         let declaration: AnyRouteDeclaration
         let presentationAnchor: PresentationAnchor
-        let adoptedFromBranch: AnyHashable?
 
         init(
             branchID: AnyHashable?,
             declaration: AnyRouteDeclaration,
-            presentationAnchor: PresentationAnchor? = nil,
-            adoptedFromBranch: AnyHashable? = nil
+            presentationAnchor: PresentationAnchor? = nil
         ) {
             self.branchID = branchID
             self.declaration = declaration
             self.presentationAnchor = presentationAnchor
                 ?? (branchID == nil ? .declarationLocation : .branchOwner)
-            self.adoptedFromBranch = adoptedFromBranch
         }
     }
 
     var routeAttachments: [AnyRouteDeclaration] {
-        let visible = branchContainer == nil
-            ? declarations.local.routeAttachments
-            : declarations.declarations(forBranch: activeBranch).routeAttachments + declarations.local.routeAttachments
-        let adopted = branchID
-            .flatMap { branchID in
-                parent?
-                    .adoptedRouteAttachments(forBranch: branchID)
-            }?
-            .hosted(by: adoptedRoutePresentationHostID)
-            ?? []
-
-        return visible + adopted
-    }
-
-    var hookAttachments: [AnyHookDeclaration] {
-        guard branchContainer != nil else {
-            return declarations.local.hookAttachments
-        }
-
-        return declarations
-            .declarations(forBranch: activeBranch)
-            .hookAttachments
-    }
-
-    func adoptedRouteAttachments(forBranch branchID: AnyHashable) -> [AnyRouteDeclaration] {
-        declarations
-            .declarations(forBranch: branchID)
-            .routeAttachments
-            .filter { $0.drivesPresentation == false }
-            .drivingPresentation(true)
+        definitions.routeAttachments
     }
 
     func firstRouteAttachment(for routeType: (some Route).Type, includingOtherBranches: Bool = true) -> RouteAttachmentMatch? {
         if includingOtherBranches, branchContainer != nil,
-           let declaration = declarations.declarations(forBranch: activeBranch).routeAttachment(for: routeType) {
+           let declaration = branchScopes[activeBranch]?.definitions.routeAttachment(for: routeType) {
             return RouteAttachmentMatch(branchID: activeBranch, declaration: declaration)
         }
 
-        if let declaration = declarations.local.routeAttachment(for: routeType) {
+        if let declaration = definitions.routeAttachment(for: routeType) {
             return RouteAttachmentMatch(branchID: nil, declaration: declaration)
         }
 
-        if let branchID,
-           let declaration = parent?
-            .adoptedRouteAttachments(forBranch: branchID)
-            .first(where: { attachment in
-                routeType == attachment.routeType
-            }) {
-            return RouteAttachmentMatch(
-                branchID: nil,
-                declaration: declaration.hosted(by: adoptedRoutePresentationHostID),
-                adoptedFromBranch: branchID
-            )
-        }
-
         if includingOtherBranches, branchContainer != nil {
-            for branchID in declarations.branchIDs where branchID != activeBranch {
-                guard let declaration = declarations.declarations(forBranch: branchID).routeAttachment(for: routeType) else {
+            for branchID in branchScopes.keys where branchID != activeBranch {
+                guard let declaration = branchScopes[branchID]?.definitions.routeAttachment(for: routeType) else {
                     continue
                 }
 
@@ -127,7 +82,7 @@ extension RouteScope {
     ) -> RouteAttachmentMatch? {
         guard
             let branchScope = branchScopes[branch]?.activeLocalScope,
-            branchScope !== self,
+            branchScope !== branchScopes[branch],
             let match = branchScope.firstRouteAttachment(for: routeType)
         else {
             return nil
@@ -140,21 +95,6 @@ extension RouteScope {
         )
     }
 
-    func drivingPresentationDeclaration(
-        matching declaration: AnyRouteDeclaration,
-        hostedBy presentationHostID: RoutePresentationHostID?
-    ) -> AnyRouteDeclaration? {
-        routeAttachments.first {
-            $0.routeType == declaration.routeType
-            && $0.kind == declaration.kind
-            && $0.drivesPresentation
-            && (
-                presentationHostID == nil
-                    || $0.presentationHostID == presentationHostID
-            )
-        }
-    }
-
     func attachedPresentationDeclaration(
         presentedBy host: RouteScope,
         matching presentationKind: RoutePresentationKind,
@@ -164,311 +104,11 @@ extension RouteScope {
             presentationOrigin === host,
             let declaration = presentationDeclaration,
             declaration.presentationKind == presentationKind,
-            declaration.drivesPresentation,
-            presentationHostID == nil || declaration.presentationHostID == presentationHostID
+            presentationHostID == nil || host.presentationHostID == presentationHostID
         else {
             return nil
         }
 
         return declaration
     }
-}
-
-private extension [AnyRouteDeclaration] {
-    func hosted(by presentationHostID: RoutePresentationHostID?) -> Self {
-        guard let presentationHostID else {
-            return self
-        }
-
-        return hosted(by: presentationHostID)
-    }
-}
-
-private extension AnyRouteDeclaration {
-    func hosted(by presentationHostID: RoutePresentationHostID?) -> Self {
-        guard let presentationHostID else {
-            return self
-        }
-
-        return hosted(by: presentationHostID)
-    }
-}
-
-// MARK: - Declaration Installation
-
-extension RouteScope {
-    @discardableResult
-    func installRouteDeclarations(
-        sourceID: AnyHashable = AnyHashable("default"),
-        id: AnyHashable?,
-        branchSelection: AnyRouteBranchSelection?,
-        routeDeclarations: [RouteScopeDeclaration],
-        sourceEnvironment: EnvironmentValues? = nil
-    ) -> Bool {
-        let requiresCommit = prepareRouteDeclarationInstallation(
-            sourceID: sourceID,
-            id: id,
-            branchSelection: branchSelection,
-            routeDeclarations: routeDeclarations,
-            sourceEnvironment: sourceEnvironment ?? EnvironmentValues()
-        )
-
-        guard requiresCommit else {
-            return false
-        }
-
-        commitRouteDeclarationInstallation()
-        return true
-    }
-
-    /// Refreshes non-observable installation values without changing the route graph.
-    ///
-    /// Returns `true` when the caller must rebuild the declaration structure by calling
-    /// `commitRouteDeclarationInstallation` inside a graph mutation. Otherwise, the source
-    /// environment, branch selection, route attachments, and hooks are refreshed in place.
-    func prepareRouteDeclarationInstallation(
-        sourceID: AnyHashable,
-        id: AnyHashable?,
-        branchSelection: AnyRouteBranchSelection?,
-        routeDeclarations: [RouteScopeDeclaration],
-        sourceEnvironment: EnvironmentValues
-    ) -> Bool {
-        let previousID = self.id
-        ledger.setRouteSource(
-            .init(id: id, selection: branchSelection, declarations: routeDeclarations,
-                environment: sourceEnvironment),
-            for: sourceID
-        )
-        return reconcileRouteSources(previousID: previousID)
-    }
-
-    func commitRouteDeclarationInstallation() {
-        let branchSelection = ledger.selection
-        let routeDeclarations = ledger.routeDeclarations
-        configureBranchContainer(
-            branchSelection: branchSelection,
-            routeDeclarations: routeDeclarations
-        )
-        self.declarations = makeDeclarationStore(
-            from: routeDeclarations,
-            activeBranch: activeBranch,
-            hookDeclarations: ledger.hookDeclarations
-        )
-        log.departureDebug(.routeDeclarationsInstalled(scope: self, declarationCount: routeDeclarations.count))
-    }
-
-    func uninstallRouteDeclarations(sourceID: AnyHashable) {
-        let previousID = id
-        guard ledger.removeRouteSource(sourceID) else {
-            return
-        }
-
-        if reconcileRouteSources(previousID: previousID) {
-            commitRouteDeclarationInstallation()
-        }
-        log.departureDebug(.routeDeclarationsUninstalled(scope: self))
-    }
-
-    @discardableResult
-    func installHookDeclarations(
-        sourceID: AnyHashable = AnyHashable("default"),
-        hookDeclarations: [AnyHookDeclaration]
-    ) -> Bool {
-        let previousIdentities = Set(declarations.allHookAttachments.map(\.identity))
-        ledger.setHookSource(hookDeclarations, for: sourceID)
-        var scopeDeclarations = ScopeDeclarations()
-
-        for hookDeclaration in ledger.hookDeclarations {
-            let inserted = scopeDeclarations.appendHook(hookDeclaration)
-            guard inserted == false else {
-                continue
-            }
-
-            logDuplicateHookDeclaration(hookDeclaration, branchID: activeBranch)
-        }
-
-        let didChangeDeclarations = previousIdentities != scopeDeclarations.hookIdentities
-        declarations.refreshHookAttachments(
-            scopeDeclarations.hookAttachments,
-            activeBranch: activeBranch,
-            usesBranches: branchContainer != nil
-        )
-
-        if didChangeDeclarations {
-            log.departureDebug(.hookDeclarationsInstalled(scope: self, hookCount: hookDeclarations.count))
-        }
-        return didChangeDeclarations
-    }
-
-    func uninstallHookDeclarations(sourceID: AnyHashable) {
-        guard ledger.removeHookSource(sourceID) else {
-            return
-        }
-
-        declarations.refreshHookAttachments(
-            ledger.hookDeclarations,
-            activeBranch: activeBranch,
-            usesBranches: branchContainer != nil
-        )
-        log.departureDebug(.hookDeclarationsUninstalled(scope: self))
-    }
-}
-
-// MARK: - Private Helpers
-
-private extension RouteScope {
-    func reconcileRouteSources(previousID: AnyHashable) -> Bool {
-        let effectiveSelection = ledger.selection
-        let effectiveDeclarations = ledger.routeDeclarations
-        let usesBranches = effectiveSelection != nil || effectiveDeclarations.contains { $0.branch != nil }
-        let desiredIdentities = routeAttachmentIdentities(
-            from: effectiveDeclarations,
-            usesBranches: usesBranches
-        )
-        let didChangeDeclarations = previousID != id
-            || (branchContainer != nil) != usesBranches
-            || (branchContainer?.isConcurrent ?? false) != (effectiveSelection?.concurrent ?? false)
-            || declarations.routeAttachmentIdentities != desiredIdentities
-
-        guard didChangeDeclarations == false else { return true }
-        refreshBranchSelection(effectiveSelection)
-        declarations.refreshRouteAttachments(
-            from: effectiveDeclarations,
-            activeBranch: activeBranch,
-            usesBranches: usesBranches
-        )
-        declarations.refreshHookAttachments(
-            ledger.hookDeclarations,
-            activeBranch: activeBranch,
-            usesBranches: usesBranches
-        )
-        return false
-    }
-
-    func refreshBranchSelection(_ branchSelection: AnyRouteBranchSelection?) {
-        guard var branchContainer else {
-            return
-        }
-
-        participation.isConcurrent = branchSelection?.concurrent ?? false
-        branchContainer.selection = branchSelection
-        self.branchContainer = branchContainer
-    }
-
-    func routeAttachmentIdentities(
-        from routeDeclarations: [RouteScopeDeclaration],
-        usesBranches: Bool
-    ) -> Set<RouteAttachmentIdentity> {
-        let branchIDs = usesBranches ? routeDeclarations.compactMap(\.branch) : []
-        var declarationStore = DeclarationStore(branchIDs: branchIDs)
-
-        for declaration in routeDeclarations {
-            let branchID = usesBranches ? declaration.branch : nil
-            for route in declaration.routes {
-                if let branchID {
-                    _ = declarationStore.appendRoute(route, toBranch: branchID)
-                } else {
-                    _ = declarationStore.local.appendRoute(route)
-                }
-            }
-        }
-
-        return declarationStore.routeAttachmentIdentities
-    }
-
-    func configureBranchContainer(
-        branchSelection: AnyRouteBranchSelection?,
-        routeDeclarations: [RouteScopeDeclaration]
-    ) {
-        participation.isConcurrent = branchSelection?.concurrent ?? false
-        let hasBranchDeclarations = routeDeclarations.contains {
-            $0.branch != nil
-        }
-
-        guard branchSelection != nil || hasBranchDeclarations else {
-            branchContainer = nil
-            return
-        }
-
-        branchContainer = BranchContainerState(
-            defaultBranch: defaultBranchID(hasSelection: branchSelection != nil),
-            selection: branchSelection
-        )
-    }
-
-    func makeDeclarationStore(
-        from routeDeclarations: [RouteScopeDeclaration],
-        activeBranch: AnyHashable,
-        hookDeclarations: [AnyHookDeclaration]
-    ) -> DeclarationStore {
-        var branchIDs = [activeBranch]
-        branchIDs.append(
-            contentsOf: routeDeclarations.compactMap(\.branch)
-        )
-
-        var declarationStore = branchContainer == nil
-            ? DeclarationStore()
-            : DeclarationStore(branchIDs: branchIDs)
-
-        for declaration in routeDeclarations {
-            let declarationBranch = branchContainer == nil ? nil : declaration.branch
-            let duplicateBranch = declarationBranch ?? activeBranch
-
-            for route in declaration.routes {
-                let inserted: Bool
-                if let declarationBranch {
-                    inserted = declarationStore.appendRoute(route, toBranch: declarationBranch)
-                } else {
-                    inserted = declarationStore.local.appendRoute(route)
-                }
-
-                if inserted == false {
-                    logDuplicateRouteDeclaration(route.routeType, branchID: duplicateBranch)
-                }
-            }
-        }
-
-        if hookDeclarations.isEmpty == false {
-            if branchContainer != nil {
-                declarationStore.setHooks(hookDeclarations, forBranch: activeBranch)
-            } else {
-                declarationStore.local.setHooks(hookDeclarations)
-            }
-        }
-
-        return declarationStore
-    }
-
-    func logDuplicateRouteDeclaration(
-        _ routeType: any Route.Type,
-        branchID: AnyHashable
-    ) {
-        log.departureWarning(
-            "Duplicate route declaration for `\(String(reflecting: routeType))` in scope "
-                + "`\(String(describing: id))` on branch `\(String(describing: branchID))`. "
-                + "The first declaration will be used."
-        )
-    }
-
-    func logDuplicateHookDeclaration(
-        _ hookDeclaration: AnyHookDeclaration,
-        branchID: AnyHashable
-    ) {
-        switch hookDeclaration.kind {
-        case let .actionInterceptor(actionType, _):
-            log.departureWarning(
-                "Duplicate action interceptor for `\(String(reflecting: actionType))` in scope "
-                    + "`\(String(describing: id))` on branch `\(String(describing: branchID))`. "
-                    + "The first interceptor will be used."
-            )
-
-        case let .unwindHandler(routeType, _):
-            log.departureWarning(
-                "Duplicate unwind handler for `\(String(reflecting: routeType))` in scope "
-                    + "`\(String(describing: id))` on branch `\(String(describing: branchID))`. "
-                    + "The first handler will be used."
-            )
-        }
-    }
-
 }

@@ -26,16 +26,13 @@ extension RouterEngine {
     final class PendingRoute {
         struct Append {
             let match: DeclarationMatch
-            let behavior: RouteAppendBehavior
             let blockingScopes: [RouteScope]
 
             init(
                 match: DeclarationMatch,
-                behavior: RouteAppendBehavior,
                 blockingScopes: [RouteScope] = []
             ) {
                 self.match = match
-                self.behavior = behavior
                 self.blockingScopes = blockingScopes
             }
         }
@@ -80,65 +77,23 @@ extension RouterEngine {
     }
 
     struct UnwindPresentationSnapshot {
-        let id = UUID()
-        let preservedPaths: [RouteForest.PreservedRoutePath]
-        let routeForest: RouteForest
-        let preservesModalPresentationBindings: Bool
-        let preservesPushPresentationBindings: Bool
-        let departingPresentationHostScopeIDs: Set<ObjectIdentifier>
-        let unanimatedPushPresentationScopeIDs: Set<ObjectIdentifier>
-
-        init(
-            preservedPaths: [RouteForest.PreservedRoutePath],
-            routeForest: RouteForest,
-            preservesModalPresentationBindings: Bool,
-            preservesPushPresentationBindings: Bool,
-            departingPresentationHostScopeIDs: Set<ObjectIdentifier>,
-            unanimatedPushPresentationScopeIDs: Set<ObjectIdentifier>
-        ) {
-            self.preservedPaths = preservedPaths
-            self.routeForest = routeForest
-            self.preservesModalPresentationBindings = preservesModalPresentationBindings
-            self.preservesPushPresentationBindings = preservesPushPresentationBindings
-            self.departingPresentationHostScopeIDs = departingPresentationHostScopeIDs
-            self.unanimatedPushPresentationScopeIDs = unanimatedPushPresentationScopeIDs
+        struct Outgoing {
+            let host: RouteScope
+            let projection: ResolvedRoutePresentation
+            let retainsBinding: Bool
+            let disablesAnimation: Bool
         }
-    }
-
-    struct EquivalentRouteMatch {
-        let position: RoutePath.Position
+        let id = UUID()
+        let presentations: [PresentationKey: Outgoing]
     }
 
     struct UnwindHandlerDeliveryKey: Equatable, Hashable {
         let sourceScopeID: ObjectIdentifier
         let targetScopeID: AnyHashable
-
-        static func == (lhs: Self, rhs: Self) -> Bool {
-            lhs.sourceScopeID == rhs.sourceScopeID
-            && lhs.targetScopeID == rhs.targetScopeID
-        }
-
-        func hash(into hasher: inout Hasher) {
-            hasher.combine(sourceScopeID)
-            hasher.combine(targetScopeID)
-        }
     }
 
     struct DeliveredUnwindHandler {
         weak var sourceScope: RouteScope?
-    }
-
-    enum RouteAppendBehavior {
-        case append
-        case startElevatedTree(RoutePriority)
-
-        var elevatedPriority: RoutePriority? {
-            if case .startElevatedTree(let priority) = self {
-                return priority
-            }
-
-            return nil
-        }
     }
 
     @discardableResult
@@ -152,14 +107,17 @@ extension RouterEngine {
         #endif
 
         log.departureDebug(.unwindRequested(target: target))
-        guard let sourceScope = resolveRequestOrigin(origin)?.scope else { return false }
+        guard let sourceScope = navigationSource(origin) else { return false }
 
-        if origin != nil, case .topmostAncestor = target {
+        switch target {
+        case nil, .topmostAncestor:
             return await unwindPrevious(from: sourceScope, payload: payload)
+        default: break
         }
 
         if case .root = target {
-            let plan = routeForest.unwindPlan(for: .root)
+            guard let space = sourceScope.space else { return false }
+            let plan = spaces.unwindPlan(for: .root(space))
             guard plan.removedScopes.isEmpty == false else {
                 log.departureDebug(.unwindSkippedNoRoute)
                 return false
@@ -170,13 +128,12 @@ extension RouterEngine {
                 removing: plan.removedScopes.count
             ))
 
-            await performPlannedUnwind(
+            return await performPlannedUnwind(
                 for: sourceScope,
                 payload: payload,
-                in: root,
+                in: space.root,
                 plan: plan
             )
-            return true
         }
 
         // Non-root targets differ only by which path they clear. `.nearestBranch` resolves against
@@ -184,7 +141,7 @@ extension RouterEngine {
         let routePath: RoutePath
         switch target {
         case .root:
-            routePath = normalTree.rootPath
+            routePath = normalSpace.rootPath
 
         case .nearestBranch:
             guard let branchPath = nearestBranchPath(from: sourceScope) else {
@@ -195,7 +152,7 @@ extension RouterEngine {
             routePath = branchPath
 
         case nil, .topmostAncestor, .id:
-            routePath = routeForest.routePath(containing: sourceScope) ?? routeForest.activeTree.currentRoutePath
+            routePath = spaces.routePath(containing: sourceScope) ?? spaces.activeSpace.currentRoutePath
         }
 
         switch routePath.unwindResolution(to: target) {
@@ -204,12 +161,12 @@ extension RouterEngine {
             return false
 
         case .targetNotFound:
-            guard let ancestorResolution = routeForest.ancestorUnwindResolution(from: routePath, to: target) else {
+            guard let ancestorResolution = spaces.ancestorUnwindResolution(from: routePath, to: target) else {
                 log.departureDebug(.unwindDroppedTargetNotFound(target: target))
                 return false
             }
 
-            let plan = routeForest.unwindPlan(for: .combined([
+            let plan = spaces.unwindPlan(for: .combined([
                 .scoped(routePath: routePath, after: .owner),
                 .scoped(routePath: ancestorResolution.path, after: ancestorResolution.position),
             ]))
@@ -219,17 +176,15 @@ extension RouterEngine {
             ))
 
             let targetScope = ancestorResolution.path.scope(at: ancestorResolution.position)
-            await performPlannedUnwind(
+            return await performPlannedUnwind(
                 for: sourceScope,
                 payload: payload,
                 in: targetScope,
                 plan: plan
             )
 
-            return true
-
         case let .keepPathThrough(targetPosition):
-            let plan = routeForest.unwindPlan(for: .scoped(routePath: routePath, after: targetPosition))
+            let plan = spaces.unwindPlan(for: .scoped(routePath: routePath, after: targetPosition))
             log.departureDebug(.unwindAccepted(
                 keepThrough: targetPosition,
                 removing: plan.removedScopes.count
@@ -241,14 +196,12 @@ extension RouterEngine {
                 keepThrough: targetPosition
             )
 
-            await performPlannedUnwind(
+            return await performPlannedUnwind(
                 for: sourceScope,
                 payload: payload,
                 in: targetScope,
                 plan: plan
             )
-
-            return true
         }
     }
 
@@ -256,15 +209,19 @@ extension RouterEngine {
     func unwindPrevious(from sourceScope: RouteScope, payload: Any? = nil) async -> Bool {
         log.departureDebug(.unwindPreviousRequested)
 
+        guard isNavigationEligible(sourceScope) else { return false }
+        if let space = sourceScope.space, sourceScope === space.root {
+            return await dismissSpace(space, source: sourceScope)
+        }
         guard
-            let routePath = routeForest.routePath(containing: sourceScope),
+            let routePath = spaces.routePath(containing: sourceScope),
             let targetPosition = routePath.positionBefore(sourceScope)
         else {
             log.departureDebug(.unwindSkippedNoRoute)
             return false
         }
 
-        let plan = routeForest.unwindPlan(for: .scoped(routePath: routePath, after: targetPosition))
+        let plan = spaces.unwindPlan(for: .scoped(routePath: routePath, after: targetPosition))
         guard plan.removedScopes.isEmpty == false else {
             log.departureDebug(.unwindSkippedNoRoute)
             return false
@@ -281,82 +238,56 @@ extension RouterEngine {
             keepThrough: targetPosition
         )
 
-        await performPlannedUnwind(
+        return await performPlannedUnwind(
             for: sourceScope,
             payload: payload,
             in: targetScope,
             plan: plan
         )
-
-        return true
     }
 
-    func appendRoute(_ route: any Route, after match: DeclarationMatch) async {
-        // A branch declaration can be discovered before SwiftUI has mounted its host. Do not
-        // prepare the append path until that host exists: the fallback path points at the
-        // declaring tree and trimming it would remove routes unrelated to the pending request.
-        if requiresBranchHostRegistration(for: match) {
-            appendPreparedRoute(route, after: match)
-            return
-        }
-
+    func appendRoute(_ route: any Route, after match: DeclarationMatch, origin: RouteRequestOrigin? = nil) async {
+        let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         if await deferRouteAppendIfNeeded(route, after: match) {
             return
         }
 
+        guard navigationSource(origin) != nil, let host = match.presentationHost, !Task.isCancelled else { return }
         if await ios17NavigationStackPushWorkaround?.prepareAppend(after: match, in: self) == true {
             return
         }
 
+        // Preparation may remove the requesting child. Its captured presentation anchor
+        // must remain in the live top space for the accepted navigation to continue.
+        guard isNavigationEligible(host), !Task.isCancelled else { return }
         if await unwindToExistingEquivalentRouteIfNeeded(route, after: match) {
             return
         }
 
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
-        let unwindPlan = routeAppendUnwindPlan(after: match)
-        let snapshotID = installUnwindPresentationSnapshot(
-            for: unwindPlan,
-            preservesModalPresentationBindings: false
-        )
-        let removedScopes = prepareRouteAppendPath(unwindPlan)
-
-        if removedScopes.isEmpty == false {
-            log.departureDebug(.routeAppendWaitingReplacingScopes(removedScopes: removedScopes.count))
-            if await deferRouteAppend(
-                route,
-                after: match,
-                until: removedScopes,
-                presentationSnapshotID: snapshotID
-            ) {
-                clearUnwindPresentationSnapshot(id: snapshotID)
-                return
-            }
-        }
-
-        clearUnwindPresentationSnapshot(id: snapshotID)
-        appendPreparedRoute(route, after: match)
+        await commitPresentation(route, after: match, unwinding: routeAppendUnwindPlan(after: match))
     }
 
-    func appendPreparedRoute(
+    private func commitPresentation(
         _ route: any Route,
         after match: DeclarationMatch,
-        behavior: RouteAppendBehavior = .append
-    ) {
-        let waitsForBranchActivation = waitsForBranchActivation(for: match)
-
-        guard activateBranch(for: match) else {
-            if let branchID = match.branchID {
-                log.departureDebug(.routeDroppedBranchActivationFailed(branch: branchID))
-            }
-            return
+        unwinding plan: RouteSpaces.UnwindPlan
+    ) async {
+        let token = beginNavigationTransaction()
+        let transition = commitTransition(plan, preservesModalPresentationBindings: false)
+        if await !deferRouteAppend(route, after: match, until: transition.removedScopes,
+            presentationSnapshotID: transition.snapshotID) {
+            clearUnwindPresentationSnapshot(id: transition.snapshotID)
+            appendPreparedRoute(route, after: match)
         }
+        await finishNavigationTransaction(token)
+    }
 
-        appendOrPendRoute(
-            route,
-            after: match,
-            behavior: behavior,
-            waitsForBranchActivation: waitsForBranchActivation
-        )
+    func appendPreparedRoute(_ route: any Route, after match: DeclarationMatch) {
+        guard match.space === spaces.activeSpace else { return }
+        let waitsForBranchActivation = waitsForBranchActivation(for: match)
+        guard activateBranch(for: match) else { return }
+        appendOrPendRoute(route, after: match, waitsForBranchActivation: waitsForBranchActivation)
     }
 
     func unwindToExistingEquivalentRouteIfNeeded(_ route: any Route, after match: DeclarationMatch) async -> Bool {
@@ -371,84 +302,40 @@ extension RouterEngine {
             return true
         }
 
-        let targetPosition = equivalentRouteMatch.position
-        let unwindPlan = equivalentRouteUnwindPlan(
-            after: match,
-            keepingThrough: targetPosition
-        )
-        let removedScopes = unwindPlan.removedScopes
-        let sourceScope = removedScopes.last
-        let targetScope = match.presentationLocation.path.scope(at: targetPosition)
-        guard removedScopes.isEmpty == false else {
-            if let existingRoute = match.presentationLocation.path.scope(at: targetPosition)?.route {
-                log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: existingRoute))
-            }
-            return true
-        }
-
-        await performPlannedUnwind(
-            for: sourceScope,
-            payload: nil,
-            in: targetScope,
-            plan: unwindPlan,
-            preservesModalPresentationBindings: false,
-            logsCompletion: false
-        )
-        return true
+        return await reuseEquivalentRoute(route, in: match.presentationLocation.path,
+            through: equivalentRouteMatch,
+            plan: spaces.presentationTransitionPlan(after: match, transition: .keepEquivalent(through: equivalentRouteMatch)))
     }
 
-    func equivalentRouteUnwindPlan(
-        after match: DeclarationMatch,
-        keepingThrough targetPosition: RoutePath.Position
-    ) -> RouteForest.UnwindPlan {
-        routeForest.presentationTransitionPlan(
-            after: match,
-            transition: .keepEquivalent(through: targetPosition)
-        )
-    }
-
-    func unwindToExistingEquivalentRouteInPriorityTreeIfNeeded(
+    func unwindToExistingEquivalentRouteInPrioritySpaceIfNeeded(
         _ route: any Route,
         priority: RoutePriority
     ) async -> Bool {
         guard
-            let tree = routeForest.tree(for: priority),
-            let equivalentRouteMatch = equivalentRouteMatch(to: route, in: tree.currentRoutePath)
+            let space = spaces.space(for: priority),
+            space.root.route?._isEqual(to: route) == true
         else {
             return false
         }
 
-        let routePath = tree.currentRoutePath
-        let targetPosition = equivalentRouteMatch.position
-        let unwindPlan = routeForest.unwindPlan(for: .scoped(
-            routePath: routePath,
-            after: targetPosition
-        ))
-        let removedScopes = unwindPlan.removedScopes
-        let sourceScope = removedScopes.last
-        let targetScope = routePath.scope(at: targetPosition)
-        guard removedScopes.isEmpty == false else {
-            if let existingRoute = routePath.scope(at: targetPosition)?.route {
-                log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: existingRoute))
-            }
+        return await reuseEquivalentRoute(route, in: space.rootPath, through: .owner,
+            plan: spaces.unwindPlan(for: .root(space)))
+    }
+
+    private func reuseEquivalentRoute(_ route: any Route, in path: RoutePath, through position: RoutePath.Position, plan: RouteSpaces.UnwindPlan) async -> Bool {
+        guard !plan.removedScopes.isEmpty else {
+            if let current = path.scope(at: position)?.route { log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: current)) }
             return true
         }
-
-        await performPlannedUnwind(
-            for: sourceScope,
-            payload: nil,
-            in: targetScope,
-            plan: unwindPlan,
-            preservesModalPresentationBindings: false,
-            logsCompletion: false
-        )
+        await performPlannedUnwind(for: plan.removedScopes.last, payload: nil, in: path.scope(at: position), plan: plan,
+            preservesModalPresentationBindings: false, logsCompletion: false)
         return true
     }
 
     func equivalentRouteMatch(
         to route: any Route,
         after match: DeclarationMatch
-    ) -> EquivalentRouteMatch? {
+    ) -> RoutePath.Position? {
         // Replacement equality belongs to the selected slot, not an equal route
         // that happens to be pushed farther down the same path.
         if match.declaration.presentationKind == .replace {
@@ -458,7 +345,7 @@ extension RouterEngine {
                   presentation.scope.route?._isEqual(to: route) == true,
                   let position = match.presentationLocation.path.position(of: presentation.scope)
             else { return nil }
-            return EquivalentRouteMatch(position: position)
+            return position
         }
         return equivalentRouteMatch(
             to: route,
@@ -471,10 +358,10 @@ extension RouterEngine {
         to route: any Route,
         in routePath: RoutePath,
         startingAt position: RoutePath.Position? = nil
-    ) -> EquivalentRouteMatch? {
+    ) -> RoutePath.Position? {
         for scope in routePath.scopes.reversed() {
             if scope.route?._isEqual(to: route) == true {
-                return EquivalentRouteMatch(position: .scope(scope))
+                return .scope(scope)
             }
 
             if position == .scope(scope) {
@@ -488,7 +375,7 @@ extension RouterEngine {
             return nil
         }
 
-        return EquivalentRouteMatch(position: .owner)
+        return .owner
     }
 
     func waitsForBranchActivation(for match: DeclarationMatch) -> Bool {
@@ -496,19 +383,8 @@ extension RouterEngine {
             return false
         }
         guard let owner = match.declarationLocation.scope else { return false }
-        if owner.branchContainer?.isConcurrent == true, owner.branchScopes[branchID] != nil { return false }
+        if owner.isConcurrent, owner.branchScopes[branchID] != nil { return false }
         return owner.activeBranch != branchID
-    }
-
-    func requiresBranchHostRegistration(for match: DeclarationMatch) -> Bool {
-        guard
-            let branchID = match.branchID,
-            let declaringScope = match.declarationLocation.scope
-        else {
-            return false
-        }
-
-        return declaringScope.branchScopes[branchID] == nil
     }
 
     func activateBranch(for match: DeclarationMatch) -> Bool {
@@ -525,6 +401,7 @@ extension RouterEngine {
     }
 
     func activateBranch(_ branchID: AnyHashable, in scope: RouteScope) -> Bool {
+        guard isNavigationEligible(scope) else { return false }
         guard scope.activeBranch != branchID else {
             log.departureDebug(.branchActivationSkipped(branch: branchID, scope: scope))
             return true
@@ -567,71 +444,49 @@ extension RouterEngine {
         }
     }
 
-    func replaceElevatedTree(
+    func replaceElevatedSpace(
         _ priority: RoutePriority,
         with route: any Route,
         after match: DeclarationMatch
     ) async {
         log.departureDebug(.elevatedPriorityReplacePreparing(route: route))
 
-        if let existingTree = routeForest.tree(for: priority) {
-            let unwindPlan = routeForest.unwindPlan(for: .tree(existingTree))
-            let snapshotID = installUnwindPresentationSnapshot(
-                for: unwindPlan,
-                preservesModalPresentationBindings: false
-            )
-            let removedScopes = prepareRouteAppendPath(unwindPlan)
-
-            if removedScopes.isEmpty == false,
-               await deferRouteAppend(
-                route,
-                after: match,
-                until: removedScopes,
-                presentationSnapshotID: snapshotID,
-                behavior: .startElevatedTree(priority)
-               ) {
-                clearUnwindPresentationSnapshot(id: snapshotID)
-                return
-            }
-
-            clearUnwindPresentationSnapshot(id: snapshotID)
+        // Commit the incoming root before awaiting native teardown: replacement
+        // never exposes a temporary lower space or leaves a logical closing root.
+        let token = beginNavigationTransaction()
+        let transition = spaces.space(for: priority).map {
+            commitTransition(spaces.unwindPlan(for: .space($0)), preservesModalPresentationBindings: false)
         }
-
-        appendPreparedRoute(
-            route,
-            after: match,
-            behavior: .startElevatedTree(priority)
-        )
+        mutateRouteGraph {
+            let scope = RouteScope(id: match.declaration.scopeID ?? AnyHashable(route.id),
+                route: route, definitions: match.declaration.childScope ?? .empty)
+            scope.attachPresentation(to: root, declaration: match.declaration, priority: priority)
+            spaces.setElevatedSpace(RouteSpace(priority: priority, root: scope), for: priority)
+        }
+        log.departureDebug(.elevatedSpaceStarted)
+        if let transition { await finishTransition(transition) }
+        await finishNavigationTransaction(token)
     }
 
     func appendOrPendRoute(
         _ route: any Route,
         after match: DeclarationMatch,
-        behavior: RouteAppendBehavior,
         waitsForBranchActivation: Bool = false
     ) {
-        let match = routeForest.refreshingPresentationLocation(for: match)
-
         guard waitsForBranchActivation == false else {
             if let branchID = match.branchID {
                 log.departureDebug(.routePendingWaitingForActivatedBranchHost(route: route, branch: branchID))
             }
             replacePendingRoute(PendingRoute(
                 route: route,
-                state: .append(.init(match: match, behavior: behavior))
+                state: .append(.init(match: match))
             ))
             schedulePendingRouteResume(for: match)
             return
         }
 
         guard let presentationHost = resolvePresentationHost(for: match) else {
-            if let branchID = match.branchID {
-                log.departureDebug(.routePendingWaitingForLocalPresentationScope(route: route, branch: branchID))
-                replacePendingRoute(PendingRoute(
-                    route: route,
-                    state: .append(.init(match: match, behavior: behavior))
-                ))
-            }
+            replacePendingRoute(nil)
             return
         }
 
@@ -639,45 +494,16 @@ extension RouterEngine {
         let presentationOrigin = presentationHost.scope
         let presentationDeclaration = presentationHost.declaration
 
-        var appendedPath: RoutePath?
+        let appendedPath = match.presentationLocation.path
         mutateRouteGraph {
-            if case .startElevatedTree(let priority) = behavior {
-                let rootScope = RouteScope(id: UUID(), route: nil)
-                let routePath = RoutePath(owner: rootScope)
-                let tree = RouteTree(
-                    priority: priority,
-                    root: rootScope,
-                    rootPath: routePath,
-                    elevatedOrigin: .init(
-                        scope: presentationOrigin,
-                        declaration: presentationDeclaration,
-                        sourceEnvironment: presentationOrigin.sourceEnvironmentReference
-                    )
-                )
-                let appendedScope = RouteScope(id: route.id, route: route)
-                appendedScope.attachPresentation(
-                    to: presentationOrigin,
-                    declaration: presentationDeclaration
-                )
-                routePath.append(appendedScope)
-                routeForest.setElevatedTree(tree, for: priority)
-                appendedPath = routePath
-                log.departureDebug(.elevatedTreeStarted)
-                return
-            }
-
-            let appendedScope = RouteScope(id: route.id, route: route)
-            appendedScope.attachPresentation(
-                to: presentationOrigin,
-                declaration: presentationDeclaration
-            )
-
-            match.presentationLocation.path.append(appendedScope)
-            appendedPath = match.presentationLocation.path
+            let scope = RouteScope(id: presentationDeclaration.scopeID ?? AnyHashable(route.id),
+                route: route, definitions: presentationDeclaration.childScope ?? .empty)
+            scope.attachPresentation(to: presentationOrigin, declaration: presentationDeclaration, priority: match.space.priority)
+            appendedPath.append(scope)
         }
         log.departureDebug(.routeAppended(
             route: route,
-            path: appendedPath?.departureDebugPathDescription ?? "root"
+            path: appendedPath.departureDebugPathDescription
         ))
     }
 
@@ -692,52 +518,24 @@ extension RouterEngine {
             return
         }
 
+        guard append.match.space === spaces.activeSpace else {
+            replacePendingRoute(nil)
+            return
+        }
         replacePendingRoute(nil)
         log.departureDebug(.pendingRouteResuming(route: pendingRoute.route))
-        let pendingMatch = append.match
-        let appendBehavior = append.behavior
-        let match = routeForest.refreshingPresentationLocation(for: pendingMatch)
-        switch appendBehavior {
-        case .append:
-            prepareRouteAppendPath(after: match)
-
-        case .startElevatedTree:
-            break
-        }
-
-        appendOrPendRoute(
-            pendingRoute.route,
-            after: match,
-            behavior: appendBehavior
-        )
+        let match = append.match
+        prepareRouteAppendPath(after: match)
+        appendOrPendRoute(pendingRoute.route, after: match)
     }
 
     func resolvePresentationHost(
         for match: DeclarationMatch
     ) -> (scope: RouteScope, declaration: AnyRouteDeclaration)? {
-        let resolution = match.presentationHost.flatMap { scope -> (scope: RouteScope, declaration: AnyRouteDeclaration)? in
-            guard routeForest.routePath(containing: scope) != nil else { return nil }
-            return scope.drivingPresentationDeclaration(
-                matching: match.declaration,
-                hostedBy: match.presentationHostID
-            ).map { (scope, $0) }
-        }
-        guard let branchID = match.branchID else {
-            if resolution != nil {
-                log.departureDebug(.routeCanPresentDeclarationDrivesPresentation)
-            }
-            return resolution
-        }
-
-        if resolution != nil {
-            log.departureDebug(.routeCanPresentActiveLocalScope(branch: branchID))
-        } else if match.declarationLocation.scope?.activeBranch != branchID {
-            log.departureDebug(.routeCannotPresentDiscoveryBranchInactive(branch: branchID))
-        } else {
-            log.departureDebug(.routeCannotPresentNoActiveLocalScope(branch: branchID))
-        }
-
-        return resolution
+        guard let scope = match.presentationHost,
+              spaces.routePath(containing: scope) != nil,
+              scope.routeAttachments.contains(match.declaration) else { return nil }
+        return (scope, match.declaration)
     }
 
     @discardableResult
@@ -746,13 +544,13 @@ extension RouterEngine {
     }
 
     @discardableResult
-    func prepareRouteAppendPath(_ plan: RouteForest.UnwindPlan) -> [RouteScope] {
+    func prepareRouteAppendPath(_ plan: RouteSpaces.UnwindPlan) -> [RouteScope] {
         let removedScopes = plan.removedScopes
         applyUnwindPlan(plan)
         return removedScopes
     }
 
-    func applyUnwindPlan(_ plan: RouteForest.UnwindPlan) {
+    func applyUnwindPlan(_ plan: RouteSpaces.UnwindPlan) {
         let pathTrimEffects = plan.pathTrims.map { trim in
             (trim: trim, removedCount: trim.removedScopes.count)
         }
@@ -762,8 +560,8 @@ extension RouterEngine {
                 effect.trim.path.keepThrough(effect.trim.keepThrough)
             }
 
-            for priority in plan.elevatedTreePrioritiesToClear {
-                routeForest.setElevatedTree(nil, for: priority)
+            for space in plan.spacesToRemove where spaces.space(for: space.priority) === space {
+                spaces.setElevatedSpace(nil, for: space.priority)
             }
         }
 
@@ -784,13 +582,14 @@ extension RouterEngine {
         }
     }
 
-    func routeAppendUnwindPlan(after match: DeclarationMatch) -> RouteForest.UnwindPlan {
-        routeForest.presentationTransitionPlan(after: match, transition: .append)
+    func routeAppendUnwindPlan(after match: DeclarationMatch) -> RouteSpaces.UnwindPlan {
+        spaces.presentationTransitionPlan(after: match, transition: .append)
     }
 
     func removeFromPath(_ routeScope: RouteScope) {
+        guard isNavigationEligible(routeScope) else { return }
         guard
-            let routePath = routeForest.routePath(containing: routeScope),
+            let routePath = spaces.routePath(containing: routeScope),
             let positionBeforeRemovedScope = routePath.positionBefore(routeScope)
         else {
             log.departureDebug(.pathRemovalSkipped(scope: routeScope))
@@ -798,48 +597,41 @@ extension RouterEngine {
         }
 
         log.departureDebug(.pathRemovalRequested(scope: routeScope))
-        applyUnwindPlan(routeForest.unwindPlan(for: .scoped(
+        applyUnwindPlan(spaces.unwindPlan(for: .scoped(
             routePath: routePath,
             after: positionBeforeRemovedScope
         )))
     }
 
-    func routeScopeDidInstallInView(_ routeScope: RouteScope) {
-        let wasInstalled = routeScope.isInstalledInView
-        routeScope.ledger.install()
-        log.departureDebug(.scopeInstalledInView(scope: routeScope))
-
-        guard wasInstalled == false else {
-            return
+    func hostDidAttach(_ scope: RouteScope, view: PlatformView?, id: UUID) {
+        let becameReady = scope.attachHost(view, id: id)
+        if becameReady {
+            log.departureDebug(.scopeInstalledInView(scope: scope))
+            ios17NavigationStackPushWorkaround?.routeScopeDidInstall(scope)
         }
-
-        ios17NavigationStackPushWorkaround?.routeScopeDidInstall(routeScope)
+        if let branch = scope.branchID, let parent = scope.parent {
+            resumePendingRoute(for: branch, in: parent)
+        }
     }
 
-    func routeScopeDidLeaveView(_ routeScope: RouteScope) {
-        guard routeScope.isInstalledInView else { return }
-
-        routeScope.ledger.uninstall()
-        log.departureDebug(.scopeUninstalledFromView(scope: routeScope))
-
-        if ios17NavigationStackPushWorkaround?.routeScopeDidLeave(routeScope, in: self) == true {
-            return
-        }
-
-        clearElevatedTreeIfNeeded(forRemovedViewScope: routeScope)
+    func hostDidDetach(_ scope: RouteScope, id: UUID) {
+        guard scope.detachHost(id: id) else { return }
+        log.departureDebug(.scopeUninstalledFromView(scope: scope))
+        if ios17NavigationStackPushWorkaround?.routeScopeDidLeave(scope, in: self) == true { return }
+        clearElevatedSpaceIfNeeded(forRemovedViewScope: scope)
     }
 
-    func clearElevatedTreeIfNeeded(forRemovedViewScope routeScope: RouteScope) {
+    func clearElevatedSpaceIfNeeded(forRemovedViewScope routeScope: RouteScope) {
         for priority in [RoutePriority.critical, .high] {
             guard
-                let tree = routeForest.tree(for: priority),
-                tree.elevatedRouteScope === routeScope
+                let space = spaces.space(for: priority),
+                space.root === routeScope
             else {
                 continue
             }
 
-            log.departureDebug(.elevatedTreeCleared)
-            applyUnwindPlan(routeForest.unwindPlan(for: .tree(tree)))
+            log.departureDebug(.elevatedSpaceCleared)
+            applyUnwindPlan(spaces.unwindPlan(for: .space(space)))
         }
     }
 
@@ -858,7 +650,7 @@ extension RouterEngine {
         )
 
         for (index, routeScope) in installedRouteScopes.enumerated() {
-            await routeScope.ledger.waitUntilUninstalled()
+            await routeScope.waitUntilUninstalled()
             log.departureDebug(.viewExitWaitProgress(
                 remaining: installedRouteScopes.count - index - 1
             ))
@@ -885,8 +677,7 @@ extension RouterEngine {
         _ route: any Route,
         after match: DeclarationMatch,
         until routeScopes: [RouteScope],
-        presentationSnapshotID: UUID? = nil,
-        behavior: RouteAppendBehavior = .append
+        presentationSnapshotID: UUID? = nil
     ) async -> Bool {
         let installedRouteScopes = routeScopes.filter(\.isInstalledInView)
         guard installedRouteScopes.isEmpty == false else {
@@ -898,44 +689,19 @@ extension RouterEngine {
             route: route,
             state: .append(.init(
                 match: match,
-                behavior: behavior,
                 blockingScopes: installedRouteScopes
             ))
         )
         replacePendingRoute(pendingAppend)
 
-        if let presentationSnapshotID {
-            // The snapshot keeps pushes stable while their enclosing modal dismisses. Release it
-            // as soon as every removed modal has left; otherwise a removed push is kept alive by
-            // the same snapshot this append is waiting for it to invalidate.
-            let installedModalScopes = installedRouteScopes.filter {
-                guard let presentationKind = $0.presentationDeclaration?.presentationKind else {
-                    return false
-                }
-
-                return presentationKind.isModal
-            }
-
-            if installedModalScopes.isEmpty == false {
-                await waitForRouteScopesToLeaveView(installedModalScopes)
-                clearUnwindPresentationSnapshot(id: presentationSnapshotID)
-
-                guard pendingRoute === pendingAppend else {
-                    log.departureDebug(.routeAppendSuperseded(route: route))
-                    return true
-                }
-            }
-        }
-
-        await waitForRouteScopesToLeaveView(installedRouteScopes)
-
-        guard pendingRoute === pendingAppend else {
+        let transition = AppliedTransition(removedScopes: installedRouteScopes, snapshotID: presentationSnapshotID)
+        guard await finishTransition(transition, releasesAfterModal: true, isCurrent: { self.pendingRoute === pendingAppend }) else {
             log.departureDebug(.routeAppendSuperseded(route: route))
             return true
         }
 
         pendingRoute = nil
-        appendPreparedRoute(route, after: match, behavior: behavior)
+        appendPreparedRoute(route, after: match)
         return true
     }
 
@@ -951,45 +717,84 @@ extension RouterEngine {
             return routePath.owner?.parent
 
         default:
-            if position == .owner,
-               let tree = routeForest.tree(containing: routePath),
-               tree.priority != .normal {
-                return tree.elevatedOrigin?.scope
-            }
-
             return routePath.scope(at: position)
         }
     }
 
+    @discardableResult
     func performPlannedUnwind(
         for sourceScope: RouteScope?,
         payload: Any?,
         in targetScope: RouteScope?,
-        plan: RouteForest.UnwindPlan,
+        plan: RouteSpaces.UnwindPlan,
         preservesModalPresentationBindings: Bool = true,
         logsCompletion: Bool = true
-    ) async {
-        var snapshotID: UUID?
-        await performAcceptedUnwind(
-            for: sourceScope,
-            payload: payload,
-            in: targetScope,
-            removing: plan.removedScopes,
-            logsCompletion: logsCompletion,
-            afterScopesLeave: {
-                clearUnwindPresentationSnapshot(id: snapshotID)
-            }
-        ) {
-            snapshotID = installUnwindPresentationSnapshot(
-                for: plan,
-                preservesModalPresentationBindings: preservesModalPresentationBindings
-            )
-            applyUnwindPlan(plan)
+    ) async -> Bool {
+        let token = beginNavigationTransaction()
+        await deliverUnwindHandlers(for: sourceScope, payload: payload, in: targetScope, removing: plan.removedScopes)
+        guard sourceScope.map(isNavigationEligible) ?? true, !Task.isCancelled else {
+            await finishNavigationTransaction(token)
+            return false
         }
+        let transition = commitTransition(plan, preservesModalPresentationBindings: preservesModalPresentationBindings)
+        await finishCoordinatedTransition(transition, token: token, logsCompletion: logsCompletion)
+        return true
+    }
+
+    @discardableResult
+    func dismissSpace(_ space: RouteSpace, source: RouteScope? = nil) async -> Bool {
+        await dismissSpaces([space], source: source)
+    }
+
+    @discardableResult
+    func dismissSpaces(_ candidates: [RouteSpace], source: RouteScope? = nil) async -> Bool {
+        let captured = candidates.filter { $0.priority != .normal && spaces.space(for: $0.priority) === $0 }
+        guard !captured.isEmpty, !Task.isCancelled,
+              source.map(isNavigationEligible) ?? true else { return false }
+        let token = beginNavigationTransaction()
+        let plan = spaces.unwindPlan(for: .combined(captured.map { .space($0) }))
+        let transition = commitTransition(plan)
+        await finishCoordinatedTransition(transition, token: token, logsCompletion: false)
+        return true
+    }
+
+    struct AppliedTransition {
+        let removedScopes: [RouteScope]
+        let snapshotID: UUID?
+    }
+
+    /// Every transition captures outgoing projections before mutating the live paths.
+    func commitTransition(_ plan: RouteSpaces.UnwindPlan, preservesModalPresentationBindings: Bool = true) -> AppliedTransition {
+        let snapshotID = installUnwindPresentationSnapshot(for: plan, preservesModalPresentationBindings: preservesModalPresentationBindings)
+        applyUnwindPlan(plan)
+        return AppliedTransition(removedScopes: plan.removedScopes, snapshotID: snapshotID)
+    }
+
+    @discardableResult
+    func finishTransition(_ transition: AppliedTransition, releasesAfterModal: Bool = false, isCurrent: () -> Bool = { true }) async -> Bool {
+        defer { clearUnwindPresentationSnapshot(id: transition.snapshotID) }
+        if releasesAfterModal, transition.snapshotID != nil {
+            let modals = transition.removedScopes.filter { $0.isInstalledInView && $0.presentationDeclaration?.presentationKind.isModal == true }
+            if !modals.isEmpty {
+                await waitForRouteScopesToLeaveView(modals)
+                clearUnwindPresentationSnapshot(id: transition.snapshotID)
+                guard isCurrent() else { return false }
+            }
+        }
+        await waitForRouteScopesToLeaveView(transition.removedScopes)
+        return isCurrent()
+    }
+
+    private func finishCoordinatedTransition(_ transition: AppliedTransition, token: NavigationTransaction.Token, logsCompletion: Bool) async {
+        await finishTransition(transition)
+        if logsCompletion {
+            log.departureDebug(.unwindCompleted(path: spaces.activeSpace.currentRoutePath.departureDebugPathDescription))
+        }
+        await finishNavigationTransaction(token)
     }
 
     func installUnwindPresentationSnapshot(
-        for plan: RouteForest.UnwindPlan,
+        for plan: RouteSpaces.UnwindPlan,
         preservesModalPresentationBindings: Bool = true
     ) -> UUID? {
         let snapshot = makeUnwindPresentationSnapshot(
@@ -997,8 +802,7 @@ extension RouterEngine {
             preservesModalPresentationBindings: preservesModalPresentationBindings
         )
 
-        guard snapshot.preservesPushPresentationBindings
-            || snapshot.unanimatedPushPresentationScopeIDs.isEmpty == false
+        guard snapshot.presentations.values.contains(where: { $0.retainsBinding || $0.disablesAnimation })
         else {
             return nil
         }
@@ -1008,7 +812,7 @@ extension RouterEngine {
     }
 
     func makeUnwindPresentationSnapshot(
-        for plan: RouteForest.UnwindPlan,
+        for plan: RouteSpaces.UnwindPlan,
         preservesModalPresentationBindings: Bool = true
     ) -> UnwindPresentationSnapshot {
         // A departing modal tears down its nested NavigationStack as part of the same
@@ -1035,18 +839,27 @@ extension RouterEngine {
             ? []
             : removedPushPresentationScopeIDs.subtracting(animatedPushPresentationScopeIDs)
 
-        return UnwindPresentationSnapshot(
-            preservedPaths: plan.preservedPaths,
-            routeForest: routeForest,
-            preservesModalPresentationBindings: preservesModalPresentationBindings,
-            preservesPushPresentationBindings: containsDepartingModal,
-            departingPresentationHostScopeIDs: departingHostScopeIDs,
-            unanimatedPushPresentationScopeIDs: unanimatedPushPresentationScopeIDs
-        )
+        var presentations: [PresentationKey: UnwindPresentationSnapshot.Outgoing] = [:]
+        for path in plan.preservedPaths {
+            for scope in path.scopes {
+                guard let host = scope.presentationOrigin, let declaration = scope.presentationDeclaration,
+                      shouldHostLocally(declaration, in: path.routePath) else { continue }
+                let key = PresentationKey(host, declaration.presentationKind)
+                guard presentations[key] == nil else { continue }
+                let retainsBinding = containsDepartingModal && departingHostScopeIDs.contains(ObjectIdentifier(host))
+                    && (!declaration.presentationKind.isModal || preservesModalPresentationBindings)
+                presentations[key] = .init(host: host,
+                    projection: .init(presentation: .init(scope: scope, declaration: declaration, sourceEnvironment: host.sourceEnvironment),
+                        routePath: path.routePath, isLive: false),
+                    retainsBinding: retainsBinding,
+                    disablesAnimation: unanimatedPushPresentationScopeIDs.contains(ObjectIdentifier(scope)))
+            }
+        }
+        return UnwindPresentationSnapshot(presentations: presentations)
     }
 
     func departingPresentationHostScopeIDs(
-        in plan: RouteForest.UnwindPlan
+        in plan: RouteSpaces.UnwindPlan
     ) -> Set<ObjectIdentifier> {
         let removedScopeIDs = Set(plan.removedScopes.map(ObjectIdentifier.init))
         let departingPresentationHostScopeIDs = plan.removedScopes.compactMap { removedScope -> ObjectIdentifier? in
@@ -1060,7 +873,7 @@ extension RouterEngine {
                     return ObjectIdentifier(host)
                 }
 
-                hostOrAncestorScope = currentScope.previousScopeInTree
+                hostOrAncestorScope = currentScope.previousScopeInSpace
             }
 
             return nil
@@ -1070,7 +883,7 @@ extension RouterEngine {
     }
 
     func outermostPushPresentationScopeIDs(
-        in plan: RouteForest.UnwindPlan
+        in plan: RouteSpaces.UnwindPlan
     ) -> Set<ObjectIdentifier> {
         let removedScopeIDs = Set(plan.removedScopes.map(ObjectIdentifier.init))
 
@@ -1088,7 +901,7 @@ extension RouterEngine {
                     return nil
                 }
 
-                ancestorScope = currentScope.previousScopeInTree
+                ancestorScope = currentScope.previousScopeInSpace
             }
 
             return ObjectIdentifier(firstRemovedScope)
@@ -1101,33 +914,6 @@ extension RouterEngine {
         }
 
         unwindPresentationSnapshot = nil
-    }
-
-    func performAcceptedUnwind(
-        for sourceScope: RouteScope?,
-        payload: Any?,
-        in targetScope: RouteScope?,
-        removing removedScopes: [RouteScope],
-        logsCompletion: Bool = true,
-        afterScopesLeave: () -> Void = {},
-        updatePath: () -> Void
-    ) async {
-        let transaction = beginNavigationTransaction()
-        await deliverUnwindHandlers(
-            for: sourceScope,
-            payload: payload,
-            in: targetScope,
-            removing: removedScopes
-        )
-        updatePath()
-        await waitForRouteScopesToLeaveView(removedScopes)
-        afterScopesLeave()
-        if logsCompletion {
-            log.departureDebug(.unwindCompleted(
-                path: routeForest.activeTree.currentRoutePath.departureDebugPathDescription
-            ))
-        }
-        await finishNavigationTransaction(transaction)
     }
 
     func deliverUnwindHandlers(
@@ -1145,7 +931,7 @@ extension RouterEngine {
         }
 
         guard let sourceRoute = sourceScope.route,
-              let match = targetScope.firstUnwindHandlerMatch(for: type(of: sourceRoute))
+              let match = targetScope.firstUnwindHandlerMatch(for: type(of: sourceRoute), in: spaces)
         else {
             return
         }
@@ -1162,6 +948,7 @@ extension RouterEngine {
         deliveredUnwindHandlers[key] = DeliveredUnwindHandler(sourceScope: sourceScope)
 
         Task { @MainActor in
+            guard self.spaces.routePath(containing: match.scope) != nil else { return }
             await match.handler.invoke(sourceRoute, payload, match.scope.id)
         }
         await Task.yield()
@@ -1210,7 +997,8 @@ extension RouterEngine {
         stage: RouteRequestStage = .resolve,
         origin: RouteRequestOrigin? = nil
     ) async {
-        guard Task.isCancelled == false, resolveRequestOrigin(origin) != nil else { return }
+        let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
+        guard Task.isCancelled == false, navigationSource(origin) != nil else { return }
         guard navigationTransaction.isInProgress == false else {
             let requestID = UUID()
             await withTaskCancellationHandler {
@@ -1254,46 +1042,17 @@ extension RouterEngine {
         replacePendingRoute(nil)
     }
 
-    func performPresentationDismissalUnwind(
-        for sourceScope: RouteScope?,
-        in targetScope: RouteScope?,
-        plan: RouteForest.UnwindPlan
-    ) {
-        var snapshotID: UUID?
-        performPresentationDismissalUnwind(
-            for: sourceScope,
-            in: targetScope,
-            removing: plan.removedScopes,
-            afterScopesLeave: { self.clearUnwindPresentationSnapshot(id: snapshotID) }
-        ) {
-            snapshotID = installUnwindPresentationSnapshot(for: plan)
-            applyUnwindPlan(plan)
+    func performPresentationDismissalUnwind(for sourceScope: RouteScope?, in targetScope: RouteScope?, plan: RouteSpaces.UnwindPlan) {
+        guard !plan.removedScopes.isEmpty else { applyUnwindPlan(plan); return }
+        let token = beginNavigationTransaction()
+        // Native binding write-back must change live state in this call stack.
+        let transition = commitTransition(plan)
+        Task { @MainActor in
+            await deliverUnwindHandlers(for: sourceScope, payload: nil, in: targetScope, removing: transition.removedScopes)
+            await finishCoordinatedTransition(transition, token: token, logsCompletion: false)
         }
     }
 
-    func performPresentationDismissalUnwind(
-        for sourceScope: RouteScope?,
-        in targetScope: RouteScope?,
-        removing removedScopes: [RouteScope],
-        afterScopesLeave: @escaping () -> Void = {},
-        updatePath: () -> Void
-    ) {
-        if removedScopes.isEmpty == false {
-            let transaction = beginNavigationTransaction()
-            Task { @MainActor in
-                await deliverUnwindHandlers(
-                    for: sourceScope,
-                    payload: nil,
-                    in: targetScope,
-                    removing: removedScopes
-                )
-                await waitForRouteScopesToLeaveView(removedScopes)
-                afterScopesLeave()
-                await finishNavigationTransaction(transaction)
-            }
-        }
-        updatePath()
-    }
 }
 
 private extension RouteScope {
@@ -1302,27 +1061,20 @@ private extension RouteScope {
         let scope: RouteScope
     }
 
-    func firstUnwindHandlerMatch(for routeType: any Route.Type) -> UnwindHandlerMatch? {
+    func firstUnwindHandlerMatch(for routeType: any Route.Type, in spaces: RouteSpaces) -> UnwindHandlerMatch? {
+        guard spaces.routePath(containing: self) != nil else { return nil }
         var scope: RouteScope? = self
 
         while let currentScope = scope {
-            if let handler = currentScope.firstUnwindHandler(for: routeType) {
+            if let binding = currentScope.hookBinding(for: .unwindHandler(ObjectIdentifier(routeType)), in: spaces) {
+                guard let handler = binding.declaration?.unwindHandler(for: routeType) else { return nil }
                 return UnwindHandlerMatch(handler: handler, scope: currentScope)
             }
 
-            scope = currentScope.previousScopeInTree
+            scope = currentScope.previousScopeInSpace
         }
 
         return nil
     }
 
-    func firstUnwindHandler(for routeType: any Route.Type) -> AnyUnwindHandler? {
-        for attachment in hookAttachments {
-            if let handler = attachment.unwindHandler(for: routeType) {
-                return handler
-            }
-        }
-
-        return nil
-    }
 }

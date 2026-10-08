@@ -20,76 +20,55 @@
 //  SOFTWARE.
 //
 
+import Foundation
+
 @resultBuilder
-/// Builds declarations for ``View/routes(id:_:)``.
 public enum RouteDeclarationBuilder {
-    public static func buildBlock(
-        _ components: [RouteScopeDeclaration]...
-    ) -> [RouteScopeDeclaration] {
-        components.flatMap { $0 }
-    }
+    public static func buildBlock(_ components: [RouteScopeDeclaration]...) -> [RouteScopeDeclaration] { components.flatMap { $0 } }
+    public static func buildOptional(_ component: [RouteScopeDeclaration]?) -> [RouteScopeDeclaration] { component ?? [] }
+    public static func buildEither(first component: [RouteScopeDeclaration]) -> [RouteScopeDeclaration] { component }
+    public static func buildEither(second component: [RouteScopeDeclaration]) -> [RouteScopeDeclaration] { component }
+    public static func buildArray(_ components: [[RouteScopeDeclaration]]) -> [RouteScopeDeclaration] { components.flatMap { $0 } }
+    public static func buildExpression(_ expression: some RouteDeclaration) -> [RouteScopeDeclaration] { [.init(routes: expression._routeDeclarations)] }
+    public static func buildExpression(_ expression: RouteMap) -> [RouteScopeDeclaration] { expression.declarations }
+    public static func buildExpression(_ expression: Branches) -> [RouteScopeDeclaration] { expression.declarations }
+    public static func buildExpression<S>(_ expression: Branch<S>) -> [RouteScopeDeclaration] { expression.routeScopeDeclarations }
+}
 
-    public static func buildOptional(
-        _ component: [RouteScopeDeclaration]?
-    ) -> [RouteScopeDeclaration] {
-        component ?? []
-    }
+/// Builds elevated space entries. Only modal declarations can start a space;
+/// each modal's child builder accepts the complete route declaration language.
+@resultBuilder
+public enum ModalRouteDeclarationBuilder {
+    public static func buildBlock(_ components: [RouteScopeDeclaration]...) -> [RouteScopeDeclaration] { components.flatMap { $0 } }
+    public static func buildOptional(_ component: [RouteScopeDeclaration]?) -> [RouteScopeDeclaration] { component ?? [] }
+    public static func buildEither(first component: [RouteScopeDeclaration]) -> [RouteScopeDeclaration] { component }
+    public static func buildEither(second component: [RouteScopeDeclaration]) -> [RouteScopeDeclaration] { component }
+    public static func buildArray(_ components: [[RouteScopeDeclaration]]) -> [RouteScopeDeclaration] { components.flatMap { $0 } }
+    public static func buildExpression(_ expression: Sheet) -> [RouteScopeDeclaration] { [.init(routes: expression._routeDeclarations)] }
+    public static func buildExpression(_ expression: Cover) -> [RouteScopeDeclaration] { [.init(routes: expression._routeDeclarations)] }
+}
 
-    public static func buildEither(
-        first component: [RouteScopeDeclaration]
-    ) -> [RouteScopeDeclaration] {
-        component
-    }
-
-    public static func buildEither(
-        second component: [RouteScopeDeclaration]
-    ) -> [RouteScopeDeclaration] {
-        component
-    }
-
-    public static func buildExpression(
-        _ expression: some RouteDeclaration
-    ) -> [RouteScopeDeclaration] {
-        [RouteScopeDeclaration(routes: expression._routeDeclarations)]
+/// Composable definitions. Inserting a map contributes declarations without creating a scope.
+public struct RouteMap: Sendable {
+    let declarations: [RouteScopeDeclaration]
+    public init(@RouteDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration]) {
+        self.declarations = declarations()
     }
 }
 
-@resultBuilder
-/// Builds declarations for ``View/routes(id:branch:concurrent:_:)``.
-public enum BranchedRouteDeclarationBuilder<Selection: Hashable & Sendable> {
-    public static func buildExpression(
-        _ expression: Branch<Selection>
-    ) -> [RouteScopeDeclaration] {
-        expression.routeScopeDeclarations
-    }
-
-    public static func buildBlock(
-        _ components: [RouteScopeDeclaration]...
-    ) -> [RouteScopeDeclaration] {
-        components.flatMap { $0 }
-    }
-
-    public static func buildOptional(
-        _ component: [RouteScopeDeclaration]?
-    ) -> [RouteScopeDeclaration] {
-        component ?? []
-    }
-
-    public static func buildEither(
-        first component: [RouteScopeDeclaration]
-    ) -> [RouteScopeDeclaration] {
-        component
-    }
-
-    public static func buildEither(
-        second component: [RouteScopeDeclaration]
-    ) -> [RouteScopeDeclaration] {
-        component
-    }
-
-    public static func buildExpression(
-        _ expression: some RouteDeclaration
-    ) -> [RouteScopeDeclaration] {
-        [RouteScopeDeclaration(routes: expression._routeDeclarations)]
+/// All definitions for a routing owner, including optional elevated root presentations.
+public struct RootRouteMap: Sendable {
+    let scopeID: AnyHashable?
+    let declarations: [RouteScopeDeclaration]
+    public init(
+        id: AnyHashable? = nil,
+        @RouteDeclarationBuilder _ routes: () -> [RouteScopeDeclaration],
+        @ModalRouteDeclarationBuilder highPriority: () -> [RouteScopeDeclaration] = { [] },
+        @ModalRouteDeclarationBuilder criticalPriority: () -> [RouteScopeDeclaration] = { [] }
+    ) {
+        scopeID = id
+        declarations = routes()
+            + highPriority().map { $0.withPriority(.high) }
+            + criticalPriority().map { $0.withPriority(.critical) }
     }
 }

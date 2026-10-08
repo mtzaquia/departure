@@ -74,13 +74,13 @@ extension AnyRouteDeclaration {
             presentationDescription = "push"
         case .replace:
             presentationDescription = "replace"
-        case let .sheet(priority, _):
+        case let .sheet(priority):
             presentationDescription = "sheet@\(priority)"
-        case let .cover(priority, transition, _):
+        case let .cover(priority, transition):
             presentationDescription = "cover.\(transition)@\(priority)"
         }
 
-        let drivesPresentationDescription = drivesPresentation ? "" : ", discovery"
+        let drivesPresentationDescription = ""
         return "\(departureDebugName(for: routeType))[\(presentationDescription)\(drivesPresentationDescription)]"
     }
 }
@@ -110,11 +110,11 @@ extension RouteScope {
             return nil
         }
 
-        return "[\(declarations.branchIDs.map(\.departureDebugDescription).joined(separator: ", "))]"
+        return "[\(branchScopes.keys.map(\.departureDebugDescription).joined(separator: ", "))]"
     }
 
     private var isFlatScope: Bool {
         branchContainer == nil
-        || declarations.branchIDs == [activeBranch]
+        || branchScopes.keys == [activeBranch]
     }
 }

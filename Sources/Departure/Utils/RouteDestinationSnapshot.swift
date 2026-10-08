@@ -23,15 +23,15 @@
 import SwiftUI
 
 struct RouteDestinationSnapshot {
-    let route: RoutePresentation
+    let route: PresentedRoute
     let destination: AnyView
 
-    init(route: RoutePresentation) {
+    init(route: PresentedRoute) {
         self.route = route
         self.destination = AnyView(Self.routeView(for: route))
     }
 
-    init(route: RoutePresentation, destinationBuilder: WindowDestinationBuilder) {
+    init(route: PresentedRoute, destinationBuilder: WindowDestinationBuilder) {
         self.route = route
         self.destination = destinationBuilder.build(
             Self.routeView(for: route),
@@ -39,16 +39,15 @@ struct RouteDestinationSnapshot {
         )
     }
 
-    private static func routeView(for route: RoutePresentation) -> RouteView {
+    private static func routeView(for route: PresentedRoute) -> RouteView {
         RouteView(
-            scope: route.scope,
-            providesNavigation: route.providesNavigation
+            scope: route.scope
         )
     }
 }
 
 extension RouteDestinationSnapshot: Identifiable {
-    var id: RoutePresentation.ID {
+    var id: PresentedRoute.ID {
         route.id
     }
 }

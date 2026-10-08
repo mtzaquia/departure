@@ -20,63 +20,64 @@
 //  SOFTWARE.
 //
 
-import RouteDomainFixtures
 import SwiftUI
 import Testing
+import RouteDomainFixtures
 @testable import Departure
 
-extension FeatureProvidedRoute: RouteViewProviding {
-    public func destination() -> some View {
-        DestinationBuildProbe(onBuild: destinationDidBuild)
-    }
-}
-
-@MainActor
-@Suite
-struct RouteDestinationTests {
-    @Test func routeWithoutDestinationUsesFallback() {
-        let destination = DomainOnlyRoute().destination()
-
-        #expect(destination is MissingRouteDestination)
-    }
-
-    @Test func legacyRouteDestinationRemainsSupported() {
-        var buildCount = 0
-        let route = LegacyDestinationRoute {
-            buildCount += 1
+@MainActor @Suite struct RouteDestinationTests {
+    @Test func domainRouteUsesFeatureDestinationWithoutConformance() async throws {
+        let recorder = BuildRecorder()
+        let destination = RouteDestination(DomainOnlyRoute.self) { _, context in
+            recorder.presentation = context.presentation
+            return EmptyView()
         }
-
-        _ = routeDestination(for: route)
-
-        #expect(buildCount == 1)
+        let engine = RouterEngine(routes: RootRouteMap { Sheet(destination) })
+        await engine.present(DomainOnlyRoute())
+        let scope = try #require(engine.normalSpace.rootPath.last)
+        let declaration = try #require(scope.presentationDeclaration)
+        let context = RouteContext(router: Router(engine: engine, scope: scope), unwindRoute: UnwindRouteAction(router: engine, routeScope: scope), presentation: .init(style: .sheet, priority: .normal), environment: EnvironmentValues())
+        _ = declaration.build(DomainOnlyRoute(), context)
+        #expect(recorder.presentation?.style == .sheet)
+        #expect(recorder.presentation?.priority == .normal)
+        #expect(await context.unwindRoute())
+        #expect(engine.normalSpace.rootPath.isEmpty)
+    }
+    @Test func destinationDefinitionsAreAvailableImmediatelyAfterAppend() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Push(RouteDestination(DomainOnlyRoute.self) { _, _ in EmptyView() }) {
+                Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+            }
+        })
+        await engine.present(DomainOnlyRoute())
+        let scope = try #require(engine.normalSpace.rootPath.last)
+        #expect(!scope.isInstalledInView)
+        #expect(scope.firstRouteAttachment(for: SettingsRoute.self) != nil)
+    }
+    @Test(arguments: [RoutePriority.high, .critical])
+    func effectivePrioritySurvivesRemovalFromLiveGraph(priority: RoutePriority) async throws {
+        let entry = Cover(RouteDestination(DomainOnlyRoute.self) { _, _ in EmptyView() }) {
+                Push(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+            }
+        let engine = RouterEngine(routes: RootRouteMap {} highPriority: {
+            if priority == .high { entry }
+        } criticalPriority: {
+            if priority == .critical { entry }
+        })
+        await engine.present(DomainOnlyRoute())
+        await engine.present(SettingsRoute())
+        let child = try #require(engine.spaces.space(for: priority)?.rootPath.last)
+        #expect(child.routePresentation?.style == .push)
+        #expect(child.routePresentation?.priority == priority)
+        #expect(await engine.unwind(to: .root))
+        #expect(child.routePresentation?.priority == priority)
     }
 
-    @Test func separatelyProvidedDestinationTakesPrecedence() {
-        var buildCount = 0
-        let route = FeatureProvidedRoute {
-            buildCount += 1
-        }
-
-        _ = routeDestination(for: route)
-
-        #expect(buildCount == 1)
+    @Test func reusedDestinationHasDistinctPlacementIdentity() {
+        let destination = RouteDestination(DomainOnlyRoute.self) { _, _ in EmptyView() }
+        let map = RootRouteMap { Push(destination) { Sheet(destination) } }
+        let parent = map.declarations[0].routes[0]
+        #expect(parent.identity != parent.children[0].routes[0].identity)
     }
 }
-
-private struct LegacyDestinationRoute: Route {
-    let destinationDidBuild: @MainActor () -> Void
-
-    func destination() -> some View {
-        DestinationBuildProbe(onBuild: destinationDidBuild)
-    }
-}
-
-private struct DestinationBuildProbe: View {
-    init(onBuild: @MainActor () -> Void) {
-        onBuild()
-    }
-
-    var body: some View {
-        EmptyView()
-    }
-}
+@MainActor private final class BuildRecorder { var presentation: RoutePresentation? }

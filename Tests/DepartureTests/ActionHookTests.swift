@@ -20,27 +20,50 @@
 //  SOFTWARE.
 //
 
+import SwiftUI
+//
+//  Copyright (c) 2026 @mtzaquia
+//
+//  Permission is hereby granted, free of charge, to any person obtaining a copy
+//  of this software and associated documentation files (the "Software"), to deal
+//  in the Software without restriction, including without limitation the rights
+//  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//  copies of the Software, and to permit persons to whom the Software is
+//  furnished to do so, subject to the following conditions:
+//
+//  The above copyright notice and this permission notice shall be included in all
+//  copies or substantial portions of the Software.
+//
+//  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//  SOFTWARE.
+//
+
 import Testing
 @testable import Departure
 
 @MainActor
 @Suite
 struct ActionHookTests {
-    @Test func duplicateHookInstallationDoesNotReportChange() {
-        let scope = RouteScope(id: RootRoute().id, route: RootRoute())
+    @Test func reinstallingHookSourceRefreshesCapturedCallbacks() async {
+        let engine = RouterEngine()
+        let scope = engine.root
+        let router = Router(engine: engine, scope: scope)
+        let recorder = ActionRecorder()
         let sourceID = AnyHashable("hooks")
-        let declarations = [
-            ActionInterceptor(ContextProbeAction.self) { _ in }.declaration,
-        ]
-
-        #expect(scope.installHookDeclarations(sourceID: sourceID, hookDeclarations: declarations))
-        #expect(scope.installHookDeclarations(sourceID: sourceID, hookDeclarations: declarations) == false)
-        #expect(scope.installHookDeclarations(sourceID: AnyHashable("replacement"), hookDeclarations: declarations) == false)
-
-        let changedDeclarations = declarations + [
-            UnwindHandler(SettingsRoute.self) {}.declaration,
-        ]
-        #expect(scope.installHookDeclarations(sourceID: sourceID, hookDeclarations: changedDeclarations))
+        scope.installHookDeclarations(sourceID: sourceID, hookDeclarations: [
+            ActionInterceptor(ContextProbeAction.self) { _ in recorder.labels.append("original") }.declaration,
+        ])
+        await router.perform(ContextProbeAction())
+        scope.installHookDeclarations(sourceID: sourceID, hookDeclarations: [
+            ActionInterceptor(ContextProbeAction.self) { _ in recorder.labels.append("updated") }.declaration,
+        ])
+        await router.perform(ContextProbeAction())
+        #expect(recorder.labels == ["original", "updated"])
     }
 
     @Test func currentScopeInterceptorWinsOverAncestorInterceptor() async {
@@ -63,7 +86,7 @@ struct ActionHookTests {
                 }.declaration,
             ]
         )
-        router.normalTree.rootPath.scopes = [parentScope, childScope]
+        router.normalSpace.rootPath.replaceTestPath([parentScope, childScope])
 
         await router.performAction(ContextProbeAction())
 
@@ -75,7 +98,7 @@ struct ActionHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
 
-        router.normalTree.rootPath.scopes.append(parentScope)
+        router.normalSpace.rootPath.append(parentScope)
         parentScope.setActiveBranch(AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -87,7 +110,7 @@ struct ActionHookTests {
             ]
         )
 
-        parentScope.registerBranchScope(homeScope, for: AppTab.home)
+        parentScope.attachTestBranch(homeScope, for: AppTab.home)
 
         await router.performAction(ContextProbeAction())
 
@@ -100,7 +123,7 @@ struct ActionHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
 
-        router.normalTree.rootPath.scopes.append(parentScope)
+        router.normalSpace.rootPath.append(parentScope)
         parentScope.setActiveBranch(AnyHashable(AppTab.wallet))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -112,7 +135,7 @@ struct ActionHookTests {
             ]
         )
 
-        parentScope.registerBranchScope(homeScope, for: AppTab.home)
+        parentScope.attachTestBranch(homeScope, for: AppTab.home)
 
         await router.performAction(ContextProbeAction())
 
@@ -126,7 +149,7 @@ struct ActionHookTests {
         let sourceID = AnyHashable("hooks")
         let recorder = ActionRecorder()
 
-        router.normalTree.rootPath.scopes.append(scope)
+        router.normalSpace.rootPath.append(scope)
         scope.installHookDeclarations(
             sourceID: sourceID,
             hookDeclarations: [
@@ -147,34 +170,34 @@ struct ActionHookTests {
         let router = RouterEngine()
         let recorder = ActionEventRecorder()
 
-        router.root.installRouteDeclarations(
+        router.root.defineTestMap(
             id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            selection: nil,
+            definitions: [
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
             ]
         )
 
         await router.performAction(ReroutingProbeAction(recorder: recorder))
         await recorder.waitForEvent("reroute")
-        let settingsScope = try #require(router.normalTree.rootPath.last)
+        let settingsScope = try #require(router.normalSpace.rootPath.last)
         router.routeScopeDidInstallInView(settingsScope)
         await recorder.waitForEvent("ran")
 
         #expect(await recorder.values() == ["reroute", "ran"])
-        #expect(router.normalTree.rootPath.count == 1)
-        #expect(router.normalTree.rootPath.last?.route is SettingsRoute)
+        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func actionRerouteWaitsForInstalledDestinationInterceptorsBeforeRetrying() async throws {
         let router = RouterEngine()
         let recorder = ActionEventRecorder()
 
-        router.root.installRouteDeclarations(
+        router.root.defineTestMap(
             id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            selection: nil,
+            definitions: [
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
             ]
         )
 
@@ -184,7 +207,7 @@ struct ActionHookTests {
 
         #expect(await recorder.values() == ["reroute"])
 
-        let settingsScope = try #require(router.normalTree.rootPath.last)
+        let settingsScope = try #require(router.normalSpace.rootPath.last)
         settingsScope.installHookDeclarations(
             hookDeclarations: [
                 ActionInterceptor(ReroutingProbeAction.self) { _ in
@@ -203,24 +226,24 @@ struct ActionHookTests {
         let router = RouterEngine()
         let recorder = ActionEventRecorder()
 
-        router.root.installRouteDeclarations(
+        router.root.defineTestMap(
             id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
+            selection: nil,
+            definitions: [
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
             ]
         )
 
         await router.performAction(LoopingRerouteAction(recorder: recorder))
         await recorder.waitForEventCount(1)
-        if let settingsScope = router.normalTree.rootPath.last {
+        if let settingsScope = router.normalSpace.rootPath.last {
             router.routeScopeDidInstallInView(settingsScope)
         }
         await recorder.waitForEventCount(2)
 
         #expect(await recorder.values() == ["attempt", "attempt"])
-        #expect(router.normalTree.rootPath.count == 1)
-        #expect(router.normalTree.rootPath.last?.route is SettingsRoute)
+        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func selectedBranchScopeChangesWhenActiveBranchChanges() {
@@ -229,9 +252,9 @@ struct ActionHookTests {
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
 
-        router.normalTree.rootPath.scopes.append(parentScope)
-        parentScope.registerBranchScope(homeScope, for: AppTab.home)
-        parentScope.registerBranchScope(walletScope, for: AppTab.wallet)
+        router.normalSpace.rootPath.append(parentScope)
+        parentScope.attachTestBranch(homeScope, for: AppTab.home)
+        parentScope.attachTestBranch(walletScope, for: AppTab.wallet)
 
         parentScope.setActiveBranch(AnyHashable(AppTab.home))
         #expect(router.currentRouteScope === homeScope)
@@ -239,7 +262,7 @@ struct ActionHookTests {
         parentScope.setActiveBranch(AnyHashable(AppTab.wallet))
         #expect(router.currentRouteScope === walletScope)
 
-        parentScope.unregisterBranchScope(walletScope, for: AppTab.wallet)
+        parentScope.detachTestBranch(walletScope, for: AppTab.wallet)
         #expect(router.currentRouteScope === parentScope)
     }
 }

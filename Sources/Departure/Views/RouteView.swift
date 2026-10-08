@@ -24,60 +24,37 @@ import SwiftUI
 
 public struct RouteView: View {
     let scope: RouteScope
-    let providesNavigation: Bool
-
-    @Environment(RouterEngine.self) private var router
-
-    init(scope: RouteScope, providesNavigation: Bool = false) {
-        self.scope = scope
-        self.providesNavigation = providesNavigation
-    }
-
+    @RouterEnvironment private var router
+    init(scope: RouteScope) { self.scope = scope }
     public var body: some View {
-        content
+        DestinationContent(scope: scope)
+            .routingAutomatically()
             .routeScopeEnvironment(scope, router: router)
-            .onLifecycleEvent { lifecycleView, lifecycleID, event in
+            .onLifecycleEvent { view, id, event in
                 switch event {
-                case .updated(isInstalledInWindow: true), .installedInWindow:
-                    guard let lifecycleView else { return }
-                    scope.ledger.installManagedView(lifecycleView, id: lifecycleID)
-                    if case .installedInWindow = event {
-                        router.routeScopeDidInstallInView(scope)
-                    }
-
-                case .updated(isInstalledInWindow: false):
-                    break
-
+                case .installedInWindow, .updated(isInstalledInWindow: true):
+                    guard let view else { return }
+                    router.hostDidAttach(scope, view: view, id: id)
+                case .updated(isInstalledInWindow: false): break
                 case .dismantled, .deinitialized:
-                    scope.ledger.uninstallManagedView(id: lifecycleID)
-                    router.routeScopeDidLeaveView(scope)
+                    router.hostDidDetach(scope, id: id)
                 }
             }
     }
+}
 
-    @ViewBuilder
-    private var content: some View {
-        let destination = scope.route.map { routeDestination(for: $0) }
-
-        if providesNavigation {
-            NavigationStack {
-                destination
-            }
-        } else {
-            destination
+private struct DestinationContent: View {
+    let scope: RouteScope
+    @RouterEnvironment private var router
+    @Environment(\.self) private var environment
+    var body: some View {
+        if let route = scope.route, let declaration = scope.presentationDeclaration, let presentation = scope.routePresentation {
+            declaration.build(route, RouteContext(
+                router: Router(engine: router, scope: scope),
+                unwindRoute: UnwindRouteAction(router: router, routeScope: scope),
+                presentation: presentation,
+                environment: environment
+            ))
         }
     }
-
-}
-
-func routeDestination(for route: any Route) -> AnyView {
-    if let provider = route as? any RouteViewProviding {
-        return AnyView(provider.destination())
-    }
-
-    return eraseRouteDestination(route)
-}
-
-private func eraseRouteDestination<R: Route>(_ route: R) -> AnyView {
-    AnyView(route.destination())
 }

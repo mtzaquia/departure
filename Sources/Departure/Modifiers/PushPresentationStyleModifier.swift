@@ -25,7 +25,7 @@ import SwiftUI
 struct PushPresentationStyleModifier: ViewModifier {
     let presentationHostID: RoutePresentationHostID
 
-    @Environment(RouterEngine.self) private var router
+    @RouterEnvironment private var router
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
@@ -42,8 +42,7 @@ struct PushPresentationStyleModifier: ViewModifier {
         content
             .navigationDestination(item: presentation) { route in
                 RouteView(
-                    scope: route.scope,
-                    providesNavigation: route.providesNavigation
+                    scope: route.scope
                 )
             }
             .transaction { transaction in

@@ -20,31 +20,30 @@
 //  SOFTWARE.
 //
 
-import SwiftUI
+import Observation
 
-/// A destination view supplied separately from a route's primary conformance.
-///
-/// Departure prefers this destination over ``Route/destination()`` when a route conforms to both
-/// protocols. This lets a domain module declare a route while a feature module supplies its view.
-///
-/// ```swift
-/// // Domain module
-/// public struct SettingsRoute: Route {}
-///
-/// // Feature module
-/// extension SettingsRoute: RouteViewProviding {
-///     public func destination() -> some View {
-///         SettingsView()
-///     }
-/// }
-/// ```
-///
-/// A conformance can be declared only once for a route type. Add `@retroactive` only when the route
-/// belongs to another package; modules in the same package do not need it.
-public protocol RouteViewProviding {
-    /// The view supplied for the route.
-    associatedtype ProvidedView: View
+@Observable
+final class RouteLane {
+    @ObservationIgnored private weak var owner: RouteScope?
+    @ObservationIgnored private weak var occupant: RouteScope?
 
-    /// Builds the route's preferred destination.
-    @ViewBuilder func destination() -> ProvidedView
+    var modal: RouteScope? {
+        access(keyPath: \.modal)
+        guard let occupant, let space = owner?.space, occupant.belongs(to: space) else { return nil }
+        return occupant
+    }
+
+    init(owner: RouteScope) { self.owner = owner }
+    var depth: Int {
+        guard let owner, owner.anchorSpace == nil, owner.presentationDeclaration?.presentationKind.isModal == true else { return 0 }
+        return (owner.previousRouteScope?.lane.depth ?? 0) + 1
+    }
+
+    var deepestModal: RouteScope? { modal?.lane.deepestModal ?? modal }
+
+    func present(_ scope: RouteScope) {
+        precondition(modal == nil, "A Y lane can own only one modal transition.")
+        precondition(scope.previousRouteScope?.lane === self, "A modal advances from its presenting lane.")
+        withMutation(keyPath: \.modal) { occupant = scope }
+    }
 }

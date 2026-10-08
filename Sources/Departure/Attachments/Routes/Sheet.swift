@@ -20,33 +20,17 @@
 //  SOFTWARE.
 //
 
-/// Declares a route as a sheet.
-///
-/// ```swift
-/// .routes {
-///     Sheet(SettingsRoute.self)
-///     Sheet(LoginRoute.self, priority: .high)
-/// }
-/// ```
+import SwiftUI
+
+/// Declares a sheet destination with optional child definitions.
 public struct Sheet: RouteDeclaration, Sendable {
     let declaration: AnyRouteDeclaration
-
-    /// Creates a sheet declaration.
-    ///
-    /// - Important: Set `providesNavigation` to `false` when the route destination
-    ///   already provides its own navigation container.
     public init<R: Route>(
-        _ routeType: R.Type,
-        priority: RoutePriority = .normal,
-        providesNavigation: Bool = true
+        _ destination: RouteDestination<R>,
+        id: AnyHashable? = nil,
+        @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        self.declaration = AnyRouteDeclaration(
-            routeType: routeType,
-            kind: .sheet(priority: priority, providesNavigation: providesNavigation)
-        )
+        declaration = AnyRouteDeclaration(destination, kind: .sheet(priority: .normal), id: id, children: children())
     }
-
-    public var _routeDeclarations: [AnyRouteDeclaration] {
-        [declaration]
-    }
+    public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }

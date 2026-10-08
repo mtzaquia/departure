@@ -23,44 +23,62 @@
 import Foundation
 import Observation
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
 
+@Observable
 final class RouteScope: Identifiable {
-    var id: AnyHashable {
-        ledger.id
+    @ObservationIgnored var id: AnyHashable
+
+    @ObservationIgnored let route: (any Route)?
+    @ObservationIgnored weak var parent: RouteScope?
+
+    @ObservationIgnored var branchID: AnyHashable?
+    @ObservationIgnored private(set) var definitions: RouteDefinitions
+    @ObservationIgnored var branchContainer: BranchContainerState?
+    @ObservationIgnored var branchScopes = OrderedStorage<AnyHashable, RouteScope>()
+
+    // Physical facts belong to the scope; current projections are derived from them.
+    private struct Host {
+        let id: UUID
+        weak var view: PlatformView?
     }
+    private struct RoutingHost {
+        let automatic: Bool
+        let environment: EnvironmentValues
+    }
+    private struct WeakAttachment { weak var value: RouteScopeAttachment? }
+    @ObservationIgnored private var host: Host?
+    @ObservationIgnored private var routingHosts = OrderedStorage<RoutePresentationHostID, RoutingHost>()
+    @ObservationIgnored private var hookSources: [AnyHashable: [AnyHookDeclaration]] = [:]
+    @ObservationIgnored private var attachments: [WeakAttachment] = []
+    @ObservationIgnored private var installationWaiters: [CheckedContinuation<Void, Never>] = []
+    @ObservationIgnored private var uninstallationWaiters: [CheckedContinuation<Void, Never>] = []
+    @ObservationIgnored private(set) var hasEverInstalled = false
+    @ObservationIgnored let sourceEnvironmentReference = RouteSourceEnvironment()
 
-    let route: (any Route)?
-    weak var parent: RouteScope?
+    @ObservationIgnored lazy var path = RoutePath(owner: self)
+    @ObservationIgnored private(set) weak var owningPath: RoutePath?
+    @ObservationIgnored private(set) weak var previousRouteScope: RouteScope?
+    @ObservationIgnored weak var anchorSpace: RouteSpace?
+    @ObservationIgnored private lazy var ownedLane = RouteLane(owner: self)
+    private(set) var continuation: RouteScope?
 
-    let participation = RouteScopeParticipation()
-
-    var branchID: AnyHashable?
-    var adoptedRoutePresentationHostID: RoutePresentationHostID?
-    var declarations = DeclarationStore()
-    var branchContainer: BranchContainerState?
-    var branchScopes: [AnyHashable: RouteScope] = [:]
-
-    let ledger: RouteScopeLedger
-
-    lazy var path = RoutePath(owner: self)
-    weak var owningPath: RoutePath?
-
-    private(set) var presentation: RouteScopePresentation?
+    @ObservationIgnored private(set) var presentation: RouteScopePresentation?
 
     #if DEBUG
-    var debugKind = DebugKind.root
+    @ObservationIgnored var debugKind = DebugKind.root
     #endif
 
     var isInstalledInView: Bool {
-        ledger.isInstalled
+        access(keyPath: \.isInstalledInView)
+        return host != nil
     }
-    var sourceEnvironment: EnvironmentValues {
-        sourceEnvironmentReference.values
-    }
-
-    var sourceEnvironmentReference: RouteSourceEnvironment {
-        ledger.sourceEnvironment
-    }
+    var hostID: UUID? { host?.id }
+    var sourceEnvironment: EnvironmentValues { sourceEnvironmentReference.values }
 
     var presentationOrigin: RouteScope? {
         presentation?.origin
@@ -70,10 +88,26 @@ final class RouteScope: Identifiable {
         presentation?.declaration
     }
 
-    init(id: AnyHashable, route: (any Route)?, parent: RouteScope? = nil) {
+    init(id: AnyHashable, route: (any Route)?, parent: RouteScope? = nil, definitions: RouteDefinitions = .empty) {
         self.route = route
         self.parent = parent
-        self.ledger = RouteScopeLedger(initialID: id)
+        self.id = id
+        self.definitions = definitions
+        useDefinitions(definitions)
+    }
+
+    /// Installs the owner's compiled map before any views mount.
+    func useDefinitions(_ definitions: RouteDefinitions) {
+        self.definitions = definitions
+        for branch in definitions.branches.keys where branchScopes[branch] == nil {
+            guard let definition = definitions.branches[branch] else { continue }
+            let scope = RouteScope(id: branch, route: nil, parent: self, definitions: definition.scope)
+            scope.branchID = branch
+            branchScopes[branch] = scope
+            if branchContainer == nil {
+                branchContainer = BranchContainerState(selectedBranch: branch, selection: nil, concurrent: definition.concurrent)
+            }
+        }
     }
 }
 
@@ -84,28 +118,30 @@ extension RouteScope {
         route ?? parent?.currentRoute
     }
 
+    var routePresentation: RoutePresentation? {
+        presentation.map { RoutePresentation(style: $0.declaration.presentationKind, priority: $0.priority) }
+    }
+
     func attachPresentation(
         to origin: RouteScope,
-        declaration: AnyRouteDeclaration
+        declaration: AnyRouteDeclaration,
+        priority: RoutePriority? = nil
     ) {
+        precondition(presentation == nil && owningPath == nil,
+                     "A destination's presentation is fixed before it enters navigation state.")
         presentation = RouteScopePresentation(
             origin: origin,
-            declaration: declaration
+            declaration: declaration,
+            priority: priority ?? declaration.priority
         )
     }
 }
 
-// MARK: - Declaration Installation State
+// MARK: - Presentation Environment
 
 extension RouteScope {
     func updateSourceEnvironment(_ sourceEnvironment: EnvironmentValues) {
-        ledger.setBaseEnvironment(sourceEnvironment)
-    }
-
-    func defaultBranchID(hasSelection: Bool) -> AnyHashable {
-        hasSelection
-            ? branchContainer?.defaultBranch ?? ledger.initialID
-            : id
+        sourceEnvironmentReference.update(sourceEnvironment)
     }
 }
 
@@ -118,9 +154,229 @@ extension RouteScope {
 }
 #endif
 
-/// Observes only stable branch state; declaration refreshes remain non-observable.
-@Observable
-final class RouteScopeParticipation {
-    var isConcurrent = false
-    var isBranchHostRegistered = false
+
+// MARK: - X/Y/Z Ownership
+
+extension RouteScope {
+    var lane: RouteLane {
+        if presentationDeclaration?.presentationKind.isModal == true { return ownedLane }
+        return previousRouteScope?.lane ?? parent?.lane ?? ownedLane
+    }
+
+    var space: RouteSpace? { anchorSpace ?? previousRouteScope?.space ?? parent?.space }
+    var pathDepth: Int { previousRouteScope.map { $0.pathDepth + 1 } ?? parent?.pathDepth ?? 0 }
+    var previousScopeInSpace: RouteScope? { previousRouteScope ?? parent }
+
+    func belongs(to space: RouteSpace) -> Bool {
+        if self === space.root { return anchorSpace === space }
+        if let branchID, let parent {
+            return parent.branchScopes[branchID] === self && parent.belongs(to: space)
+        }
+        guard owningPath != nil, let previousRouteScope,
+              previousRouteScope.belongs(to: space) else { return false }
+        return previousRouteScope.continuation === self
+    }
+
+    func next(in path: RoutePath) -> RouteScope? {
+        if let continuation, continuation.owningPath === path { return continuation }
+        return nil
+    }
+
+    func append(_ scope: RouteScope, in path: RoutePath) {
+        precondition(path === path.owner?.path, "Each root or branch has one canonical X path.")
+        precondition(scope !== self && scope.anchorSpace == nil && scope.branchID == nil,
+                     "Only a destination instance can extend an X path.")
+        precondition(scope.owningPath == nil, "A route instance has exactly one owning path.")
+        precondition(next(in: path) == nil, "Append begins at the end of its X path.")
+        let isModal = scope.presentationDeclaration?.presentationKind.isModal == true
+        precondition(continuation == nil && (!isModal || lane.modal == nil),
+                     "The owning X continuation or Y modal slot must be vacant.")
+        scope.previousRouteScope = self
+        scope.owningPath = path
+        continuation = scope
+        if isModal { lane.present(scope) }
+    }
+
+    func removeContinuation(in path: RoutePath) {
+        if continuation?.owningPath === path { continuation = nil }
+    }
+
 }
+
+// MARK: - Physical Hosting
+
+extension RouteScope {
+    enum Ownership: Equatable { case pending, managed, unmanaged }
+
+    @discardableResult
+    func attachHost(_ view: PlatformView?, id: UUID) -> Bool {
+        let becameReady = host == nil
+        if becameReady {
+            withMutation(keyPath: \.isInstalledInView) { host = Host(id: id, view: view) }
+            hasEverInstalled = true
+            resume(&installationWaiters)
+        } else {
+            host = Host(id: id, view: view)
+        }
+        reconcileAttachments()
+        return becameReady
+    }
+
+    @discardableResult
+    func detachHost(id: UUID) -> Bool {
+        guard host?.id == id else { return false }
+        withMutation(keyPath: \.isInstalledInView) { host = nil }
+        reconcileAttachments()
+        resume(&uninstallationWaiters)
+        return true
+    }
+
+    var presentationHostID: RoutePresentationHostID? {
+        access(keyPath: \.presentationHostID)
+        return selectedHost(in: routingHosts)
+    }
+
+    private func selectedHost(in hosts: OrderedStorage<RoutePresentationHostID, RoutingHost>) -> RoutePresentationHostID? {
+        hosts.keys.last { hosts[$0]?.automatic == false } ?? hosts.keys.last
+    }
+
+    func bindRoutingHost(_ id: RoutePresentationHostID, automatic: Bool, environment: EnvironmentValues) {
+        var hosts = routingHosts
+        hosts[id] = RoutingHost(automatic: automatic, environment: environment)
+        updateRoutingHosts(hosts)
+    }
+
+    func unbindRoutingHost(_ id: RoutePresentationHostID) {
+        var hosts = routingHosts
+        hosts[id] = nil
+        updateRoutingHosts(hosts)
+    }
+
+    private func updateRoutingHosts(_ hosts: OrderedStorage<RoutePresentationHostID, RoutingHost>) {
+        if selectedHost(in: hosts) != selectedHost(in: routingHosts) {
+            withMutation(keyPath: \.presentationHostID) { routingHosts = hosts }
+        } else {
+            routingHosts = hosts
+        }
+        if let id = selectedHost(in: hosts), let host = hosts[id] {
+            sourceEnvironmentReference.update(host.environment)
+        }
+    }
+
+    enum HookBinding {
+        case declared(AnyHookDeclaration)
+        case conflict
+
+        var declaration: AnyHookDeclaration? {
+            if case let .declared(declaration) = self { return declaration }
+            return nil
+        }
+    }
+
+    // Sources own captured closures. Resolution is derived, so updates and removal
+    // cannot leave a second cache or an implicit mount-order winner behind.
+    private var hookBindings: [HookDeclarationIdentity: HookBinding] {
+        var bindings: [HookDeclarationIdentity: HookBinding] = [:]
+        for declarations in hookSources.values {
+            for declaration in declarations {
+                let identity = declaration.identity
+                bindings[identity] = bindings[identity] == nil ? .declared(declaration) : .conflict
+            }
+        }
+        return bindings
+    }
+
+    func hookBinding(for identity: HookDeclarationIdentity, in spaces: RouteSpaces) -> HookBinding? {
+        guard spaces.routePath(containing: self) != nil else { return nil }
+        return hookBindings[identity]
+    }
+
+    func installHookDeclarations(sourceID: AnyHashable = "default", hookDeclarations: [AnyHookDeclaration]) {
+        let previous = hookBindings
+        hookSources[sourceID] = hookDeclarations
+        let updated = hookBindings
+        for (identity, binding) in updated {
+            guard case .conflict = binding else { continue }
+            if case .conflict? = previous[identity] { continue }
+            log.departureWarning(
+                "Conflicting hook declarations for `\(identity)` in scope `\(id)`; "
+                    + "the hook is disabled until only one declaration remains."
+            )
+        }
+    }
+
+    func uninstallHookDeclarations(sourceID: AnyHashable) { hookSources[sourceID] = nil }
+
+    func ownership(of view: PlatformView) -> Ownership {
+        guard let managedView = host?.view, let managedWindow = managedView.window else { return .pending }
+        if let window = view.window, window !== managedWindow { return .unmanaged }
+        #if canImport(UIKit)
+        guard let managedController = managedView.departureViewController,
+              let candidateController = view.departureViewController else { return .pending }
+        let managedRoot = managedController.departurePresentationRoot
+        let candidateRoot = candidateController.departurePresentationRoot
+        if candidateRoot !== managedRoot && candidateRoot.presentingViewController != nil { return .unmanaged }
+        #endif
+        return view.window == nil ? .pending : .managed
+    }
+
+    func observe(_ attachment: RouteScopeAttachment) {
+        attachments.removeAll { $0.value == nil }
+        if !attachments.contains(where: { $0.value === attachment }) { attachments.append(.init(value: attachment)) }
+    }
+
+    func stopObserving(_ attachment: RouteScopeAttachment) {
+        attachments.removeAll { $0.value == nil || $0.value === attachment }
+    }
+
+    private func reconcileAttachments() {
+        attachments.removeAll { $0.value == nil }
+        for attachment in attachments { attachment.value?.reconcile() }
+    }
+
+    func waitUntilInstalled() async {
+        guard !isInstalledInView else { return }
+        await withCheckedContinuation { installationWaiters.append($0) }
+    }
+
+    func waitUntilUninstalled() async {
+        guard isInstalledInView else { return }
+        await withCheckedContinuation { uninstallationWaiters.append($0) }
+    }
+
+    private func resume(_ waiters: inout [CheckedContinuation<Void, Never>]) {
+        let pending = waiters
+        waiters.removeAll()
+        pending.forEach { $0.resume() }
+    }
+}
+
+final class RouteSourceEnvironment {
+    private(set) var values = EnvironmentValues()
+    func update(_ values: EnvironmentValues) { self.values = values }
+}
+
+#if canImport(UIKit)
+private extension UIView {
+    var departureViewController: UIViewController? {
+        var responder: UIResponder? = self
+        while let current = responder {
+            if let controller = current as? UIViewController { return controller }
+            responder = current.next
+        }
+        return nil
+    }
+}
+
+private extension UIViewController {
+    var departurePresentationRoot: UIViewController {
+        var controller: UIViewController? = self
+        var root = self
+        while let current = controller {
+            root = current
+            controller = current.parent
+        }
+        return root
+    }
+}
+#endif

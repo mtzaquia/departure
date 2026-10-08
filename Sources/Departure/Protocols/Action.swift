@@ -94,6 +94,10 @@ public struct ActionInvocation<Output> {
     }
 
     /// Runs the intercepted action.
+    ///
+    /// Throws `CancellationError` if the intercepting scope has left navigation. An action that
+    /// requests a reroute also throws `CancellationError`; the engine waits for the destination
+    /// to install, then dispatches a new invocation through that destination's interceptor.
     public func callAsFunction() async throws -> Output {
         try await run()
     }

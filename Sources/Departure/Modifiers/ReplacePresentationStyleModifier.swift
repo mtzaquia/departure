@@ -27,7 +27,7 @@ struct ReplacePresentationStyleModifier: ViewModifier {
     let presentationHostID: RoutePresentationHostID
     let isEnabled: Bool
 
-    @Environment(RouterEngine.self) private var router
+    @RouterEnvironment private var router
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
@@ -39,16 +39,13 @@ struct ReplacePresentationStyleModifier: ViewModifier {
         let presentation = isEnabled ? slot.wrappedValue : nil
 
         renderedContent(content, presentation: presentation)
-            .onChange(of: isEnabled) { _, enabled in
-                guard !enabled, routeScope != nil else { return }
-                slot.wrappedValue = nil
-            }
+
     }
 
     @ViewBuilder
-    private func renderedContent(_ content: Content, presentation: RoutePresentation?) -> some View {
+    private func renderedContent(_ content: Content, presentation: PresentedRoute?) -> some View {
         if let presentation {
-            RouteView(scope: presentation.scope, providesNavigation: false)
+            RouteView(scope: presentation.scope)
                 .id(presentation.id)
         } else {
             content

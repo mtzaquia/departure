@@ -23,9 +23,13 @@
 final class RouteScopePresentation {
     weak var origin: RouteScope?
     let declaration: AnyRouteDeclaration
+    let sourceEnvironment: RouteSourceEnvironment
+    let priority: RoutePriority
 
-    init(origin: RouteScope, declaration: AnyRouteDeclaration) {
+    init(origin: RouteScope, declaration: AnyRouteDeclaration, priority: RoutePriority) {
         self.origin = origin
         self.declaration = declaration
+        sourceEnvironment = origin.sourceEnvironmentReference
+        self.priority = priority
     }
 }

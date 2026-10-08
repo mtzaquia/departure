@@ -25,7 +25,7 @@ import SwiftUI
 /// Installs a ``Router`` and the root route scope.
 ///
 /// ```swift
-/// WithRouter {
+/// WithRouter(routes: AppRoutes.root) {
 ///     AppView()
 /// }
 /// ```
@@ -36,27 +36,25 @@ public struct WithRouter<Content: View>: View {
 
     public var body: some View {
         content
+            .routingAutomatically()
             .routeScopeEnvironment(router.root, router: router)
             .background {
                 WindowDestinationBuilderRegistration(
                     router: router,
                     windowDestinationBuilder: windowDestinationBuilder
                 )
-                ElevatedPrioritySheetHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
-                ElevatedPriorityCoverSlideHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
-                ElevatedPriorityCoverFadeHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
-                ElevatedPrioritySheetHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
-                ElevatedPriorityCoverSlideHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
-                ElevatedPriorityCoverFadeHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPriorityHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
+                ElevatedPriorityHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
             }
-            .environment(router)
+            .environment(\.routerEngine, router)
     }
 
     /// Creates a router host.
     ///
-    /// Pass a ``Router`` when app code needs to keep an explicit reference.
-    public init(router: Router? = nil, @ViewBuilder content: () -> Content) {
-        let router = router?.engine ?? RouterEngine()
+    /// Pass a ``RootRouter`` when app code needs to keep an explicit reference.
+    public init(routes: RootRouteMap, router: RootRouter? = nil, @ViewBuilder content: () -> Content) {
+        let router = router?.engine ?? RouterEngine(routes: routes)
+        router.configureMap(routes)
         router.windowDestinationBuilder = .passthrough
         self._router = State(wrappedValue: router)
         self.content = content()
@@ -65,17 +63,19 @@ public struct WithRouter<Content: View>: View {
 
     /// Creates a router host with a detached presentation customizer.
     ///
-    /// Pass a ``Router`` when app code needs to keep an explicit reference.
+    /// Pass a ``RootRouter`` when app code needs to keep an explicit reference.
     ///
     /// `windowDestination` customizes destinations that Departure renders in a detached
     /// SwiftUI host, including elevated-priority presentations and normal-priority fade
     /// covers. Use it to explicitly forward environment values those destinations need.
     public init<WindowContent: View>(
-        router: Router? = nil,
+        routes: RootRouteMap,
+        router: RootRouter? = nil,
         @ViewBuilder _ content: () -> Content,
         @ViewBuilder windowDestination: @escaping (RouteView, EnvironmentValues) -> WindowContent
     ) {
-        let router = router?.engine ?? RouterEngine()
+        let router = router?.engine ?? RouterEngine(routes: routes)
+        router.configureMap(routes)
         let windowDestinationBuilder = WindowDestinationBuilder(windowDestination)
         router.windowDestinationBuilder = windowDestinationBuilder
         self._router = State(wrappedValue: router)
@@ -96,13 +96,13 @@ private struct WindowDestinationBuilderRegistration: View {
                 case .installedInWindow, .updated(isInstalledInWindow: true):
                     router.windowDestinationBuilder = windowDestinationBuilder
                     guard let lifecycleView else { return }
-                    router.root.ledger.installManagedView(lifecycleView, id: lifecycleID)
+                    router.hostDidAttach(router.root, view: lifecycleView, id: lifecycleID)
 
                 case .updated(isInstalledInWindow: false):
                     router.windowDestinationBuilder = windowDestinationBuilder
 
                 case .dismantled, .deinitialized:
-                    router.root.ledger.uninstallManagedView(id: lifecycleID)
+                    router.hostDidDetach(router.root, id: lifecycleID)
                 }
             }
     }

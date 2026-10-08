@@ -22,6 +22,30 @@
 
 import SwiftUI
 
-extension EnvironmentValues {
-    @Entry var branchRouteDeclarations: [RouteScopeDeclaration] = []
+/// Associates domain route data with a feature view, without a retroactive conformance.
+public struct RouteDestination<R: Route>: Sendable {
+    let build: @MainActor @Sendable (R, RouteContext) -> AnyView
+    public init<Content: View>(_ route: R.Type, @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content) {
+        build = { AnyView(destination($0, $1)) }
+    }
+}
+
+/// Information about how this destination was presented.
+public struct RoutePresentation: Hashable, Sendable {
+    public enum Style: Hashable, Sendable {
+        case push, replace, sheet, cover(Cover.Transition)
+        var isModal: Bool {
+            switch self { case .sheet, .cover: true; case .push, .replace: false }
+        }
+    }
+    public let style: Style
+    public let priority: RoutePriority
+}
+
+/// Values for this destination's own scope, refreshed as its environment changes.
+public struct RouteContext {
+    public let router: Router
+    public let unwindRoute: UnwindRouteAction
+    public let presentation: RoutePresentation
+    public let environment: EnvironmentValues
 }

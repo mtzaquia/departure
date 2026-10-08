@@ -1,10 +1,11 @@
 #if canImport(UIKit)
 import Testing
 import UIKit
+import SwiftUI
 @testable import Departure
 
 @MainActor
-struct RouteScopeLedgerUIKitTests {
+struct RouteScopeHostUIKitTests {
     @Test func siblingAndUnrelatedHostingControllersAreNotMistakenForPresentations() {
         let root = UIViewController()
         let managedController = UIViewController()
@@ -25,21 +26,21 @@ struct RouteScopeLedgerUIKitTests {
         window.makeKeyAndVisible()
         defer { window.isHidden = true }
 
-        let ledger = RouteScopeLedger(initialID: "root")
+        let scope = RouteScope(id: "root", route: nil)
         // A descendant may update before the branch's own lifecycle bridge installs.
-        #expect(ledger.ownership(of: declarationView) == .pending)
+        #expect(scope.ownership(of: declarationView) == .pending)
         let managedID = UUID()
-        ledger.installManagedView(managedView, id: managedID)
-        #expect(ledger.ownership(of: declarationView) == .managed)
+        scope.attachHost(managedView, id: managedID)
+        #expect(scope.ownership(of: declarationView) == .managed)
 
         let fragmentedController = UIViewController()
         let fragmentedView = UIView()
         fragmentedController.view.addSubview(fragmentedView)
         root.view.addSubview(fragmentedController.view)
-        #expect(ledger.ownership(of: fragmentedView) == .managed)
+        #expect(scope.ownership(of: fragmentedView) == .managed)
 
-        ledger.uninstallManagedView(id: managedID)
-        #expect(ledger.ownership(of: declarationView) == .pending)
+        scope.detachHost(id: managedID)
+        #expect(scope.ownership(of: declarationView) == .pending)
     }
 
     @Test func presentedControllerIsOutsideTheManagedPresentation() {
@@ -51,8 +52,8 @@ struct RouteScopeLedgerUIKitTests {
 
         let managedView = UIView()
         root.view.addSubview(managedView)
-        let ledger = RouteScopeLedger(initialID: "root")
-        ledger.installManagedView(managedView, id: UUID())
+        let scope = RouteScope(id: "root", route: nil)
+        scope.attachHost(managedView, id: UUID())
 
         let presented = UIViewController()
         presented.modalPresentationStyle = .fullScreen
@@ -62,7 +63,7 @@ struct RouteScopeLedgerUIKitTests {
         defer { root.dismiss(animated: false) }
 
         #expect(presented.presentingViewController === root)
-        #expect(ledger.ownership(of: declarationView) == .unmanaged)
+        #expect(scope.ownership(of: declarationView) == .unmanaged)
     }
 
     @Test func pageSheetControllerIsOutsideTheManagedPresentation() {
@@ -74,8 +75,8 @@ struct RouteScopeLedgerUIKitTests {
 
         let managedView = UIView()
         root.view.addSubview(managedView)
-        let ledger = RouteScopeLedger(initialID: "root")
-        ledger.installManagedView(managedView, id: UUID())
+        let scope = RouteScope(id: "root", route: nil)
+        scope.attachHost(managedView, id: UUID())
 
         let presented = UIViewController()
         presented.modalPresentationStyle = .pageSheet
@@ -85,7 +86,7 @@ struct RouteScopeLedgerUIKitTests {
         defer { root.dismiss(animated: false) }
 
         #expect(presented.presentingViewController === root)
-        #expect(ledger.ownership(of: declarationView) == .unmanaged)
+        #expect(scope.ownership(of: declarationView) == .unmanaged)
     }
 
     @Test func staleTeardownCannotRemoveTheReplacementManagedView() {
@@ -100,13 +101,13 @@ struct RouteScopeLedgerUIKitTests {
         let declarationView = UIView()
         [firstView, replacementView, declarationView].forEach(root.view.addSubview)
 
-        let ledger = RouteScopeLedger(initialID: "root")
+        let scope = RouteScope(id: "root", route: nil)
         let firstID = UUID()
-        ledger.installManagedView(firstView, id: firstID)
-        ledger.installManagedView(replacementView, id: UUID())
-        ledger.uninstallManagedView(id: firstID)
+        scope.attachHost(firstView, id: firstID)
+        scope.attachHost(replacementView, id: UUID())
+        scope.detachHost(id: firstID)
 
-        #expect(ledger.ownership(of: declarationView) == .managed)
+        #expect(scope.ownership(of: declarationView) == .managed)
     }
 
     @Test func changingTabsDoesNotMakeTheSelectedBranchUnmanaged() {
@@ -125,14 +126,14 @@ struct RouteScopeLedgerUIKitTests {
         first.view.addSubview(firstDeclaration)
         let secondDeclaration = UIView()
         second.view.addSubview(secondDeclaration)
-        let ledger = RouteScopeLedger(initialID: "root")
-        ledger.installManagedView(managedView, id: UUID())
+        let scope = RouteScope(id: "root", route: nil)
+        scope.attachHost(managedView, id: UUID())
 
-        #expect(ledger.ownership(of: firstDeclaration) == .managed)
+        #expect(scope.ownership(of: firstDeclaration) == .managed)
         tabs.selectedIndex = 1
-        #expect(ledger.ownership(of: secondDeclaration) == .managed)
+        #expect(scope.ownership(of: secondDeclaration) == .managed)
         tabs.selectedIndex = 0
-        #expect(ledger.ownership(of: firstDeclaration) == .managed)
+        #expect(scope.ownership(of: firstDeclaration) == .managed)
     }
 
     @Test func pendingAttachmentInstallsWhenTheManagedViewArrives() {
@@ -148,7 +149,7 @@ struct RouteScopeLedgerUIKitTests {
         root.view.addSubview(declarationView)
 
         let scope = RouteScope(id: "root", route: nil)
-        let attachment = RouteScopeAttachment(kind: .routes)
+        let attachment = RouteScopeAttachment(kind: .hooks)
         var installations = 0
         var removals = 0
         attachment.update(target: scope, view: declarationView,
@@ -156,11 +157,11 @@ struct RouteScopeLedgerUIKitTests {
         #expect(installations == 0)
 
         let firstManagedID = UUID()
-        scope.ledger.installManagedView(managedView, id: firstManagedID)
+        scope.attachHost(managedView, id: firstManagedID)
         #expect(installations == 1)
-        scope.ledger.uninstallManagedView(id: firstManagedID)
+        scope.detachHost(id: firstManagedID)
         #expect(removals == 0)
-        scope.ledger.installManagedView(managedView, id: UUID())
+        scope.attachHost(managedView, id: UUID())
         #expect(installations == 2)
         attachment.detach()
         #expect(removals == 1)
@@ -179,8 +180,8 @@ struct RouteScopeLedgerUIKitTests {
         [firstView, secondView, attachmentView].forEach(root.view.addSubview)
         let first = RouteScope(id: "first", route: nil)
         let second = RouteScope(id: "second", route: nil)
-        first.ledger.installManagedView(firstView, id: UUID())
-        second.ledger.installManagedView(secondView, id: UUID())
+        first.attachHost(firstView, id: UUID())
+        second.attachHost(secondView, id: UUID())
 
         let attachment = RouteScopeAttachment(kind: .hooks)
         var applied: [ObjectIdentifier] = []
@@ -195,7 +196,7 @@ struct RouteScopeLedgerUIKitTests {
         #expect(removed == [ObjectIdentifier(first), ObjectIdentifier(second)])
     }
 
-    @Test func branchKeyChangeRemovesTheFormerRegistration() {
+    @Test func branchHostRebindingKeepsMappedScopes() throws {
         let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
         let controller = UIViewController()
         window.rootViewController = controller
@@ -207,24 +208,26 @@ struct RouteScopeLedgerUIKitTests {
         controller.view.addSubview(hostView)
         controller.view.addSubview(attachmentView)
         let parent = RouteScope(id: "parent", route: nil)
-        let branch = RouteScope(id: "first", route: nil)
-        parent.ledger.installManagedView(hostView, id: UUID())
-        let attachment = RouteScopeAttachment(kind: .branch)
+        parent.define(RouteMap { Branches { Branch("first") {}; Branch("second") {} } }.declarations)
+        let first = try #require(parent.branchScopes["first"])
+        let second = try #require(parent.branchScopes["second"])
+        first.attachHost(hostView, id: UUID())
+        second.attachHost(hostView, id: UUID())
+        let attachment = RouteScopeAttachment(kind: .routing)
+        let hostID = RoutePresentationHostID()
+        let apply: (RouteScope) -> Void = {
+            $0.bindRoutingHost(hostID, automatic: false, environment: EnvironmentValues())
+        }
+        let remove: (RouteScope) -> Void = { $0.unbindRoutingHost(hostID) }
+        attachment.update(target: first, view: attachmentView, apply: apply, remove: remove)
+        attachment.update(target: second, view: nil, apply: apply, remove: remove)
 
-        attachment.update(target: parent, key: "first", view: attachmentView,
-            apply: { $0.registerBranchScope(branch, for: "first") },
-            remove: { $0.unregisterBranchScope(branch, for: "first") })
-        attachment.update(target: parent, key: "second", view: nil,
-            apply: { $0.registerBranchScope(branch, for: "second") },
-            remove: { $0.unregisterBranchScope(branch, for: "second") })
-
-        #expect(parent.branchScopes["first"] == nil)
-        #expect(parent.branchScopes["second"] === branch)
-        // Direct registration preserves a scope's explicit ID; the view modifier
-        // updates its own generated scope ID when its branch value changes.
-        #expect(branch.id == AnyHashable("first"))
+        #expect(first.presentationHostID == nil)
+        #expect(second.presentationHostID == hostID)
         attachment.detach()
-        #expect(parent.branchScopes["second"] == nil)
+        #expect(second.presentationHostID == nil)
+        #expect(parent.branchScopes["first"] === first)
+        #expect(parent.branchScopes["second"] === second)
     }
 }
 #endif

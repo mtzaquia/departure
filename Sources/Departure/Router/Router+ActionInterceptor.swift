@@ -44,7 +44,7 @@ extension RouterEngine {
         logsStart: Bool = true,
         origin: RouteRequestOrigin? = nil
     ) async throws -> A.Output {
-        guard let source = resolveRequestOrigin(origin)?.scope else { throw CancellationError() }
+        guard let source = resolveRequestOrigin(origin) else { throw CancellationError() }
         do {
             let currentRoute: (any Route.Type)? = source.currentRoute.map { type(of: $0) }
             if logsStart {
@@ -63,17 +63,19 @@ extension RouterEngine {
                 log.departureDebug(.actionRerouteRequested(action: action, route: route))
                 Task {
                     let sourceScope = source
-                    let continuationOwner = origin == nil ? nil : (nearestBranchPath(from: source)?.owner ?? root)
+                    let continuationOwner = origin == nil ? nil : (nearestBranchPath(from: source)?.owner ?? source.space?.root)
                     await requestRouteWhenReady(route, origin: origin)
-                    let targetScope = continuationOwner?.activeLocalScope ?? currentRouteScope
+                    let targetScope = continuationOwner?.space === spaces.activeSpace
+                        ? continuationOwner?.activeLocalScope ?? currentRouteScope
+                        : currentRouteScope
 
                     if targetScope !== sourceScope || targetScope.isInstalledInView {
                         await waitForRouteScopeToInstall(targetScope)
                     }
 
-                    await performAction(action, hasRerouted: true, origin: continuationOwner.map { RouteRequestOrigin(scope: $0.activeLocalScope) })
+                    await performAction(action, hasRerouted: true, origin: RouteRequestOrigin(scope: targetScope))
                 }
-                
+
                 throw CancellationError()
 
             case let .invocationError(error):
@@ -86,12 +88,13 @@ extension RouterEngine {
 
 private extension RouterEngine {
     func waitForRouteScopeToInstall(_ routeScope: RouteScope) async {
-        await routeScope.ledger.waitUntilInstalled()
+        await routeScope.waitUntilInstalled()
     }
 
     func performAction<A: Action>(_ action: A, hasRerouted: Bool, origin: RouteRequestOrigin? = nil) async {
-        guard let source = resolveRequestOrigin(origin)?.scope else { return }
-        if let interceptor = source.firstInterceptor(for: A.self) {
+        guard let source = resolveRequestOrigin(origin) else { return }
+        if let binding = source.hookBinding(for: .actionInterceptor(ObjectIdentifier(A.self)), in: spaces) {
+            guard let interceptor = binding.declaration?.interceptor(for: A.self) else { return }
             log.departureDebug(.actionIntercepted(action: action, scope: source))
             await interceptor.invoke(self, action, hasRerouted, origin)
             log.departureDebug(.actionInterceptorFinished(action: action))
@@ -112,17 +115,5 @@ private extension RouterEngine {
         } catch {
             log.departureDebug(.actionDirectInvocationEnded(action: action, error: error))
         }
-    }
-}
-
-private extension RouteScope {
-    func firstInterceptor(for actionType: (some Action).Type) -> AnyActionInterceptor? {
-        for attachment in self.hookAttachments {
-            if let candidateInterceptor = attachment.interceptor(for: actionType) {
-                return candidateInterceptor
-            }
-        }
-
-        return nil
     }
 }

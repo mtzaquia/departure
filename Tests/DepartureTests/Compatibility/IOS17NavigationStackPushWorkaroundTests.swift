@@ -44,7 +44,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
         let workaround = IOS17NavigationStackPushWorkaround()
         let (selection, _) = tabSelection(.home)
         router.root.branchContainer = BranchContainerState(
-            defaultBranch: AnyHashable(AppTab.home),
+            selectedBranch: AnyHashable(AppTab.home),
             selection: AnyRouteBranchSelection(selection, concurrent: true)
         )
 
@@ -52,7 +52,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
         #expect(!workaround.pushHostIdentity(for: AppTab.wallet, in: router.root, router: router))
 
         router.root.branchContainer = BranchContainerState(
-            defaultBranch: AnyHashable(AppTab.home),
+            selectedBranch: AnyHashable(AppTab.home),
             selection: AnyRouteBranchSelection(selection)
         )
         #expect(workaround.pushHostIdentity(for: AppTab.wallet, in: router.root, router: router))
@@ -64,7 +64,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         installPushDeclaration(in: router, hostedBy: presentationHostID)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalTree.rootPath.last)
+        let pushedScope = try #require(router.normalSpace.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
         let presentation = router.routePresentationBinding(
@@ -75,16 +75,16 @@ struct IOS17NavigationStackPushWorkaroundTests {
         presentation.wrappedValue = nil
         await Task.yield()
 
-        #expect(router.normalTree.rootPath.count == 1)
-        #expect(router.normalTree.rootPath.last === pushedScope)
+        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.normalSpace.rootPath.last === pushedScope)
         #expect(presentation.wrappedValue?.scope === pushedScope)
 
         router.routeScopeDidLeaveView(pushedScope)
-        for _ in 0..<10 where router.normalTree.rootPath.isEmpty == false {
+        for _ in 0..<10 where router.normalSpace.rootPath.isEmpty == false {
             await Task.yield()
         }
 
-        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(router.normalSpace.rootPath.isEmpty)
         #expect(presentation.wrappedValue == nil)
     }
 
@@ -92,14 +92,14 @@ struct IOS17NavigationStackPushWorkaroundTests {
         let router = makeRouterWithWorkaround()
         installPushDeclaration(in: router)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalTree.rootPath.last)
+        let pushedScope = try #require(router.normalSpace.rootPath.last)
         let presentation = router.routePresentationBinding(from: router.root, matching: .push)
 
         presentation.wrappedValue = nil
 
-        #expect(router.normalTree.rootPath.last === pushedScope)
+        #expect(router.normalSpace.rootPath.last === pushedScope)
         #expect(presentation.wrappedValue?.scope === pushedScope)
-        #expect(pushedScope.ledger.hasEverInstalled == false)
+        #expect(pushedScope.hasEverInstalled == false)
     }
 
     @Test func disabledWorkaroundRetainsImmediatePushDismissalSemantics() async throws {
@@ -108,12 +108,39 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         installPushDeclaration(in: router)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalTree.rootPath.last)
+        let pushedScope = try #require(router.normalSpace.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
         router.routePresentationBinding(from: router.root, matching: .push).wrappedValue = nil
 
-        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(router.normalSpace.rootPath.isEmpty)
+    }
+
+    @Test func replacementFromPushedChildContinuesAfterItsOwnStagedPop() async throws {
+        let owner = RootRouter()
+        owner.engine.ios17NavigationStackPushWorkaround = IOS17NavigationStackPushWorkaround()
+        _ = WithRouter(routes: RootRouteMap {
+            Replace(RouteDestination(CompatSelection.self) { _, _ in EmptyView() }) {
+                Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
+            }
+        }, router: owner) { EmptyView() }
+        await owner.current.present(CompatSelection(number: 1))
+        await owner.current.present(HomeDetailRoute())
+        let child = try #require(owner.engine.normalSpace.rootPath.last)
+        let childRouter = owner.current
+        let hostID = UUID()
+        owner.engine.hostDidAttach(child, view: nil, id: hostID)
+
+        let replacement = Task { await childRouter.present(CompatSelection(number: 2)) }
+        for _ in 0..<1000 where owner.engine.normalSpace.rootPath.count != 1 { await Task.yield() }
+        #expect(owner.engine.normalSpace.rootPath.count == 1)
+        owner.engine.hostDidDetach(child, id: hostID)
+        await replacement.value
+
+        #expect(owner.engine.normalSpace.rootPath.count == 1)
+        #expect((owner.engine.normalSpace.rootPath.last?.route as? CompatSelection)?.number == 2)
+        await childRouter.present(CompatSelection(number: 3))
+        #expect((owner.engine.normalSpace.rootPath.last?.route as? CompatSelection)?.number == 2)
     }
 
     @Test func transientViewReinstallationDoesNotCompleteDeferredPushDismissal() async throws {
@@ -121,7 +148,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         installPushDeclaration(in: router)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalTree.rootPath.last)
+        let pushedScope = try #require(router.normalSpace.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
         let presentation = router.routePresentationBinding(from: router.root, matching: .push)
@@ -132,8 +159,8 @@ struct IOS17NavigationStackPushWorkaroundTests {
             await Task.yield()
         }
 
-        #expect(router.normalTree.rootPath.count == 1)
-        #expect(router.normalTree.rootPath.last === pushedScope)
+        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.normalSpace.rootPath.last === pushedScope)
         #expect(presentation.wrappedValue?.scope === pushedScope)
     }
 
@@ -142,20 +169,20 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         installPushDeclaration(in: router)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalTree.rootPath.last)
+        let pushedScope = try #require(router.normalSpace.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
         let presentation = router.routePresentationBinding(from: router.root, matching: .push)
         presentation.wrappedValue = nil
         let laterScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
         router.mutateRouteGraph {
-            router.normalTree.rootPath.append(laterScope)
+            router.normalSpace.rootPath.append(laterScope)
         }
         router.routeScopeDidLeaveView(pushedScope)
 
-        #expect(router.normalTree.rootPath.count == 2)
-        #expect(router.normalTree.rootPath.first === pushedScope)
-        #expect(router.normalTree.rootPath.last === laterScope)
+        #expect(router.normalSpace.rootPath.count == 2)
+        #expect(router.normalSpace.rootPath.first === pushedScope)
+        #expect(router.normalSpace.rootPath.last === laterScope)
         #expect(presentation.wrappedValue?.scope === pushedScope)
     }
 
@@ -164,7 +191,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         installPushDeclaration(in: router)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalTree.rootPath.last)
+        let pushedScope = try #require(router.normalSpace.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
         let presentation = router.routePresentationBinding(from: router.root, matching: .push)
@@ -173,16 +200,16 @@ struct IOS17NavigationStackPushWorkaroundTests {
         let unrelatedBranch = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let unrelatedScope = RouteScope(id: TransactionRoute().id, route: TransactionRoute())
         router.mutateRouteGraph {
-            router.root.registerBranchScope(unrelatedBranch, for: AppTab.wallet)
+            router.root.attachTestBranch(unrelatedBranch, for: AppTab.wallet)
             unrelatedBranch.path.append(unrelatedScope)
         }
 
         router.routeScopeDidLeaveView(pushedScope)
-        for _ in 0..<10 where router.normalTree.rootPath.isEmpty == false {
+        for _ in 0..<10 where router.normalSpace.rootPath.isEmpty == false {
             await Task.yield()
         }
 
-        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(router.normalSpace.rootPath.isEmpty)
         #expect(unrelatedBranch.path.last === unrelatedScope)
     }
 
@@ -190,33 +217,33 @@ struct IOS17NavigationStackPushWorkaroundTests {
         let router = makeRouterWithWorkaround()
         let (selection, _) = tabSelection(.home)
 
-        router.root.installRouteDeclarations(
+        router.root.defineTestMap(
             id: nil,
-            branchSelection: AnyRouteBranchSelection(selection),
-            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
-                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
-                    Branch(.home) {
-                        Push(HomeDetailRoute.self)
+            selection: AnyRouteBranchSelection(selection),
+            definitions: RouteDeclarationBuilder.buildBlock(
+                RouteDeclarationBuilder.buildExpression(
+                    Branch(AppTab.home) {
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
-                    Branch(.wallet) {
-                        Push(TransactionRoute.self)
+                RouteDeclarationBuilder.buildExpression(
+                    Branch(AppTab.wallet) {
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 )
             )
         )
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.installRouteDeclarations(
+        homeScope.defineTestMap(
             id: AnyHashable(AppTab.home),
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Push(HomeDetailRoute.self)._routeDeclarations),
+            selection: nil,
+            definitions: [
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
             ]
         )
-        router.root.registerBranchScope(homeScope, for: AppTab.home)
-        router.root.registerBranchScope(
+        router.root.attachTestBranch(homeScope, for: AppTab.home)
+        router.root.attachTestBranch(
             RouteScope(id: AnyHashable(AppTab.wallet), route: nil),
             for: AppTab.wallet
         )
@@ -253,6 +280,43 @@ struct IOS17NavigationStackPushWorkaroundTests {
         #expect(scope.isInstalledInView == false)
     }
 
+    @Test func staleViewExitWatchdogCannotDetachAReplacementHost() async throws {
+        let workaround = IOS17NavigationStackPushWorkaround()
+        workaround.viewExitTimeout = .milliseconds(10)
+        let router = RouterEngine()
+        router.ios17NavigationStackPushWorkaround = workaround
+        installPushDeclaration(in: router)
+        await router.present(HomeDetailRoute())
+        let scope = try #require(router.normalSpace.rootPath.last)
+        let first = UUID(), replacement = UUID()
+        router.hostDidAttach(scope, view: nil, id: first)
+        workaround.startViewExitWatchdogs(for: [scope], in: router)
+        await Task.yield()
+        workaround.viewExitTimeout = .milliseconds(100)
+        router.hostDidAttach(scope, view: nil, id: replacement)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(scope.isInstalledInView)
+        #expect(scope.hostID == replacement)
+        router.hostDidDetach(scope, id: replacement)
+        #expect(!scope.isInstalledInView)
+    }
+
+    @Test func replacementHostKeepsTheMissingExitCallbackFallback() async throws {
+        let workaround = IOS17NavigationStackPushWorkaround()
+        workaround.viewExitTimeout = .milliseconds(10)
+        let router = RouterEngine()
+        router.ios17NavigationStackPushWorkaround = workaround
+        installPushDeclaration(in: router)
+        await router.present(HomeDetailRoute())
+        let scope = try #require(router.normalSpace.rootPath.last)
+        router.hostDidAttach(scope, view: nil, id: UUID())
+        let wait = Task { await router.waitForRouteScopesToLeaveView([scope]) }
+        await Task.yield()
+        router.hostDidAttach(scope, view: nil, id: UUID())
+        await wait.value
+        #expect(!scope.isInstalledInView)
+    }
+
     private func makeRouterWithWorkaround() -> RouterEngine {
         let router = RouterEngine()
         router.ios17NavigationStackPushWorkaround = IOS17NavigationStackPushWorkaround()
@@ -263,15 +327,20 @@ struct IOS17NavigationStackPushWorkaroundTests {
         in router: RouterEngine,
         hostedBy presentationHostID: RoutePresentationHostID? = nil
     ) {
-        let declarations = Push(HomeDetailRoute.self)._routeDeclarations
-        router.root.installRouteDeclarations(
+        if let presentationHostID {
+            router.root.bindRoutingHost(presentationHostID, automatic: false, environment: router.root.sourceEnvironment)
+        }
+        let declarations = AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
+        router.root.defineTestMap(
             id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(
-                    routes: presentationHostID.map { declarations.hosted(by: $0) } ?? declarations
-                ),
+            selection: nil,
+            definitions: [
+                RouteScopeDeclaration(routes: declarations),
             ]
         )
     }
+}
+
+private struct CompatSelection: Route, Equatable {
+    let number: Int
 }

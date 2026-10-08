@@ -20,46 +20,21 @@
 //  SOFTWARE.
 //
 
-/// Declares a route as a full-screen cover.
-///
-/// ```swift
-/// .routes {
-///     Cover(OnboardingRoute.self)
-///     Cover(LoginRoute.self, priority: .high)
-///     Cover(NoticeRoute.self, transition: .fade)
-/// }
-/// ```
+import SwiftUI
+
+/// Declares a cover destination with optional child definitions.
 public struct Cover: RouteDeclaration, Sendable {
     let declaration: AnyRouteDeclaration
-
-    /// Creates a cover declaration.
-    ///
-    /// - Important: Set `providesNavigation` to `false` when the route destination
-    ///   already provides its own navigation container.
     public init<R: Route>(
-        _ routeType: R.Type,
-        priority: RoutePriority = .normal,
-        transition: Transition = .slide,
-        providesNavigation: Bool = true
+        _ destination: RouteDestination<R>, transition: Transition = .slide,
+        id: AnyHashable? = nil,
+        @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        self.declaration = AnyRouteDeclaration(
-            routeType: routeType,
-            kind: .cover(priority: priority, transition: transition, providesNavigation: providesNavigation)
-        )
+        declaration = AnyRouteDeclaration(destination, kind: .cover(priority: .normal, transition: transition), id: id, children: children())
     }
-
-    public var _routeDeclarations: [AnyRouteDeclaration] {
-        [declaration]
-    }
+    public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }
 
 extension Cover {
-    /// Animation style for ``Cover``.
-    public enum Transition: Hashable, Sendable, CaseIterable {
-        /// Uses SwiftUI full-screen cover movement.
-        case slide
-
-        /// Uses a cross-dissolve presentation.
-        case fade
-    }
+    public enum Transition: Hashable, Sendable, CaseIterable { case slide, fade }
 }

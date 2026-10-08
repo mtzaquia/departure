@@ -26,7 +26,7 @@ import SwiftUI
 struct CoverFadePresentationStyleModifier: ViewModifier {
     let presentationHostID: RoutePresentationHostID
 
-    @Environment(RouterEngine.self) private var router
+    @RouterEnvironment private var router
     @Environment(\.routeScope) private var routeScope
 
     func body(content: Content) -> some View {
@@ -47,36 +47,10 @@ struct CoverFadePresentationStyleModifier: ViewModifier {
 #else
             .sheet(item: presentation) { route in
                 RouteView(
-                    scope: route.scope,
-                    providesNavigation: route.providesNavigation
+                    scope: route.scope
                 )
             }
 #endif
-    }
-}
-
-struct ElevatedPriorityCoverFadeHost: View {
-    @Environment(RouterEngine.self) private var router
-    @Environment(\.scenePhase) private var scenePhase
-    let priority: RoutePriority
-    let windowDestinationBuilder: WindowDestinationBuilder
-
-    var body: some View {
-        let presentation = router.elevatedRoutePresentationBinding(priority: priority, matching: .cover(.fade))
-
-        ElevatedPriorityPresentationWindowBridge(
-            priority: priority,
-            route: presentation,
-            sourceScenePhase: scenePhase,
-            windowDestinationBuilder: windowDestinationBuilder
-        ) { presentation, onDismiss in
-            ElevatedPriorityCoverFadePresenter(
-                presentation: presentation,
-                router: router,
-                onDismiss: onDismiss
-            )
-        }
-        .allowsHitTesting(false)
     }
 }
 
@@ -94,8 +68,8 @@ private final class CoverFadePresentationState {
     var systemPresentation: RouteDestinationSnapshot?
     var isContentVisible = false
     var isDismissing = false
-    var fadeInTaskID: RoutePresentation.ID?
-    var dismissalTaskID: RoutePresentation.ID?
+    var fadeInTaskID: PresentedRoute.ID?
+    var dismissalTaskID: PresentedRoute.ID?
 
     subscript(systemPresentation _: SystemPresentationProjection) -> RouteDestinationSnapshot? {
         get {
@@ -139,7 +113,7 @@ private final class CoverFadePresentationState {
 }
 
 private struct CoverFadeModalPresenter: View {
-    @Binding var route: RoutePresentation?
+    @Binding var route: PresentedRoute?
     @Environment(\.scenePhase) private var scenePhase
     let router: RouterEngine
     @State private var presentationState = CoverFadePresentationState()
@@ -235,7 +209,7 @@ private struct CoverFadeModalPresenter: View {
         presentationState.setSystemPresentation(presentation)
     }
 
-    private func fadeInContentIfNeeded(for id: RoutePresentation.ID) {
+    private func fadeInContentIfNeeded(for id: PresentedRoute.ID) {
         guard presentationState.isDismissing == false,
               presentationState.systemPresentation?.id == id
         else {
@@ -245,7 +219,7 @@ private struct CoverFadeModalPresenter: View {
         presentationState.fadeInTaskID = id
     }
 
-    private func fadeInContent(for id: RoutePresentation.ID?) async {
+    private func fadeInContent(for id: PresentedRoute.ID?) async {
         guard let id else {
             return
         }
@@ -264,7 +238,7 @@ private struct CoverFadeModalPresenter: View {
         }
     }
 
-    private func finishDismissal(for id: RoutePresentation.ID?) async {
+    private func finishDismissal(for id: PresentedRoute.ID?) async {
         guard let id else {
             return
         }
@@ -306,7 +280,7 @@ private struct CoverFadeModalPresenter: View {
 
     private func destination(for presentation: RouteDestinationSnapshot) -> some View {
         presentation.destination
-            .environment(router)
+            .environment(\.routerEngine, router)
             .environment(\.scenePhase, scenePhase)
     }
 
@@ -319,7 +293,7 @@ private struct CoverFadeModalPresenter: View {
     }
 }
 
-private struct ElevatedPriorityCoverFadePresenter: View {
+struct ElevatedPriorityCoverFadePresenter: View {
     let presentation: RouteDestinationSnapshot
     let router: RouterEngine
     let onDismiss: @MainActor () -> Void
@@ -363,7 +337,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         private var router: RouterEngine?
         private var sourceScenePhase: ScenePhase?
         private var onDismiss: (@MainActor () -> Void)?
-        private var presentedRouteID: RoutePresentation.ID?
+        private var presentedRouteID: PresentedRoute.ID?
         private var presentedScenePhase: ScenePhase?
         private var hostingController: PassThroughModalHostingController<AnyView>?
 
@@ -493,7 +467,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         ) -> AnyView {
             AnyView(
                 destination
-                    .environment(router)
+                    .environment(\.routerEngine, router)
                     .environment(\.scenePhase, sourceScenePhase)
             )
         }
@@ -514,21 +488,6 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
             finishDismiss()
         }
-    }
-}
-#else
-private struct ElevatedPriorityCoverFadePresenter: View {
-    let presentation: RouteDestinationSnapshot
-    let router: RouterEngine
-    let onDismiss: @MainActor () -> Void
-
-    var body: some View {
-        // macOS uses a sheet for covers, matching the normal-priority cover fallback.
-        ElevatedPrioritySheetPresenter(
-            onDismiss: onDismiss,
-            destination: presentation.destination
-        )
-        .environment(router)
     }
 }
 #endif

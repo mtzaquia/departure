@@ -20,27 +20,17 @@
 //  SOFTWARE.
 //
 
-/// Declares a route as a navigation push.
-///
-/// ```swift
-/// .routes {
-///     Push(DetailRoute.self)
-/// }
-/// ```
+import SwiftUI
+
+/// Declares a push destination with optional child definitions.
 public struct Push: RouteDeclaration, Sendable {
     let declaration: AnyRouteDeclaration
-
-    /// Creates a push declaration.
-    ///
-    /// - Important: The declaring view must be inside a SwiftUI `NavigationStack`.
-    public init<R: Route>(_ routeType: R.Type) {
-        self.declaration = AnyRouteDeclaration(
-            routeType: routeType,
-            kind: .push
-        )
+    public init<R: Route>(
+        _ destination: RouteDestination<R>,
+        id: AnyHashable? = nil,
+        @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
+    ) {
+        declaration = AnyRouteDeclaration(destination, kind: .push, id: id, children: children())
     }
-
-    public var _routeDeclarations: [AnyRouteDeclaration] {
-        [declaration]
-    }
+    public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }

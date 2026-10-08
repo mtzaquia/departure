@@ -43,6 +43,8 @@ public struct ActionInterceptor<A: Action>: HookDeclaration, Sendable {
             kind: .actionInterceptor(
                 actionType,
                 AnyActionInterceptor { router, action, hasRerouted, origin async in
+                    guard let source = router.resolveRequestOrigin(origin) else { return }
+                    let interceptionOrigin = RouteRequestOrigin(scope: source)
                     guard let action = action as? A else {
                         log.departureWarning(
                             "Action interceptor for `\(String(reflecting: actionType))` received "
@@ -53,7 +55,8 @@ public struct ActionInterceptor<A: Action>: HookDeclaration, Sendable {
                     }
 
                     let invocation = ActionInvocation<A.Output> {
-                        try await router.runAction(action, hasRerouted: hasRerouted, origin: origin)
+                        guard interceptionOrigin.resolve(in: router.spaces) != nil else { throw CancellationError() }
+                        return try await router.runAction(action, hasRerouted: hasRerouted, origin: origin)
                     }
 
                     await intercept(invocation)

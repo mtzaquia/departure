@@ -30,25 +30,26 @@ struct NavigationReadinessTests {
     @Test(arguments: [false, true])
     func resolutionFinishingDuringUnwindWaitsWithoutResolvingAgain(cancel: Bool) async throws {
         let router = RouterEngine()
-        router.root.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations: [
-            RouteScopeDeclaration(routes: Sheet(SettingsRoute.self)._routeDeclarations),
-            RouteScopeDeclaration(routes: Sheet(DelayedResolutionRoute.self)._routeDeclarations),
+        router.root.defineTestMap(id: nil, selection: nil, definitions: [
+            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(DelayedResolutionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
         ])
         await router.present(SettingsRoute())
-        let old = try #require(router.normalTree.rootPath.last)
+        let old = try #require(router.normalSpace.rootPath.last)
         router.routeScopeDidInstallInView(old)
         let gate = ResolutionGate()
-        let request = Task { await router.present(DelayedResolutionRoute(gate: gate)) }
+        let surviving = Router(engine: router, scope: router.root)
+        let request = Task { await surviving.present(DelayedResolutionRoute(gate: gate)) }
         await gate.waitForResolutionToStart()
 
         let unwind = Task { await router.unwind(to: .root) }
-        for _ in 0..<100 where !router.normalTree.rootPath.isEmpty { await Task.yield() }
+        for _ in 0..<100 where !router.normalSpace.rootPath.isEmpty { await Task.yield() }
         #expect(router.navigationTransaction.isInProgress)
-        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(router.normalSpace.rootPath.isEmpty)
         gate.release()
         for _ in 0..<100 where router.pendingRoute == nil { await Task.yield() }
         #expect(router.pendingRoute != nil)
-        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(router.normalSpace.rootPath.isEmpty)
         #expect(gate.resolutionCount == 1)
 
         if cancel {
@@ -62,9 +63,9 @@ struct NavigationReadinessTests {
 
         #expect(router.pendingRoute == nil)
         #expect(gate.resolutionCount == 1)
-        #expect(router.normalTree.rootPath.count == (cancel ? 0 : 1))
+        #expect(router.normalSpace.rootPath.count == (cancel ? 0 : 1))
         if !cancel {
-            #expect(router.normalTree.rootPath.last?.route is DelayedResolutionRoute)
+            #expect(router.normalSpace.rootPath.last?.route is DelayedResolutionRoute)
         }
     }
 }

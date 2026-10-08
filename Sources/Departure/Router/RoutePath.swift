@@ -21,7 +21,6 @@
 //
 
 import Foundation
-import Observation
 
 struct RoutePathTrim {
     let path: RoutePath
@@ -32,7 +31,6 @@ struct RoutePathTrim {
     }
 }
 
-@Observable
 final class RoutePath: Identifiable {
     enum Position: Equatable, CustomStringConvertible {
         case owner
@@ -68,26 +66,19 @@ final class RoutePath: Identifiable {
         case keepPathThrough(Position)
     }
 
-    @ObservationIgnored let id = UUID()
-    @ObservationIgnored weak var owner: RouteScope?
-    var scopes: [RouteScope] = [] {
-        didSet {
-            let currentScopeIDs = Set(scopes.map(ObjectIdentifier.init))
-            for routeScope in oldValue where currentScopeIDs.contains(ObjectIdentifier(routeScope)) == false {
-                if routeScope.owningPath === self {
-                    routeScope.owningPath = nil
-                }
-            }
-
-            for routeScope in scopes {
-                routeScope.owningPath = self
-            }
+    let id = UUID()
+    weak var owner: RouteScope?
+    var scopes: [RouteScope] {
+        var result: [RouteScope] = []
+        var current = owner
+        while let next = current?.next(in: self) {
+            result.append(next)
+            current = next
         }
+        return result
     }
 
-    init(owner: RouteScope? = nil) {
-        self.owner = owner
-    }
+    init(owner: RouteScope) { self.owner = owner }
 
     var isEmpty: Bool {
         scopes.isEmpty
@@ -106,7 +97,7 @@ final class RoutePath: Identifiable {
     }
 
     func append(_ routeScope: RouteScope) {
-        scopes.append(routeScope)
+        (last ?? owner)?.append(routeScope, in: self)
     }
 
     func position(of routeScope: RouteScope) -> Position? {
@@ -114,8 +105,14 @@ final class RoutePath: Identifiable {
             return .owner
         }
 
-        if let scope = scopes.first(where: { $0 === routeScope }) {
-            return .scope(scope)
+        if routeScope.owningPath === self {
+            var current = routeScope
+            while let previous = current.previousRouteScope, previous.continuation === current {
+                if previous === owner { return .scope(routeScope) }
+                guard previous.owningPath === self else { return nil }
+                current = previous
+            }
+            return nil
         }
 
         guard let parent = routeScope.parent else {
@@ -142,35 +139,29 @@ final class RoutePath: Identifiable {
     }
 
     func keepThrough(_ position: Position) {
-        guard let removalStartIndex = index(after: position) else {
-            return
-        }
-
-        scopes.removeSubrange(removalStartIndex..<scopes.endIndex)
+        guard let retained = scope(at: position),
+              position == .owner || self.position(of: retained) == position else { return }
+        // Cut one owning edge. Outgoing snapshots retain the detached subtree until exit.
+        retained.removeContinuation(in: self)
     }
 
     func scopesRemovedAfter(_ position: Position) -> [RouteScope] {
-        guard let removalStartIndex = index(after: position) else {
-            return []
+        guard let retained = scope(at: position),
+              position == .owner || self.position(of: retained) == position else { return [] }
+        var removed: [RouteScope] = []
+        var current = retained
+        while let next = current.next(in: self) {
+            removed.append(next)
+            current = next
         }
-
-        guard removalStartIndex < scopes.endIndex else {
-            return []
-        }
-
-        return Array(scopes[removalStartIndex..<scopes.endIndex])
+        return removed
     }
 
     func positionBefore(_ routeScope: RouteScope) -> Position? {
-        guard let index = scopes.firstIndex(where: { $0 === routeScope }) else {
+        guard case .scope = position(of: routeScope), let previous = routeScope.previousRouteScope else {
             return position(of: routeScope)
         }
-
-        guard index > scopes.startIndex else {
-            return .owner
-        }
-
-        return .scope(scopes[scopes.index(before: index)])
+        return previous === owner ? .owner : .scope(previous)
     }
 
     var lastPosition: Position {
@@ -188,14 +179,13 @@ final class RoutePath: Identifiable {
 
         guard case let .scope(lhsScope) = lhs,
               case let .scope(rhsScope) = rhs,
-              let lhsIndex = scopes.firstIndex(where: { $0 === lhsScope }),
-              let rhsIndex = scopes.firstIndex(where: { $0 === rhsScope })
+              lhsScope.owningPath === self, rhsScope.owningPath === self
         else {
             assertionFailure("Route trim positions must belong to their route path.")
             return lhs
         }
 
-        return lhsIndex <= rhsIndex ? lhs : rhs
+        return lhsScope.pathDepth <= rhsScope.pathDepth ? lhs : rhs
     }
 
     func unwindResolution(to target: RouterEngine.UnwindTarget?) -> UnwindResolution {
@@ -234,17 +224,4 @@ final class RoutePath: Identifiable {
         }
     }
 
-    private func index(after position: Position) -> [RouteScope].Index? {
-        switch position {
-        case .owner:
-            return scopes.startIndex
-
-        case let .scope(scope):
-            guard let index = scopes.firstIndex(where: { $0 === scope }) else {
-                return nil
-            }
-
-            return scopes.index(after: index)
-        }
-    }
 }

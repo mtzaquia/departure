@@ -22,16 +22,13 @@
 
 import SwiftUI
 
-/// A routing handle for a shared routing container.
-///
-/// Read `@Environment(\.router)` for a view-scoped router. Routers created outside
-/// a view search the active routing graph without a captured scope. Stored scoped
-/// routers retain their original scope; commands become inactive when that scope
-/// leaves the routing graph. Routers and their commands are isolated to the main actor.
+/// A scope-bound navigation handle supplied by `WithRouter` or `RouteContext`.
+/// Stored routers retain their source identity and become inactive when that scope
+/// leaves navigation. Read `RootRouter.current` to capture a source for external navigation.
 public struct Router: Equatable {
     /// A destination for ``Router/unwind(to:)``.
     public enum UnwindTarget {
-        /// Unwinds every presented route across all branches and scopes, returning to the app's start.
+        /// Resets navigation in the receiving space, keeping its root and outer presentation.
         case root
 
         /// Unwinds to the first scope of the nearest enclosing branch.
@@ -41,45 +38,37 @@ public struct Router: Equatable {
         /// the unwind request returns `false`.
         case nearestBranch
 
-        /// Unwinds to the nearest ancestor of the receiving router's route scope,
-        /// or the current route for an unscoped router.
+        /// Dismisses the receiving scope. An elevated root removes its whole space.
         ///
         /// Dismisses the receiving scope and its descendants, matching a local
         /// ``UnwindRouteAction`` captured from that scope.
         case topmostAncestor
 
-        /// Unwinds to the scope that was declared with a matching ``SwiftUICore/View/routes(id:_:)`` ID.
+        /// Unwinds to the mapped scope with a matching declaration ID.
         case id(AnyHashable)
     }
 
-    let engine: RouterEngine?
+    private weak var referencedEngine: RouterEngine?
+    var engine: RouterEngine? { referencedEngine }
     let origin: RouteRequestOrigin?
 
-    /// Creates an unscoped router for a new routing container.
-    public init() {
-        let engine = RouterEngine()
-        self.init(engine: engine)
-    }
-
     init(engine: RouterEngine) {
-        self.engine = engine
-        self.origin = nil
+        self.init(engine: engine, scope: engine.currentRouteScope)
     }
 
     init(engine: RouterEngine, scope: RouteScope) {
-        self.engine = engine
-        self.origin = RouteRequestOrigin(scope: scope)
+        self.init(engine: engine, origin: RouteRequestOrigin(scope: scope))
     }
 
     private init(engine: RouterEngine?, origin: RouteRequestOrigin?) {
-        self.engine = engine
+        self.referencedEngine = engine
         self.origin = origin
     }
 
     static let inactive = Router(engine: nil, origin: nil)
 
     /// Returns a router targeting a named branch of the nearest enclosing container.
-    /// An unscoped router targets from the root container.
+    /// External callers can capture a scoped router through `RootRouter.current`.
     ///
     /// Obtaining the router does not activate the branch. A presentation owned by
     /// the branch activates it through the container's selection binding. A missing
@@ -91,58 +80,52 @@ public struct Router: Equatable {
     /// - Parameter id: The branch value declared by the target container.
     public func branch<ID: Hashable & Sendable>(_ id: ID) -> Router {
         guard let engine else { return .inactive }
-        warnIfUnscoped(using: engine)
-        let source = origin ?? RouteRequestOrigin(scope: engine.root)
-        guard let target = source.targeting(AnyHashable(id), in: engine.routeForest) else {
+        let source = origin ?? RouteRequestOrigin(scope: engine.currentRouteScope)
+        guard let target = source.targeting(AnyHashable(id), in: engine.spaces) else {
             return .inactive
         }
         return Router(engine: engine, origin: target)
     }
 
-    /// Resolves and presents a route from this router's scope, or from the active
-    /// routing graph when this router has no scope.
+    /// Resolves and presents a route from this router's scope, within its priority space.
     ///
     /// Returns after routing state updates, without waiting for SwiftUI to display
     /// the destination. Rejected routes do not activate the targeted branch.
     /// - Parameter route: The route to resolve and present.
     public func present(_ route: any Route) async {
         guard let engine else { return }
-        warnIfUnscoped(using: engine)
         await engine.requestRouteWhenReady(route, origin: origin)
     }
 
-    /// Unwinds from this router's scope, or the current route when unscoped,
-    /// to an explicit target.
+    /// Unwinds from this router's scope, to an explicit target in its priority space.
     ///
-    /// `.root` clears the entire routing container. Other targets resolve locally.
+    /// `.root` retains this space's root. Use `dismissSpace()` for whole-space removal.
     /// - Returns: Whether an unwind target was found for an active scope.
     @discardableResult
     public func unwind(to target: UnwindTarget) async -> Bool {
         guard let engine else { return false }
-        warnIfUnscoped(using: engine)
         return await engine.unwindAndWait(to: target, origin: origin)
     }
 
-    /// Unwinds from this router's scope, or the current route when unscoped,
-    /// and delivers a payload to a matching handler.
+    /// Unwinds from this router's scope, and delivers a payload to a matching handler.
     /// - Returns: Whether an unwind target was found for an active scope.
     @discardableResult
     public func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {
         guard let engine else { return false }
-        warnIfUnscoped(using: engine)
         return await engine.unwindAndWait(to: target, payload: payload, origin: origin)
     }
 
-    /// Performs an action from this router's scope, or from the current route
-    /// when this router has no scope.
+    /// Performs an action from this router's scope, within its priority space.
     public func perform(_ action: any Action) async {
         guard let engine else { return }
-        warnIfUnscoped(using: engine)
         await engine.performAction(action, origin: origin)
     }
 
-    private func warnIfUnscoped(using engine: RouterEngine) {
-        if origin == nil { engine.warnAboutUnscopedRouterIfNeeded() }
+    /// Removes this router's entire elevated space. Only the top space can request it.
+    @discardableResult
+    public func dismissSpace() async -> Bool {
+        guard let engine, let source = engine.navigationSource(origin), let space = source.space else { return false }
+        return await engine.dismissSpace(space, source: source)
     }
 
     public static func == (lhs: Router, rhs: Router) -> Bool {
@@ -162,7 +145,7 @@ final class RouteRequestOrigin: Equatable {
         self.branches = branches
     }
 
-    func targeting(_ branch: AnyHashable, in forest: RouteForest?) -> RouteRequestOrigin? {
+    func targeting(_ branch: AnyHashable, in forest: RouteSpaces?) -> RouteRequestOrigin? {
         guard let scope, let forest, forest.routePath(containing: scope) != nil else { return nil }
         if branches.isEmpty {
             var candidate: RouteScope? = scope
@@ -183,31 +166,17 @@ final class RouteRequestOrigin: Equatable {
 }
 
 extension RouteRequestOrigin {
-    enum Target {
-        case scope(RouteScope)
-        case unmountedBranch(owner: RouteScope, id: AnyHashable)
-
-        var scope: RouteScope? {
-            if case .scope(let scope) = self { return scope }
-            return nil
-        }
-    }
-
-    func resolve(in forest: RouteForest) -> Target? {
+    func resolve(in forest: RouteSpaces) -> RouteScope? {
         guard let scope, forest.routePath(containing: scope) != nil else { return nil }
-        guard branches.isEmpty == false else { return .scope(scope) }
+        guard branches.isEmpty == false else { return scope }
 
         // Branch handles already capture their container at creation. Losing
         // that container must not redirect a stored handle to an ancestor.
         guard scope.branchContainer != nil else { return nil }
         var container = scope
         for (index, branch) in branches.enumerated() {
-            guard container.declarations.branchIDs.contains(branch)
-                || container.branchScopes[branch] != nil else { return nil }
-            guard let child = container.branchScopes[branch] else {
-                return index == branches.count - 1 ? .unmountedBranch(owner: container, id: branch) : nil
-            }
-            if index == branches.count - 1 { return .scope(child.activeLocalScope) }
+            guard let child = container.branchScopes[branch] else { return nil }
+            if index == branches.count - 1 { return child.activeLocalScope }
             // Stay at the next container instead of following its selected branch
             // into a destination that no longer owns the nested branch map.
             container = child.path.scopes.reversed().first { $0.branchContainer != nil } ?? child

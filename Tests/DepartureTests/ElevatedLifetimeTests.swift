@@ -24,88 +24,55 @@ import SwiftUI
 import Testing
 @testable import Departure
 
-@MainActor
-@Suite
-struct ElevatedLifetimeTests {
-    @Test func removingNormalOriginClearsHighAndDependentCritical() async throws {
-        let (router, normal, _, _) = try await makeChain()
-        #expect(await router.unwindPrevious(from: normal))
-        #expect(router.normalTree.rootPath.isEmpty)
-        #expect(router.routeForest.highTree == nil)
-        #expect(router.routeForest.criticalTree == nil)
+@MainActor @Suite struct ElevatedLifetimeTests {
+    @Test func removingNormalDestinationKeepsRootPriorityPresentations() async throws {
+        let (engine, normal, _, _) = try await makeChain()
+        #expect(!((await engine.unwindPrevious(from: normal))))
+        #expect(engine.normalSpace.rootPath.last === normal)
+        #expect(engine.spaces.highSpace != nil)
+        #expect(engine.spaces.criticalSpace != nil)
     }
-
-    @Test func removingHighOriginClearsCriticalButPreservesNormal() async throws {
-        let (router, normal, high, _) = try await makeChain()
-        #expect(await router.unwindPrevious(from: high))
-        #expect(router.normalTree.rootPath.last === normal)
-        #expect(router.routeForest.highTree == nil)
-        #expect(router.routeForest.criticalTree == nil)
+    @Test func removingHighDestinationKeepsRootCriticalAndNormal() async throws {
+        let (engine, normal, _, _) = try await makeChain()
+        #expect(await RootRouter(engine: engine).dismissSpace(.high))
+        #expect(engine.normalSpace.rootPath.last === normal)
+        #expect(engine.spaces.highSpace == nil)
+        #expect(engine.spaces.criticalSpace != nil)
     }
-
-    @Test func elevatedHostTeardownAlsoClearsDependentCritical() async throws {
-        let (router, normal, high, _) = try await makeChain()
-        router.routeScopeDidInstallInView(high)
-        router.routeScopeDidLeaveView(high)
-        #expect(router.normalTree.rootPath.last === normal)
-        #expect(router.routeForest.highTree == nil)
-        #expect(router.routeForest.criticalTree == nil)
+    @Test func elevatedNativeTeardownClearsOnlyItsOwnPriority() async throws {
+        let (engine, normal, high, _) = try await makeChain()
+        engine.routeScopeDidInstallInView(high)
+        engine.routeScopeDidLeaveView(high)
+        #expect(engine.normalSpace.rootPath.last === normal)
+        #expect(engine.spaces.highSpace == nil)
+        #expect(engine.spaces.criticalSpace != nil)
     }
-
-    @Test func rootDeclaredCriticalSurvivesRemovalOfUnrelatedOrigins() async throws {
-        let (router, normal, _, _) = try await makeChain(criticalAtRoot: true)
-        #expect(await router.unwindPrevious(from: normal))
-        #expect(router.normalTree.rootPath.isEmpty)
-        #expect(router.routeForest.highTree == nil)
-        #expect(router.routeForest.criticalTree != nil)
-        #expect(router.elevatedRoutePresentationBinding(priority: .critical, matching: .sheet).wrappedValue != nil)
+    @Test func ownerRemovalClearsAllElevatedPriorities() async throws {
+        let (engine, _, _, _) = try await makeChain()
+        #expect(await RootRouter(engine: engine).dismissSpaces())
+        #expect(engine.normalSpace.rootPath.count == 1)
+        #expect(engine.spaces.highSpace == nil)
+        #expect(engine.spaces.criticalSpace == nil)
     }
-
-    @Test func removingBranchContainerClearsBranchDeclaredElevatedChain() async throws {
-        let (router, normal, _, _) = try await makeChain(highInBranch: true)
-        #expect(await router.unwindPrevious(from: normal))
-        #expect(router.normalTree.rootPath.isEmpty)
-        #expect(router.routeForest.highTree == nil)
-        #expect(router.routeForest.criticalTree == nil)
+    @Test func allElevatedOriginsAreRootAnchored() async throws {
+        let (engine, _, _, _) = try await makeChain()
+        #expect(engine.spaces.highSpace?.root.presentationOrigin === engine.root)
+        #expect(engine.spaces.criticalSpace?.root.presentationOrigin === engine.root)
     }
-
-    private func makeChain(
-        criticalAtRoot: Bool = false,
-        highInBranch: Bool = false
-    ) async throws -> (RouterEngine, RouteScope, RouteScope, RouteScope) {
-        let router = RouterEngine()
-        var rootRoutes = Push(HomeDetailRoute.self)._routeDeclarations
-        if criticalAtRoot {
-            rootRoutes += Sheet(AlertRoute.self, priority: .critical)._routeDeclarations
-        }
-        router.root.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations: [
-            RouteScopeDeclaration(routes: rootRoutes),
-        ])
-        await router.present(HomeDetailRoute())
-        let normal = try #require(router.normalTree.rootPath.last)
-        let highOrigin: RouteScope
-        if highInBranch {
-            let branch = RouteScope(id: "branch", route: nil)
-            router.mutateRouteGraph {
-                normal.setActiveBranch("branch")
-                normal.registerBranchScope(branch, for: "branch")
-            }
-            highOrigin = branch
-        } else {
-            highOrigin = normal
-        }
-        highOrigin.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations: [
-            RouteScopeDeclaration(routes: Sheet(LoginRoute.self, priority: .high)._routeDeclarations),
-        ])
-        await router.present(LoginRoute())
-        let high = try #require(router.routeForest.highTree?.rootPath.last)
-        if !criticalAtRoot {
-            high.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations: [
-                RouteScopeDeclaration(routes: Sheet(AlertRoute.self, priority: .critical)._routeDeclarations),
-            ])
-        }
-        await router.present(AlertRoute())
-        let critical = try #require(router.routeForest.criticalTree?.rootPath.last)
-        return (router, normal, high, critical)
+    private func makeChain() async throws -> (RouterEngine, RouteScope, RouteScope, RouteScope) {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
+        } highPriority: {
+            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+        } criticalPriority: {
+            Sheet(RouteDestination(AlertRoute.self) { _, _ in EmptyView() })
+        })
+        await engine.present(HomeDetailRoute())
+        let normal = try #require(engine.normalSpace.rootPath.last)
+        await engine.present(LoginRoute())
+        let high = try #require(engine.spaces.highSpace?.currentRouteScope)
+        await engine.present(AlertRoute())
+        let critical = try #require(engine.spaces.criticalSpace?.currentRouteScope)
+        return (engine, normal, high, critical)
     }
 }
