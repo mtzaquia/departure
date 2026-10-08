@@ -1,34 +1,58 @@
 # Priority
 
-Use elevated priority for flows that must appear above normal app navigation, such as authentication or a critical outage.
+High and critical presentations are declared at the routing root. They appear above normal app navigation and retain independent navigation state.
 
 ```swift
-.routes {
-  Sheet(ProfileRoute.self)
-  Cover(LoginRoute.self, priority: .high)
-  Cover(SystemOutageRoute.self, priority: .critical)
+let routes = RootRouteMap {
+  Sheet(ProfileFeature.destination)
+} highPriority: {
+  Cover(LoginFeature.destination) {
+    Push(LoginFeature.challengeDestination)
+  }
+} criticalPriority: {
+  Cover(SystemOutageFeature.destination, transition: .fade)
 }
 ```
 
-| Priority | Use |
-| --- | --- |
-| `.normal` | Everyday navigation. |
-| `.high` | Important flows above normal navigation. |
-| `.critical` | Urgent flows above everything else. |
+Either additional builder may be omitted independently. Elevated base builders accept only `Sheet` and `Cover`; unsupported expressions fail at compile time. Compose `RouteMap` values inside their nested builders. Child declarations use normal local styles within that elevated flow; they inherit its effective priority. Priorities belong to the root builders, so `Push`, `Replace`, `Sheet`, and `Cover` have no priority argument.
 
-High and critical presentations use their own window. If their destination relies on a custom environment value, forward it with `windowDestination`.
+| Priority | Presentation owner |
+| --- | --- |
+| `.normal` | The matching local scope. |
+| `.high` | The router root, above normal navigation. |
+| `.critical` | The router root, above high navigation. |
+
+The entry destination becomes the space root at X0/Y0. Its outer modal presents that space; local modals advance Y within it. Replacement commits a new root before waiting for the outgoing presentation, so it never exposes a temporary lower space.
+
+Only the top space may originate navigation. Covered scoped routers cannot push, replace, unwind, select a branch, or open another priority. Lookup and unwind IDs stop at the space root; the owner's elevated entry definitions remain discoverable separately. Detached environment forwarding comes from the owner and does not establish navigation ancestry.
+
+`router.unwind(to: .root)` resets only its space and retains the entry and outer presentation. `router.dismissSpace()` or the elevated root's `unwindRoute()` removes the whole space. An explicit owner can also remove a covered space:
 
 ```swift
-WithRouter {
+@State private var rootRouter = RootRouter()
+
+WithRouter(routes: routes, router: rootRouter) { AppRoot() }
+
+await rootRouter.dismissSpace(.high)
+await rootRouter.current.present(ProfileRoute())
+// Or remove every elevated space present when the call is accepted:
+await rootRouter.dismissSpaces()
+```
+
+Pending requests, transactions, and outgoing snapshots share one owner-level pipeline. After removal commits, the surviving top space becomes eligible immediately; its next presentation waits for required native teardown. A stored router from the removed space remains inactive.
+
+## Forward detached environment values
+
+High and critical presentations use detached hosts, as do fade covers. Forward custom values with `windowDestination`:
+
+```swift
+WithRouter(routes: routes) {
   AppRoot()
 } windowDestination: { destination, environment in
-  destination
-    .environment(\.myCustomKey, environment.myCustomKey)
+  destination.environment(\.myCustomKey, environment.myCustomKey)
 }
 ```
 
-Elevated flows are for interruption, not ordinary stacking. A high or critical request from normal content replaces an active presentation at that priority; from an equal- or higher-priority context, it continues as local routing. Lower-priority requests outside an active elevated context do not present.
-
-An elevated flow's lifetime follows the scope that declares it. Declare it at the router root when it should survive changes to lower-priority routes. When you unwind away from a declaring scope, its elevated flow is also cleared, including elevated flows declared inside it. For example, removing a normal destination clears a high flow declared there and a critical flow declared inside that high flow. A critical flow declared at the router root remains independent. An explicit `.root` unwind clears all priorities.
+High and critical forwarding comes from the router root. Normal fade-cover forwarding comes from its local presentation host. The destination context receives the same effective environment as its view.
 
 Next: [Getting started](getting-started.md)

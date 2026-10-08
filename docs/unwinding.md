@@ -10,16 +10,18 @@ await router.unwind(to: .id("settings-flow"))
 
 The environment router resolves targets from its captured scope. `.nearestBranch` clears
 that scope’s enclosing branch; `.topmostAncestor` dismisses that scope and its descendants.
-`.root` explicitly clears the entire routing container, including sibling branches.
-`unwindRoute()` remains the convenient local dismissal action.
+`.root` resets only the receiving priority space and keeps its root visible. Inactive pushes survive only in branches owned by that retained root; removing a nested container removes all its branches from live navigation. Targets and payload handlers never cross a space boundary. Covered spaces reject ordinary unwinds.
 
-Tag a scope to make it a stable target.
+`unwindRoute()` dismisses the captured destination. At an elevated root it removes the entire space; the permanent normal root cannot be dismissed. `router.dismissSpace()` removes the receiving top elevated space from any descendant. `RootRouter.dismissSpace(_:)` and `dismissSpaces()` coordinate removal explicitly, including covered spaces, and finish after native teardown.
+
+Name a mapped scope to target it explicitly:
 
 ```swift
-SettingsFlowView()
-  .routes(id: "settings-flow") {
-    Push(AdvancedSettingsRoute.self)
+RootRouteMap(id: "app-root") {
+  Sheet(SettingsFeature.destination, id: "settings-flow") {
+    Push(SettingsFeature.advancedDestination)
   }
+}
 ```
 
 `unwind(to:)` returns whether it found a target. Await it before continuing a flow.
@@ -32,7 +34,7 @@ if await router.unwind(to: .id("settings-flow")) {
 
 ## Dismiss from a route
 
-`unwindRoute` is the local dismissal action. It stays tied to the scope where it was read, making it ideal for child views and callbacks.
+`RouteContext.unwindRoute` and the environment `unwindRoute` are local dismissal actions. It stays tied to the scope where it was read, making it ideal for child views and callbacks.
 
 ```swift
 struct EditorView: View {
@@ -61,5 +63,7 @@ await unwindRoute(payload: SaveResult.saved)
 ```
 
 SwiftUI’s `dismiss()` follows the same payload-free unwind path and triggers a matching handler.
+
+Handlers are found from the surviving landing scope toward its space root. An outgoing scope stops participating when it leaves navigation, even if its view is retained for dismissal. Distinct hook types compose across `.hooks` modifiers in the same scope; duplicate handlers for one route type disable that handler and report a diagnostic. An ambiguous handler does not fall back to an ancestor's handler.
 
 Next: [Branches](branches.md)
