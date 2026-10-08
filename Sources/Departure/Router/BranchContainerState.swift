@@ -24,5 +24,4 @@ import Foundation
 
 struct BranchContainerState {
     var selectedBranch: AnyHashable
-    var concurrent = false
 }

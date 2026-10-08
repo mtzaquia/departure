@@ -75,7 +75,7 @@ There is no separate ledger. The scope owns the accepted host identity and weak 
 | --- | --- |
 | Scope belongs to live navigation | Its location in the owning space. |
 | Host ownership and current readiness | The accepted host identity and native anchor. |
-| Selected routing projection and source environment | The ordered host registrations and existing explicit-host precedence. |
+| Selected routing projection and source environment | One explicit routing host, or one automatic host when no explicit host exists. Ambiguity disables presentation. |
 | Captured live hooks | Their own accepted host registrations, independent of definitions. |
 | Installation/teardown waiters and pending branch resumption | Changes in the accepted readiness state. |
 | Platform reconciliation and priority cleanup | The accepted event and identity of the corresponding route instance. |
@@ -92,7 +92,7 @@ Compile and normalize the complete root map when its routing owner is initialize
 
 Compiled definitions also carry the receiving scope's optional explicit ID. Root, presentation, and inlined map IDs are validated together: one ID names that scope; multiple IDs use the same conflict representation as other invalid declarations. Branch selection values remain independent of their scope's unwind name.
 
-All runtime instances of one declaration occurrence share its immutable `RouteDefinitions` node. Each instance creates its own branch scopes, selections, and paths. Repeated composition of the same feature map creates distinct declaration occurrences, while repeatedly presenting one occurrence does not recompile it.
+All runtime instances of one declaration occurrence share its immutable `RouteDefinitions` node, including the branch container's concurrency setting. Runtime branch state holds only the selected value. Each instance creates its own branch scopes, selections, and paths. Repeated composition of the same feature map creates distinct declaration occurrences, while repeatedly presenting one occurrence does not recompile it.
 
 Definition structure stays stable for that owner's lifetime. SwiftUI reevaluating a body does not reinstall the map. Runtime replacement of the complete map is outside the current scope.
 
@@ -142,7 +142,7 @@ Bindings read the presentation belonging to their accumulated context and presen
 
 Binding getters do not install declarations, mutate navigation state, or change scope identity. Presentation identity comes from the runtime instance, independently of route type equality and definition identity.
 
-Each physical presentation must have one effective owner. Repeating `.routing()` for the same scope must not create competing modal bindings or replacement owners. Use the context and presentation role to identify ownership; retain a small stable host token only where physical host identity is necessary. Do not recreate a stack of declaration sources to solve host placement.
+Each physical presentation must have one effective owner. Repeating explicit `.routing()` for the same scope diagnoses a conflict and disables local presentation until exactly one explicit owner remains. Without an explicit host, multiple automatic hosts likewise conflict. Refreshing an existing identity updates its environment without creating another owner. Use the context and presentation role to identify ownership; retain a small stable host token only where physical host identity is necessary. Do not recreate a stack of declaration sources to solve host placement.
 
 Shared Y modal ownership is projected consistently by branch hosts. A branch must not gain its own modal capacity merely because it has its own path prefix. Default-priority local presentation uses its appropriate host; high and critical root presentation uses the router root. One resolver projects both local and root presentations, and one binding implementation validates the expected destination instance before accepting write-back. Each root priority has one detached host that chooses sheet, slide, or fade presentation from the committed destination snapshot. Native style-specific adapters retain their own transition behavior.
 

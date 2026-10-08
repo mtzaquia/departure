@@ -42,17 +42,16 @@ struct IOS17NavigationStackPushWorkaroundTests {
     @Test func pushHostIdentityChangesOnlyForConcurrentBranchSelection() {
         let router = makeRouterWithWorkaround()
         let workaround = IOS17NavigationStackPushWorkaround()
-        router.root.branchContainer = BranchContainerState(
-            selectedBranch: AnyHashable(AppTab.home),
-            concurrent: true
-        )
+        router.root.define(RootRouteMap { Branches(concurrent: true) {
+            Branch(AppTab.home) {}; Branch(AppTab.wallet) {}
+        } }.declarations)
 
         #expect(workaround.pushHostIdentity(for: AppTab.home, in: router.root, router: router))
         #expect(!workaround.pushHostIdentity(for: AppTab.wallet, in: router.root, router: router))
 
-        router.root.branchContainer = BranchContainerState(
-            selectedBranch: AnyHashable(AppTab.home)
-        )
+        router.root.define(RootRouteMap { Branches {
+            Branch(AppTab.home) {}; Branch(AppTab.wallet) {}
+        } }.declarations)
         #expect(workaround.pushHostIdentity(for: AppTab.wallet, in: router.root, router: router))
     }
 

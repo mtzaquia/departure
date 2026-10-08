@@ -41,8 +41,7 @@ extension RouteScope {
     }
 
     var isConcurrent: Bool {
-        access(keyPath: \.branchContainer)
-        return branchContainer?.concurrent == true
+        definitions.branchContainer?.declaration?.concurrent == true
     }
 
     var activeLocalScope: RouteScope {

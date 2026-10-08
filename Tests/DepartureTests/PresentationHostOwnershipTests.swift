@@ -25,6 +25,39 @@ import Testing
 @testable import Departure
 
 @MainActor @Suite struct PresentationHostOwnershipTests {
+    @Test(arguments: [false, true])
+    func duplicateExplicitHostsDisablePresentationUntilOneRemains(removeFirst: Bool) async {
+        let engine = RouterEngine(routes: RootRouteMap { Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }) })
+        let first = RoutePresentationHostID(), second = RoutePresentationHostID(), automatic = RoutePresentationHostID()
+        let scope = engine.root
+        scope.bindRoutingHost(automatic, automatic: true, environment: scope.sourceEnvironment)
+        scope.bindRoutingHost(first, automatic: false, environment: scope.sourceEnvironment)
+        scope.bindRoutingHost(second, automatic: false, environment: scope.sourceEnvironment)
+        #expect(scope.hasConflictingPresentationHosts)
+        #expect(scope.presentationHostID == nil)
+        await engine.present(SettingsRoute())
+        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.routePresentationBinding(from: scope, matching: .sheet).wrappedValue == nil)
+        scope.unbindRoutingHost(removeFirst ? first : second)
+        #expect(!scope.hasConflictingPresentationHosts)
+        #expect(scope.presentationHostID == (removeFirst ? second : first))
+        await engine.present(SettingsRoute())
+        #expect(engine.routePresentationBinding(from: scope, matching: .sheet, hostedBy: scope.presentationHostID).wrappedValue?.scope === engine.defaultSpace.rootPath.last)
+    }
+
+    @Test func ambiguousAutomaticHostsRequireAnExplicitOwner() {
+        let scope = RouteScope(id: "root", route: nil)
+        let first = RoutePresentationHostID(), second = RoutePresentationHostID(), explicit = RoutePresentationHostID()
+        scope.bindRoutingHost(first, automatic: true, environment: scope.sourceEnvironment)
+        scope.bindRoutingHost(second, automatic: true, environment: scope.sourceEnvironment)
+        #expect(scope.hasConflictingPresentationHosts)
+        #expect(scope.presentationHostID == nil)
+        scope.bindRoutingHost(explicit, automatic: false, environment: scope.sourceEnvironment)
+        #expect(!scope.hasConflictingPresentationHosts)
+        #expect(scope.presentationHostID == explicit)
+        scope.unbindRoutingHost(explicit)
+        #expect(scope.hasConflictingPresentationHosts)
+    }
     @Test func explicitPhysicalHostWinsAndRestoresAutomaticHost() {
         let scope = RouteScope(id: "root", route: nil)
         let automatic = RoutePresentationHostID(), explicit = RoutePresentationHostID()

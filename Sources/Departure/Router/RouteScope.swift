@@ -112,7 +112,7 @@ final class RouteScope: Identifiable {
             scope.branchID = branch
             branchScopes[branch] = scope
             if branchContainer == nil {
-                branchContainer = BranchContainerState(selectedBranch: branch, concurrent: container.concurrent)
+                branchContainer = BranchContainerState(selectedBranch: branch)
             }
         }
     }
@@ -244,7 +244,19 @@ extension RouteScope {
     }
 
     private func selectedHost(in hosts: OrderedStorage<RoutePresentationHostID, RoutingHost>) -> RoutePresentationHostID? {
-        hosts.keys.last { hosts[$0]?.automatic == false } ?? hosts.keys.last
+        presentationHostBinding(in: hosts)?.declaration
+    }
+
+    private func presentationHostBinding(in hosts: OrderedStorage<RoutePresentationHostID, RoutingHost>) -> DeclarationBinding<RoutePresentationHostID>? {
+        let explicit = hosts.keys.filter { hosts[$0]?.automatic == false }
+        let candidates = explicit.isEmpty ? hosts.keys : explicit
+        guard let first = candidates.first else { return nil }
+        return candidates.count == 1 ? .declared(first) : .conflict
+    }
+
+    var hasConflictingPresentationHosts: Bool {
+        if case .conflict? = presentationHostBinding(in: routingHosts) { return true }
+        return false
     }
 
     func bindRoutingHost(_ id: RoutePresentationHostID, automatic: Bool, environment: EnvironmentValues, selection: AnyRouteBranchSelection? = nil) {
@@ -261,6 +273,7 @@ extension RouteScope {
 
     private func updateRoutingHosts(_ hosts: OrderedStorage<RoutePresentationHostID, RoutingHost>) {
         let previouslyConflicted = hasConflictingBranchSelection
+        let presentationPreviouslyConflicted = hasConflictingPresentationHosts
         if selectedHost(in: hosts) != selectedHost(in: routingHosts) {
             withMutation(keyPath: \.presentationHostID) { routingHosts = hosts }
         } else {
@@ -268,6 +281,14 @@ extension RouteScope {
         }
         if let id = selectedHost(in: hosts), let host = hosts[id] {
             sourceEnvironmentReference.update(host.environment)
+        }
+        if hasConflictingPresentationHosts && !presentationPreviouslyConflicted {
+            log.departureWarning(
+                "Scope `\(id)` has conflicting presentation hosts. Keep one explicit `.routing()` "
+                    + "or `.routing(branch:)` presentation owner in this scope; use `.routing(branchValue)` "
+                    + "to enter another branch scope. Automatic hosts are used only without an explicit owner. "
+                    + "Presentation is disabled until one owner remains."
+            )
         }
         if hasConflictingBranchSelection && !previouslyConflicted {
             log.departureWarning(

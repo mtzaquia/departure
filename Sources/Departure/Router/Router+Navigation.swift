@@ -185,7 +185,8 @@ extension RouterEngine {
 
     func appendRoute(_ route: any Route, after match: DeclarationMatch, origin: RouteRequestOrigin? = nil) async {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
-        guard navigationSource(origin) != nil, let host = match.presentationHost, !Task.isCancelled else { return }
+        guard navigationSource(origin) != nil, let host = match.presentationHost,
+              !host.hasConflictingPresentationHosts, !Task.isCancelled else { return }
         if await ios17NavigationStackPushWorkaround?.prepareAppend(after: match, in: self) == true {
             return
         }

@@ -28,27 +28,28 @@ import SwiftUI
 extension RouteScope {
     static let testSelectionOwner = RoutePresentationHostID()
 
-    func bindTestBranchSelection(_ selection: AnyRouteBranchSelection, concurrent: Bool? = nil) {
+    func bindTestBranchSelection(_ selection: AnyRouteBranchSelection) {
         bindRoutingHost(Self.testSelectionOwner, automatic: false, environment: sourceEnvironment, selection: selection)
-        if let concurrent { branchContainer?.concurrent = concurrent }
         bindBranchSelection(selection)
     }
 
-    func define(_ declarations: [RouteScopeDeclaration]) {
+    func define(_ declarations: [RouteScopeDeclaration], concurrent: Bool? = nil) {
         // Legacy fixtures express their one container as individual branch records.
         let branches = declarations.filter { $0.branch != nil }
-        let definitions = declarations.filter { $0.branch == nil }
-            + (branches.isEmpty ? [] : [.init(branches: branches, concurrent: false)])
+        let definitions: [RouteScopeDeclaration] = declarations.filter { $0.branch == nil }.map { declaration -> RouteScopeDeclaration in
+            guard let concurrent, case let .branches(_, children) = declaration.content else { return declaration }
+            return RouteScopeDeclaration(branches: children, concurrent: concurrent)
+        } + (branches.isEmpty ? [] : [RouteScopeDeclaration(branches: branches, concurrent: concurrent ?? false)])
         useDefinitions(RouteDefinitions(definitions))
     }
     @discardableResult
     func defineTestMap(sourceID: AnyHashable = "fixture", id: AnyHashable? = nil, selection: AnyRouteBranchSelection? = nil, concurrent: Bool? = nil, definitions: [RouteScopeDeclaration], environment: EnvironmentValues? = nil) -> Bool {
         if let id { self.id = id }
         if let environment { updateSourceEnvironment(environment) }
-        define(definitions)
+        define(definitions, concurrent: concurrent)
         if let selection {
             if branchContainer == nil { branchContainer = BranchContainerState(selectedBranch: selection.value()) }
-            bindTestBranchSelection(selection, concurrent: concurrent)
+            bindTestBranchSelection(selection)
         }
         return true
     }

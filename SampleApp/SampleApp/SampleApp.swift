@@ -95,13 +95,13 @@ struct DepartureSampleApp: App {
             } else if ProcessInfo.processInfo.arguments.contains("--nested-modal-probe") {
                 WithRouter(routes: NestedModalProbeMap.root, router: router) {
                     NavigationStack {
-                        NestedModalProbeRoot().routing()
+                        NestedModalProbeRoot()
                     }
                 }
             } else if ProcessInfo.processInfo.arguments.contains("--dismissal-stack-probe") {
                 WithRouter(routes: DismissalStackProbeMap.root, router: router) {
                     NavigationStack {
-                        DismissalStackProbeRoot().routing()
+                        DismissalStackProbeRoot()
                     }
                 }
             } else {

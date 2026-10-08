@@ -100,7 +100,7 @@ extension RouterEngine {
                 sourceEnvironment: metadata.sourceEnvironment.values), routePath: space.rootPath, isLive: true)
 
         case let .local(host, hostID):
-            guard let style, host.canDrivePresentation(matching: style),
+            guard !host.hasConflictingPresentationHosts, let style, host.canDrivePresentation(matching: style),
                   hostID == nil || host.presentationHostID == hostID else { return nil }
             if let path = spaces.routePath(containing: host),
                let scope = path.scopes.first(where: { $0.attachedPresentationDeclaration(presentedBy: host, matching: style, hostedBy: hostID) != nil }),

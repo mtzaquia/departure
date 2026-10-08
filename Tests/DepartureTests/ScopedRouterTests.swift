@@ -471,7 +471,7 @@ private struct Fixture {
     init(concurrent: Bool) {
         @Bindable var selection = selection
         engine.root.defineTestMap(id: nil,
-            selection: AnyRouteBranchSelection($selection.value),
+            selection: AnyRouteBranchSelection($selection.value), concurrent: concurrent,
             definitions:
                 Branch("sidebar") { AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, kind: .push) }.routeScopeDeclarations
                 + Branch("content") { AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push); AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) }.routeScopeDeclarations
@@ -481,7 +481,6 @@ private struct Fixture {
                     AnyRouteDeclaration(RouteDestination(DroppedRoute.self) { route, _ in EmptyView() }, kind: .push)
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
                 }.routeScopeDeclarations)
-        engine.root.branchContainer?.concurrent = concurrent
         engine.mutateRouteGraph {
             engine.root.attachTestBranch(sidebar, for: "sidebar")
             engine.root.attachTestBranch(content, for: "content")
