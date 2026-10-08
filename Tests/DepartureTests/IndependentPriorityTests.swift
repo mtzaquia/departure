@@ -152,7 +152,7 @@ struct IndependentPriorityTests {
         let removal = Task { await owner.dismissSpace(.high) }
         for _ in 0..<1000 where owner.engine.spaces.highSpace != nil { await Task.yield() }
         #expect(owner.engine.spaces.highSpace == nil)
-        #expect(owner.engine.navigationTransaction.isInProgress)
+        #expect(owner.engine.isNavigating)
         await removed.present(CriticalEntry())
         let followUp = Task { await surviving.present(NormalPush()) }
         for _ in 0..<1000 where owner.engine.pendingRoute == nil { await Task.yield() }
@@ -162,7 +162,7 @@ struct IndependentPriorityTests {
         #expect(await removal.value)
         await followUp.value
         #expect(owner.engine.normalSpace.rootPath.count == 1)
-        #expect(!owner.engine.navigationTransaction.isInProgress)
+        #expect(!owner.engine.isNavigating)
         #expect(owner.engine.spaces.criticalSpace == nil)
     }
 

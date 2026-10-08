@@ -38,6 +38,9 @@ One accepted occurrence of a route in navigation state. Its identity is distinct
 **Presentation host**:
 The physical view or native container that presents a scope's content. Its lifetime and readiness are distinct from the scope's membership in navigation state.
 
+**Navigation operation**:
+One accepted navigation change and its completion. Logical navigation changes when committed; outgoing presentations may finish later before a requested destination continues.
+
 **Routing owner (`RootRouter`)**:
 Owns all priority spaces and one global transition pipeline. Explicit whole-space removal belongs here; `current` captures an ordinary scoped navigation handle.
 

@@ -109,7 +109,7 @@ extension RouterEngine {
                 return ResolvedRoutePresentation(presentation: PresentedRoute(scope: scope, declaration: declaration,
                     sourceEnvironment: host.sourceEnvironment), routePath: path, isLive: true)
             }
-            guard host !== root, let outgoing = unwindPresentationSnapshot?.presentations[PresentationKey(host, style)],
+            guard host !== root, let outgoing = outgoingPresentation(for: PresentationKey(host, style)),
                   outgoing.retainsBinding else { return nil }
             return outgoing.projection
         }
@@ -118,7 +118,7 @@ extension RouterEngine {
     func pushPresentationDismissalDisablesAnimations(from scope: RouteScope?, hostedBy hostID: RoutePresentationHostID? = nil) -> Bool {
         let scope = scope ?? root
         guard hostID == nil || scope.presentationHostID == hostID else { return false }
-        return unwindPresentationSnapshot?.presentations[PresentationKey(scope, .push)]?.disablesAnimation == true
+        return outgoingPresentation(for: PresentationKey(scope, .push))?.disablesAnimation == true
     }
 
     func shouldHostLocally(_ declaration: AnyRouteDeclaration, in path: RoutePath) -> Bool {

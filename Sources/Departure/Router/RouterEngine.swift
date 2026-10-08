@@ -35,12 +35,16 @@ final class RouterEngine: Identifiable, Equatable {
     var spaces: RouteSpaces
 
     @ObservationIgnored
-    var pendingRoute: PendingRoute?
+    var pendingRoute: PendingNavigation?
 
-    var unwindPresentationSnapshot: UnwindPresentationSnapshot?
+    /// Operations retain their outgoing projections until native teardown completes.
+    var navigationOperations: [NavigationOperation] = []
 
-    @ObservationIgnored
-    var navigationTransaction = NavigationTransaction()
+    var isNavigating: Bool { !navigationOperations.isEmpty }
+
+    var hasOutgoingPresentations: Bool {
+        navigationOperations.contains { !$0.outgoing.isEmpty }
+    }
 
     @ObservationIgnored
     var deliveredUnwindHandlers: [UnwindHandlerDeliveryKey: DeliveredUnwindHandler] = [:]
@@ -133,29 +137,6 @@ final class RouterEngine: Identifiable, Equatable {
 }
 
 extension RouterEngine {
-    struct NavigationTransaction {
-        struct Token: Hashable {
-            let id = UUID()
-        }
-
-        private var activeTokens: Set<Token> = []
-
-        var isInProgress: Bool {
-            activeTokens.isEmpty == false
-        }
-
-        mutating func begin() -> Token {
-            let token = Token()
-            activeTokens.insert(token)
-            return token
-        }
-
-        @discardableResult
-        mutating func finish(_ token: Token) -> Bool {
-            activeTokens.remove(token) != nil
-        }
-    }
-
     func mutateRouteGraph(_ mutation: () -> Void) {
         routeGraphMutationDepth += 1
         mutation()

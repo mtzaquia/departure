@@ -272,7 +272,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.normalSpace.rootPath.isEmpty)
-        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.home))
 
         let homeScope = router.root.branchScopes[AppTab.home]!
         router.resumePendingRoute(for: AppTab.home, in: router.root)
@@ -413,7 +413,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.normalSpace.rootPath.isEmpty)
-        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.home))
 
         let homeScope = router.root.branchScopes[AppTab.home]!
         router.resumePendingRoute(for: AppTab.home, in: router.root)
@@ -513,7 +513,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .home)
         #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
+        #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.home))
 
         router.resumePendingRoute(for: AppTab.home, in: landingScope)
 
@@ -916,8 +916,7 @@ struct RouterTests {
 
         let match = try #require(router.spaces.firstDeclaration(including: TransactionRoute.self))
         router.appendOrPendRoute(
-            TransactionRoute(),
-            after: match,
+            RouterEngine.NavigationOperation(presentation: .init(route: TransactionRoute(), match: match)),
             waitsForBranchActivation: true
         )
         router.resumePendingRoute(for: AppTab.wallet, in: router.root)
@@ -1600,7 +1599,7 @@ struct RouterTests {
 
         #expect(selectedTab() == .wallet)
         #expect(router.normalSpace.rootPath.isEmpty)
-        #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.wallet))
+        #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.wallet))
 
         router.resumePendingRoute(for: AppTab.wallet, in: router.root)
 
@@ -2015,7 +2014,7 @@ struct RouterTests {
         let unwindTask = Task {
             await router.unwind(to: .id(RootRoute().id))
         }
-        for _ in 0..<10 where router.unwindPresentationSnapshot == nil {
+        for _ in 0..<10 where router.hasOutgoingPresentations == false {
             await Task.yield()
         }
 
@@ -2631,7 +2630,7 @@ struct RouterTests {
                 RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
             ]
         )
-        let transaction = router.beginNavigationTransaction()
+        let transaction = router.beginNavigationOperation()
 
         let presentationTask = Task {
             await router.present(SettingsRoute())
@@ -2650,7 +2649,7 @@ struct RouterTests {
 
         #expect(router.pendingRoute == nil)
         #expect(router.normalSpace.rootPath.isEmpty)
-        await router.finishNavigationTransaction(transaction)
+        await router.finishNavigationOperation(transaction)
     }
 
     @Test func pendingPresentationWaitsForEveryOverlappingNavigationTransaction() async throws {
@@ -2685,7 +2684,7 @@ struct RouterTests {
             await Task.yield()
         }
 
-        #expect(router.navigationTransaction.isInProgress)
+        #expect(router.isNavigating)
         #expect(router.pendingRoute != nil)
 
         router.routeScopeDidLeaveView(firstDismissedScope)
@@ -2693,14 +2692,14 @@ struct RouterTests {
             await Task.yield()
         }
 
-        #expect(router.navigationTransaction.isInProgress)
+        #expect(router.isNavigating)
         #expect(router.pendingRoute != nil)
         #expect(router.normalSpace.rootPath.isEmpty)
 
         router.routeScopeDidLeaveView(secondDismissedScope)
         await presentationTask.value
 
-        #expect(router.navigationTransaction.isInProgress == false)
+        #expect(router.isNavigating == false)
         #expect(router.pendingRoute == nil)
         #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
     }
@@ -2723,14 +2722,14 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.unwindPresentationSnapshot != nil {
+            if router.hasOutgoingPresentations {
                 break
             }
             await Task.yield()
         }
 
         #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.unwindPresentationSnapshot != nil)
+        #expect(router.hasOutgoingPresentations)
         let presentation = router.routePresentation(from: loginScope, matching: .sheet)
         #expect(presentation?.scope === noticeScope)
         #expect(presentation?.declaration.priority == .high)
@@ -3032,14 +3031,14 @@ struct RouterTests {
         let unwind = Task { await Router(engine: router, scope: sheetScope).unwind(to: .topmostAncestor) }
         await Task.yield()
 
-        #expect(router.unwindPresentationSnapshot != nil)
+        #expect(router.hasOutgoingPresentations)
         #expect(router.routePresentationBinding(from: sheetScope, matching: .push).wrappedValue?.scope === pushedScope)
         #expect(sheetScope.routeAttachments.contains { $0.presentationKind == .push })
 
         router.routeScopeDidLeaveView(pushedScope)
         router.routeScopeDidLeaveView(sheetScope)
         #expect(await unwind.value)
-        #expect(router.unwindPresentationSnapshot == nil)
+        #expect(router.hasOutgoingPresentations == false)
     }
 
     @Test func capturedAncestorUnwindRemovesBothNestedSheetsInOnePlan() async throws {
@@ -3079,14 +3078,14 @@ struct RouterTests {
         }
 
         #expect(router.normalSpace.rootPath.isEmpty)
-        #expect(router.unwindPresentationSnapshot != nil)
+        #expect(router.hasOutgoingPresentations)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
         #expect(router.routePresentationBinding(from: sheetA, matching: .sheet).wrappedValue?.scope === sheetB)
 
         router.routeScopeDidLeaveView(sheetB)
         router.routeScopeDidLeaveView(sheetA)
         #expect(await unwind.value)
-        #expect(router.unwindPresentationSnapshot == nil)
+        #expect(router.hasOutgoingPresentations == false)
     }
 
     @Test func sheetBindingDismissalPreservesNestedPushUntilSheetLeavesView() async throws {
@@ -3123,17 +3122,17 @@ struct RouterTests {
         router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue = nil
 
         #expect(router.normalSpace.rootPath.isEmpty)
-        #expect(router.unwindPresentationSnapshot != nil)
+        #expect(router.hasOutgoingPresentations)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
         #expect(router.routePresentationBinding(from: sheetScope, matching: .push).wrappedValue?.scope === pushedScope)
         #expect(sheetScope.routeAttachments.contains { $0.presentationKind == .push })
 
         router.routeScopeDidLeaveView(pushedScope)
         router.routeScopeDidLeaveView(sheetScope)
-        for _ in 0..<10 where router.unwindPresentationSnapshot != nil {
+        for _ in 0..<10 where router.hasOutgoingPresentations {
             await Task.yield()
         }
-        #expect(router.unwindPresentationSnapshot == nil)
+        #expect(router.hasOutgoingPresentations == false)
     }
 
     @Test func targetedUnwindClearsCoverHostedByRetainedNonRootScopeWhilePreservingNestedPush() async throws {
@@ -3177,7 +3176,7 @@ struct RouterTests {
             await router.unwind(to: .id(paymentMethodsID))
         }
 
-        for _ in 0..<10 where router.unwindPresentationSnapshot == nil {
+        for _ in 0..<10 where router.hasOutgoingPresentations == false {
             await Task.yield()
         }
 
@@ -3195,7 +3194,7 @@ struct RouterTests {
         router.routeScopeDidLeaveView(pushedScope)
 
         #expect(await unwindTask.value)
-        #expect(router.unwindPresentationSnapshot == nil)
+        #expect(router.hasOutgoingPresentations == false)
     }
 
     @Test func rootUnwindPreservesBranchDescendantPresentationBindingUntilAncestorLeavesView() async throws {
@@ -3241,7 +3240,7 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.unwindPresentationSnapshot != nil {
+            if router.hasOutgoingPresentations {
                 break
             }
             await Task.yield()
@@ -3314,7 +3313,7 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.unwindPresentationSnapshot != nil {
+            if router.hasOutgoingPresentations {
                 break
             }
             await Task.yield()
@@ -3387,7 +3386,7 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.unwindPresentationSnapshot != nil {
+            if router.hasOutgoingPresentations {
                 break
             }
             await Task.yield()
@@ -3401,7 +3400,7 @@ struct RouterTests {
         router.routeScopeDidLeaveView(landingScope)
         await requestTask.value
 
-        #expect(router.unwindPresentationSnapshot == nil)
+        #expect(router.hasOutgoingPresentations == false)
         #expect(router.normalSpace.rootPath.last?.route is MessageRoute)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue?.scope === router.normalSpace.rootPath.last)
     }
@@ -3457,7 +3456,7 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.unwindPresentationSnapshot != nil {
+            if router.hasOutgoingPresentations {
                 break
             }
             await Task.yield()
@@ -3472,14 +3471,14 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.unwindPresentationSnapshot == nil,
+            if router.hasOutgoingPresentations == false,
                router.pendingRoute?.route is AlertRoute {
                 break
             }
             await Task.yield()
         }
 
-        #expect(router.unwindPresentationSnapshot == nil)
+        #expect(router.hasOutgoingPresentations == false)
         #expect(router.routePresentationBinding(from: appearanceScope, matching: .push).wrappedValue == nil)
         #expect(router.pendingRoute?.route is AlertRoute)
 
@@ -3522,7 +3521,7 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.unwindPresentationSnapshot != nil {
+            if router.hasOutgoingPresentations {
                 break
             }
             await Task.yield()
@@ -3598,7 +3597,7 @@ struct RouterTests {
         router.routeScopeDidLeaveView(appearanceScope)
         await requestTask.value
 
-        #expect(router.unwindPresentationSnapshot == nil)
+        #expect(router.hasOutgoingPresentations == false)
         #expect(router.normalSpace.rootPath.count == 1)
         #expect(router.normalSpace.rootPath.last?.route is TransactionRoute)
     }
@@ -4021,7 +4020,7 @@ struct RouterTests {
         let replacing = Task { await engine.present(NumberedRoute(number: 2)) }
         for _ in 0..<1000 where engine.spaces.highSpace?.root === old { await Task.yield() }
         #expect(engine.spaces.highSpace?.root.route as? NumberedRoute == NumberedRoute(number: 2))
-        #expect(engine.navigationTransaction.isInProgress)
+        #expect(engine.isNavigating)
         await Router(engine: engine, scope: engine.root).present(SettingsRoute())
         #expect(engine.normalSpace.rootPath.isEmpty)
         #expect(engine.spaces.highSpace?.root.route as? NumberedRoute == NumberedRoute(number: 2))
@@ -4226,11 +4225,11 @@ struct RouterTests {
 
         #expect(router.spaces.highSpace?.root.route is AlertRoute)
         #expect(router.spaces.routePath(containing: branchScope) == nil)
-        #expect(router.navigationTransaction.isInProgress)
+        #expect(router.isNavigating)
 
         router.routeScopeDidLeaveView(loginScope)
         await Task.yield()
-        #expect(router.navigationTransaction.isInProgress)
+        #expect(router.isNavigating)
         #expect(router.spaces.highSpace?.root.route is AlertRoute)
 
         router.routeScopeDidLeaveView(branchDetailScope)

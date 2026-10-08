@@ -40,7 +40,7 @@ struct UnwindPresentationPolicyTests {
         for _ in 0..<100 where !engine.normalSpace.rootPath.isEmpty { await Task.yield() }
 
         #expect(engine.normalSpace.rootPath.isEmpty)
-        #expect(engine.unwindPresentationSnapshot != nil)
+        #expect(engine.hasOutgoingPresentations)
         #expect(!engine.pushPresentationDismissalDisablesAnimations(from: engine.root))
         #expect(engine.pushPresentationDismissalDisablesAnimations(from: scopes[0]))
         #expect(engine.pushPresentationDismissalDisablesAnimations(from: scopes[1]))
@@ -50,7 +50,7 @@ struct UnwindPresentationPolicyTests {
 
         for scope in scopes { engine.routeScopeDidLeaveView(scope) }
         #expect(await unwind.value)
-        #expect(engine.unwindPresentationSnapshot == nil)
+        #expect(engine.hasOutgoingPresentations == false)
     }
 
     @Test(arguments: [RoutePriority.normal, .high, .critical])
@@ -85,7 +85,7 @@ struct UnwindPresentationPolicyTests {
         for _ in 0..<1000 where space.rootPath.count > (space.priority == .normal ? 1 : 0) { await Task.yield() }
 
         #expect(space.rootPath.scopes.elementsEqual(space.priority == .normal ? [retained] : [], by: { $0 === $1 }))
-        #expect(engine.unwindPresentationSnapshot != nil)
+        #expect(engine.hasOutgoingPresentations)
         #expect(engine.routePresentationBinding(from: retained, matching: .sheet).wrappedValue == nil)
         #expect(engine.routePresentationBinding(from: sheet, matching: .push).wrappedValue?.scope === push)
 
@@ -93,6 +93,6 @@ struct UnwindPresentationPolicyTests {
         engine.routeScopeDidLeaveView(push)
         await request.value
         #expect(space.rootPath.scopes.elementsEqual(space.priority == .normal ? [retained] : [], by: { $0 === $1 }))
-        #expect(engine.unwindPresentationSnapshot == nil)
+        #expect(engine.hasOutgoingPresentations == false)
     }
 }

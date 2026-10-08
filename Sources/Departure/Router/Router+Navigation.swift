@@ -23,70 +23,6 @@
 import Foundation
 
 extension RouterEngine {
-    final class PendingRoute {
-        struct Append {
-            let match: DeclarationMatch
-            let blockingScopes: [RouteScope]
-
-            init(
-                match: DeclarationMatch,
-                blockingScopes: [RouteScope] = []
-            ) {
-                self.match = match
-                self.blockingScopes = blockingScopes
-            }
-        }
-
-        let id: UUID
-        let route: any Route
-        let state: State
-        let origin: RouteRequestOrigin?
-
-        enum State {
-            case request(CheckedContinuation<Void, Never>, stage: RouteRequestStage)
-            case append(Append)
-        }
-
-        init(
-            id: UUID = UUID(),
-            route: any Route,
-            state: State,
-            origin: RouteRequestOrigin? = nil
-        ) {
-            self.id = id
-            self.route = route
-            self.state = state
-            self.origin = origin
-        }
-
-        var append: Append? {
-            guard case let .append(append) = state else {
-                return nil
-            }
-
-            return append
-        }
-
-        func resumeRequestIfNeeded() {
-            guard case let .request(continuation, _) = state else {
-                return
-            }
-
-            continuation.resume()
-        }
-    }
-
-    struct UnwindPresentationSnapshot {
-        struct Outgoing {
-            let host: RouteScope
-            let projection: ResolvedRoutePresentation
-            let retainsBinding: Bool
-            let disablesAnimation: Bool
-        }
-        let id = UUID()
-        let presentations: [PresentationKey: Outgoing]
-    }
-
     struct UnwindHandlerDeliveryKey: Equatable, Hashable {
         let sourceScopeID: ObjectIdentifier
         let targetScopeID: AnyHashable
@@ -248,10 +184,6 @@ extension RouterEngine {
 
     func appendRoute(_ route: any Route, after match: DeclarationMatch, origin: RouteRequestOrigin? = nil) async {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
-        if await deferRouteAppendIfNeeded(route, after: match) {
-            return
-        }
-
         guard navigationSource(origin) != nil, let host = match.presentationHost, !Task.isCancelled else { return }
         if await ios17NavigationStackPushWorkaround?.prepareAppend(after: match, in: self) == true {
             return
@@ -273,21 +205,37 @@ extension RouterEngine {
         after match: DeclarationMatch,
         unwinding plan: RouteSpaces.UnwindPlan
     ) async {
-        let token = beginNavigationTransaction()
-        let transition = commitTransition(plan, preservesModalPresentationBindings: false)
-        if await !deferRouteAppend(route, after: match, until: transition.removedScopes,
-            presentationSnapshotID: transition.snapshotID) {
-            clearUnwindPresentationSnapshot(id: transition.snapshotID)
-            appendPreparedRoute(route, after: match)
+        let operation = beginNavigationOperation(plan: plan, presentation: .init(route: route, match: match))
+        commitNavigationOperation(operation, preservesModalPresentationBindings: false)
+        if operation.removedScopes.contains(where: \.isInstalledInView) {
+            replacePendingRoute(.presentation(operation))
+            await withTaskCancellationHandler {
+                await waitForNavigationOperation(operation, releasesAfterModal: true)
+                if pendingRoute?.operation === operation {
+                    replacePendingRoute(nil)
+                    if !Task.isCancelled { appendPreparedRoute(operation) }
+                } else if operation.presentation != nil {
+                    log.departureDebug(.routeAppendSuperseded(route: route))
+                }
+            } onCancel: {
+                Task { @MainActor [weak self] in
+                    if self?.pendingRoute?.operation === operation { self?.replacePendingRoute(nil) }
+                }
+            }
+        } else {
+            operation.outgoing = [:]
+            appendPreparedRoute(operation)
         }
-        await finishNavigationTransaction(token)
+        await finishNavigationOperation(operation)
     }
 
-    func appendPreparedRoute(_ route: any Route, after match: DeclarationMatch) {
-        guard match.space === spaces.activeSpace else { return }
+    func appendPreparedRoute(_ operation: NavigationOperation) {
+        guard let presentation = operation.presentation,
+              presentation.match.space === spaces.activeSpace else { return }
+        let match = presentation.match
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
         guard activateBranch(for: match) else { return }
-        appendOrPendRoute(route, after: match, waitsForBranchActivation: waitsForBranchActivation)
+        appendOrPendRoute(operation, waitsForBranchActivation: waitsForBranchActivation)
     }
 
     func unwindToExistingEquivalentRouteIfNeeded(_ route: any Route, after match: DeclarationMatch) async -> Bool {
@@ -453,10 +401,10 @@ extension RouterEngine {
 
         // Commit the incoming root before awaiting native teardown: replacement
         // never exposes a temporary lower space or leaves a logical closing root.
-        let token = beginNavigationTransaction()
-        let transition = spaces.space(for: priority).map {
-            commitTransition(spaces.unwindPlan(for: .space($0)), preservesModalPresentationBindings: false)
-        }
+        let operation = beginNavigationOperation(plan: spaces.space(for: priority).map {
+            spaces.unwindPlan(for: .space($0))
+        })
+        commitNavigationOperation(operation, preservesModalPresentationBindings: false)
         mutateRouteGraph {
             let scope = RouteScope(id: match.declaration.scopeID ?? AnyHashable(route.id),
                 route: route, definitions: match.declaration.childScope ?? .empty)
@@ -464,69 +412,49 @@ extension RouterEngine {
             spaces.setElevatedSpace(RouteSpace(priority: priority, root: scope), for: priority)
         }
         log.departureDebug(.elevatedSpaceStarted)
-        if let transition { await finishTransition(transition) }
-        await finishNavigationTransaction(token)
+        await waitForNavigationOperation(operation)
+        await finishNavigationOperation(operation)
     }
 
-    func appendOrPendRoute(
-        _ route: any Route,
-        after match: DeclarationMatch,
-        waitsForBranchActivation: Bool = false
-    ) {
-        guard waitsForBranchActivation == false else {
+    func appendOrPendRoute(_ operation: NavigationOperation, waitsForBranchActivation: Bool = false) {
+        guard let presentation = operation.presentation else { return }
+        let route = presentation.route
+        let match = presentation.match
+        guard !waitsForBranchActivation else {
             if let branchID = match.branchID {
                 log.departureDebug(.routePendingWaitingForActivatedBranchHost(route: route, branch: branchID))
             }
-            replacePendingRoute(PendingRoute(
-                route: route,
-                state: .append(.init(match: match))
-            ))
+            replacePendingRoute(.presentation(operation))
             schedulePendingRouteResume(for: match)
             return
         }
 
-        guard let presentationHost = resolvePresentationHost(for: match) else {
-            replacePendingRoute(nil)
-            return
-        }
-
         replacePendingRoute(nil)
-        let presentationOrigin = presentationHost.scope
-        let presentationDeclaration = presentationHost.declaration
-
+        guard let presentationHost = resolvePresentationHost(for: match) else { return }
         let appendedPath = match.presentationLocation.path
         mutateRouteGraph {
-            let scope = RouteScope(id: presentationDeclaration.scopeID ?? AnyHashable(route.id),
-                route: route, definitions: presentationDeclaration.childScope ?? .empty)
-            scope.attachPresentation(to: presentationOrigin, declaration: presentationDeclaration, priority: match.space.priority)
+            let declaration = presentationHost.declaration
+            let scope = RouteScope(id: declaration.scopeID ?? AnyHashable(route.id),
+                route: route, definitions: declaration.childScope ?? .empty)
+            scope.attachPresentation(to: presentationHost.scope, declaration: declaration, priority: match.space.priority)
             appendedPath.append(scope)
         }
-        log.departureDebug(.routeAppended(
-            route: route,
-            path: appendedPath.departureDebugPathDescription
-        ))
+        log.departureDebug(.routeAppended(route: route, path: appendedPath.departureDebugPathDescription))
+        operation.presentation = nil
     }
 
     func resumePendingRoute(for branch: AnyHashable, in declaringScope: RouteScope) {
-        guard
-            let pendingRoute,
-            let append = pendingRoute.append,
-            append.match.branchID == branch,
-            append.match.declarationLocation.scope === declaringScope,
-            declaringScope.branchScopes[branch] != nil
-        else {
-            return
-        }
+        guard let operation = pendingRoute?.operation,
+              let presentation = operation.presentation,
+              presentation.match.branchID == branch,
+              presentation.match.declarationLocation.scope === declaringScope,
+              declaringScope.branchScopes[branch] != nil else { return }
 
-        guard append.match.space === spaces.activeSpace else {
-            replacePendingRoute(nil)
-            return
-        }
         replacePendingRoute(nil)
-        log.departureDebug(.pendingRouteResuming(route: pendingRoute.route))
-        let match = append.match
-        prepareRouteAppendPath(after: match)
-        appendOrPendRoute(pendingRoute.route, after: match)
+        guard presentation.match.space === spaces.activeSpace else { return }
+        log.departureDebug(.pendingRouteResuming(route: presentation.route))
+        prepareRouteAppendPath(after: presentation.match)
+        appendOrPendRoute(operation)
     }
 
     func resolvePresentationHost(
@@ -657,54 +585,6 @@ extension RouterEngine {
         }
     }
 
-    func deferRouteAppendIfNeeded(_ route: any Route, after match: DeclarationMatch) async -> Bool {
-        guard let pendingAppend = pendingRoute?.append,
-              pendingAppend.blockingScopes.isEmpty == false
-        else {
-            return false
-        }
-
-        if pendingAppend.blockingScopes.contains(where: \.isInstalledInView) == false {
-            pendingRoute = nil
-            return false
-        }
-
-        _ = await deferRouteAppend(route, after: match, until: pendingAppend.blockingScopes)
-        return true
-    }
-
-    func deferRouteAppend(
-        _ route: any Route,
-        after match: DeclarationMatch,
-        until routeScopes: [RouteScope],
-        presentationSnapshotID: UUID? = nil
-    ) async -> Bool {
-        let installedRouteScopes = routeScopes.filter(\.isInstalledInView)
-        guard installedRouteScopes.isEmpty == false else {
-            await waitForRouteScopesToLeaveView(routeScopes)
-            return false
-        }
-
-        let pendingAppend = PendingRoute(
-            route: route,
-            state: .append(.init(
-                match: match,
-                blockingScopes: installedRouteScopes
-            ))
-        )
-        replacePendingRoute(pendingAppend)
-
-        let transition = AppliedTransition(removedScopes: installedRouteScopes, snapshotID: presentationSnapshotID)
-        guard await finishTransition(transition, releasesAfterModal: true, isCurrent: { self.pendingRoute === pendingAppend }) else {
-            log.departureDebug(.routeAppendSuperseded(route: route))
-            return true
-        }
-
-        pendingRoute = nil
-        appendPreparedRoute(route, after: match)
-        return true
-    }
-
     func unwindHandlerScope(
         for target: UnwindTarget?,
         in routePath: RoutePath,
@@ -730,14 +610,18 @@ extension RouterEngine {
         preservesModalPresentationBindings: Bool = true,
         logsCompletion: Bool = true
     ) async -> Bool {
-        let token = beginNavigationTransaction()
+        let operation = beginNavigationOperation(plan: plan)
         await deliverUnwindHandlers(for: sourceScope, payload: payload, in: targetScope, removing: plan.removedScopes)
         guard sourceScope.map(isNavigationEligible) ?? true, !Task.isCancelled else {
-            await finishNavigationTransaction(token)
+            await finishNavigationOperation(operation)
             return false
         }
-        let transition = commitTransition(plan, preservesModalPresentationBindings: preservesModalPresentationBindings)
-        await finishCoordinatedTransition(transition, token: token, logsCompletion: logsCompletion)
+        commitNavigationOperation(operation, preservesModalPresentationBindings: preservesModalPresentationBindings)
+        await waitForNavigationOperation(operation)
+        if logsCompletion {
+            log.departureDebug(.unwindCompleted(path: spaces.activeSpace.currentRoutePath.departureDebugPathDescription))
+        }
+        await finishNavigationOperation(operation)
         return true
     }
 
@@ -751,70 +635,40 @@ extension RouterEngine {
         let captured = candidates.filter { $0.priority != .normal && spaces.space(for: $0.priority) === $0 }
         guard !captured.isEmpty, !Task.isCancelled,
               source.map(isNavigationEligible) ?? true else { return false }
-        let token = beginNavigationTransaction()
-        let plan = spaces.unwindPlan(for: .combined(captured.map { .space($0) }))
-        let transition = commitTransition(plan)
-        await finishCoordinatedTransition(transition, token: token, logsCompletion: false)
+        let operation = beginNavigationOperation(plan: spaces.unwindPlan(for: .combined(captured.map { .space($0) })))
+        commitNavigationOperation(operation)
+        await waitForNavigationOperation(operation)
+        await finishNavigationOperation(operation)
         return true
     }
 
-    struct AppliedTransition {
-        let removedScopes: [RouteScope]
-        let snapshotID: UUID?
-    }
-
-    /// Every transition captures outgoing projections before mutating the live paths.
-    func commitTransition(_ plan: RouteSpaces.UnwindPlan, preservesModalPresentationBindings: Bool = true) -> AppliedTransition {
-        let snapshotID = installUnwindPresentationSnapshot(for: plan, preservesModalPresentationBindings: preservesModalPresentationBindings)
+    /// Capture outgoing projections before cutting their owning edges in the live tree.
+    func commitNavigationOperation(_ operation: NavigationOperation, preservesModalPresentationBindings: Bool = true) {
+        guard let plan = operation.plan else { return }
+        let outgoing = outgoingPresentations(for: plan, preservesModalPresentationBindings: preservesModalPresentationBindings)
+        if outgoing.values.contains(where: { $0.retainsBinding || $0.disablesAnimation }) {
+            operation.outgoing = outgoing
+        }
         applyUnwindPlan(plan)
-        return AppliedTransition(removedScopes: plan.removedScopes, snapshotID: snapshotID)
     }
 
-    @discardableResult
-    func finishTransition(_ transition: AppliedTransition, releasesAfterModal: Bool = false, isCurrent: () -> Bool = { true }) async -> Bool {
-        defer { clearUnwindPresentationSnapshot(id: transition.snapshotID) }
-        if releasesAfterModal, transition.snapshotID != nil {
-            let modals = transition.removedScopes.filter { $0.isInstalledInView && $0.presentationDeclaration?.presentationKind.isModal == true }
+    func waitForNavigationOperation(_ operation: NavigationOperation, releasesAfterModal: Bool = false) async {
+        defer { operation.outgoing = [:] }
+        if releasesAfterModal, !operation.outgoing.isEmpty {
+            let modals = operation.removedScopes.filter { $0.isInstalledInView && $0.presentationDeclaration?.presentationKind.isModal == true }
             if !modals.isEmpty {
                 await waitForRouteScopesToLeaveView(modals)
-                clearUnwindPresentationSnapshot(id: transition.snapshotID)
-                guard isCurrent() else { return false }
+                operation.outgoing = [:]
+                guard pendingRoute?.operation === operation else { return }
             }
         }
-        await waitForRouteScopesToLeaveView(transition.removedScopes)
-        return isCurrent()
+        await waitForRouteScopesToLeaveView(operation.removedScopes)
     }
 
-    private func finishCoordinatedTransition(_ transition: AppliedTransition, token: NavigationTransaction.Token, logsCompletion: Bool) async {
-        await finishTransition(transition)
-        if logsCompletion {
-            log.departureDebug(.unwindCompleted(path: spaces.activeSpace.currentRoutePath.departureDebugPathDescription))
-        }
-        await finishNavigationTransaction(token)
-    }
-
-    func installUnwindPresentationSnapshot(
+    func outgoingPresentations(
         for plan: RouteSpaces.UnwindPlan,
         preservesModalPresentationBindings: Bool = true
-    ) -> UUID? {
-        let snapshot = makeUnwindPresentationSnapshot(
-            for: plan,
-            preservesModalPresentationBindings: preservesModalPresentationBindings
-        )
-
-        guard snapshot.presentations.values.contains(where: { $0.retainsBinding || $0.disablesAnimation })
-        else {
-            return nil
-        }
-
-        unwindPresentationSnapshot = snapshot
-        return snapshot.id
-    }
-
-    func makeUnwindPresentationSnapshot(
-        for plan: RouteSpaces.UnwindPlan,
-        preservesModalPresentationBindings: Bool = true
-    ) -> UnwindPresentationSnapshot {
+    ) -> [PresentationKey: NavigationOperation.Outgoing] {
         // A departing modal tears down its nested NavigationStack as part of the same
         // transition. Keep that stack bound until the modal has left. For a push-only unwind,
         // every binding clears together, but only the outermost removed push animates so SwiftUI
@@ -839,7 +693,7 @@ extension RouterEngine {
             ? []
             : removedPushPresentationScopeIDs.subtracting(animatedPushPresentationScopeIDs)
 
-        var presentations: [PresentationKey: UnwindPresentationSnapshot.Outgoing] = [:]
+        var presentations: [PresentationKey: NavigationOperation.Outgoing] = [:]
         for path in plan.preservedPaths {
             for scope in path.scopes {
                 guard let host = scope.presentationOrigin, let declaration = scope.presentationDeclaration,
@@ -848,14 +702,14 @@ extension RouterEngine {
                 guard presentations[key] == nil else { continue }
                 let retainsBinding = containsDepartingModal && departingHostScopeIDs.contains(ObjectIdentifier(host))
                     && (!declaration.presentationKind.isModal || preservesModalPresentationBindings)
-                presentations[key] = .init(host: host,
+                presentations[key] = .init(
                     projection: .init(presentation: .init(scope: scope, declaration: declaration, sourceEnvironment: host.sourceEnvironment),
                         routePath: path.routePath, isLive: false),
                     retainsBinding: retainsBinding,
                     disablesAnimation: unanimatedPushPresentationScopeIDs.contains(ObjectIdentifier(scope)))
             }
         }
-        return UnwindPresentationSnapshot(presentations: presentations)
+        return presentations
     }
 
     func departingPresentationHostScopeIDs(
@@ -908,14 +762,6 @@ extension RouterEngine {
         })
     }
 
-    func clearUnwindPresentationSnapshot(id: UUID?) {
-        guard unwindPresentationSnapshot?.id == id else {
-            return
-        }
-
-        unwindPresentationSnapshot = nil
-    }
-
     func deliverUnwindHandlers(
         for sourceScope: RouteScope?,
         payload: Any?,
@@ -954,20 +800,23 @@ extension RouterEngine {
         await Task.yield()
     }
 
-    func beginNavigationTransaction() -> NavigationTransaction.Token {
-        navigationTransaction.begin()
+    func beginNavigationOperation(plan: RouteSpaces.UnwindPlan? = nil,
+        presentation: NavigationOperation.Presentation? = nil) -> NavigationOperation {
+        let operation = NavigationOperation(plan: plan, presentation: presentation)
+        navigationOperations.append(operation)
+        return operation
     }
 
-    func finishNavigationTransaction(_ token: NavigationTransaction.Token) async {
-        guard navigationTransaction.finish(token) else {
-            return
-        }
+    func finishNavigationOperation(_ operation: NavigationOperation) async {
+        guard let index = navigationOperations.firstIndex(where: { $0 === operation }) else { return }
+        operation.outgoing = [:]
+        operation.plan = nil
+        navigationOperations.remove(at: index)
+        if !isNavigating { await drainPendingRouteRequests() }
+    }
 
-        guard navigationTransaction.isInProgress == false else {
-            return
-        }
-
-        await drainPendingRouteRequests()
+    func outgoingPresentation(for key: PresentationKey) -> NavigationOperation.Outgoing? {
+        navigationOperations.reversed().lazy.compactMap { $0.outgoing[key] }.first
     }
 
     enum RouteRequestStage {
@@ -976,19 +825,21 @@ extension RouterEngine {
     }
 
     func drainPendingRouteRequests() async {
-        guard let route = pendingRoute,
-              case let .request(_, stage) = route.state
-        else {
-            return
-        }
-
+        guard case let .request(request) = pendingRoute else { return }
         pendingRoute = nil
-        await requestRouteWhenReady(route.route, stage: stage, origin: route.origin)
-        route.resumeRequestIfNeeded()
+        // Queued work runs from the completing operation, but cancellation still belongs
+        // to its original caller. The request owns that execution until it finishes.
+        let execution = Task { @MainActor in
+            await requestRouteWhenReady(request.route, stage: request.stage, origin: request.origin)
+        }
+        request.execution = execution
+        await execution.value
+        request.execution = nil
+        request.resume()
     }
 
-    func replacePendingRoute(_ pendingRoute: PendingRoute?) {
-        self.pendingRoute?.resumeRequestIfNeeded()
+    func replacePendingRoute(_ pendingRoute: PendingNavigation?) {
+        if case let .request(request) = self.pendingRoute { request.resume() }
         self.pendingRoute = pendingRoute
     }
 
@@ -999,8 +850,8 @@ extension RouterEngine {
     ) async {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         guard Task.isCancelled == false, navigationSource(origin) != nil else { return }
-        guard navigationTransaction.isInProgress == false else {
-            let requestID = UUID()
+        guard isNavigating == false else {
+            let request = PendingNavigation.Request(route: route, stage: stage, origin: origin)
             await withTaskCancellationHandler {
                 await withCheckedContinuation { continuation in
                     guard Task.isCancelled == false else {
@@ -1008,16 +859,15 @@ extension RouterEngine {
                         return
                     }
 
-                    replacePendingRoute(PendingRoute(
-                        id: requestID,
-                        route: route,
-                        state: .request(continuation, stage: stage),
-                        origin: origin
-                    ))
+                    request.continuation = continuation
+                    replacePendingRoute(.request(request))
                 }
             } onCancel: {
                 Task { @MainActor [weak self] in
-                    self?.cancelPendingRequest(id: requestID)
+                    request.execution?.cancel()
+                    if case let .request(pending) = self?.pendingRoute, pending === request {
+                        self?.replacePendingRoute(nil)
+                    }
                 }
             }
             return
@@ -1031,25 +881,15 @@ extension RouterEngine {
         }
     }
 
-    func cancelPendingRequest(id: UUID) {
-        guard let pendingRoute,
-              pendingRoute.id == id,
-              case .request = pendingRoute.state
-        else {
-            return
-        }
-
-        replacePendingRoute(nil)
-    }
-
     func performPresentationDismissalUnwind(for sourceScope: RouteScope?, in targetScope: RouteScope?, plan: RouteSpaces.UnwindPlan) {
         guard !plan.removedScopes.isEmpty else { applyUnwindPlan(plan); return }
-        let token = beginNavigationTransaction()
+        let operation = beginNavigationOperation(plan: plan)
         // Native binding write-back must change live state in this call stack.
-        let transition = commitTransition(plan)
+        commitNavigationOperation(operation)
         Task { @MainActor in
-            await deliverUnwindHandlers(for: sourceScope, payload: nil, in: targetScope, removing: transition.removedScopes)
-            await finishCoordinatedTransition(transition, token: token, logsCompletion: false)
+            await deliverUnwindHandlers(for: sourceScope, payload: nil, in: targetScope, removing: operation.removedScopes)
+            await waitForNavigationOperation(operation)
+            await finishNavigationOperation(operation)
         }
     }
 

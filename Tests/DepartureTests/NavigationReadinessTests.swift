@@ -27,6 +27,60 @@ import Testing
 @MainActor
 @Suite
 struct NavigationReadinessTests {
+    @Test func cancellingCommittedUnwindDoesNotCancelAnUnrelatedQueuedPresentation() async throws {
+        let owner = RootRouter()
+        _ = WithRouter(routes: RootRouteMap {
+            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+        }, router: owner) { EmptyView() }
+        let root = owner.current
+        await root.present(SettingsRoute())
+        let old = try #require(owner.engine.normalSpace.rootPath.last)
+        owner.engine.routeScopeDidInstallInView(old)
+        let unwind = Task { await owner.current.unwind(to: .root) }
+        for _ in 0..<1000 where !owner.engine.normalSpace.rootPath.isEmpty { await Task.yield() }
+        unwind.cancel()
+        let request = Task { await root.present(LoginRoute()) }
+        for _ in 0..<1000 where owner.engine.pendingRoute == nil { await Task.yield() }
+        #expect(owner.engine.pendingRoute != nil)
+        owner.engine.routeScopeDidLeaveView(old)
+        #expect(await unwind.value)
+        await request.value
+        #expect(owner.engine.pendingRoute == nil)
+        #expect(!owner.engine.isNavigating)
+        #expect(owner.engine.normalSpace.rootPath.last?.route is LoginRoute)
+    }
+
+    @Test func cancellingDequeuedRequestStillCancelsItsResolution() async throws {
+        let owner = RootRouter()
+        _ = WithRouter(routes: RootRouteMap {
+            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+            Sheet(RouteDestination(DelayedResolutionRoute.self) { _, _ in EmptyView() })
+        }, router: owner) { EmptyView() }
+        let root = owner.current
+        await root.present(SettingsRoute())
+        let old = try #require(owner.engine.normalSpace.rootPath.last)
+        owner.engine.routeScopeDidInstallInView(old)
+        let unwind = Task { await owner.current.unwind(to: .root) }
+        for _ in 0..<1000 where !owner.engine.normalSpace.rootPath.isEmpty { await Task.yield() }
+        let gate = ResolutionGate()
+        let request = Task { await root.present(DelayedResolutionRoute(gate: gate)) }
+        for _ in 0..<1000 where owner.engine.pendingRoute == nil { await Task.yield() }
+        #expect(owner.engine.pendingRoute != nil)
+        owner.engine.routeScopeDidLeaveView(old)
+        await gate.waitForResolutionToStart()
+        #expect(owner.engine.pendingRoute == nil)
+        request.cancel()
+        gate.release()
+        await request.value
+        #expect(await unwind.value)
+        #expect(gate.resolutionCount == 1)
+        #expect(owner.engine.normalSpace.rootPath.isEmpty)
+        #expect(!owner.engine.isNavigating)
+        await root.present(SettingsRoute())
+        #expect(owner.engine.normalSpace.rootPath.last?.route is SettingsRoute)
+    }
+
     @Test(arguments: [false, true])
     func resolutionFinishingDuringUnwindWaitsWithoutResolvingAgain(cancel: Bool) async throws {
         let router = RouterEngine()
@@ -44,7 +98,7 @@ struct NavigationReadinessTests {
 
         let unwind = Task { await router.unwind(to: .root) }
         for _ in 0..<100 where !router.normalSpace.rootPath.isEmpty { await Task.yield() }
-        #expect(router.navigationTransaction.isInProgress)
+        #expect(router.isNavigating)
         #expect(router.normalSpace.rootPath.isEmpty)
         gate.release()
         for _ in 0..<100 where router.pendingRoute == nil { await Task.yield() }

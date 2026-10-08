@@ -99,12 +99,12 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
 
         // iOS 17 cannot reliably remove a pushed child and replace its enclosing selection
         // in the same graph update. Pop the child first and preserve latest-request semantics.
-        let transaction = router.beginNavigationTransaction()
         let plan = router.spaces.unwindPlan(for: .scoped(routePath: path, after: position))
-        let removed = router.prepareRouteAppendPath(plan)
-        await router.waitForRouteScopesToLeaveView(removed)
+        let operation = router.beginNavigationOperation(plan: plan)
+        router.applyUnwindPlan(plan)
+        await router.waitForNavigationOperation(operation)
         let wasSuperseded = router.pendingRoute != nil
-        await router.finishNavigationTransaction(transaction)
+        await router.finishNavigationOperation(operation)
         return wasSuperseded
     }
 

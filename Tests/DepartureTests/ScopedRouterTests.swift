@@ -81,7 +81,7 @@ struct ScopedRouterTests {
         await fixture.root.branch("detail").present(MessageRoute())
         #expect(fixture.selection.value == "detail")
         #expect(fixture.detail.path.isEmpty)
-        #expect(fixture.engine.pendingRoute?.append?.match.branchID == AnyHashable("detail"))
+        #expect(fixture.engine.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable("detail"))
         fixture.engine.resumePendingRoute(for: "detail", in: fixture.engine.root)
         #expect(fixture.detail.path.last?.route is MessageRoute)
         #expect(fixture.engine.pendingRoute == nil)
@@ -340,12 +340,12 @@ struct ScopedRouterTests {
 
     @Test func scopedRequestRetainsOriginAcrossNavigationReadiness() async {
         let fixture = Fixture(concurrent: true)
-        let transaction = fixture.engine.beginNavigationTransaction()
+        let transaction = fixture.engine.beginNavigationOperation()
         let request = Task { await fixture.local(fixture.content).present(HomeDetailRoute()) }
         for _ in 0..<100 where fixture.engine.pendingRoute == nil { await Task.yield() }
         #expect(fixture.engine.pendingRoute != nil)
         fixture.selection.value = "detail"
-        await fixture.engine.finishNavigationTransaction(transaction)
+        await fixture.engine.finishNavigationOperation(transaction)
         await request.value
         #expect(fixture.content.path.last?.route is HomeDetailRoute)
         #expect(fixture.detail.path.isEmpty)
