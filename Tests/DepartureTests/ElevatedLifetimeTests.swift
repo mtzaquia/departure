@@ -25,32 +25,32 @@ import Testing
 @testable import Departure
 
 @MainActor @Suite struct ElevatedLifetimeTests {
-    @Test func removingNormalDestinationKeepsRootPriorityPresentations() async throws {
-        let (engine, normal, _, _) = try await makeChain()
-        #expect(!((await engine.unwindPrevious(from: normal))))
-        #expect(engine.normalSpace.rootPath.last === normal)
+    @Test func removingDefaultDestinationKeepsRootPriorityPresentations() async throws {
+        let (engine, defaultScope, _, _) = try await makeChain()
+        #expect(!((await engine.unwindPrevious(from: defaultScope))))
+        #expect(engine.defaultSpace.rootPath.last === defaultScope)
         #expect(engine.spaces.highSpace != nil)
         #expect(engine.spaces.criticalSpace != nil)
     }
-    @Test func removingHighDestinationKeepsRootCriticalAndNormal() async throws {
-        let (engine, normal, _, _) = try await makeChain()
+    @Test func removingHighDestinationKeepsRootCriticalAndDefault() async throws {
+        let (engine, defaultScope, _, _) = try await makeChain()
         #expect(await RootRouter(engine: engine).dismissSpace(.high))
-        #expect(engine.normalSpace.rootPath.last === normal)
+        #expect(engine.defaultSpace.rootPath.last === defaultScope)
         #expect(engine.spaces.highSpace == nil)
         #expect(engine.spaces.criticalSpace != nil)
     }
     @Test func elevatedNativeTeardownClearsOnlyItsOwnPriority() async throws {
-        let (engine, normal, high, _) = try await makeChain()
+        let (engine, defaultScope, high, _) = try await makeChain()
         engine.routeScopeDidInstallInView(high)
         engine.routeScopeDidLeaveView(high)
-        #expect(engine.normalSpace.rootPath.last === normal)
+        #expect(engine.defaultSpace.rootPath.last === defaultScope)
         #expect(engine.spaces.highSpace == nil)
         #expect(engine.spaces.criticalSpace != nil)
     }
     @Test func ownerRemovalClearsAllElevatedPriorities() async throws {
         let (engine, _, _, _) = try await makeChain()
         #expect(await RootRouter(engine: engine).dismissSpaces())
-        #expect(engine.normalSpace.rootPath.count == 1)
+        #expect(engine.defaultSpace.rootPath.count == 1)
         #expect(engine.spaces.highSpace == nil)
         #expect(engine.spaces.criticalSpace == nil)
     }
@@ -68,11 +68,11 @@ import Testing
             Sheet(RouteDestination(AlertRoute.self) { _, _ in EmptyView() })
         })
         await engine.present(HomeDetailRoute())
-        let normal = try #require(engine.normalSpace.rootPath.last)
+        let defaultScope = try #require(engine.defaultSpace.rootPath.last)
         await engine.present(LoginRoute())
         let high = try #require(engine.spaces.highSpace?.currentRouteScope)
         await engine.present(AlertRoute())
         let critical = try #require(engine.spaces.criticalSpace?.currentRouteScope)
-        return (engine, normal, high, critical)
+        return (engine, defaultScope, high, critical)
     }
 }

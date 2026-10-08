@@ -94,7 +94,7 @@ extension RouterEngine {
         switch target {
         case let .priority(priority):
             guard let space = spaces.space(for: priority),
-                  priority != .normal, let metadata = space.root.presentation,
+                  priority != .default, let metadata = space.root.presentation,
                   style == nil || metadata.declaration.presentationKind == style else { return nil }
             return ResolvedRoutePresentation(presentation: PresentedRoute(scope: space.root, declaration: metadata.declaration,
                 sourceEnvironment: metadata.sourceEnvironment.values), routePath: space.rootPath, isLive: true)

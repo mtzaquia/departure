@@ -38,7 +38,7 @@ final class SampleAppUITests: XCTestCase {
         XCUIDevice.shared.orientation = .portrait
     }
 
-    func testElevatedRootResetAndRemovalThenNormalPresentation() {
+    func testElevatedRootResetAndRemovalThenDefaultPresentation() {
         app.terminate()
         app.launchArguments = ["--independent-space-probe"]
         app.launch()
@@ -50,7 +50,7 @@ final class SampleAppUITests: XCTestCase {
         assertExists("sample.spaces.high-root")
         tap("sample.spaces.chain")
         assertGone("sample.spaces.high-root")
-        assertExists("sample.spaces.normal")
+        assertExists("sample.spaces.default")
     }
 
     func testOwnerRemovalOfCoveredHighLeavesCriticalVisible() {
@@ -107,7 +107,7 @@ final class SampleAppUITests: XCTestCase {
         XCTAssertEqual(dismissalProbeValue("sample.nested-modal.b-minimum-depth"), bDepth)
     }
 
-    func testNormalEquivalentRouteKeepsDepartingNestedStack() {
+    func testDefaultEquivalentRouteKeepsDepartingNestedStack() {
         assertEquivalentRouteKeepsDepartingNestedStack(priorityArgument: nil)
     }
 
@@ -497,7 +497,7 @@ final class SampleAppUITests: XCTestCase {
         assertLabel(A11y.homeRoutePhase, contains: "Home route phase: inactive")
     }
 
-    func testRoutesFromHighPriorityTreeBehaveAsNormalNavigationAndModal() {
+    func testRoutesFromHighPriorityTreeBehaveAsDefaultNavigationAndModal() {
         openLanding()
 
         // Reaching profile while logged out reroutes to the login high-priority cover, starting a
@@ -506,8 +506,8 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.loginTitle)
         assertLabel(A11y.loginIsPresented, contains: "true")
 
-        // A normal push declared inside the tree navigates within the login stack (it is not
-        // blocked the way a normal route before the tree would be).
+        // A default push declared inside the tree navigates within the login stack (it is not
+        // blocked the way a default route before the tree would be).
         tap(A11y.loginIncrementPresentationProbeButton)
         assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
 
@@ -519,7 +519,7 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.loginTitle)
         assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
 
-        // A high-priority sheet declared inside the tree presents as a normal sheet over login
+        // A high-priority sheet declared inside the tree presents as a default sheet over login
         // — it must not escalate/replace the login cover, so login stays in the hierarchy behind it.
         tap(A11y.loginPresentHighPrioritySheetButton)
         assertExists(A11y.loginNoticeText)
@@ -853,7 +853,7 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.settingsAuthenticationButton)
     }
 
-    func testPendingElevatedBranchRequestBlocksNormalPresentationBeforeWindowStarts() {
+    func testPendingElevatedBranchRequestBlocksDefaultPresentationBeforeWindowStarts() {
         openLanding()
 
         tap(A11y.homePresentPendingPriorityRaceButton)

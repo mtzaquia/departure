@@ -455,10 +455,10 @@ private extension RouterEngine.DeclarationMatch.LookupStrategy {
             "enclosing branch path in \(spacePriority) space, nearest scope first"
         case let .rootPath(spacePriority):
             "root path in \(spacePriority) space, nearest scope first"
-        case .normalRootActiveBranchScope:
-            "active branch scope under normal root"
-        case .normalRootDeclarations:
-            "normal root declarations, active branch before local and inactive branches"
+        case .defaultRootActiveBranchScope:
+            "active branch scope under default root"
+        case .defaultRootDeclarations:
+            "default root declarations, active branch before local and inactive branches"
         }
     }
 }

@@ -88,7 +88,7 @@ The context is supplied by Departure. Application code does not construct a cont
 Presentation style and priority describe separate facts. `RoutePresentation` has:
 
 - `style`: `.push`, `.replace`, `.sheet`, or cover with its declared transition.
-- `priority: RoutePriority`: `.normal`, `.high`, or `.critical`, according to the root map builder containing this presentation or its enclosing flow.
+- `priority: RoutePriority`: `.default`, `.high`, or `.critical`, according to the root map builder containing this presentation or its enclosing flow.
 
 A push within a high-priority Login flow reports `.push` style and `.high` priority. It does not report cover style merely because the enclosing flow was presented as a cover. The same route type can receive different presentation information when requested through different map declarations.
 

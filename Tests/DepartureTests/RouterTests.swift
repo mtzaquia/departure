@@ -62,14 +62,14 @@ struct RouterTests {
 
         await owner.current.present(HomeDetailRoute())
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is HomeDetailRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is HomeDetailRoute)
 
         await owner.current.unwind(to: .topmostAncestor)
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
 
-        router.normalSpace.rootPath.replaceTestPath([RouteScope(id: RootRoute().id, route: RootRoute())])
+        router.defaultSpace.rootPath.replaceTestPath([RouteScope(id: RootRoute().id, route: RootRoute())])
         await owner.current.perform(RecordingProbeAction(recorder: actionRecorder))
 
         #expect(await actionRecorder.values() == [true])
@@ -83,7 +83,7 @@ struct RouterTests {
         #expect(router.routePhase(for: routeScope) == .inactive)
 
         router.mutateRouteGraph {
-            router.normalSpace.rootPath.replaceTestPath([routeScope])
+            router.defaultSpace.rootPath.replaceTestPath([routeScope])
         }
 
         #expect(router.routePhase(for: router.root) == .inactive)
@@ -123,13 +123,13 @@ struct RouterTests {
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
 
-        #expect(router.normalSpace.currentRouteScope === homeScope)
-        #expect(router.normalSpace.currentRoutePath === homeScope.path)
+        #expect(router.defaultSpace.currentRouteScope === homeScope)
+        #expect(router.defaultSpace.currentRoutePath === homeScope.path)
 
         await router.requestRoute(HomeDetailRoute())
 
-        #expect(router.normalSpace.currentRouteScope === homeScope.path.last)
-        #expect(router.normalSpace.currentRoutePath === homeScope.path)
+        #expect(router.defaultSpace.currentRouteScope === homeScope.path.last)
+        #expect(router.defaultSpace.currentRoutePath === homeScope.path)
     }
 
     @Test func routePhaseTreatsActiveBranchRootAsCurrentScope() {
@@ -139,7 +139,7 @@ struct RouterTests {
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
 
         router.mutateRouteGraph {
-            router.normalSpace.rootPath.replaceTestPath([containerScope])
+            router.defaultSpace.rootPath.replaceTestPath([containerScope])
             containerScope.setActiveBranch(AnyHashable(AppTab.home))
             containerScope.attachTestBranch(homeScope, for: AppTab.home)
             containerScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -166,7 +166,7 @@ struct RouterTests {
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
 
         router.mutateRouteGraph {
-            router.normalSpace.rootPath.replaceTestPath([containerScope])
+            router.defaultSpace.rootPath.replaceTestPath([containerScope])
             containerScope.setActiveBranch(AnyHashable(AppTab.home))
             containerScope.attachTestBranch(homeScope, for: AppTab.home)
             containerScope.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -189,11 +189,11 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         router.mutateRouteGraph {
-            router.normalSpace.rootPath.replaceTestPath([containerScope])
+            router.defaultSpace.rootPath.replaceTestPath([containerScope])
             containerScope.setActiveBranch(AnyHashable(AppTab.home))
             containerScope.attachTestBranch(homeScope, for: AppTab.home)
         }
@@ -224,7 +224,7 @@ struct RouterTests {
         }
 
         #expect(didUnwind == false)
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
     }
 
     @Test func publicUnwindReportsNoRouteAtRoot() async {
@@ -232,14 +232,14 @@ struct RouterTests {
 
         #expect(await router.unwind(to: .root) == false)
         #expect(await router.unwind(to: .topmostAncestor) == false)
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
     }
 
     @Test func publicUnwindReportsMissingNearestBranch() async {
         let router = RouterEngine()
 
         #expect(await router.unwind(to: .nearestBranch) == false)
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
     }
 
     @Test func routeRequestSelectsInactiveBranchAndWaitsForInstalledBranchScope() async {
@@ -271,13 +271,13 @@ struct RouterTests {
         await Task.yield()
 
         #expect(selectedTab() == .home)
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.home))
 
         let homeScope = router.root.branchScopes[AppTab.home]!
         router.resumePendingRoute(for: AppTab.home, in: router.root)
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last?.route is HomeDetailRoute)
         #expect(router.pendingRoute == nil)
@@ -290,11 +290,11 @@ struct RouterTests {
             }
         })
         await engine.present(RootRoute())
-        let container = engine.normalSpace.rootPath.last!
+        let container = engine.defaultSpace.rootPath.last!
         let home = container.branchScopes[AppTab.home]!
         #expect(!home.isInstalledInView)
         await Router(engine: engine, scope: container).present(HomeDetailRoute())
-        #expect(engine.normalSpace.rootPath.last === container)
+        #expect(engine.defaultSpace.rootPath.last === container)
         #expect(home.path.last?.route is HomeDetailRoute)
         #expect(engine.pendingRoute == nil)
     }
@@ -357,7 +357,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -368,14 +368,14 @@ struct RouterTests {
 
         await router.requestRoute(HomeDetailRoute())
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last?.route is HomeDetailRoute)
 
         await router.unwind(to: .nearestBranch)
         await router.requestRoute(SettingsRoute())
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last?.route is SettingsRoute)
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue != nil)
@@ -415,13 +415,13 @@ struct RouterTests {
         await router.requestRoute(HomeDetailRoute())
 
         #expect(selectedTab() == .home)
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.home))
 
         let homeScope = router.root.branchScopes[AppTab.home]!
         router.resumePendingRoute(for: AppTab.home, in: router.root)
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last?.route is HomeDetailRoute)
         #expect(router.pendingRoute == nil)
@@ -473,7 +473,7 @@ struct RouterTests {
         let (selection, selectedTab) = tabSelection(.wallet)
 
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
 
         landingScope.defineTestMap(
             id: RootRoute().id,
@@ -481,7 +481,7 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .fade))
+                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))
                     }
                 ),
                 RouteDeclarationBuilder.buildExpression(
@@ -497,7 +497,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -515,12 +515,12 @@ struct RouterTests {
         await router.requestRoute(MessageRoute())
 
         #expect(selectedTab() == .home)
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
         #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.home))
 
         router.resumePendingRoute(for: AppTab.home, in: landingScope)
 
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last?.route is MessageRoute)
         #expect(router.pendingRoute == nil)
@@ -541,7 +541,7 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
@@ -562,14 +562,14 @@ struct RouterTests {
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
 
         await router.requestRoute(TransactionRoute())
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(walletScope.path.count == 1)
         #expect(walletScope.path.last?.route is TransactionRoute)
 
         await router.requestRoute(MessageRoute())
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is MessageRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is MessageRoute)
         #expect(walletScope.path.count == 1)
         #expect(walletScope.path.last?.route is TransactionRoute)
 
@@ -577,12 +577,12 @@ struct RouterTests {
             from: router.root,
             matching: .cover(.slide)
         ).wrappedValue)
-        #expect(presentation.scope === router.normalSpace.rootPath.last)
+        #expect(presentation.scope === router.defaultSpace.rootPath.last)
         #expect(router.routePresentationBinding(from: walletScope, matching: .cover(.slide)).wrappedValue == nil)
 
         router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue = nil
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(walletScope.path.count == 1)
         #expect(walletScope.path.last?.route is TransactionRoute)
     }
@@ -592,13 +592,13 @@ struct RouterTests {
         let (selection, selectedTab) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
@@ -636,17 +636,17 @@ struct RouterTests {
         await router.requestRoute(MessageRoute())
 
         #expect(selectedTab() == .wallet)
-        #expect(router.normalSpace.rootPath.count == 2)
-        #expect(router.normalSpace.rootPath.last?.route is MessageRoute)
+        #expect(router.defaultSpace.rootPath.count == 2)
+        #expect(router.defaultSpace.rootPath.last?.route is MessageRoute)
         #expect(landingScope.path.isEmpty)
         #expect(walletScope.path.isEmpty)
-        #expect(router.routePresentationBinding(from: landingScope, matching: .sheet).wrappedValue?.scope === router.normalSpace.rootPath.last)
+        #expect(router.routePresentationBinding(from: landingScope, matching: .sheet).wrappedValue?.scope === router.defaultSpace.rootPath.last)
 
         landingScope.setActiveBranch(AnyHashable(AppTab.home))
         router.routePresentationBinding(from: landingScope, matching: .sheet).wrappedValue = nil
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === landingScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === landingScope)
         #expect(router.routePresentationBinding(from: landingScope, matching: .sheet).wrappedValue == nil)
 
         landingScope.setActiveBranch(AnyHashable(AppTab.wallet))
@@ -660,13 +660,13 @@ struct RouterTests {
         let (selection, selectedTab) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
@@ -692,7 +692,7 @@ struct RouterTests {
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
 
         await router.requestRoute(MessageRoute())
-        let modalScope = try #require(router.normalSpace.rootPath.last)
+        let modalScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(modalScope)
 
         let requestTask = Task {
@@ -700,8 +700,8 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.normalSpace.rootPath.count == 1,
-               router.normalSpace.rootPath.last === landingScope,
+            if router.defaultSpace.rootPath.count == 1,
+               router.defaultSpace.rootPath.last === landingScope,
                homeScope.path.isEmpty {
                 break
             }
@@ -709,8 +709,8 @@ struct RouterTests {
         }
 
         #expect(selectedTab() == .home)
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === landingScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === landingScope)
         #expect(homeScope.path.isEmpty)
         #expect(router.routePresentationBinding(from: landingScope, matching: .sheet).wrappedValue == nil)
 
@@ -718,8 +718,8 @@ struct RouterTests {
         _ = await requestTask.value
 
         #expect(selectedTab() == .home)
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === landingScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === landingScope)
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last?.route is HomeDetailRoute)
         #expect(router.routePresentationBinding(from: homeScope, matching: .push).wrappedValue?.scope === homeScope.path.last)
@@ -738,7 +738,7 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
@@ -768,12 +768,12 @@ struct RouterTests {
         )
         modalScope.attachPresentation(to: landingScope, declaration: modalDeclaration)
         walletScope.path.replaceTestPath([appearanceScope])
-        router.normalSpace.rootPath.replaceTestPath([landingScope, modalScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope, modalScope])
 
         await router.requestRoute(SettingsRoute())
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === landingScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === landingScope)
         #expect(walletScope.path.count == 2)
         #expect(walletScope.path.first === appearanceScope)
         let authenticationScope = try #require(walletScope.path.last)
@@ -785,7 +785,7 @@ struct RouterTests {
         )
     }
 
-    @Test func normalRootBranchLocalPushBehindModalPreservesActiveLocalScope() async throws {
+    @Test func defaultRootBranchLocalPushBehindModalPreservesActiveLocalScope() async throws {
         let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
@@ -797,10 +797,10 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
@@ -830,16 +830,16 @@ struct RouterTests {
         )
         modalScope.attachPresentation(to: router.root, declaration: modalDeclaration)
         walletScope.path.replaceTestPath([walletRouteScope])
-        router.normalSpace.rootPath.replaceTestPath([modalScope])
+        router.defaultSpace.rootPath.replaceTestPath([modalScope])
 
         let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
         let unwindPlan = router.routeAppendUnwindPlan(after: match)
 
-        #expect(match.lookupStrategy == .normalRootActiveBranchScope)
+        #expect(match.lookupStrategy == .defaultRootActiveBranchScope)
         #expect(match.declaration.presentationKind == .push)
         #expect(match.presentationLocation.path === walletScope.path)
         #expect(match.presentationLocation.position == .scope(walletRouteScope))
-        #expect(match.declarationLocation.path === router.normalSpace.rootPath)
+        #expect(match.declarationLocation.path === router.defaultSpace.rootPath)
         #expect(match.declarationLocation.position == .owner)
         #expect(unwindPlan.removedScopes.count == 1)
         #expect(unwindPlan.removedScopes.first === modalScope)
@@ -849,11 +849,11 @@ struct RouterTests {
             await router.requestRoute(SettingsRoute())
         }
 
-        for _ in 0..<10 where router.normalSpace.rootPath.isEmpty == false {
+        for _ in 0..<10 where router.defaultSpace.rootPath.isEmpty == false {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(walletScope.path.count == 1)
         #expect(walletScope.path.last === walletRouteScope)
         #expect(router.pendingRoute?.route is SettingsRoute)
@@ -889,7 +889,7 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
@@ -913,9 +913,9 @@ struct RouterTests {
         walletScope.path.replaceTestPath([walletRouteScope])
         modalScope.attachPresentation(
             to: router.root,
-            declaration: try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations.first)
+            declaration: try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations.first)
         )
-        router.normalSpace.rootPath.replaceTestPath([modalScope])
+        router.defaultSpace.rootPath.replaceTestPath([modalScope])
 
         let match = try #require(router.spaces.firstDeclaration(including: TransactionRoute.self)?.declaration)
         router.appendOrPendRoute(
@@ -924,7 +924,7 @@ struct RouterTests {
         )
         router.resumePendingRoute(for: AppTab.wallet, in: router.root)
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(walletScope.path.count == 2)
         #expect(walletScope.path.first === walletRouteScope)
         let transactionScope = try #require(walletScope.path.last)
@@ -945,10 +945,10 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
@@ -965,16 +965,16 @@ struct RouterTests {
         )
         modalScope.attachPresentation(to: router.root, declaration: modalDeclaration)
         walletScope.path.replaceTestPath([walletRouteScope])
-        router.normalSpace.rootPath.replaceTestPath([modalScope])
+        router.defaultSpace.rootPath.replaceTestPath([modalScope])
 
         let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
         let unwindPlan = router.routeAppendUnwindPlan(after: match)
 
-        #expect(match.lookupStrategy == .normalRootDeclarations)
+        #expect(match.lookupStrategy == .defaultRootDeclarations)
         #expect(match.declaration.presentationKind == .push)
         #expect(match.presentationLocation.path === walletScope.path)
         #expect(match.presentationLocation.position == .owner)
-        #expect(match.declarationLocation.path === router.normalSpace.rootPath)
+        #expect(match.declarationLocation.path === router.defaultSpace.rootPath)
         #expect(match.declarationLocation.position == .owner)
         #expect(unwindPlan.removedScopes.count == 2)
         #expect(unwindPlan.removedScopes.contains { $0 === walletRouteScope })
@@ -993,7 +993,7 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 )
             )
@@ -1002,7 +1002,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -1032,7 +1032,7 @@ struct RouterTests {
         let detailScope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute())
         let modalScope = RouteScope(id: MessageRoute().id, route: MessageRoute())
         let pushDeclaration = try #require(AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations.first)
-        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations.first)
+        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations.first)
 
         landingScope.setActiveBranch(AnyHashable(AppTab.home))
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -1042,19 +1042,19 @@ struct RouterTests {
         )
         modalScope.attachPresentation(to: landingScope, declaration: modalDeclaration)
         homeScope.path.replaceTestPath([detailScope])
-        router.normalSpace.rootPath.replaceTestPath([landingScope, modalScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope, modalScope])
         router.routeScopeDidInstallInView(modalScope)
 
         let match = RouterEngine.DeclarationMatch(
             presentationLocation: .init(path: homeScope.path, position: .owner),
-            space: router.normalSpace,
+            space: router.defaultSpace,
             declarationLocation: .init(
-                path: router.normalSpace.rootPath,
+                path: router.defaultSpace.rootPath,
                 position: .scope(landingScope)
             ),
             branchID: AnyHashable(AppTab.home),
             declaration: pushDeclaration,
-            lookupStrategy: .rootPath(spacePriority: .normal)
+            lookupStrategy: .rootPath(spacePriority: .default)
         )
         let requestTask = Task {
             await router.unwindToExistingEquivalentRouteIfNeeded(
@@ -1064,14 +1064,14 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.normalSpace.rootPath.last === landingScope {
+            if router.defaultSpace.rootPath.last === landingScope {
                 break
             }
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === landingScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === landingScope)
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last === detailScope)
         #expect(router.routePresentationBinding(from: landingScope, matching: .sheet).wrappedValue == nil)
@@ -1079,8 +1079,8 @@ struct RouterTests {
         router.routeScopeDidLeaveView(modalScope)
         #expect(await requestTask.value)
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === landingScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === landingScope)
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last === detailScope)
         #expect(router.routePresentationBinding(from: homeScope, matching: .push).wrappedValue?.scope === detailScope)
@@ -1093,7 +1093,7 @@ struct RouterTests {
         let existingDetailScope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute())
         let modalScope = RouteScope(id: MessageRoute().id, route: MessageRoute())
         let pushDeclaration = try #require(AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations.first)
-        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations.first)
+        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations.first)
 
         landingScope.setActiveBranch(AnyHashable(AppTab.home))
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -1110,12 +1110,12 @@ struct RouterTests {
             ]
         )
         homeScope.path.replaceTestPath([existingDetailScope])
-        router.normalSpace.rootPath.replaceTestPath([landingScope, modalScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope, modalScope])
 
         await router.requestRoute(HomeDetailRoute())
 
-        let presentedDetailScope = try #require(router.normalSpace.rootPath.last)
-        #expect(router.normalSpace.rootPath.count == 3)
+        let presentedDetailScope = try #require(router.defaultSpace.rootPath.last)
+        #expect(router.defaultSpace.rootPath.count == 3)
         #expect(presentedDetailScope !== existingDetailScope)
         #expect(presentedDetailScope.route is HomeDetailRoute)
         #expect(presentedDetailScope.presentationOrigin === modalScope)
@@ -1133,7 +1133,7 @@ struct RouterTests {
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
@@ -1160,13 +1160,13 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(MessageRoute())
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(homeScope.path.count == 2)
         #expect(homeScope.path.first?.route is SettingsRoute)
         #expect(homeScope.path.last?.route is MessageRoute)
@@ -1179,13 +1179,13 @@ struct RouterTests {
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
@@ -1210,7 +1210,7 @@ struct RouterTests {
 
         // Toggle OFF: the pushed scope declares nothing, so the container-level sheet hosts.
         await router.requestRoute(MessageRoute())
-        #expect(router.routePresentationBinding(from: landingScope, matching: .sheet).wrappedValue?.scope === router.normalSpace.rootPath.last)
+        #expect(router.routePresentationBinding(from: landingScope, matching: .sheet).wrappedValue?.scope === router.defaultSpace.rootPath.last)
         #expect(router.routePresentationBinding(from: walletScope, matching: .sheet).wrappedValue == nil)
         #expect(router.routePresentationBinding(from: settingsScope, matching: .sheet).wrappedValue == nil)
 
@@ -1222,7 +1222,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1237,17 +1237,17 @@ struct RouterTests {
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal)) // top-level (shared) sheet
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) // top-level (shared) sheet
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal)) // branch-local sheet
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) // branch-local sheet
                     }
                 )
             )
@@ -1259,8 +1259,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -1288,17 +1288,17 @@ struct RouterTests {
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .fade)) // top-level cover
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade)) // top-level cover
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal)) // branch-local sheet
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) // branch-local sheet
                     }
                 )
             )
@@ -1309,8 +1309,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .fade))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -1339,23 +1339,23 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(LoginRoute())
-        let loginScope = try #require(router.normalSpace.rootPath.last)
+        let loginScope = try #require(router.defaultSpace.rootPath.last)
         loginScope.defineTestMap(
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(SettingsRoute())
-        let settingsScope = try #require(router.normalSpace.rootPath.last)
+        let settingsScope = try #require(router.defaultSpace.rootPath.last)
 
         #expect(loginScope.lane.depth == 1)
         #expect(settingsScope.lane.depth == 2)
@@ -1364,10 +1364,10 @@ struct RouterTests {
 
         await router.requestRoute(MessageRoute())
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is MessageRoute)
-        #expect(router.normalSpace.rootPath.scopes.contains { $0.route is LoginRoute } == false)
-        #expect(router.normalSpace.rootPath.scopes.contains { $0.route is SettingsRoute } == false)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is MessageRoute)
+        #expect(router.defaultSpace.rootPath.scopes.contains { $0.route is LoginRoute } == false)
+        #expect(router.defaultSpace.rootPath.scopes.contains { $0.route is SettingsRoute } == false)
     }
 
     @Test func replacingTopLevelCoverPreservesActiveBranchPushStack() async throws {
@@ -1375,16 +1375,16 @@ struct RouterTests {
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
                 ),
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
@@ -1399,8 +1399,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
                     + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
             ]
         )
@@ -1445,16 +1445,16 @@ struct RouterTests {
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
                 ),
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
@@ -1469,8 +1469,8 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
                     + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
             ]
         )
@@ -1482,7 +1482,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1594,19 +1594,19 @@ struct RouterTests {
 
         await Task.yield()
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(homeScope.path.last === homeDetailScope)
 
         router.routeScopeDidLeaveView(homeDetailScope)
         _ = await requestTask.value
 
         #expect(selectedTab() == .wallet)
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.pendingRoute?.operation?.presentation?.match.branchID == AnyHashable(AppTab.wallet))
 
         router.resumePendingRoute(for: AppTab.wallet, in: router.root)
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(walletScope.path.count == 1)
         #expect(walletScope.path.last?.route is TransactionRoute)
         #expect(router.pendingRoute == nil)
@@ -1617,10 +1617,10 @@ struct RouterTests {
         let router = RouterEngine()
 
         await router.requestRoute(DroppedRoute())
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
 
         await router.requestRoute(SettingsRoute())
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
     }
 
     @Test func routeResolutionReroutePresentsResolvedRoute() async {
@@ -1636,8 +1636,8 @@ struct RouterTests {
 
         await router.requestRoute(ReroutingRoute())
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is LoginRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is LoginRoute)
     }
 
     @Test func routeResolutionRerouteChainStopsWhenAResolvedRouteDrops() async {
@@ -1653,17 +1653,17 @@ struct RouterTests {
 
         await router.requestRoute(ReroutingToDroppedRoute())
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
     }
 
-    @Test func normalPresentationResolvesAndDismissesFromDeclaringScope() async throws {
+    @Test func defaultPresentationResolvesAndDismissesFromDeclaringScope() async throws {
         let router = RouterEngine()
 
         router.root.defineTestMap(
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
@@ -1674,12 +1674,12 @@ struct RouterTests {
             matching: .sheet
         ).wrappedValue)
 
-        #expect(presentation.scope === router.normalSpace.rootPath.last)
+        #expect(presentation.scope === router.defaultSpace.rootPath.last)
         #expect(presentation.declaration.routeTypeID == ObjectIdentifier(SettingsRoute.self))
 
         router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue = nil
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
     }
 
     @Test func repeatedPresentationOfEquivalentRouteKeepsPresentationIdentity() async throws {
@@ -1705,7 +1705,7 @@ struct RouterTests {
             matching: .push
         ).wrappedValue)
 
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
         #expect(firstPresentation.id == secondPresentation.id)
         #expect(firstPresentation == secondPresentation)
         #expect(firstPresentation.scope === secondPresentation.scope)
@@ -1734,7 +1734,7 @@ struct RouterTests {
             matching: .push
         ).wrappedValue)
 
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
         #expect(firstPresentation.id != secondPresentation.id)
         #expect(firstPresentation.scope !== secondPresentation.scope)
         #expect(secondPresentation.scope.route as? NumberedRoute == NumberedRoute(number: 2))
@@ -1767,8 +1767,8 @@ struct RouterTests {
         )
 
         await router.requestRoute(SettingsRoute())
-        let settingsScope = try #require(router.normalSpace.rootPath.last)
-        #expect(router.normalSpace.rootPath.count == 2)
+        let settingsScope = try #require(router.defaultSpace.rootPath.last)
+        #expect(router.defaultSpace.rootPath.count == 2)
         #expect(settingsScope.route is SettingsRoute)
         router.routeScopeDidInstallInView(settingsScope)
 
@@ -1777,14 +1777,14 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.normalSpace.rootPath.last === numberedScope {
+            if router.defaultSpace.rootPath.last === numberedScope {
                 break
             }
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === numberedScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === numberedScope)
         #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue?.scope === numberedScope)
         #expect(router.routePresentationBinding(from: numberedScope, matching: .push).wrappedValue == nil)
 
@@ -1797,7 +1797,7 @@ struct RouterTests {
         ).wrappedValue)
         #expect(finalPresentation.id == numberedPresentation.id)
         #expect(finalPresentation.scope === numberedScope)
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
     }
 
     @Test func presentingEquivalentRouteInInactiveBranchSelectsBranchAndUnwindsThere() async throws {
@@ -1883,7 +1883,7 @@ struct RouterTests {
         )
 
         await router.requestRoute(HomeDetailRoute())
-        let firstScope = try #require(router.normalSpace.rootPath.last)
+        let firstScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(firstScope)
 
         let requestTask = Task {
@@ -1892,13 +1892,13 @@ struct RouterTests {
 
         await Task.yield()
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
 
         router.routeScopeDidLeaveView(firstScope)
         _ = await requestTask.value
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func removingPresentedRouteScopeSynchronizesRouterPath() async throws {
@@ -1913,11 +1913,11 @@ struct RouterTests {
         )
 
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalSpace.rootPath.last)
+        let pushedScope = try #require(router.defaultSpace.rootPath.last)
 
         router.removeFromPath(pushedScope)
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue == nil)
     }
 
@@ -1933,14 +1933,14 @@ struct RouterTests {
         )
 
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalSpace.rootPath.last)
+        let pushedScope = try #require(router.defaultSpace.rootPath.last)
 
         router.routeScopeDidInstallInView(pushedScope)
         router.routeScopeDidLeaveView(pushedScope)
 
         #expect(pushedScope.isInstalledInView == false)
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === pushedScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === pushedScope)
         #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue != nil)
     }
 
@@ -1951,18 +1951,18 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(SettingsRoute())
-        let sheetScope = try #require(router.normalSpace.rootPath.last)
+        let sheetScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(sheetScope)
 
         let presentation = router.routePresentationBinding(from: router.root, matching: .sheet)
         presentation.wrappedValue = nil
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(presentation.wrappedValue == nil)
 
         router.routeScopeDidLeaveView(sheetScope)
@@ -1973,7 +1973,7 @@ struct RouterTests {
         let modalScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let branchScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
         let detailScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
-        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations.first)
+        let modalDeclaration = try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations.first)
 
         router.root.defineTestMap(
             id: nil,
@@ -1985,11 +1985,11 @@ struct RouterTests {
         modalScope.attachPresentation(to: router.root, declaration: modalDeclaration)
         modalScope.attachTestBranch(branchScope, for: AppTab.wallet)
         branchScope.path.replaceTestPath([detailScope])
-        router.normalSpace.rootPath.replaceTestPath([modalScope])
+        router.defaultSpace.rootPath.replaceTestPath([modalScope])
 
         router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue = nil
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: branchScope) == nil)
     }
 
@@ -1998,7 +1998,7 @@ struct RouterTests {
         let retainedScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let coverScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let pushedScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
-        let coverDeclaration = try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations.first)
+        let coverDeclaration = try #require(AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations.first)
         let pushDeclaration = try #require(AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations.first)
 
         coverScope.defineTestMap(
@@ -2010,7 +2010,7 @@ struct RouterTests {
         )
         coverScope.attachPresentation(to: retainedScope, declaration: coverDeclaration)
         pushedScope.attachPresentation(to: coverScope, declaration: pushDeclaration)
-        router.normalSpace.rootPath.replaceTestPath([retainedScope, coverScope, pushedScope])
+        router.defaultSpace.rootPath.replaceTestPath([retainedScope, coverScope, pushedScope])
         router.routeScopeDidInstallInView(coverScope)
         router.routeScopeDidInstallInView(pushedScope)
 
@@ -2025,8 +2025,8 @@ struct RouterTests {
         #expect(binding.wrappedValue?.scope === pushedScope)
         binding.wrappedValue = nil
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === retainedScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === retainedScope)
 
         router.routeScopeDidLeaveView(coverScope)
         router.routeScopeDidLeaveView(pushedScope)
@@ -2069,13 +2069,13 @@ struct RouterTests {
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([firstScope])
+        router.defaultSpace.rootPath.replaceTestPath([firstScope])
         router.installElevatedSpace(priority: .high, scopes: [secondScope])
 
         await router.unwindAndWait(to: nil)
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === firstScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === firstScope)
         #expect(router.spaces.highSpace == nil)
     }
 
@@ -2084,11 +2084,11 @@ struct RouterTests {
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([firstScope])
+        router.defaultSpace.rootPath.replaceTestPath([firstScope])
         router.installElevatedSpace(priority: .high, scopes: [secondScope])
 
         #expect(!((await router.unwindAndWait(to: .id(RootRoute().id)))))
-        #expect(router.normalSpace.rootPath.last === firstScope)
+        #expect(router.defaultSpace.rootPath.last === firstScope)
         #expect(router.spaces.highSpace?.root === secondScope)
     }
 
@@ -2097,11 +2097,11 @@ struct RouterTests {
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let thirdScope = RouteScope(id: AlertRoute().id, route: AlertRoute())
-        router.normalSpace.rootPath.replaceTestPath([firstScope, secondScope, thirdScope])
+        router.defaultSpace.rootPath.replaceTestPath([firstScope, secondScope, thirdScope])
 
         let plan = router.spaces.unwindPlan(for: .combined([
-            .scoped(routePath: router.normalSpace.rootPath, after: .scope(secondScope)),
-            .scoped(routePath: router.normalSpace.rootPath, after: .scope(firstScope)),
+            .scoped(routePath: router.defaultSpace.rootPath, after: .scope(secondScope)),
+            .scoped(routePath: router.defaultSpace.rootPath, after: .scope(firstScope)),
         ]))
 
         #expect(plan.pathTrims.count == 1)
@@ -2116,12 +2116,12 @@ struct RouterTests {
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([firstScope])
+        router.defaultSpace.rootPath.replaceTestPath([firstScope])
         router.installElevatedSpace(priority: .high, scopes: [secondScope])
 
         await router.unwindAndWait(to: .root)
 
-        #expect(router.normalSpace.rootPath.last === firstScope)
+        #expect(router.defaultSpace.rootPath.last === firstScope)
         #expect(router.spaces.highSpace?.root === secondScope)
         #expect(router.spaces.highSpace?.rootPath.isEmpty == true)
     }
@@ -2131,7 +2131,7 @@ struct RouterTests {
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
@@ -2156,11 +2156,11 @@ struct RouterTests {
 
         await router.requestRoute(SettingsRoute())
         #expect(walletScope.path.count == 1)
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
 
         // `.root` reaches past the current branch path to the app root.
         await router.unwind(to: .root)
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: walletScope) == nil)
     }
 
@@ -2169,13 +2169,13 @@ struct RouterTests {
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
-                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                    AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
@@ -2190,7 +2190,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
                     + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
             ]
         )
@@ -2199,14 +2199,14 @@ struct RouterTests {
         await router.requestRoute(SettingsRoute())
         await router.requestRoute(MessageRoute())
 
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
         #expect(homeScope.path.count == 2)
         #expect(homeScope.path.first?.route is SettingsRoute)
         #expect(homeScope.path.last?.route is MessageRoute)
 
         await router.unwind(to: .root)
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: homeScope) == nil)
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }
@@ -2216,7 +2216,7 @@ struct RouterTests {
         let (selection, selectedTab) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
@@ -2224,7 +2224,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
-                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 ),
                 RouteDeclarationBuilder.buildExpression(
@@ -2241,7 +2241,7 @@ struct RouterTests {
             selection: nil,
             definitions: [
                 RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2262,13 +2262,13 @@ struct RouterTests {
         await router.requestRoute(TransactionRoute())
 
         #expect(selectedTab() == .wallet)
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
         #expect(homeScope.path.count == 2)
         #expect(walletScope.path.count == 1)
 
         await router.unwind(to: .root)
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: homeScope) == nil)
         #expect(router.spaces.routePath(containing: walletScope) == nil)
         #expect(router.routePresentationBinding(from: homeScope, matching: .push).wrappedValue == nil)
@@ -2286,13 +2286,13 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
-                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 )
             )
@@ -2304,7 +2304,7 @@ struct RouterTests {
             selection: nil,
             definitions: [
                 RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -2315,7 +2315,7 @@ struct RouterTests {
             selection: nil,
             definitions: [
                 RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -2335,7 +2335,7 @@ struct RouterTests {
 
         await router.unwind(to: .root)
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last?.route is HomeDetailRoute)
         #expect(router.routePresentationBinding(from: homeScope, matching: .push).wrappedValue?.scope === homeScope.path.last)
@@ -2348,7 +2348,7 @@ struct RouterTests {
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
@@ -2378,7 +2378,7 @@ struct RouterTests {
         // to its root but keeps the app root (the landing scope) — it does not escape the branch.
         await router.unwind(to: .nearestBranch)
         #expect(walletScope.path.isEmpty)
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
     }
 
     @Test func unwindToNearestBranchAtBranchRootIsNoOp() async throws {
@@ -2386,7 +2386,7 @@ struct RouterTests {
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
@@ -2414,7 +2414,7 @@ struct RouterTests {
         #expect(walletScope.path.isEmpty)
         await router.unwind(to: .nearestBranch)
         #expect(walletScope.path.isEmpty)
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
     }
 
     @Test func sequentialUnwindThenPresentWaitsForInstalledRouteScopeToLeaveView() async {
@@ -2425,7 +2425,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
@@ -2442,14 +2442,14 @@ struct RouterTests {
 
         await Task.yield()
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
 
         router.routeScopeDidLeaveView(loginScope)
         _ = await unwindTask.value
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func modalReplacementWaitsForInstalledRouteScopeToLeaveView() async throws {
@@ -2459,13 +2459,13 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(LoginRoute())
-        let loginScope = try #require(router.normalSpace.rootPath.last)
+        let loginScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(loginScope)
 
         let replacementTask = Task {
@@ -2473,20 +2473,20 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.normalSpace.rootPath.isEmpty {
+            if router.defaultSpace.rootPath.isEmpty {
                 break
             }
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
 
         router.routeScopeDidLeaveView(loginScope)
         _ = await replacementTask.value
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func sheetToCoverReplacementWaitsForOldScopeToLeaveView() async throws {
@@ -2496,13 +2496,13 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(LoginRoute())
-        let loginScope = try #require(router.normalSpace.rootPath.last)
+        let loginScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(loginScope)
 
         let replacementTask = Task {
@@ -2510,22 +2510,22 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.normalSpace.rootPath.isEmpty {
+            if router.defaultSpace.rootPath.isEmpty {
                 break
             }
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
         #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue == nil)
 
         router.routeScopeDidLeaveView(loginScope)
         _ = await replacementTask.value
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
-        #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue?.scope === router.normalSpace.rootPath.last)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is SettingsRoute)
+        #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue?.scope === router.defaultSpace.rootPath.last)
     }
 
     @Test func coverToSheetReplacementWaitsForOldScopeToLeaveView() async throws {
@@ -2535,13 +2535,13 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(LoginRoute())
-        let loginScope = try #require(router.normalSpace.rootPath.last)
+        let loginScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(loginScope)
 
         let replacementTask = Task {
@@ -2549,22 +2549,22 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.normalSpace.rootPath.isEmpty {
+            if router.defaultSpace.rootPath.isEmpty {
                 break
             }
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue == nil)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
 
         router.routeScopeDidLeaveView(loginScope)
         _ = await replacementTask.value
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
-        #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue?.scope === router.normalSpace.rootPath.last)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is SettingsRoute)
+        #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue?.scope === router.defaultSpace.rootPath.last)
     }
 
     @Test func pendingModalReplacementUsesLatestRequest() async throws {
@@ -2574,14 +2574,14 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(LoginRoute())
-        let loginScope = try #require(router.normalSpace.rootPath.last)
+        let loginScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(loginScope)
 
         let firstReplacementTask = Task {
@@ -2589,27 +2589,27 @@ struct RouterTests {
         }
 
         for _ in 0..<10 {
-            if router.normalSpace.rootPath.isEmpty {
+            if router.defaultSpace.rootPath.isEmpty {
                 break
             }
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
 
         let latestReplacementTask = Task {
             await router.requestRoute(AlertRoute())
         }
 
         await Task.yield()
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
 
         router.routeScopeDidLeaveView(loginScope)
         _ = await firstReplacementTask.value
         _ = await latestReplacementTask.value
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is AlertRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is AlertRoute)
     }
 
     @Test func namedRootUnwindTargetSurvivesNativeTeardown() async {
@@ -2621,7 +2621,7 @@ struct RouterTests {
         #expect(engine.root.id == AnyHashable("custom"))
         await engine.present(HomeDetailRoute())
         #expect(await engine.unwind(to: .id("custom")))
-        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
     }
 
     @Test func cancellingPresentationWaitingForNavigationRemovesPendingRequest() async {
@@ -2630,7 +2630,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         let transaction = router.beginNavigationOperation()
@@ -2651,7 +2651,7 @@ struct RouterTests {
         await presentationTask.value
 
         #expect(router.pendingRoute == nil)
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         await router.finishNavigationOperation(transaction)
     }
 
@@ -2697,14 +2697,14 @@ struct RouterTests {
 
         #expect(router.isNavigating)
         #expect(router.pendingRoute != nil)
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
 
         router.routeScopeDidLeaveView(secondDismissedScope)
         await presentationTask.value
 
         #expect(router.isNavigating == false)
         #expect(router.pendingRoute == nil)
-        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
+        #expect(router.defaultSpace.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func snapshotPresentationUsesOriginalPositionForHighTreeLocalHosting() async {
@@ -2714,7 +2714,7 @@ struct RouterTests {
         let noticeScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
         let noticeDeclaration = AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .high))._routeDeclarations[0]
 
-        router.normalSpace.rootPath.replaceTestPath([rootScope])
+        router.defaultSpace.rootPath.replaceTestPath([rootScope])
         noticeScope.attachPresentation(to: loginScope, declaration: noticeDeclaration)
         router.installElevatedSpace(priority: .high, scopes: [loginScope, noticeScope])
         router.routeScopeDidInstallInView(loginScope)
@@ -2731,7 +2731,7 @@ struct RouterTests {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.count == 1)
         #expect(router.hasOutgoingPresentations)
         let presentation = router.routePresentation(from: loginScope, matching: .sheet)
         #expect(presentation?.scope === noticeScope)
@@ -2748,12 +2748,12 @@ struct RouterTests {
         let (selection, _) = tabSelection(.home)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: Branch(AppTab.home) {
-                AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .fade))
+                AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))
             }.routeScopeDeclarations
         )
 
@@ -2762,7 +2762,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2772,8 +2772,8 @@ struct RouterTests {
 
         await router.unwind(to: .topmostAncestor)
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === landingScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === landingScope)
         #expect(homeScope.path.isEmpty)
     }
 
@@ -2782,7 +2782,7 @@ struct RouterTests {
         let (selection, selectedTab) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
@@ -2792,7 +2792,7 @@ struct RouterTests {
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 ),
                 RouteDeclarationBuilder.buildExpression(
@@ -2808,7 +2808,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2825,16 +2825,16 @@ struct RouterTests {
 
         await router.requestRoute(LoginRoute())
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === landingScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === landingScope)
         #expect(router.spaces.highSpace?.rootPath.count == 0)
         #expect(router.spaces.highSpace?.currentRouteScope.route is LoginRoute)
         #expect(router.spaces.highSpace?.currentRoutePath === router.spaces.highSpace?.rootPath)
 
         await router.unwind(to: .topmostAncestor)
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === landingScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === landingScope)
         #expect(landingScope.path.isEmpty)
         #expect(walletScope.path.isEmpty)
 
@@ -2851,14 +2851,14 @@ struct RouterTests {
         let (selection, selectedTab) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
 
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         landingScope.defineTestMap(
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .fade))
+                        AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))
                     }
                 ),
                 RouteDeclarationBuilder.buildExpression(
@@ -2874,7 +2874,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2901,8 +2901,8 @@ struct RouterTests {
         }
 
         #expect(didUnwind)
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === landingScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === landingScope)
         #expect(walletScope.path.isEmpty)
         #expect(selectedTab() == .home)
         #expect(homeScope.path.count == 1)
@@ -2919,11 +2919,11 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
-        router.normalSpace.rootPath.replaceTestPath([firstScope, secondScope, thirdScope])
+        router.defaultSpace.rootPath.replaceTestPath([firstScope, secondScope, thirdScope])
         router.routeScopeDidInstallInView(firstScope)
         router.routeScopeDidInstallInView(secondScope)
         router.routeScopeDidInstallInView(thirdScope)
@@ -2938,19 +2938,19 @@ struct RouterTests {
 
         await Task.yield()
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
 
         router.routeScopeDidLeaveView(firstScope)
         router.routeScopeDidLeaveView(secondScope)
         await Task.yield()
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
 
         router.routeScopeDidLeaveView(thirdScope)
         _ = await unwindTask.value
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func unwindPreservesDescendantPresentationBindingsUntilAncestorLeavesView() async throws {
@@ -2963,7 +2963,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
             ]
         )
         landingScope.setActiveBranch(AnyHashable(AppTab.home))
@@ -2971,7 +2971,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -2980,7 +2980,7 @@ struct RouterTests {
             to: homeScope,
             declaration: try #require(homeScope.routeAttachments.first { $0.presentationKind == .sheet })
         )
-        router.normalSpace.rootPath.replaceTestPath([landingScope, profileScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope, profileScope])
         router.routeScopeDidInstallInView(landingScope)
         router.routeScopeDidInstallInView(profileScope)
 
@@ -3009,7 +3009,7 @@ struct RouterTests {
             id: "root",
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         sheetScope.defineTestMap(
@@ -3027,7 +3027,7 @@ struct RouterTests {
             to: sheetScope,
             declaration: try #require(sheetScope.routeAttachments.first { $0.presentationKind == .push })
         )
-        router.normalSpace.rootPath.replaceTestPath([sheetScope, pushedScope])
+        router.defaultSpace.rootPath.replaceTestPath([sheetScope, pushedScope])
         router.routeScopeDidInstallInView(sheetScope)
         router.routeScopeDidInstallInView(pushedScope)
 
@@ -3053,14 +3053,14 @@ struct RouterTests {
             id: "root",
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         sheetA.defineTestMap(
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         sheetA.attachPresentation(
@@ -3071,16 +3071,16 @@ struct RouterTests {
             to: sheetA,
             declaration: try #require(sheetA.routeAttachments.first { $0.presentationKind == .sheet })
         )
-        router.normalSpace.rootPath.replaceTestPath([sheetA, sheetB])
+        router.defaultSpace.rootPath.replaceTestPath([sheetA, sheetB])
         router.routeScopeDidInstallInView(sheetA)
         router.routeScopeDidInstallInView(sheetB)
 
         let unwind = Task { await UnwindRouteAction(router: router, routeScope: sheetA)() }
-        for _ in 0..<10 where !router.normalSpace.rootPath.isEmpty {
+        for _ in 0..<10 where !router.defaultSpace.rootPath.isEmpty {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.hasOutgoingPresentations)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
         #expect(router.routePresentationBinding(from: sheetA, matching: .sheet).wrappedValue?.scope === sheetB)
@@ -3100,7 +3100,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         sheetScope.defineTestMap(
@@ -3118,13 +3118,13 @@ struct RouterTests {
             to: sheetScope,
             declaration: try #require(sheetScope.routeAttachments.first { $0.presentationKind == .push })
         )
-        router.normalSpace.rootPath.replaceTestPath([sheetScope, pushedScope])
+        router.defaultSpace.rootPath.replaceTestPath([sheetScope, pushedScope])
         router.routeScopeDidInstallInView(sheetScope)
         router.routeScopeDidInstallInView(pushedScope)
 
         router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue = nil
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.hasOutgoingPresentations)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
         #expect(router.routePresentationBinding(from: sheetScope, matching: .push).wrappedValue?.scope === pushedScope)
@@ -3149,7 +3149,7 @@ struct RouterTests {
             id: paymentMethodsID,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddMethodRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AddMethodRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
             ]
         )
         coverScope.defineTestMap(
@@ -3171,7 +3171,7 @@ struct RouterTests {
                 coverScope.routeAttachments.first { $0.presentationKind == .push }
             )
         )
-        router.normalSpace.rootPath.replaceTestPath([paymentMethodsScope, coverScope, pushedScope])
+        router.defaultSpace.rootPath.replaceTestPath([paymentMethodsScope, coverScope, pushedScope])
         router.routeScopeDidInstallInView(coverScope)
         router.routeScopeDidInstallInView(pushedScope)
 
@@ -3183,7 +3183,7 @@ struct RouterTests {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.scopes.elementsEqual([paymentMethodsScope], by: { $0 === $1 }))
+        #expect(router.defaultSpace.rootPath.scopes.elementsEqual([paymentMethodsScope], by: { $0 === $1 }))
         #expect(
             router.routePresentationBinding(from: paymentMethodsScope, matching: .cover(.slide))
                 .wrappedValue == nil
@@ -3210,7 +3210,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
             ]
         )
         landingScope.attachPresentation(
@@ -3223,7 +3223,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
@@ -3233,7 +3233,7 @@ struct RouterTests {
             declaration: try #require(homeScope.routeAttachments.first { $0.presentationKind == .sheet })
         )
         homeScope.path.replaceTestPath([profileScope])
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
 
         router.routeScopeDidInstallInView(landingScope)
         router.routeScopeDidInstallInView(profileScope)
@@ -3249,7 +3249,7 @@ struct RouterTests {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: homeScope) == nil)
         #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue == nil)
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue?.scope === profileScope)
@@ -3272,7 +3272,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
             ]
         )
         landingScope.attachPresentation(
@@ -3305,7 +3305,7 @@ struct RouterTests {
             declaration: try #require(authenticationScope.routeAttachments.first { $0.presentationKind == .push })
         )
         settingsScope.path.replaceTestPath([authenticationScope, detailScope])
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
 
         router.routeScopeDidInstallInView(landingScope)
         router.routeScopeDidInstallInView(authenticationScope)
@@ -3347,8 +3347,8 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(RootRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         landingScope.attachPresentation(
@@ -3381,7 +3381,7 @@ struct RouterTests {
             declaration: try #require(appearanceScope.routeAttachments.first { $0.presentationKind == .push })
         )
         settingsScope.path.replaceTestPath([appearanceScope, authenticationScope])
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
         router.routeScopeDidInstallInView(landingScope)
 
         let requestTask = Task {
@@ -3395,7 +3395,7 @@ struct RouterTests {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue == nil)
         #expect(router.routePresentationBinding(from: settingsScope, matching: .push).wrappedValue?.scope === appearanceScope)
         #expect(router.routePresentationBinding(from: appearanceScope, matching: .push).wrappedValue?.scope === authenticationScope)
@@ -3404,8 +3404,8 @@ struct RouterTests {
         _ = await requestTask.value
 
         #expect(router.hasOutgoingPresentations == false)
-        #expect(router.normalSpace.rootPath.last?.route is MessageRoute)
-        #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue?.scope === router.normalSpace.rootPath.last)
+        #expect(router.defaultSpace.rootPath.last?.route is MessageRoute)
+        #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue?.scope === router.defaultSpace.rootPath.last)
     }
 
     @Test func routeAppendDoesNotPreservePushHostedByRetainedScopeWhileNestedModalLeaves() async throws {
@@ -3427,14 +3427,14 @@ struct RouterTests {
             definitions: [
                 RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
                     + AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                    + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         authenticationScope.defineTestMap(
             id: SettingsRoute().id,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
@@ -3450,7 +3450,7 @@ struct RouterTests {
             to: authenticationScope,
             declaration: try #require(authenticationScope.routeAttachments.first { $0.routeType == MessageRoute.self })
         )
-        router.normalSpace.rootPath.replaceTestPath([appearanceScope, authenticationScope, sheetScope])
+        router.defaultSpace.rootPath.replaceTestPath([appearanceScope, authenticationScope, sheetScope])
         router.routeScopeDidInstallInView(authenticationScope)
         router.routeScopeDidInstallInView(sheetScope)
 
@@ -3465,7 +3465,7 @@ struct RouterTests {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.scopes.elementsEqual([appearanceScope], by: { $0 === $1 }))
+        #expect(router.defaultSpace.rootPath.scopes.elementsEqual([appearanceScope], by: { $0 === $1 }))
         #expect(router.routePresentationBinding(from: appearanceScope, matching: .push).wrappedValue == nil)
 
         router.routeScopeDidLeaveView(sheetScope)
@@ -3490,8 +3490,8 @@ struct RouterTests {
         _ = await supersedingTask.value
 
         #expect(router.pendingRoute == nil)
-        #expect(router.normalSpace.rootPath.count == 2)
-        #expect(router.normalSpace.rootPath.last?.route is AlertRoute)
+        #expect(router.defaultSpace.rootPath.count == 2)
+        #expect(router.defaultSpace.rootPath.last?.route is AlertRoute)
     }
 
     @Test func unwindSnapshotDoesNotPreservePushPresentationBindingWithoutDepartingModal() async throws {
@@ -3515,7 +3515,7 @@ struct RouterTests {
             declaration: try #require(settingsScope.routeAttachments.first { $0.presentationKind == .push })
         )
         settingsScope.path.replaceTestPath([authenticationScope])
-        router.normalSpace.rootPath.replaceTestPath([landingScope])
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
 
         router.routeScopeDidInstallInView(authenticationScope)
 
@@ -3565,7 +3565,7 @@ struct RouterTests {
             to: appearanceScope,
             declaration: try #require(appearanceScope.routeAttachments.first { $0.routeType == SettingsRoute.self })
         )
-        router.normalSpace.rootPath.replaceTestPath([appearanceScope, authenticationScope])
+        router.defaultSpace.rootPath.replaceTestPath([appearanceScope, authenticationScope])
         router.routeScopeDidInstallInView(appearanceScope)
         router.routeScopeDidInstallInView(authenticationScope)
 
@@ -3573,11 +3573,11 @@ struct RouterTests {
             await router.requestRoute(TransactionRoute())
         }
 
-        for _ in 0..<10 where router.normalSpace.rootPath.isEmpty == false {
+        for _ in 0..<10 where router.defaultSpace.rootPath.isEmpty == false {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.routePresentationBinding(from: router.root, matching: .push).wrappedValue == nil)
         #expect(
             router.routePresentationBinding(from: appearanceScope, matching: .push)
@@ -3601,8 +3601,8 @@ struct RouterTests {
         _ = await requestTask.value
 
         #expect(router.hasOutgoingPresentations == false)
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is TransactionRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is TransactionRoute)
     }
 
     @Test func inactiveBranchPathIsPreservedWhenActiveBranchChanges() async throws {
@@ -3652,7 +3652,7 @@ struct RouterTests {
         router.root.setActiveBranch(AnyHashable(AppTab.wallet))
 
         #expect(selectedTab() == .wallet)
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last === homeDetailScope)
 
@@ -3681,7 +3681,7 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 ),
                 RouteDeclarationBuilder.buildExpression(
@@ -3697,7 +3697,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -3798,7 +3798,7 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: Branch(AppTab.home) {
-                AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
             }.routeScopeDeclarations
         )
 
@@ -3807,7 +3807,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -3831,12 +3831,12 @@ struct RouterTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 )
             )
@@ -3847,7 +3847,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -3857,7 +3857,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.wallet),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(walletScope, for: AppTab.wallet)
@@ -3917,14 +3917,14 @@ struct RouterTests {
                 RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations),
             ]
         )
-        router.normalSpace.rootPath.replaceTestPath([ancestorScope, firstDescendant, secondDescendant])
+        router.defaultSpace.rootPath.replaceTestPath([ancestorScope, firstDescendant, secondDescendant])
 
         let match = try #require(router.spaces.firstDeclaration(including: MessageRoute.self)?.declaration)
         let plan = router.routeAppendUnwindPlan(after: match)
         let expectedDescription = "MessageRoute[push] • local scope"
-            + " • lookup=current route path in normal space, nearest scope first"
+            + " • lookup=current route path in default space, nearest scope first"
 
-        #expect(match.lookupStrategy == .currentPath(spacePriority: .normal))
+        #expect(match.lookupStrategy == .currentPath(spacePriority: .default))
         #expect(match.departureDebugDescription == expectedDescription)
         #expect(plan.pathTrims.count == 1)
         #expect(plan.pathTrims.first?.keepThrough == .scope(ancestorScope))
@@ -4025,7 +4025,7 @@ struct RouterTests {
         #expect(engine.spaces.highSpace?.root.route as? NumberedRoute == NumberedRoute(number: 2))
         #expect(engine.isNavigating)
         await Router(engine: engine, scope: engine.root).present(SettingsRoute())
-        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
         #expect(engine.spaces.highSpace?.root.route as? NumberedRoute == NumberedRoute(number: 2))
         engine.routeScopeDidLeaveView(old)
         await replacing.value
@@ -4065,7 +4065,7 @@ struct RouterTests {
                 ),
                 RouteDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))
+                        AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 )
             )
@@ -4076,7 +4076,7 @@ struct RouterTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -4092,7 +4092,7 @@ struct RouterTests {
         #expect(presentation?.declaration.routeTypeID == ObjectIdentifier(LoginRoute.self))
     }
 
-    @Test func normalRouteBeforeActiveHighTreeIsDropped() async {
+    @Test func defaultRouteBeforeActiveHighTreeIsDropped() async {
         let router = RouterEngine()
 
         router.root.defineTestMap(
@@ -4100,37 +4100,37 @@ struct RouterTests {
             selection: nil,
             definitions: [
                 RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                    + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(LoginRoute())
         await router.requestRoute(SettingsRoute())
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.highSpace?.rootPath.count == 0)
         #expect(router.spaces.highSpace?.currentRouteScope.route is LoginRoute)
         #expect(router.routePresentationBinding(from: router.root, matching: .sheet).wrappedValue == nil)
     }
 
-    @Test func highPriorityPresentationOverlaysNormalPresentation() async {
+    @Test func highPriorityPresentationOverlaysDefaultPresentation() async {
         let router = RouterEngine()
 
         router.root.defineTestMap(
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
                     + AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(SettingsRoute())
-        let normalScope = router.normalSpace.rootPath.last
+        let defaultScope = router.defaultSpace.rootPath.last
 
         await router.requestRoute(LoginRoute())
 
-        let normalPresentation = router.routePresentationBinding(
+        let defaultPresentation = router.routePresentationBinding(
             from: router.root,
             matching: .cover(.slide)
         ).wrappedValue
@@ -4139,44 +4139,44 @@ struct RouterTests {
             matching: .cover(.slide)
         ).wrappedValue
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.first === normalScope)
-        #expect(router.normalSpace.rootPath.first?.route is SettingsRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.first === defaultScope)
+        #expect(router.defaultSpace.rootPath.first?.route is SettingsRoute)
         #expect(router.spaces.highSpace?.rootPath.count == 0)
         #expect(router.spaces.highSpace?.currentRouteScope.route is LoginRoute)
         #expect(router.spaces.highSpace?.root.route is LoginRoute)
-        #expect(normalPresentation?.scope === normalScope)
-        #expect(normalPresentation?.declaration.priority == .normal)
+        #expect(defaultPresentation?.scope === defaultScope)
+        #expect(defaultPresentation?.declaration.priority == .default)
         #expect(highPresentation?.scope === router.spaces.highSpace?.currentRouteScope)
         #expect(highPresentation?.declaration.priority == .high)
 
         router.elevatedRoutePresentationBinding(priority: .high, matching: .cover(.slide)).wrappedValue = nil
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === normalScope)
-        #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue?.scope === normalScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === defaultScope)
+        #expect(router.routePresentationBinding(from: router.root, matching: .cover(.slide)).wrappedValue?.scope === defaultScope)
         #expect(router.spaces.highSpace == nil)
     }
 
-    @Test func highPriorityReplacementPreservesUnderlyingNormalPresentation() async {
+    @Test func highPriorityReplacementPreservesUnderlyingDefaultPresentation() async {
         let router = RouterEngine()
 
         router.root.defineTestMap(
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations
                     + AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
                     + AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .fade))._routeDeclarations),
             ]
         )
 
         await router.requestRoute(SettingsRoute())
-        let normalScope = router.normalSpace.rootPath.last
+        let defaultScope = router.defaultSpace.rootPath.last
         await router.requestRoute(LoginRoute())
         await router.requestRoute(AlertRoute())
 
-        let normalPresentation = router.routePresentationBinding(
+        let defaultPresentation = router.routePresentationBinding(
             from: router.root,
             matching: .cover(.slide)
         ).wrappedValue
@@ -4185,15 +4185,15 @@ struct RouterTests {
             matching: .cover(.fade)
         ).wrappedValue
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.first === normalScope)
-        #expect(router.normalSpace.rootPath.first?.route is SettingsRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.first === defaultScope)
+        #expect(router.defaultSpace.rootPath.first?.route is SettingsRoute)
         #expect(router.spaces.highSpace?.rootPath.count == 0)
         #expect(router.spaces.highSpace?.currentRouteScope.route is AlertRoute)
         #expect(router.spaces.highSpace?.rootPath.scopes.contains { $0.route is LoginRoute } == false)
         #expect(router.spaces.highSpace?.root.route is AlertRoute)
-        #expect(normalPresentation?.scope === normalScope)
-        #expect(normalPresentation?.declaration.priority == .normal)
+        #expect(defaultPresentation?.scope === defaultScope)
+        #expect(defaultPresentation?.declaration.priority == .default)
         #expect(highPresentation?.scope === router.spaces.highSpace?.currentRouteScope)
         #expect(highPresentation?.declaration.priority == .high)
     }
@@ -4242,7 +4242,7 @@ struct RouterTests {
         #expect(router.spaces.highSpace?.currentRouteScope.route is AlertRoute)
     }
 
-    @Test func normalRouteMatchedInsideHighTreeAppendsNormally() async {
+    @Test func defaultRouteMatchedInsideHighTreeAppendsNormally() async {
         let router = RouterEngine()
 
         router.root.defineTestMap(
@@ -4288,7 +4288,7 @@ struct RouterTests {
             id: nil,
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .fade))._routeDeclarations),
+                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(AlertRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))._routeDeclarations),
             ]
         )
 
@@ -4551,7 +4551,7 @@ struct RouterTests {
             definitions: [
                 RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .critical, transition: .slide))._routeDeclarations
                     + AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations
-                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations),
+                    + AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations),
             ]
         )
 
@@ -4559,7 +4559,7 @@ struct RouterTests {
         await router.requestRoute(SettingsRoute())
         await router.requestRoute(MessageRoute())
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.criticalSpace?.rootPath.count == 0)
         #expect(router.spaces.criticalSpace?.currentRouteScope.route is LoginRoute)
         #expect(router.spaces.criticalSpace?.root === router.spaces.criticalSpace?.currentRouteScope)
@@ -4622,7 +4622,7 @@ private extension RouterEngine {
         rootScope.path.replaceTestPath(Array(scopes.dropFirst()))
 
         switch priority {
-        case .normal:
+        case .default:
             break
 
         case .high:

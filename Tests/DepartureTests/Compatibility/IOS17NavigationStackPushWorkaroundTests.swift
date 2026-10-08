@@ -64,7 +64,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         installPushDeclaration(in: router, hostedBy: presentationHostID)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalSpace.rootPath.last)
+        let pushedScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
         let presentation = router.routePresentationBinding(
@@ -75,16 +75,16 @@ struct IOS17NavigationStackPushWorkaroundTests {
         presentation.wrappedValue = nil
         await Task.yield()
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === pushedScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === pushedScope)
         #expect(presentation.wrappedValue?.scope === pushedScope)
 
         router.routeScopeDidLeaveView(pushedScope)
-        for _ in 0..<10 where router.normalSpace.rootPath.isEmpty == false {
+        for _ in 0..<10 where router.defaultSpace.rootPath.isEmpty == false {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(presentation.wrappedValue == nil)
     }
 
@@ -92,12 +92,12 @@ struct IOS17NavigationStackPushWorkaroundTests {
         let router = makeRouterWithWorkaround()
         installPushDeclaration(in: router)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalSpace.rootPath.last)
+        let pushedScope = try #require(router.defaultSpace.rootPath.last)
         let presentation = router.routePresentationBinding(from: router.root, matching: .push)
 
         presentation.wrappedValue = nil
 
-        #expect(router.normalSpace.rootPath.last === pushedScope)
+        #expect(router.defaultSpace.rootPath.last === pushedScope)
         #expect(presentation.wrappedValue?.scope === pushedScope)
         #expect(pushedScope.hasEverInstalled == false)
     }
@@ -108,12 +108,12 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         installPushDeclaration(in: router)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalSpace.rootPath.last)
+        let pushedScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
         router.routePresentationBinding(from: router.root, matching: .push).wrappedValue = nil
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
     }
 
     @Test func replacementFromPushedChildContinuesAfterItsOwnStagedPop() async throws {
@@ -126,21 +126,21 @@ struct IOS17NavigationStackPushWorkaroundTests {
         }, router: owner) { EmptyView() }
         await owner.current.present(CompatSelection(number: 1))
         await owner.current.present(HomeDetailRoute())
-        let child = try #require(owner.engine.normalSpace.rootPath.last)
+        let child = try #require(owner.engine.defaultSpace.rootPath.last)
         let childRouter = owner.current
         let hostID = UUID()
         owner.engine.hostDidAttach(child, view: nil, id: hostID)
 
         let replacement = Task { await childRouter.present(CompatSelection(number: 2)) }
-        for _ in 0..<1000 where owner.engine.normalSpace.rootPath.count != 1 { await Task.yield() }
-        #expect(owner.engine.normalSpace.rootPath.count == 1)
+        for _ in 0..<1000 where owner.engine.defaultSpace.rootPath.count != 1 { await Task.yield() }
+        #expect(owner.engine.defaultSpace.rootPath.count == 1)
         owner.engine.hostDidDetach(child, id: hostID)
         await replacement.value
 
-        #expect(owner.engine.normalSpace.rootPath.count == 1)
-        #expect((owner.engine.normalSpace.rootPath.last?.route as? CompatSelection)?.number == 2)
+        #expect(owner.engine.defaultSpace.rootPath.count == 1)
+        #expect((owner.engine.defaultSpace.rootPath.last?.route as? CompatSelection)?.number == 2)
         await childRouter.present(CompatSelection(number: 3))
-        #expect((owner.engine.normalSpace.rootPath.last?.route as? CompatSelection)?.number == 2)
+        #expect((owner.engine.defaultSpace.rootPath.last?.route as? CompatSelection)?.number == 2)
     }
 
     @Test func transientViewReinstallationDoesNotCompleteDeferredPushDismissal() async throws {
@@ -148,7 +148,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         installPushDeclaration(in: router)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalSpace.rootPath.last)
+        let pushedScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
         let presentation = router.routePresentationBinding(from: router.root, matching: .push)
@@ -159,8 +159,8 @@ struct IOS17NavigationStackPushWorkaroundTests {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last === pushedScope)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last === pushedScope)
         #expect(presentation.wrappedValue?.scope === pushedScope)
     }
 
@@ -169,20 +169,20 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         installPushDeclaration(in: router)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalSpace.rootPath.last)
+        let pushedScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
         let presentation = router.routePresentationBinding(from: router.root, matching: .push)
         presentation.wrappedValue = nil
         let laterScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
         router.mutateRouteGraph {
-            router.normalSpace.rootPath.append(laterScope)
+            router.defaultSpace.rootPath.append(laterScope)
         }
         router.routeScopeDidLeaveView(pushedScope)
 
-        #expect(router.normalSpace.rootPath.count == 2)
-        #expect(router.normalSpace.rootPath.first === pushedScope)
-        #expect(router.normalSpace.rootPath.last === laterScope)
+        #expect(router.defaultSpace.rootPath.count == 2)
+        #expect(router.defaultSpace.rootPath.first === pushedScope)
+        #expect(router.defaultSpace.rootPath.last === laterScope)
         #expect(presentation.wrappedValue?.scope === pushedScope)
     }
 
@@ -191,7 +191,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
 
         installPushDeclaration(in: router)
         await router.requestRoute(HomeDetailRoute())
-        let pushedScope = try #require(router.normalSpace.rootPath.last)
+        let pushedScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(pushedScope)
 
         let presentation = router.routePresentationBinding(from: router.root, matching: .push)
@@ -205,11 +205,11 @@ struct IOS17NavigationStackPushWorkaroundTests {
         }
 
         router.routeScopeDidLeaveView(pushedScope)
-        for _ in 0..<10 where router.normalSpace.rootPath.isEmpty == false {
+        for _ in 0..<10 where router.defaultSpace.rootPath.isEmpty == false {
             await Task.yield()
         }
 
-        #expect(router.normalSpace.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(unrelatedBranch.path.last === unrelatedScope)
     }
 
@@ -287,7 +287,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
         router.ios17NavigationStackPushWorkaround = workaround
         installPushDeclaration(in: router)
         await router.present(HomeDetailRoute())
-        let scope = try #require(router.normalSpace.rootPath.last)
+        let scope = try #require(router.defaultSpace.rootPath.last)
         let first = UUID(), replacement = UUID()
         router.hostDidAttach(scope, view: nil, id: first)
         workaround.startViewExitWatchdogs(for: [scope], in: router)
@@ -308,7 +308,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
         router.ios17NavigationStackPushWorkaround = workaround
         installPushDeclaration(in: router)
         await router.present(HomeDetailRoute())
-        let scope = try #require(router.normalSpace.rootPath.last)
+        let scope = try #require(router.defaultSpace.rootPath.last)
         router.hostDidAttach(scope, view: nil, id: UUID())
         let wait = Task { await router.waitForRouteScopesToLeaveView([scope]) }
         await Task.yield()

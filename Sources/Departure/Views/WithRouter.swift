@@ -66,7 +66,7 @@ public struct WithRouter<Content: View>: View {
     /// Pass a ``RootRouter`` when app code needs to keep an explicit reference.
     ///
     /// `windowDestination` customizes destinations that Departure renders in a detached
-    /// SwiftUI host, including elevated-priority presentations and normal-priority fade
+    /// SwiftUI host, including elevated-priority presentations and default-priority fade
     /// covers. Use it to explicitly forward environment values those destinations need.
     public init<WindowContent: View>(
         routes: RootRouteMap,

@@ -10,7 +10,7 @@ Logical removal cuts the live tree's ownership edges immediately. Native teardow
 
 Eligibility is checked on arrival and again when the queue drains. An already inactive or covered source is dropped immediately and never occupies the latest request slot. For a buffered eligible request, source membership and top-space eligibility are rechecked after teardown, followed by the remaining resolution, declaration, equality, and priority rules at its retained resolution stage. A request resolved before waiting is not resolved again. Rejected unwinds create no operation. An accepted target that removes nothing has no native teardown to await; it cannot hold a new presentation for a dismissal animation.
 
-For example, successful MFA dismisses its high-priority entry sheet and requests screen X through a surviving normal-flow router. Acceptance of the sheet's removal immediately removes its space from the live tree. X waits in the latest request slot while the sheet animates out. After native teardown, X is evaluated with normal priority active and can proceed. The outgoing MFA router is inactive; it cannot stand in for the surviving normal-flow source.
+For example, successful MFA dismisses its high-priority entry sheet and requests screen X through a surviving default-flow router. Acceptance of the sheet's removal immediately removes its space from the live tree. X waits in the latest request slot while the sheet animates out. After native teardown, X is evaluated with default priority active and can proceed. The outgoing MFA router is inactive; it cannot stand in for the surviving default-flow source.
 
 Different operations can overlap, including owner removal of covered high priority while critical priority is also removed. Each outgoing native stack retains its own projections until its operation releases them. Completion of one operation cannot clear another's projections. For an identical presentation key, the most recent active operation supplies the outgoing projection; live projections still take precedence.
 
@@ -48,7 +48,7 @@ Production Swift source decreases from 8,185 to 8,097 lines: 88 fewer lines incl
 
 ## Regression evidence
 
-New tests use `RootRouter`, `WithRouter`, and map declarations to create high and critical entry sheets, each containing two pushed destinations. They remove both spaces through the public owner API, verify both outgoing stacks, complete native exits in either order, and verify that the queued normal presentation waits for both operations. A second test cancels a replacement after logical removal and verifies cleanup without insertion, followed by successful new navigation.
+New tests use `RootRouter`, `WithRouter`, and map declarations to create high and critical entry sheets, each containing two pushed destinations. They remove both spaces through the public owner API, verify both outgoing stacks, complete native exits in either order, and verify that the queued default presentation waits for both operations. A second test cancels a replacement after logical removal and verifies cleanup without insertion, followed by successful new navigation.
 
 The same tests were run against an isolated copy of commit `f419419`, adapting only the internal coordination assertions. Both tests failed there: overlapping removals lost outgoing push bindings, and cancellation still inserted the replacement. The new implementation passes both tests without weakening their behavioral assertions.
 
@@ -65,7 +65,7 @@ Native validation caught an overly strict branch-readiness guard introduced duri
 | iOS 17.5 package suite | All 308 tests passed. |
 | Full iPhone/iOS 27 SampleApp UI suite | 39 passed, with the two expected iPad-only skips. |
 | iPad/iOS 27 UI cases | Both passed, completing all 41 UI cases across iPhone and iPad. |
-| iPhone/iOS 17.5 native regressions | All five passed: native Back/re-push, replacement from a child, outgoing sheet-stack retention, elevated-root reset/removal followed by normal presentation, and owner removal of covered high while critical remains visible. |
+| iPhone/iOS 17.5 native regressions | All five passed: native Back/re-push, replacement from a child, outgoing sheet-stack retention, elevated-root reset/removal followed by default presentation, and owner removal of covered high while critical remains visible. |
 | Mounted macOS presentations | Five tests covering six cases passed, including both elevated fade priorities. |
 
 All checks used unchanged production, package-test, sample, and UI-test source. The full iPhone run was repeated after correcting the branch-readiness guard; its replacement assertions and every other native assertion remain unchanged. The combined implementation preserves the hook-composition and live-membership changes from the earlier pass.

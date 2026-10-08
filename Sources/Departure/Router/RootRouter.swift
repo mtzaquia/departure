@@ -30,12 +30,12 @@ public struct RootRouter {
     /// Captures the current scope of the top space for ordinary navigation.
     public var current: Router { Router(engine: engine, scope: engine.currentRouteScope) }
 
-    /// Captures the current scope of the normal flow for external entry points.
+    /// Captures the current scope of the default flow for external entry points.
     ///
     /// Use this handle for deep links and notifications. Presentations, unwinds,
     /// and action dispatch are rejected while a high or critical space covers it.
     /// The captured router becomes inactive if its exact scope leaves navigation.
-    public var normal: Router { Router(engine: engine, scope: engine.normalSpace.currentRouteScope) }
+    public var `default`: Router { Router(engine: engine, scope: engine.defaultSpace.currentRouteScope) }
 
     /// Removes the captured elevated space, including a covered space, and awaits native teardown.
     @discardableResult
@@ -47,6 +47,6 @@ public struct RootRouter {
     /// Removes all elevated spaces present when this operation is accepted.
     @discardableResult
     public func dismissSpaces() async -> Bool {
-        await engine.dismissSpaces(engine.spaces.allSpaces.filter { $0.priority != .normal })
+        await engine.dismissSpaces(engine.spaces.allSpaces.filter { $0.priority != .default })
     }
 }

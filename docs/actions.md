@@ -24,7 +24,7 @@ Task {
 
 When an action throws `.reroute(route)`, Departure presents that route and retries the action once.
 
-The requesting scope must belong to the top priority space. A covered or removed scope cannot dispatch an action or enter its interceptor. External entry points should use `rootRouter.normal.perform(...)`, so a covering high or critical flow blocks them.
+The requesting scope must belong to the top priority space. A covered or removed scope cannot dispatch an action or enter its interceptor. External entry points should use `rootRouter.default.perform(...)`, so a covering high or critical flow blocks them.
 
 ## Intercept an action
 

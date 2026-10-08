@@ -78,7 +78,7 @@ extension RouterEngine {
         let routePath: RoutePath
         switch target {
         case .root:
-            routePath = normalSpace.rootPath
+            routePath = defaultSpace.rootPath
 
         case .nearestBranch:
             guard let branchPath = nearestBranchPath(from: sourceScope) else {
@@ -639,7 +639,7 @@ extension RouterEngine {
 
     @discardableResult
     func dismissSpaces(_ candidates: [RouteSpace], source: RouteScope? = nil) async -> Bool {
-        let captured = candidates.filter { $0.priority != .normal && spaces.space(for: $0.priority) === $0 }
+        let captured = candidates.filter { $0.priority != .default && spaces.space(for: $0.priority) === $0 }
         guard !captured.isEmpty, !Task.isCancelled,
               source.map(isNavigationEligible) ?? true else { return false }
         let operation = beginNavigationOperation(plan: spaces.unwindPlan(for: .combined(captured.map { .space($0) })))

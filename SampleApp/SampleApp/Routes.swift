@@ -154,7 +154,7 @@ struct PendingPriorityView: View {
     var body: some View {
         ZStack {
             LabBackground()
-            LabModalCard("Priority won", subtitle: "The pending elevated request blocked the normal sheet before its window started.", symbol: "flag.checkered", color: LabPalette.coral) {
+            LabModalCard("Priority won", subtitle: "The pending elevated request blocked the default sheet before its window started.", symbol: "flag.checkered", color: LabPalette.coral) {
                 Text("Pending high-priority route")
                     .font(.caption.weight(.semibold))
                     .accessibilityIdentifier(SampleAppAccessibility.pendingPriorityText)
@@ -200,7 +200,7 @@ struct TopLevelCoverView: View {
     var body: some View {
         ZStack {
             LabBackground()
-            LabModalCard("Top-level cover", subtitle: "A normal full-screen cover can replace the sheet that requested it.", symbol: "rectangle.fill") {
+            LabModalCard("Top-level cover", subtitle: "A default full-screen cover can replace the sheet that requested it.", symbol: "rectangle.fill") {
                 Text("Top-level cover")
                     .font(.caption.weight(.semibold))
                     .accessibilityIdentifier(SampleAppAccessibility.topLevelCoverText)

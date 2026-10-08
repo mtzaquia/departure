@@ -23,38 +23,38 @@ struct IndependentPriorityTests {
 
     @Test func resetKeepsTheEntryAndOtherSpacesUntouched() async throws {
         let owner = fixture()
-        await owner.current.present(NormalPush())
-        let normal = try #require(owner.engine.normalSpace.rootPath.last)
+        await owner.current.present(DefaultPush())
+        let defaultSource = try #require(owner.engine.defaultSpace.rootPath.last)
         await owner.current.present(HighEntry(value: 1))
         let high = try #require(owner.engine.spaces.highSpace)
         await owner.current.present(HighPush())
         #expect(await owner.current.unwind(to: .root))
         #expect(owner.engine.spaces.highSpace === high)
         #expect(high.rootPath.isEmpty)
-        #expect(owner.engine.normalSpace.rootPath.last === normal)
+        #expect(owner.engine.defaultSpace.rootPath.last === defaultSource)
         #expect(!((await owner.current.unwind(to: .root))))
         #expect(await owner.current.unwind(to: .topmostAncestor))
         #expect(owner.engine.spaces.highSpace == nil)
-        #expect(owner.engine.normalSpace.rootPath.last === normal)
+        #expect(owner.engine.defaultSpace.rootPath.last === defaultSource)
     }
 
     @Test func coveredRoutersCannotNavigateEvenToHigherPriorityOrThroughNativeBindings() async throws {
         let owner = fixture()
-        let normal = owner.current
-        await normal.present(NormalPush())
-        let normalPush = owner.current
-        let normalBinding = owner.engine.routePresentationBinding(from: owner.engine.root, matching: .push)
-        await normalPush.present(HighEntry(value: 1))
+        let defaultSource = owner.current
+        await defaultSource.present(DefaultPush())
+        let defaultPush = owner.current
+        let defaultBinding = owner.engine.routePresentationBinding(from: owner.engine.root, matching: .push)
+        await defaultPush.present(HighEntry(value: 1))
         let high = try #require(owner.engine.spaces.highSpace)
         let highRouter = owner.current
         await highRouter.present(HighPush())
         let highBinding = owner.engine.elevatedRoutePresentationBinding(priority: .high, matching: .sheet)
-        await normal.present(CriticalEntry())
-        await normalPush.present(NormalPush())
-        #expect(!((await normalPush.unwind(to: .root))))
-        #expect(!((await normalPush.dismissSpace())))
-        normalBinding.wrappedValue = nil
-        #expect(owner.engine.normalSpace.rootPath.count == 1)
+        await defaultSource.present(CriticalEntry())
+        await defaultPush.present(DefaultPush())
+        #expect(!((await defaultPush.unwind(to: .root))))
+        #expect(!((await defaultPush.dismissSpace())))
+        defaultBinding.wrappedValue = nil
+        #expect(owner.engine.defaultSpace.rootPath.count == 1)
         #expect(owner.engine.spaces.criticalSpace == nil)
         await owner.current.present(CriticalEntry())
         let critical = try #require(owner.engine.spaces.criticalSpace)
@@ -83,8 +83,8 @@ struct IndependentPriorityTests {
         await highRouter.present(HighPush())
         #expect(!((await highRouter.dismissSpace())))
         #expect(await owner.dismissSpaces())
-        #expect(owner.engine.spaces.activeSpace === owner.engine.normalSpace)
-        #expect(!((await owner.dismissSpace(.normal))))
+        #expect(owner.engine.spaces.activeSpace === owner.engine.defaultSpace)
+        #expect(!((await owner.dismissSpace(.default))))
         #expect(!((await owner.dismissSpaces())))
     }
 
@@ -107,37 +107,37 @@ struct IndependentPriorityTests {
 
     @Test func localDefinitionsAndUnwindIDsDoNotFallBackToCoveredSpaces() async throws {
         let owner = fixture()
-        await owner.current.present(NormalPush())
+        await owner.current.present(DefaultPush())
         await owner.current.present(HighEntry(value: 1))
         let high = try #require(owner.engine.spaces.highSpace)
-        await owner.current.present(NormalOnlyModal())
+        await owner.current.present(DefaultOnlyModal())
         #expect(high.rootPath.isEmpty)
-        #expect(!((await owner.current.unwind(to: .id("normal-root")))))
-        #expect(owner.engine.normalSpace.rootPath.count == 1)
+        #expect(!((await owner.current.unwind(to: .id("default-root")))))
+        #expect(owner.engine.defaultSpace.rootPath.count == 1)
     }
 
-    @Test func removalThenNormalPresentationUsesTheSurvivingSource() async throws {
+    @Test func removalThenDefaultPresentationUsesTheSurvivingSource() async throws {
         let owner = fixture()
-        let normal = owner.current
-        await normal.present(HighEntry(value: 1))
+        let defaultSource = owner.current
+        await defaultSource.present(HighEntry(value: 1))
         let removed = owner.current
         #expect(await owner.dismissSpace(.high))
-        await normal.present(NormalPush())
-        #expect(owner.engine.normalSpace.rootPath.count == 1)
-        await removed.present(NormalPush())
-        #expect(owner.engine.normalSpace.rootPath.count == 1)
+        await defaultSource.present(DefaultPush())
+        #expect(owner.engine.defaultSpace.rootPath.count == 1)
+        await removed.present(DefaultPush())
+        #expect(owner.engine.defaultSpace.rootPath.count == 1)
     }
 
     @Test func suspendedResolutionCannotCommitAfterItsSourceBecomesCovered() async {
         let owner = fixture()
         let source = owner.current
         let gate = SpaceResolutionGate()
-        let request = Task { await source.present(SuspendedNormal(gate: gate)) }
+        let request = Task { await source.present(SuspendedDefault(gate: gate)) }
         await gate.waitForStart()
         await source.present(HighEntry(value: 1))
         gate.release()
         await request.value
-        #expect(owner.engine.normalSpace.rootPath.isEmpty)
+        #expect(owner.engine.defaultSpace.rootPath.isEmpty)
         #expect(owner.engine.spaces.highSpace?.root.route is HighEntry)
     }
 
@@ -154,14 +154,14 @@ struct IndependentPriorityTests {
         #expect(owner.engine.spaces.highSpace == nil)
         #expect(owner.engine.isNavigating)
         await removed.present(CriticalEntry())
-        let followUp = Task { await surviving.present(NormalPush()) }
+        let followUp = Task { await surviving.present(DefaultPush()) }
         for _ in 0..<1000 where owner.engine.pendingRoute == nil { await Task.yield() }
         #expect(owner.engine.pendingRoute != nil)
-        #expect(owner.engine.normalSpace.rootPath.isEmpty)
+        #expect(owner.engine.defaultSpace.rootPath.isEmpty)
         owner.engine.hostDidDetach(high.root, id: hostID)
         #expect(await removal.value)
         await followUp.value
-        #expect(owner.engine.normalSpace.rootPath.count == 1)
+        #expect(owner.engine.defaultSpace.rootPath.count == 1)
         #expect(!owner.engine.isNavigating)
         #expect(owner.engine.spaces.criticalSpace == nil)
     }
@@ -208,10 +208,10 @@ struct IndependentPriorityTests {
 
     private func fixture() -> RootRouter {
         let owner = RootRouter()
-        _ = WithRouter(routes: RootRouteMap(id: "normal-root") {
-            Push(RouteDestination(SuspendedNormal.self) { _, _ in EmptyView() })
-            Push(RouteDestination(NormalPush.self) { _, _ in EmptyView() }) {
-                Sheet(RouteDestination(NormalOnlyModal.self) { _, _ in EmptyView() })
+        _ = WithRouter(routes: RootRouteMap(id: "default-root") {
+            Push(RouteDestination(SuspendedDefault.self) { _, _ in EmptyView() })
+            Push(RouteDestination(DefaultPush.self) { _, _ in EmptyView() }) {
+                Sheet(RouteDestination(DefaultOnlyModal.self) { _, _ in EmptyView() })
             }
         } highPriority: {
             Sheet(RouteDestination(HighEntry.self) { _, _ in EmptyView() }) {
@@ -225,8 +225,8 @@ struct IndependentPriorityTests {
     }
 }
 
-private struct NormalPush: Route, Equatable {}
-private struct NormalOnlyModal: Route, Equatable {}
+private struct DefaultPush: Route, Equatable {}
+private struct DefaultOnlyModal: Route, Equatable {}
 private struct HighEntry: Route, Equatable { let value: Int }
 private struct HighPush: Route, Equatable {}
 private struct HighModal: Route, Equatable {}
@@ -249,7 +249,7 @@ private final class SpaceResolutionGate {
     }
     func release() { continuation?.resume(); continuation = nil }
 }
-private struct SuspendedNormal: Route {
+private struct SuspendedDefault: Route {
     let gate: SpaceResolutionGate
     func resolveRoute() async -> RouteResolution { await gate.wait(); return .allow }
 }

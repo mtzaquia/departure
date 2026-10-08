@@ -67,7 +67,7 @@ struct NestedModalProbeRoot: View {
     private var priority: RoutePriority {
         if ProcessInfo.processInfo.arguments.contains("--nested-modal-critical") { return .critical }
         if ProcessInfo.processInfo.arguments.contains("--nested-modal-high") { return .high }
-        return .normal
+        return .default
     }
 
     var body: some View {

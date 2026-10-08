@@ -35,8 +35,8 @@ import Testing
             Cover(login) { Push(detail); Sheet(settings) }
         } criticalPriority: { Sheet(alert) }
         let definitions = map.declarations.flatMap(\.routes)
-        #expect(definitions.map(\.priority) == [.normal, .high, .critical])
-        #expect(definitions[1].children.flatMap(\.routes).allSatisfy { $0.priority == .normal })
+        #expect(definitions.map(\.priority) == [.default, .high, .critical])
+        #expect(definitions[1].children.flatMap(\.routes).allSatisfy { $0.priority == .default })
     }
     @Test func independentlyOptionalPriorityBuilders() {
         let map = RootRouteMap {} criticalPriority: { Cover(alert) }
@@ -80,9 +80,9 @@ import Testing
             return
         }
         await router.present(SettingsRoute())
-        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
         await router.present(HomeDetailRoute())
-        #expect(engine.normalSpace.rootPath.last?.route is HomeDetailRoute)
+        #expect(engine.defaultSpace.rootPath.last?.route is HomeDetailRoute)
     }
 
     @Test func conflictingRouteDoesNotFallBackToAncestorOrSibling() async throws {
@@ -97,9 +97,9 @@ import Testing
         })
         let root = Router(engine: engine, scope: engine.root)
         await root.present(HomeDetailRoute())
-        let scope = try #require(engine.normalSpace.rootPath.last)
+        let scope = try #require(engine.defaultSpace.rootPath.last)
         await Router(engine: engine, scope: scope).present(SettingsRoute())
-        #expect(engine.normalSpace.rootPath.last === scope)
+        #expect(engine.defaultSpace.rootPath.last === scope)
         #expect(scope.branchScopes.values.allSatisfy { $0.path.isEmpty })
         #expect(scope.activeBranch == AnyHashable("conflicting"))
     }
@@ -122,7 +122,7 @@ import Testing
         let engine = RouterEngine(routes: RootRouteMap { Sheet(settings) } highPriority: { Sheet(settings) })
         await Router(engine: engine, scope: engine.root).present(SettingsRoute())
         #expect(engine.root.routeAttachments.isEmpty)
-        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
         #expect(engine.spaces.highSpace == nil)
     }
 
@@ -141,9 +141,9 @@ import Testing
             }
         })
         await engine.present(NumberedRoute(number: 1))
-        let first = try #require(engine.normalSpace.rootPath.last)
+        let first = try #require(engine.defaultSpace.rootPath.last)
         await engine.present(NumberedRoute(number: 2))
-        let second = try #require(engine.normalSpace.rootPath.last)
+        let second = try #require(engine.defaultSpace.rootPath.last)
         #expect(first !== second)
         #expect(first.definitions === second.definitions)
         #expect(first.branchScopes["content"] !== second.branchScopes["content"])

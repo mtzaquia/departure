@@ -5,7 +5,7 @@ Departure describes navigation through path depth, modal lanes, and branches. Ea
 ## Language
 
 **Priority**:
-The ordering of presentation spaces: normal, high, and critical. An elevated priority is presented from the routing root.
+The ordering of presentation spaces: default, high, and critical. An elevated priority is presented from the routing root.
 _Avoid_: Layer
 
 **Space**:

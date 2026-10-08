@@ -119,7 +119,7 @@ extension RouterEngine {
         }
         guard let match = binding.declaration else { return .dropConflictingDeclaration(routeType: routeType) }
 
-        if match.declaration.priority == .normal, let source = resolveRequestOrigin(origin),
+        if match.declaration.priority == .default, let source = resolveRequestOrigin(origin),
            let currentRoute = source.route, currentRoute._isEqual(to: route),
            let host = match.presentationHost,
            source.attachedPresentationDeclaration(presentedBy: host,
@@ -165,8 +165,8 @@ extension RouterEngine {
             case currentPath(spacePriority: RoutePriority)
             case ancestorPath(spacePriority: RoutePriority)
             case rootPath(spacePriority: RoutePriority)
-            case normalRootActiveBranchScope
-            case normalRootDeclarations
+            case defaultRootActiveBranchScope
+            case defaultRootDeclarations
         }
 
         struct Location {
@@ -207,12 +207,12 @@ extension RouterEngine {
     }
 
     func priorityDecision(for match: DeclarationMatch) -> PriorityDecision {
-        if match.declaration.priority == .normal {
+        if match.declaration.priority == .default {
             return match.space === spaces.activeSpace ? .append : .drop
         }
 
-        guard match.declaration.priority != .normal else {
-            return spaces.activeSpace.priority == .normal ? .append : .drop
+        guard match.declaration.priority != .default else {
+            return spaces.activeSpace.priority == .default ? .append : .drop
         }
 
         if spaces.activeSpace.priority > match.declaration.priority {

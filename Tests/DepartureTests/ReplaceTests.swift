@@ -28,11 +28,11 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct ReplaceTests {
-    @Test func declarationIsInlineAndNormalPriority() {
+    @Test func declarationIsInlineAndDefaultPriority() {
         let declaration = AnyRouteDeclaration(RouteDestination(SelectedRoute.self) { route, _ in EmptyView() }, kind: .replace)._routeDeclarations[0]
         #expect(declaration.presentationKind == .replace)
         #expect(!declaration.presentationKind.isModal)
-        #expect(declaration.priority == .normal)
+        #expect(declaration.priority == .default)
         #expect(Branch("wallet") { AnyRouteDeclaration(RouteDestination(SelectedRoute.self) { route, _ in EmptyView() }, kind: .replace) }
             .routeScopeDeclarations[0].children[0].routes[0].presentationKind == .replace)
     }
@@ -44,7 +44,7 @@ struct ReplaceTests {
         await source.present(SelectedRoute(number: 1))
         #expect(fixture.selection.value == "wallet")
         #expect((fixture.engine.pendingRoute != nil) == !concurrent)
-        #expect(fixture.engine.normalSpace.rootPath.isEmpty)
+        #expect(fixture.engine.defaultSpace.rootPath.isEmpty)
         fixture.mountWallet()
         fixture.engine.resumePendingRoute(for: "wallet", in: fixture.engine.root)
         #expect(fixture.wallet.path.first?.route as? SelectedRoute == SelectedRoute(number: 1))
@@ -67,7 +67,7 @@ struct ReplaceTests {
         #expect(fixture.wallet.path.count == 1)
         #expect(fixture.wallet.path.first?.route as? SelectedRoute == SelectedRoute(number: 2))
         #expect(fixture.sidebar.path.first === sibling)
-        #expect(fixture.engine.normalSpace.currentModalScope == nil)
+        #expect(fixture.engine.defaultSpace.currentModalScope == nil)
         #expect(fixture.engine.routePhase(for: sibling) == .active)
         #expect(await fixture.local(previous).unwind(to: .root) == false)
     }
@@ -235,12 +235,12 @@ struct ReplaceTests {
         fixture.installChildren(on: selected)
         await fixture.local(selected).present(OverlayRoute())
         #expect(selected.lane.depth == 0)
-        #expect(fixture.engine.normalSpace.root.lane.modal != nil)
-        #expect(fixture.engine.normalSpace.currentModalScope?.route is OverlayRoute)
+        #expect(fixture.engine.defaultSpace.root.lane.modal != nil)
+        #expect(fixture.engine.defaultSpace.currentModalScope?.route is OverlayRoute)
         #expect(fixture.engine.routePresentation(from: fixture.wallet, matching: .replace)?.scope === selected)
     }
 
-    @Test func normalReplacementIsBlockedByElevatedContextButWorksInsideIt() async throws {
+    @Test func defaultReplacementIsBlockedByElevatedContextButWorksInsideIt() async throws {
         let fixture = ReplaceFixture()
         fixture.engine.root.defineTestMap(sourceID: "elevated", id: nil,
             selection: nil, definitions: [
@@ -292,7 +292,7 @@ struct ReplaceTests {
         await fixture.local(nested).present(ChildRoute())
         let match = try #require(fixture.engine.spaces.firstDeclaration(
             including: ElevatedRoute.self, origin: fixture.local(selected).origin)?.declaration)
-        // Construct the context through the canonical elevated transition. A normal
+        // Construct the context through the canonical elevated transition. A default
         // replacement would be blocked while the high-priority context is active.
         await fixture.engine.replaceElevatedSpace(.high, with: ElevatedRoute(), after: match)
         let captured = fixture.local(selected)
@@ -332,7 +332,7 @@ private struct ReplaceFixture {
     func installChildren(on selected: RouteScope) {
         selected.defineTestMap(id: nil, selection: nil, definitions: [
             RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(ChildRoute.self) { route, _ in EmptyView() }, kind: .push)._routeDeclarations
-                + AnyRouteDeclaration(RouteDestination(OverlayRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .normal, transition: .slide))._routeDeclarations),
+                + AnyRouteDeclaration(RouteDestination(OverlayRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations),
         ])
     }
 }

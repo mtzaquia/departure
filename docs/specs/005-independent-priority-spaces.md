@@ -6,7 +6,7 @@ Status: Implemented. Automated and functional native checks passed; animation-fr
 
 Each priority has an independent navigation space. Creating a high or critical space makes the entry destination its navigation root, at X zero and Y zero. Its outer sheet or cover presents the space; it is not a modal transition within the space. There is no navigation ancestry into another priority.
 
-An elevated presentation still needs a synthetic base in its detached window. Insert the window and its base immediately, without animation, then animate the actual sheet or cover from that installed base as a normal presentation. Removing that staging base would let the destination appear already presented or blink into place during its slide. Nonanimated base insertion must not suppress the destination's subsequent presentation animation.
+An elevated presentation still needs a synthetic base in its detached window. Insert the window and its base immediately, without animation, then animate the actual sheet or cover from that installed base as a default presentation. Removing that staging base would let the destination appear already presented or blink into place during its slide. Nonanimated base insertion must not suppress the destination's subsequent presentation animation.
 
 The base is presentation infrastructure, not the destination targeted by navigation root reset, route lookup, hooks, or branch operations. The implementation may retain an internal base scope where the native presenter requires it; that does not make it an additional navigable X/Y position. Resetting a space keeps its entry destination and outer presentation visible. Dismissing the space tears down its destination and presentation base.
 
@@ -16,11 +16,11 @@ Root reset preserves inactive branch pushes only when the space root itself owns
 
 Branch lifetime follows container ownership, rather than a blanket inactive-path preservation rule. Disconnecting a container from the live tree disconnects every branch it owns. A retained outgoing container may still hold its old paths for presentation continuity, but those paths are outside live navigation. ARC releases that subtree after its outgoing owners finish; removing a container must not require recursively emptying its branches.
 
-Calling `unwindRoute` from the root destination of a high or critical space dismisses that entire space. From a descendant it dismisses that destination as usual. The permanent normal root cannot be dismissed this way. The covered-space navigation gate still applies to this local unwind action.
+Calling `unwindRoute` from the root destination of a high or critical space dismisses that entire space. From a descendant it dismisses that destination as usual. The permanent default root cannot be dismissed this way. The covered-space navigation gate still applies to this local unwind action.
 
-Only the top space may originate navigation or dispatch router actions. Every other space is covered and rejects presentations, replacements, unwinds, root resets, branch selection or activation, and action dispatch including interception. Deferred invocations recheck the same authority. This includes requests to create or replace an equal-or-higher priority space: a covered normal space cannot open critical while high is on top. The lower space retains its navigation state while covered.
+Only the top space may originate navigation or dispatch router actions. Every other space is covered and rejects presentations, replacements, unwinds, root resets, branch selection or activation, and action dispatch including interception. Deferred invocations recheck the same authority. This includes requests to create or replace an equal-or-higher priority space: a covered default space cannot open critical while high is on top. The lower space retains its navigation state while covered.
 
-The source space determines eligibility, not the destination's priority or the scope that owns its declaration. A captured router remains bound to its source space; the normal root's router has no implicit owner privilege. Rejected requests are dropped rather than queued for later. Requests that suspend during resolution or readiness must still originate from the exact live top space when they commit; losing that eligibility prevents the navigation from committing.
+The source space determines eligibility, not the destination's priority or the scope that owns its declaration. A captured router remains bound to its source space; the default root's router has no implicit owner privilege. Rejected requests are dropped rather than queued for later. Requests that suspend during resolution or readiness must still originate from the exact live top space when they commit; losing that eligibility prevents the navigation from committing.
 
 An explicit owner-level dismissal can close an addressed space even when it is covered. This is deliberately separate from navigation originating in a space, and a covered scoped router cannot use it as a bypass. Closing high while critical exists leaves critical intact; closing critical reveals the highest remaining space. No source-space gate is needed for this explicit coordination operation.
 
@@ -28,9 +28,9 @@ Full dismissal removes the entire space from live navigation state: its root, ev
 
 Outgoing snapshots may retain the removed destination views until native teardown completes. This retention exists only for presentation continuity and command completion; it does not retain a live space, grant eligibility to captured routers from it, or keep the remaining spaces covered. Eligible requests from a remaining space can still wait in the global transition pipeline for required outgoing completion and physical host readiness. Navigation eligibility and transition readiness are separate conditions.
 
-Pending requests, navigation transactions, and outgoing snapshot coordination remain global under the routing owner. Independent space navigation state does not imply independent transition scheduling. One global coordinator must preserve ordered flows that remove a high-priority space and then present a normal-priority route, waiting for the necessary teardown and host readiness before starting the next presentation.
+Pending requests, navigation transactions, and outgoing snapshot coordination remain global under the routing owner. Independent space navigation state does not imply independent transition scheduling. One global coordinator must preserve ordered flows that remove a high-priority space and then present a default-priority route, waiting for the necessary teardown and host readiness before starting the next presentation.
 
-For that chain, commit high-space removal, finish the required outgoing presentation work, then present from the now-eligible normal space. The follow-up request targets a surviving source scope rather than the removed high destination. Ordinary requests from a covered normal space remain rejected; an ordered chain must sequence removal before attempting its normal navigation. Source identity, eligibility, cancellation, and supersession checks still apply when an accepted pending request resumes.
+For that chain, commit high-space removal, finish the required outgoing presentation work, then present from the now-eligible default space. The follow-up request targets a surviving source scope rather than the removed high destination. Ordinary requests from a covered default space remain rejected; an ordered chain must sequence removal before attempting its default navigation. Source identity, eligibility, cancellation, and supersession checks still apply when an accepted pending request resumes.
 
 ## Coordination rules
 
@@ -44,10 +44,10 @@ The routing owner coordinates space creation, replacement, dismissal, priority o
 | Present a different entry at an existing priority | Require the requesting space to be top, then replace that entire space. Other priorities keep their state. |
 | Unwind to an ancestor or ID | Require the requesting space to be top, then resolve only within it; there is no fallback to a lower-priority ancestor. |
 | Unwind to the space root | Require the requesting space to be top, then retain the root and reset navigation in that space. Preserve inactive pushes only for the root's own branch container; remove every branch owned by a discarded container. |
-| Invoke the root destination's unwind action | Require the requesting space to be top, then close its high or critical space. The permanent normal root cannot be closed this way. |
+| Invoke the root destination's unwind action | Require the requesting space to be top, then close its high or critical space. The permanent default root cannot be closed this way. |
 | Select or activate a branch | Require the owning space to be top. A rejected selection cannot alter its retained branch state. |
 | Dismiss an entire space | Remove that space's root and all navigation it owns when dismissal commits, even when covered. Keep every other space intact and derive the top space from those that remain. |
-| Chain high-space removal into normal navigation | Sequence removal and required native teardown before the normal presentation. Resolve the follow-up from a surviving normal scope once normal is eligible; recheck eligibility and readiness before committing it. |
+| Chain high-space removal into default navigation | Sequence removal and required native teardown before the default presentation. Resolve the follow-up from a surviving default scope once default is eligible; recheck eligibility and readiness before committing it. |
 | Complete native dismissal of the outer space presentation | Complete teardown of that exact outgoing instance. For an interactive dismissal, remove the matching live instance if still present. A stale callback cannot dismiss a replacement at the same priority. |
 
 Local definition lookup, action interceptors, unwind handlers, and payload recipient lookup stop at the space root. A priority-entry catalog belongs to the routing owner and remains available for deliberate entry requests; consulting that catalog does not expose another space's local definitions or hooks. Closing a space does not implicitly deliver a payload to a lower space.
@@ -62,8 +62,8 @@ Unwind plans, outgoing snapshots, equal-route stopping, branch targeting, native
 
 - Opening a sheet-rooted high or critical space inserts its detached window/base without animation, then visibly animates the sheet from the installed base. The destination must not blink into an already-presented state. Base insertion must not disable its presentation animation.
 - Resetting a sheet-rooted elevated space retains its entry destination and outer sheet; it does not unwind to the synthetic base. The same logical-root rule applies to cover-rooted spaces.
-- An ordered flow removes high and then presents a normal route only after required outgoing teardown/readiness. A normal request attempted while high remains live is still rejected; a pending eligible request rechecks its exact source when the global transaction completes.
-- Normal opens high. A captured normal router cannot push, unwind, switch branches, or open critical while high is top. High can open critical.
+- An ordered flow removes high and then presents a default route only after required outgoing teardown/readiness. A default request attempted while high remains live is still rejected; a pending eligible request rechecks its exact source when the global transaction completes.
+- Default opens high. A captured default router cannot push, unwind, switch branches, or open critical while high is top. High can open critical.
 - Critical covers high. A captured high router cannot replace high, reuse its entry root, reset its paths, dismiss itself, or activate a branch.
 - Removing critical immediately makes high top with its retained navigation state. Requests from high are eligible while critical's outgoing snapshot finishes native teardown; the global coordinator sequences their execution according to required outgoing completion and actual presentation-host readiness.
 - Full dismissal removes the root and inactive branch history. Resetting a branched root preserves its own inactive pushes. Resetting past a descendant branch container removes all of that container's branches.
@@ -83,7 +83,7 @@ The owner handle and scope-bound navigation handle are distinct:
 - `RootRouter` owns the routing container and is the optional explicit handle passed to `WithRouter`.
 - `Router` is bound to one scope. It is supplied through the environment and `RouteContext.router`; it has no owner-level removal operation.
 - `RootRouter.current` returns a `Router` bound to the current position in the top space at the time of access. It carries that space's local authority.
-- `RootRouter.normal` returns a `Router` bound to the current position in the normal flow, even while covered. Deep links and notifications use this handle so they cannot navigate behind or dismiss a high/critical flow. Both properties capture exact source identity rather than dynamically retargeting after suspension or removal.
+- `RootRouter.default` returns a `Router` bound to the current position in the default flow, even while covered. Deep links and notifications use this handle so they cannot navigate behind or dismiss a high/critical flow. Both properties capture exact source identity rather than dynamically retargeting after suspension or removal.
 
 ```swift
 @State private var rootRouter = RootRouter()
@@ -92,8 +92,8 @@ WithRouter(routes: AppRoutes.root, router: rootRouter) {
     AppView()
 }
 
-// Ordinary external navigation captures a scope in the normal flow.
-await rootRouter.normal.present(LoginRoute())
+// Ordinary external navigation captures a scope in the default flow.
+await rootRouter.default.present(LoginRoute())
 
 // Inside any destination in the top elevated space:
 await context.router.dismissSpace()
@@ -113,7 +113,7 @@ extension Router {
 
 extension RootRouter {
     public var current: Router { get }
-    public var normal: Router { get }
+    public var default: Router { get }
 
     @discardableResult
     public func dismissSpace(_ priority: RoutePriority) async -> Bool
@@ -129,9 +129,9 @@ extension RootRouter {
 | `unwindRoute()` | Dismiss the receiving destination; at an elevated space root, remove the whole space. Require the source space to be top. |
 | `router.dismissSpace()` | Remove the receiving high or critical space from any depth. Require that exact live source space to be top. |
 | `rootRouter.dismissSpace(.high)` | Remove the high space present when the owner command is accepted, including when it is covered. Other spaces remain intact. |
-| `rootRouter.dismissSpaces()` | Remove every elevated space present when the owner command is accepted in one logical commit. Keep normal navigation intact. |
+| `rootRouter.dismissSpaces()` | Remove every elevated space present when the owner command is accepted in one logical commit. Keep default navigation intact. |
 
-The scoped call returns `false` for an inactive scope, a covered space, or the permanent normal space. The addressed owner call returns `false` for an absent priority or `.normal`. The plural call returns `false` when no elevated spaces exist. A successful call returns `true` after native exit and required snapshot cleanup, consistent with unwind completion. Logical removal and top-space eligibility change at commit, before that asynchronous completion.
+The scoped call returns `false` for an inactive scope, a covered space, or the permanent default space. The addressed owner call returns `false` for an absent priority or `.default`. The plural call returns `false` when no elevated spaces exist. A successful call returns `true` after native exit and required snapshot cleanup, consistent with unwind completion. Logical removal and top-space eligibility change at commit, before that asynchronous completion.
 
 Owner commands capture the addressed space instances when accepted. A replacement created during teardown is not part of the earlier command, including a plural dismissal. Captured routers from removed instances remain inactive. Cancellation before commit leaves navigation unchanged; cancellation after commit cannot resurrect a removed space.
 
@@ -144,7 +144,7 @@ This replaces the dual role of `Router()` as an unscoped owner and scoped handle
 - Whether to retain an explicit owner-level reset of all spaces, separately from local root unwind.
 - Whether cross-space results need an explicit completion or action mechanism; ordinary unwind payloads do not cross roots.
 
-The implemented surface uses `RootRouter.current`, `RootRouter.normal`, `Router.dismissSpace()`, `RootRouter.dismissSpace(_:)`, and `RootRouter.dismissSpaces()`. Owner-level global reset and cross-space result delivery remain outside this change.
+The implemented surface uses `RootRouter.current`, `RootRouter.default`, `Router.dismissSpace()`, `RootRouter.dismissSpace(_:)`, and `RootRouter.dismissSpaces()`. Owner-level global reset and cross-space result delivery remain outside this change.
 
 ## Implementation notes (2026-10-08)
 
@@ -163,7 +163,7 @@ The final implementation includes hook-source composition, duplicate-key conflic
 | iOS 17.5 package suite | All 303 tests passed. |
 | Full iPhone/iOS 27 SampleApp UI suite | 39 passed, with the two expected iPad-only skips. |
 | iPad/iOS 27 UI cases | Both passed, completing all 41 UI cases across iPhone and iPad. |
-| iPhone/iOS 17.5 native regressions | All five passed: native Back/re-push, replacement from a child, outgoing sheet-stack retention, elevated-root reset/removal followed by normal presentation, and owner removal of covered high while critical remains visible. |
+| iPhone/iOS 17.5 native regressions | All five passed: native Back/re-push, replacement from a child, outgoing sheet-stack retention, elevated-root reset/removal followed by default presentation, and owner removal of covered high while critical remains visible. |
 | Mounted macOS presentations | Five tests covering six cases passed, including both elevated fade priorities. |
 | Modal-only entry builder | Valid sheets/covers and their nested full builders compile; base Push, Replace, Branches, and unrestricted RouteMap expressions are rejected at compile time. |
 
@@ -173,6 +173,6 @@ Final production source contains 8,185 Swift lines, compared with 10,502 before 
 
 The complete native results are preserved under XcodeBuildMCP's Departure result bundles, including `test_sim_2026-10-08T08-13-30-535Z_pid78295_3100cf14.xcresult` (full iPhone), `test_sim_2026-10-08T08-37-42-774Z_pid80984_c7d9b473.xcresult` (iPad), `test_sim_2026-10-08T08-40-23-936Z_pid81591_939c3446.xcresult` (iOS 27 package), `test_sim_2026-10-08T08-41-50-782Z_pid81917_4221e5f9.xcresult` (iOS 17.5 package), and `test_sim_2026-10-08T08-43-20-281Z_pid82106_14b5ce7f.xcresult` (older-system native regressions).
 
-A final observed simulator interaction verified clean root → high sheet, high removal → normal sheet, and normal Done → clean root on iOS 27. Screenshot and hierarchy evidence establish those completed states. Recording under the UI automation backend interfered with taps, and the saved recording did not capture the transition sequence. Initial-frame blink prevention and precise animation-frame ordering therefore remain visually unverified; the source retains nonanimated base insertion and animation triggered after window installation, and the native suites validate presentation outcomes and chaining. No routing change or assertion relaxation was made for the failed recorded taps.
+A final observed simulator interaction verified clean root → high sheet, high removal → default sheet, and default Done → clean root on iOS 27. Screenshot and hierarchy evidence establish those completed states. Recording under the UI automation backend interfered with taps, and the saved recording did not capture the transition sequence. Initial-frame blink prevention and precise animation-frame ordering therefore remain visually unverified; the source retains nonanimated base insertion and animation triggered after window installation, and the native suites validate presentation outcomes and chaining. No routing change or assertion relaxation was made for the failed recorded taps.
 
-Local visual evidence is preserved in `/tmp/departure-space-visual-report.md`, `/tmp/departure-space-visual-high.jpg`, `/tmp/departure-space-visual-normal.jpg`, and `/tmp/departure-space-visual-after-done.jpg`. The saved `/tmp/departure-space-visual-retry.mp4` and inspected contact sheet contain no transition proof.
+Local visual evidence is preserved in `/tmp/departure-space-visual-report.md`, `/tmp/departure-space-visual-high.jpg`, `/tmp/departure-space-visual-default.jpg`, and `/tmp/departure-space-visual-after-done.jpg`. The saved `/tmp/departure-space-visual-retry.mp4` and inspected contact sheet contain no transition proof.

@@ -77,22 +77,22 @@ struct RouteSpaces {
         case combined([UnwindPlanRequest])
     }
 
-    let normalSpace: RouteSpace
+    let defaultSpace: RouteSpace
     var highSpace: RouteSpace?
     var criticalSpace: RouteSpace?
 
     var activeSpace: RouteSpace {
-        criticalSpace ?? highSpace ?? normalSpace
+        criticalSpace ?? highSpace ?? defaultSpace
     }
 
     var allSpaces: [RouteSpace] {
-        [normalSpace, highSpace, criticalSpace].compactMap { $0 }
+        [defaultSpace, highSpace, criticalSpace].compactMap { $0 }
     }
 
     func space(for priority: RoutePriority) -> RouteSpace? {
         switch priority {
-        case .normal:
-            normalSpace
+        case .default:
+            defaultSpace
 
         case .high:
             highSpace
@@ -179,7 +179,7 @@ struct RouteSpaces {
 
     mutating func setElevatedSpace(_ space: RouteSpace?, for priority: RoutePriority) {
         switch priority {
-        case .normal:
+        case .default:
             return
 
         case .high:
@@ -326,14 +326,14 @@ extension RouteSpaces {
         if let match = scopedDeclaration(including: routeType, origin: origin) { return match }
         // The owner's entry catalog is independent of every live navigation tree.
         // Only elevated definitions are visible across the space boundary.
-        guard let binding = normalSpace.root.firstRouteAttachment(for: routeType) else { return nil }
+        guard let binding = defaultSpace.root.firstRouteAttachment(for: routeType) else { return nil }
         guard let attachment = binding.declaration else { return .conflict }
-        guard attachment.declaration.priority != .normal else { return nil }
+        guard attachment.declaration.priority != .default else { return nil }
         return .declared(RouterEngine.DeclarationMatch(
-            presentationLocation: .init(path: normalSpace.rootPath, position: .owner),
-            space: normalSpace, declarationLocation: .init(path: normalSpace.rootPath, position: .owner),
+            presentationLocation: .init(path: defaultSpace.rootPath, position: .owner),
+            space: defaultSpace, declarationLocation: .init(path: defaultSpace.rootPath, position: .owner),
             branchID: nil, declaration: attachment.declaration,
-            lookupStrategy: .normalRootDeclarations))
+            lookupStrategy: .defaultRootDeclarations))
     }
 
     private func declarationMatch(
@@ -434,7 +434,7 @@ private extension RouteSpaces {
                let binding = source.firstBranchScopeRouteAttachment(for: routeType, in: source.activeBranch) {
                 return binding.map { declarationMatch($0, under: source, space: space,
                     declaringPath: path, declaringPosition: path.position(of: source) ?? .owner,
-                    lookupStrategy: .normalRootActiveBranchScope) }
+                    lookupStrategy: .defaultRootActiveBranchScope) }
             }
             // Plain requests can discover branch maps while climbing out of their
             // local scope. Explicit branch handles keep their chosen search boundary.
@@ -442,7 +442,7 @@ private extension RouteSpaces {
                 includingOtherBranches: origin.branches.isEmpty) {
                 return binding.map { declarationMatch($0, under: source, space: space,
                     declaringPath: path, declaringPosition: path.position(of: source) ?? .owner,
-                    lookupStrategy: source === normalSpace.root ? .normalRootDeclarations : .currentPath(spacePriority: space.priority)) }
+                    lookupStrategy: source === defaultSpace.root ? .defaultRootDeclarations : .currentPath(spacePriority: space.priority)) }
             }
             guard let previous = enclosingScope(before: source) else { break }
             source = previous

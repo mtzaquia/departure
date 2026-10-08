@@ -151,10 +151,10 @@ struct MacOSPresentationTests {
         let second = await waitUntil { recorder.number == 2 }
         try #require(second)
         #expect(router.engine.root.routeAttachments.count == 1)
-        #expect(router.engine.normalSpace.rootPath.count == 1)
+        #expect(router.engine.defaultSpace.rootPath.count == 1)
         #expect(window.attachedSheet == nil)
         control.isEnabled = false
-        #expect(router.engine.normalSpace.rootPath.count == 1)
+        #expect(router.engine.defaultSpace.rootPath.count == 1)
         #expect(recorder.number == 2)
         #expect(router.engine.root.routeAttachments.count == 1)
         control.isEnabled = true

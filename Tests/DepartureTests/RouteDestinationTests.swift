@@ -34,14 +34,14 @@ import RouteDomainFixtures
         }
         let engine = RouterEngine(routes: RootRouteMap { Sheet(destination) })
         await engine.present(DomainOnlyRoute())
-        let scope = try #require(engine.normalSpace.rootPath.last)
+        let scope = try #require(engine.defaultSpace.rootPath.last)
         let declaration = try #require(scope.presentationDeclaration)
-        let context = RouteContext(router: Router(engine: engine, scope: scope), unwindRoute: UnwindRouteAction(router: engine, routeScope: scope), presentation: .init(style: .sheet, priority: .normal), environment: EnvironmentValues())
+        let context = RouteContext(router: Router(engine: engine, scope: scope), unwindRoute: UnwindRouteAction(router: engine, routeScope: scope), presentation: .init(style: .sheet, priority: .default), environment: EnvironmentValues())
         _ = declaration.build(DomainOnlyRoute(), context)
         #expect(recorder.presentation?.style == .sheet)
-        #expect(recorder.presentation?.priority == .normal)
+        #expect(recorder.presentation?.priority == .default)
         #expect(await context.unwindRoute())
-        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
     }
     @Test func destinationDefinitionsAreAvailableImmediatelyAfterAppend() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
@@ -50,7 +50,7 @@ import RouteDomainFixtures
             }
         })
         await engine.present(DomainOnlyRoute())
-        let scope = try #require(engine.normalSpace.rootPath.last)
+        let scope = try #require(engine.defaultSpace.rootPath.last)
         #expect(!scope.isInstalledInView)
         #expect(scope.firstRouteAttachment(for: SettingsRoute.self) != nil)
     }

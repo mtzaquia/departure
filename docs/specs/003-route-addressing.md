@@ -34,7 +34,7 @@ For one path, the progression can be:
 
 The axes describe logical navigation state. They do not imply automatic `NavigationStack` construction, a new presentation API, or numeric coordinates exposed to application code.
 
-Each priority defines its own complete X/Y/Z space. Normal, high, and critical each have independent path progression, branch paths, and modal lanes. A high-priority modal does not consume the normal space's modal capacity, and clearing one priority does not implicitly clear the others. Existing priority eligibility, blocking, and root-unwind policy coordinate operations across spaces.
+Each priority defines its own complete X/Y/Z space. Default, high, and critical each have independent path progression, branch paths, and modal lanes. A high-priority modal does not consume the default space's modal capacity, and clearing one priority does not implicitly clear the others. Existing priority eligibility, blocking, and root-unwind policy coordinate operations across spaces.
 
 These axes shape the runtime entities and their ownership, so the constraints are enforced by construction. The implemented entity model is recorded in [specification 4](004-implementation.md#ownership-of-the-xyz-navigation-space): paths project owned continuations, modal lanes own one shared slot, and each priority has its own space.
 

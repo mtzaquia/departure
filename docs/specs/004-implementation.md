@@ -32,7 +32,7 @@ The following entities are internal; they do not add public API requirements:
 
 | Entity | Ownership and constraint |
 | --- | --- |
-| Space | Belongs to exactly one priority and owns its initial modal lane. Normal, high, and critical have independent X/Y/Z state. |
+| Space | Belongs to exactly one priority and owns its initial modal lane. Default, high, and critical have independent X/Y/Z state. |
 | Modal lane (Y) | Tracks one optional outgoing modal transition without owning it. That transition opens exactly one child lane in the same space. |
 | Path (X) | Owns the ordered forward progression at its routing position. A modal extends the accumulated path by one and continues it in the child lane. |
 | Branch container (Z) | Owns ordered, independent branch paths and selection/participation. Its branch paths all use the enclosing lane's single modal capacity. Nested containers establish their own branch identities. |
@@ -142,7 +142,7 @@ Binding getters do not install declarations, mutate navigation state, or change 
 
 Each physical presentation must have one effective owner. Repeating `.routing()` for the same scope must not create competing modal bindings or replacement owners. Use the context and presentation role to identify ownership; retain a small stable host token only where physical host identity is necessary. Do not recreate a stack of declaration sources to solve host placement.
 
-Shared Y modal ownership is projected consistently by branch hosts. A branch must not gain its own modal capacity merely because it has its own path prefix. Normal-priority local presentation uses its appropriate host; high and critical root presentation uses the router root. One resolver projects both local and root presentations, and one binding implementation validates the expected destination instance before accepting write-back. Each root priority has one detached host that chooses sheet, slide, or fade presentation from the committed destination snapshot. Native style-specific adapters retain their own transition behavior.
+Shared Y modal ownership is projected consistently by branch hosts. A branch must not gain its own modal capacity merely because it has its own path prefix. Default-priority local presentation uses its appropriate host; high and critical root presentation uses the router root. One resolver projects both local and root presentations, and one binding implementation validates the expected destination instance before accepting write-back. Each root priority has one detached host that chooses sheet, slide, or fade presentation from the committed destination snapshot. Native style-specific adapters retain their own transition behavior.
 
 SwiftUI write-back is a navigation event, not permission to truncate an arbitrary array. A pop, sheet dismissal, cover dismissal, or replacement removal must be interpreted against the expected presentation instance and fed through the router's unwind machinery.
 
@@ -283,7 +283,7 @@ Physical bookkeeping is excluded from SwiftUI observation. Only selected host id
 | iPad, iOS 27 | Both selected UI tests passed: concurrent split branches and replacement preserving other columns. |
 | iPhone, iOS 17.5 | All 3 selected UI tests passed: native Back followed by re-push, replacement clearing descendants, and root unwind preserving two pushes inside a sheet. |
 
-The final iOS 27 UI checks cover root, ancestor, and binding sheet dismissal; nested sheets and stacks; normal/high/critical equivalent-route retention; native Back and re-push; shared-lane modal replacement; inline replacement; cross-style elevated replacement and continuation; critical presentation above high priority; sheet passthrough and scrim isolation; and fade-cover navigation. The modal replacement check also verifies its presentation host's custom environment value. Earlier map-rewrite checks additionally exercised branch bridge replacement, modal chaining, concurrent branch covers, and local navigation inside elevated flows.
+The final iOS 27 UI checks cover root, ancestor, and binding sheet dismissal; nested sheets and stacks; default/high/critical equivalent-route retention; native Back and re-push; shared-lane modal replacement; inline replacement; cross-style elevated replacement and continuation; critical presentation above high priority; sheet passthrough and scrim isolation; and fade-cover navigation. The modal replacement check also verifies its presentation host's custom environment value. Earlier map-rewrite checks additionally exercised branch bridge replacement, modal chaining, concurrent branch covers, and local navigation inside elevated flows.
 
 Package tests cover immutable definitions before mounting, definitions shared across instances with independent branch state, distinct occurrences when composing a feature map twice, nearest-match and explicit-branch boundaries, inactive captured routers, payloads and hooks, stale binding write-back, cancellation, pending branch readiness, unwind plans, and outgoing context priority.
 

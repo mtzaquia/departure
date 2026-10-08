@@ -57,7 +57,7 @@ struct NavigationOperationTests {
         if firstToFinish == .high { #expect(await removeHigh.value) }
         else { #expect(await removeCritical.value) }
         #expect(engine.navigationOperations.count == 1)
-        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
         for (host, push) in zip(remaining, remaining.dropFirst()) {
             #expect(engine.routePresentationBinding(from: host, matching: .push).wrappedValue?.scope === push)
         }
@@ -72,7 +72,7 @@ struct NavigationOperationTests {
         #expect(!engine.isNavigating)
         #expect(!engine.hasOutgoingPresentations)
         #expect(engine.pendingRoute == nil)
-        #expect(engine.normalSpace.rootPath.last?.route is SettingsRoute)
+        #expect(engine.defaultSpace.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func cancelledReplacementCompletesTeardownWithoutPresentingItsContinuation() async throws {
@@ -82,22 +82,22 @@ struct NavigationOperationTests {
             Sheet(destination(LoginRoute.self))
         }, router: owner) { EmptyView() }
         await owner.current.present(SettingsRoute())
-        let old = try #require(owner.engine.normalSpace.rootPath.last)
+        let old = try #require(owner.engine.defaultSpace.rootPath.last)
         owner.engine.routeScopeDidInstallInView(old)
         let oldUnwind = UnwindRouteAction(router: owner.engine, routeScope: old)
         let root = Router(engine: owner.engine, scope: owner.engine.root)
         let request = Task { await root.present(LoginRoute()) }
-        for _ in 0..<1000 where !owner.engine.normalSpace.rootPath.isEmpty { await Task.yield() }
+        for _ in 0..<1000 where !owner.engine.defaultSpace.rootPath.isEmpty { await Task.yield() }
         #expect(owner.engine.isNavigating)
         request.cancel()
         owner.engine.routeScopeDidLeaveView(old)
         await request.value
-        #expect(owner.engine.normalSpace.rootPath.isEmpty)
+        #expect(owner.engine.defaultSpace.rootPath.isEmpty)
         #expect(!owner.engine.isNavigating)
         #expect(owner.engine.pendingRoute == nil)
         #expect(!(await oldUnwind()))
         await root.present(LoginRoute())
-        #expect(owner.engine.normalSpace.rootPath.last?.route is LoginRoute)
+        #expect(owner.engine.defaultSpace.rootPath.last?.route is LoginRoute)
     }
 
     private func destination<R: Route>(_ type: R.Type) -> RouteDestination<R> {

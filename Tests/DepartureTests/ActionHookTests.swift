@@ -86,7 +86,7 @@ struct ActionHookTests {
                 }.declaration,
             ]
         )
-        router.normalSpace.rootPath.replaceTestPath([parentScope, childScope])
+        router.defaultSpace.rootPath.replaceTestPath([parentScope, childScope])
 
         await router.performAction(ContextProbeAction())
 
@@ -98,7 +98,7 @@ struct ActionHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
 
-        router.normalSpace.rootPath.append(parentScope)
+        router.defaultSpace.rootPath.append(parentScope)
         parentScope.setActiveBranch(AnyHashable(AppTab.home))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -123,7 +123,7 @@ struct ActionHookTests {
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let recorder = ActionRecorder()
 
-        router.normalSpace.rootPath.append(parentScope)
+        router.defaultSpace.rootPath.append(parentScope)
         parentScope.setActiveBranch(AnyHashable(AppTab.wallet))
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -149,7 +149,7 @@ struct ActionHookTests {
         let sourceID = AnyHashable("hooks")
         let recorder = ActionRecorder()
 
-        router.normalSpace.rootPath.append(scope)
+        router.defaultSpace.rootPath.append(scope)
         scope.installHookDeclarations(
             sourceID: sourceID,
             hookDeclarations: [
@@ -180,13 +180,13 @@ struct ActionHookTests {
 
         await router.performAction(ReroutingProbeAction(recorder: recorder))
         await recorder.waitForEvent("reroute")
-        let settingsScope = try #require(router.normalSpace.rootPath.last)
+        let settingsScope = try #require(router.defaultSpace.rootPath.last)
         router.routeScopeDidInstallInView(settingsScope)
         await recorder.waitForEvent("ran")
 
         #expect(await recorder.values() == ["reroute", "ran"])
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func actionRerouteWaitsForInstalledDestinationInterceptorsBeforeRetrying() async throws {
@@ -207,7 +207,7 @@ struct ActionHookTests {
 
         #expect(await recorder.values() == ["reroute"])
 
-        let settingsScope = try #require(router.normalSpace.rootPath.last)
+        let settingsScope = try #require(router.defaultSpace.rootPath.last)
         settingsScope.installHookDeclarations(
             hookDeclarations: [
                 ActionInterceptor(ReroutingProbeAction.self) { _ in
@@ -236,14 +236,14 @@ struct ActionHookTests {
 
         await router.performAction(LoopingRerouteAction(recorder: recorder))
         await recorder.waitForEventCount(1)
-        if let settingsScope = router.normalSpace.rootPath.last {
+        if let settingsScope = router.defaultSpace.rootPath.last {
             router.routeScopeDidInstallInView(settingsScope)
         }
         await recorder.waitForEventCount(2)
 
         #expect(await recorder.values() == ["attempt", "attempt"])
-        #expect(router.normalSpace.rootPath.count == 1)
-        #expect(router.normalSpace.rootPath.last?.route is SettingsRoute)
+        #expect(router.defaultSpace.rootPath.count == 1)
+        #expect(router.defaultSpace.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func selectedBranchScopeChangesWhenActiveBranchChanges() {
@@ -252,7 +252,7 @@ struct ActionHookTests {
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
 
-        router.normalSpace.rootPath.append(parentScope)
+        router.defaultSpace.rootPath.append(parentScope)
         parentScope.attachTestBranch(homeScope, for: AppTab.home)
         parentScope.attachTestBranch(walletScope, for: AppTab.wallet)
 

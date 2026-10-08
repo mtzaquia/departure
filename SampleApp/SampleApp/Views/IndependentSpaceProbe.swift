@@ -12,9 +12,9 @@ struct IndependentSpaceProbeRoot: View {
 enum IndependentSpaceProbeMap {
     static func root(owner: RootRouter) -> RootRouteMap {
         RootRouteMap {
-            Sheet(RouteDestination(SpaceProbeNormal.self) { _, context in
+            Sheet(RouteDestination(SpaceProbeDefault.self) { _, context in
                 VStack {
-                    Text("Normal after high removal").accessibilityIdentifier("sample.spaces.normal")
+                    Text("Default after high removal").accessibilityIdentifier("sample.spaces.default")
                     Button("Done") { Task { await context.unwindRoute() } }
                 }
             })
@@ -25,10 +25,10 @@ enum IndependentSpaceProbeMap {
                         Text("High space root").accessibilityIdentifier("sample.spaces.high-root")
                         Button("Push within high") { Task { await context.router.present(SpaceProbeDetail()) } }
                             .accessibilityIdentifier("sample.spaces.push")
-                        Button("Close high, then present normal") {
+                        Button("Close high, then present default") {
                             Task {
                                 if await owner.dismissSpace(.high) {
-                                    await owner.current.present(SpaceProbeNormal())
+                                    await owner.current.present(SpaceProbeDefault())
                                 }
                             }
                         }.accessibilityIdentifier("sample.spaces.chain")
@@ -60,5 +60,5 @@ enum IndependentSpaceProbeMap {
 
 private struct SpaceProbeHigh: Route, Equatable {}
 private struct SpaceProbeDetail: Route, Equatable {}
-private struct SpaceProbeNormal: Route, Equatable {}
+private struct SpaceProbeDefault: Route, Equatable {}
 private struct SpaceProbeCritical: Route, Equatable {}

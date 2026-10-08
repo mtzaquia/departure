@@ -20,7 +20,7 @@ struct HookBindingTests {
 
         await router.perform(HookBindingAction(probe: probe))
         await router.present(LoginRoute())
-        let source = try #require(engine.normalSpace.rootPath.last)
+        let source = try #require(engine.defaultSpace.rootPath.last)
         #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor))
         #expect(probe.events == ["action", "unwind"])
 
@@ -31,7 +31,7 @@ struct HookBindingTests {
         engine.root.uninstallHookDeclarations(sourceID: "actions")
         await router.perform(HookBindingAction(probe: probe))
         await router.present(LoginRoute())
-        let second = try #require(engine.normalSpace.rootPath.last)
+        let second = try #require(engine.defaultSpace.rootPath.last)
         #expect(await Router(engine: engine, scope: second).unwind(to: .topmostAncestor))
         #expect(probe.events == ["action", "unwind", "updated", "body", "unwind"])
     }
@@ -100,7 +100,7 @@ struct HookBindingTests {
             UnwindHandler(SettingsRoute.self) { probe.events.append("ancestor") }.declaration,
         ])
         await root.present(LoginRoute())
-        let receiver = try #require(engine.normalSpace.rootPath.last)
+        let receiver = try #require(engine.defaultSpace.rootPath.last)
         let receiverRouter = Router(engine: engine, scope: receiver)
         for source in ["first", "second"] {
             receiver.installHookDeclarations(sourceID: AnyHashable(source), hookDeclarations: [
@@ -108,13 +108,13 @@ struct HookBindingTests {
             ])
         }
         await receiverRouter.present(SettingsRoute())
-        let source = try #require(engine.normalSpace.rootPath.last)
+        let source = try #require(engine.defaultSpace.rootPath.last)
         #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor))
         #expect(probe.events.isEmpty)
 
         receiver.uninstallHookDeclarations(sourceID: "second")
         await receiverRouter.present(SettingsRoute())
-        let second = try #require(engine.normalSpace.rootPath.last)
+        let second = try #require(engine.defaultSpace.rootPath.last)
         #expect(await Router(engine: engine, scope: second).unwind(to: .topmostAncestor))
         #expect(probe.events == ["first"])
     }
@@ -131,7 +131,7 @@ struct HookBindingTests {
             UnwindHandler(LoginRoute.self) { probe.events.append("surviving") }.declaration,
         ])
         await root.present(LoginRoute())
-        let source = try #require(engine.normalSpace.rootPath.last)
+        let source = try #require(engine.defaultSpace.rootPath.last)
         let branch = try #require(source.branchScopes["tab"])
         let snapshot = RouteDestinationSnapshot(route: .init(
             scope: source, declaration: try #require(source.presentationDeclaration)
@@ -143,8 +143,8 @@ struct HookBindingTests {
         engine.routeScopeDidInstallInView(source)
 
         let unwind = Task { await sourceRouter.unwind(to: .topmostAncestor) }
-        for _ in 0..<1000 where source.belongs(to: engine.normalSpace) { await Task.yield() }
-        #expect(!source.belongs(to: engine.normalSpace))
+        for _ in 0..<1000 where source.belongs(to: engine.defaultSpace) { await Task.yield() }
+        #expect(!source.belongs(to: engine.defaultSpace))
         #expect(source.isInstalledInView)
         #expect(snapshot.route.scope === source)
         #expect(source.branchScopes["tab"] === branch)
@@ -227,8 +227,8 @@ struct HookBindingTests {
             }.declaration,
         ])
         await Router(engine: engine, scope: engine.root).perform(HookReroutingAction(probe: probe))
-        for _ in 0..<1000 where engine.normalSpace.rootPath.last == nil { await Task.yield() }
-        let destination = try #require(engine.normalSpace.rootPath.last)
+        for _ in 0..<1000 where engine.defaultSpace.rootPath.last == nil { await Task.yield() }
+        let destination = try #require(engine.defaultSpace.rootPath.last)
         #expect(probe.events == ["source", "reroute"])
         destination.installHookDeclarations(hookDeclarations: [
             ActionInterceptor(HookReroutingAction.self) { invocation in

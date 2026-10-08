@@ -25,7 +25,7 @@ struct UnwindPresentationPolicyTests {
             scope.attachPresentation(to: host, declaration: try #require(host.routeAttachments.first))
             engine.routeScopeDidInstallInView(scope)
         }
-        engine.normalSpace.rootPath.replaceTestPath(scopes)
+        engine.defaultSpace.rootPath.replaceTestPath(scopes)
         let router = Router(engine: engine, scope: scopes[0])
         let unwind = Task {
             switch jump {
@@ -37,9 +37,9 @@ struct UnwindPresentationPolicyTests {
                 await UnwindRouteAction(router: engine, routeScope: scopes[0])()
             }
         }
-        for _ in 0..<100 where !engine.normalSpace.rootPath.isEmpty { await Task.yield() }
+        for _ in 0..<100 where !engine.defaultSpace.rootPath.isEmpty { await Task.yield() }
 
-        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
         #expect(engine.hasOutgoingPresentations)
         #expect(!engine.pushPresentationDismissalDisablesAnimations(from: engine.root))
         #expect(engine.pushPresentationDismissalDisablesAnimations(from: scopes[0]))
@@ -53,7 +53,7 @@ struct UnwindPresentationPolicyTests {
         #expect(engine.hasOutgoingPresentations == false)
     }
 
-    @Test(arguments: [RoutePriority.normal, .high, .critical])
+    @Test(arguments: [RoutePriority.default, .high, .critical])
     func equivalentRoutesKeepDepartingModalStacks(priority: RoutePriority) async throws {
         let engine = RouterEngine()
         engine.root.defineTestMap(
@@ -63,11 +63,11 @@ struct UnwindPresentationPolicyTests {
         )
         await Router(engine: engine, scope: engine.root).present(LoginRoute())
         let space = try #require(engine.spaces.space(for: priority))
-        let retained = space.priority == .normal ? try #require(space.rootPath.last) : space.root
+        let retained = space.priority == .default ? try #require(space.rootPath.last) : space.root
         retained.defineTestMap(
             id: nil,
             selection: nil,
-            definitions: [RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .normal))._routeDeclarations)]
+            definitions: [RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))._routeDeclarations)]
         )
         await Router(engine: engine, scope: retained).present(SettingsRoute())
         let sheet = try #require(space.rootPath.last)
@@ -82,9 +82,9 @@ struct UnwindPresentationPolicyTests {
         engine.routeScopeDidInstallInView(push)
 
         let request = Task { await Router(engine: engine, scope: push).present(LoginRoute()) }
-        for _ in 0..<1000 where space.rootPath.count > (space.priority == .normal ? 1 : 0) { await Task.yield() }
+        for _ in 0..<1000 where space.rootPath.count > (space.priority == .default ? 1 : 0) { await Task.yield() }
 
-        #expect(space.rootPath.scopes.elementsEqual(space.priority == .normal ? [retained] : [], by: { $0 === $1 }))
+        #expect(space.rootPath.scopes.elementsEqual(space.priority == .default ? [retained] : [], by: { $0 === $1 }))
         #expect(engine.hasOutgoingPresentations)
         #expect(engine.routePresentationBinding(from: retained, matching: .sheet).wrappedValue == nil)
         #expect(engine.routePresentationBinding(from: sheet, matching: .push).wrappedValue?.scope === push)
@@ -92,7 +92,7 @@ struct UnwindPresentationPolicyTests {
         engine.routeScopeDidLeaveView(sheet)
         engine.routeScopeDidLeaveView(push)
         await request.value
-        #expect(space.rootPath.scopes.elementsEqual(space.priority == .normal ? [retained] : [], by: { $0 === $1 }))
+        #expect(space.rootPath.scopes.elementsEqual(space.priority == .default ? [retained] : [], by: { $0 === $1 }))
         #expect(engine.hasOutgoingPresentations == false)
     }
 }

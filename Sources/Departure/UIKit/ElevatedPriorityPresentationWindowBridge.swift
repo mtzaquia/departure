@@ -318,7 +318,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
             case .high:
                 return UIWindow.Level(rawValue: UIWindow.Level.alert.rawValue - 1)
 
-            case .normal:
+            case .default:
                 return UIWindow.Level(rawValue: resolveHighestWindowLevel(in: scene).rawValue + 1)
             }
         }

@@ -62,11 +62,11 @@ final class RouterEngine: Identifiable, Equatable {
     var activeRouteScopeID: ObjectIdentifier { ObjectIdentifier(currentRouteScope) }
 
     var root: RouteScope {
-        spaces.normalSpace.root
+        spaces.defaultSpace.root
     }
 
-    var normalSpace: RouteSpace {
-        spaces.normalSpace
+    var defaultSpace: RouteSpace {
+        spaces.defaultSpace
     }
 
     var currentRouteScope: RouteScope {
@@ -81,8 +81,8 @@ final class RouterEngine: Identifiable, Equatable {
             if let id = routes.scopeID { root.id = id }
             root.useDefinitions(RouteDefinitions(routes.declarations))
         }
-        let normalSpace = RouteSpace(priority: .normal, root: root)
-        self.spaces = RouteSpaces(normalSpace: normalSpace)
+        let defaultSpace = RouteSpace(priority: .default, root: root)
+        self.spaces = RouteSpaces(defaultSpace: defaultSpace)
     }
 
     func configureMap(_ map: RootRouteMap) {

@@ -12,7 +12,7 @@ The environment router resolves targets from its captured scope. `.nearestBranch
 that scope’s enclosing branch; `.topmostAncestor` dismisses that scope and its descendants.
 `.root` resets only the receiving priority space and keeps its root visible. Inactive pushes survive only in branches owned by that retained root; removing a nested container removes all its branches from live navigation. Targets and payload handlers never cross a space boundary. Covered spaces reject ordinary unwinds.
 
-`unwindRoute()` dismisses the captured destination. At an elevated root it removes the entire space; the permanent normal root cannot be dismissed. `router.dismissSpace()` removes the receiving top elevated space from any descendant. `RootRouter.dismissSpace(_:)` and `dismissSpaces()` coordinate removal explicitly, including covered spaces, and finish after native teardown.
+`unwindRoute()` dismisses the captured destination. At an elevated root it removes the entire space; the permanent default root cannot be dismissed. `router.dismissSpace()` removes the receiving top elevated space from any descendant. `RootRouter.dismissSpace(_:)` and `dismissSpaces()` coordinate removal explicitly, including covered spaces, and finish after native teardown.
 
 Name a mapped scope to target it explicitly:
 
@@ -64,7 +64,7 @@ await unwindRoute(payload: SaveResult.saved)
 
 SwiftUI’s `dismiss()` follows the same payload-free unwind path and triggers a matching handler.
 
-Native and explicit unwinds enter the matching handler before committing the path change, while the outgoing source is still live. The handler may start asynchronous work; the unwind continues once it suspends and does not wait for that work to finish. A presentation requested by the handler waits for unwind completion and then rechecks its captured source and the normal routing rules.
+Native and explicit unwinds enter the matching handler before committing the path change, while the outgoing source is still live. The handler may start asynchronous work; the unwind continues once it suspends and does not wait for that work to finish. A presentation requested by the handler waits for unwind completion and then rechecks its captured source and the default routing rules.
 
 Handlers are found from the surviving landing scope toward its space root. An outgoing scope stops participating when it leaves navigation, even if its view is retained for dismissal. Distinct hook types compose across `.hooks` modifiers in the same scope; duplicate handlers for one route type disable that handler and report a diagnostic. An ambiguous handler does not fall back to an ancestor's handler.
 

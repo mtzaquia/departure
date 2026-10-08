@@ -24,7 +24,7 @@ import SwiftUI
 
 /// A scope-bound navigation handle supplied by `WithRouter` or `RouteContext`.
 /// Stored routers retain their source identity and become inactive when that scope
-/// leaves navigation. Read ``RootRouter/normal`` for external entry points or
+/// leaves navigation. Read ``RootRouter/default`` for external entry points or
 /// ``RootRouter/current`` to capture a source in the top space.
 public struct Router: Equatable {
     /// A destination for ``Router/unwind(to:)``.
@@ -69,7 +69,7 @@ public struct Router: Equatable {
     static let inactive = Router(engine: nil, origin: nil)
 
     /// Returns a router targeting a named branch of the nearest enclosing container.
-    /// External callers can capture a normal-flow router through ``RootRouter/normal``.
+    /// External callers can capture a default flow router through ``RootRouter/default``.
     ///
     /// Obtaining the router does not activate the branch. A presentation owned by
     /// the branch activates it through the container's selection binding. A missing

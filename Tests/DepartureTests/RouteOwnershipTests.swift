@@ -10,7 +10,7 @@ struct RouteOwnershipTests {
         let (engine, probe) = try await detachModalSubtree()
         #expect(probe.scope == nil)
         #expect(engine.root.lane.modal == nil)
-        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
     }
 
     @Test func outgoingSnapshotRetainsObjectsWithoutOccupyingTheLiveLane() async throws {
@@ -19,13 +19,13 @@ struct RouteOwnershipTests {
         var snapshot: RouteDestinationSnapshot?
         (engine, snapshot, probe) = try await snapshotDetachedModalSubtree()
         #expect(probe.scope != nil)
-        #expect(snapshot!.route.scope.belongs(to: engine.normalSpace) == false)
-        #expect(engine.normalSpace.rootPath.position(of: snapshot!.route.scope) == nil)
+        #expect(snapshot!.route.scope.belongs(to: engine.defaultSpace) == false)
+        #expect(engine.defaultSpace.rootPath.position(of: snapshot!.route.scope) == nil)
         #expect(engine.root.lane.modal == nil)
 
         let root = Router(engine: engine, scope: engine.root)
         await root.present(LoginRoute())
-        let replacement = try #require(engine.normalSpace.rootPath.last)
+        let replacement = try #require(engine.defaultSpace.rootPath.last)
         let branch = try #require(replacement.branchScopes["modal"])
         engine.hostDidAttach(branch, view: nil, id: UUID())
         await Router(engine: engine, scope: replacement).branch("modal").present(MessageRoute())
@@ -47,7 +47,7 @@ struct RouteOwnershipTests {
         } onChange: {
             MainActor.assumeIsolated { changes.value += 1 }
         }
-        engine.normalSpace.rootPath.keepThrough(.owner)
+        engine.defaultSpace.rootPath.keepThrough(.owner)
         #expect(changes.value == 1)
         #expect(engine.root.lane.modal == nil)
         #expect(container.branchScopes["modal"]?.path.last === modal)
@@ -87,7 +87,7 @@ private func modalSubtree() async throws -> (RouterEngine, RouteScope, RouteScop
     })
     let root = Router(engine: engine, scope: engine.root)
     await root.present(LoginRoute())
-    let container = try #require(engine.normalSpace.rootPath.last)
+    let container = try #require(engine.defaultSpace.rootPath.last)
     let branch = try #require(container.branchScopes["modal"])
     engine.hostDidAttach(branch, view: nil, id: UUID())
     await Router(engine: engine, scope: container).branch("modal").present(MessageRoute())
@@ -99,7 +99,7 @@ private func modalSubtree() async throws -> (RouterEngine, RouteScope, RouteScop
 private func detachModalSubtree() async throws -> (RouterEngine, RoutingOwnershipProbe) {
     let (engine, _, modal) = try await modalSubtree()
     let probe = RoutingOwnershipProbe(engine: engine, scope: modal)
-    engine.normalSpace.rootPath.keepThrough(.owner)
+    engine.defaultSpace.rootPath.keepThrough(.owner)
     return (engine, probe)
 }
 
@@ -110,7 +110,7 @@ private func snapshotDetachedModalSubtree() async throws -> (RouterEngine, Route
     let snapshot = RouteDestinationSnapshot(route: .init(
         scope: container, declaration: try #require(container.presentationDeclaration)
     ))
-    engine.normalSpace.rootPath.keepThrough(.owner)
+    engine.defaultSpace.rootPath.keepThrough(.owner)
     return (engine, snapshot, probe)
 }
 

@@ -50,14 +50,14 @@ import Testing
         switch style {
         case .push: kind = .push
         case .replace: kind = .replace
-        case .sheet: kind = .sheet(priority: .normal)
-        case let .cover(transition): kind = .cover(priority: .normal, transition: transition)
+        case .sheet: kind = .sheet(priority: .default)
+        case let .cover(transition): kind = .cover(priority: .default, transition: transition)
         }
         let engine = RouterEngine(routes: RootRouteMap { AnyRouteDeclaration(destination, kind: kind) })
         let owner = RoutePresentationHostID(), stranger = RoutePresentationHostID()
         engine.root.bindRoutingHost(owner, automatic: false, environment: engine.root.sourceEnvironment)
         await engine.present(NumberedRoute(number: 1))
-        let scope = try #require(engine.normalSpace.rootPath.last)
+        let scope = try #require(engine.defaultSpace.rootPath.last)
         // An unseen iOS 17 push rejects nil intentionally. Model an actual
         // destination that has appeared and is now leaving its native host.
         engine.routeScopeDidInstallInView(scope)
@@ -65,20 +65,20 @@ import Testing
         let foreign = engine.routePresentationBinding(from: engine.root, matching: style, hostedBy: stranger)
         #expect(foreign.wrappedValue == nil)
         foreign.wrappedValue = nil
-        #expect(engine.normalSpace.rootPath.last === scope)
+        #expect(engine.defaultSpace.rootPath.last === scope)
         let binding = engine.routePresentationBinding(from: engine.root, matching: style, hostedBy: owner)
         #expect(binding.wrappedValue?.scope === scope)
         binding.wrappedValue = nil
-        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
     }
-    @Test func staleNormalDismissalCannotClearReplacement() async throws {
+    @Test func staleDefaultDismissalCannotClearReplacement() async throws {
         let engine = RouterEngine(routes: RootRouteMap { Sheet(RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }) })
         await engine.present(NumberedRoute(number: 1))
         let oldBinding = engine.routePresentationBinding(from: engine.root, matching: .sheet)
         await engine.present(NumberedRoute(number: 2))
-        let replacement = try #require(engine.normalSpace.rootPath.last)
+        let replacement = try #require(engine.defaultSpace.rootPath.last)
         oldBinding.wrappedValue = nil
-        #expect(engine.normalSpace.rootPath.last === replacement)
+        #expect(engine.defaultSpace.rootPath.last === replacement)
     }
     @Test(arguments: [RoutePriority.high, .critical])
     func staleElevatedDismissalCannotClearReplacement(priority: RoutePriority) async throws {

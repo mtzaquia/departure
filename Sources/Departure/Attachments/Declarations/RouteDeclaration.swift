@@ -74,7 +74,7 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
         case .sheet: return Self(copy: self, kind: .sheet(priority: priority))
         case let .cover(_, transition): return Self(copy: self, kind: .cover(priority: priority, transition: transition))
         case .push, .replace:
-            precondition(priority == .normal, "Root priority builders accept only modal presentations.")
+            precondition(priority == .default, "Root priority builders accept only modal presentations.")
             return self
         }
     }
@@ -85,7 +85,7 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
 
     var priority: RoutePriority {
         switch kind {
-        case .push, .replace: .normal
+        case .push, .replace: .default
         case let .sheet(priority), let .cover(priority, _): priority
         }
     }
@@ -103,7 +103,7 @@ typealias RoutePresentationKind = RoutePresentation.Style
 
 /// Priority of a presentation. Elevated presentations are anchored at the routing root.
 public enum RoutePriority: Int, Comparable, Hashable, Sendable {
-    case normal, high, critical
+    case `default`, high, critical
     public nonisolated static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 

@@ -6,15 +6,15 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct SpaceAuthorityTests {
     @Test(arguments: [RoutePriority.high, .critical])
-    func externalNormalHandleCannotActInOrDismissACoveringSpace(priority: RoutePriority) async throws {
+    func externalDefaultHandleCannotActInOrDismissACoveringSpace(priority: RoutePriority) async throws {
         let owner = fixture()
-        await owner.normal.present(SettingsRoute())
-        let normalScope = try #require(owner.engine.normalSpace.rootPath.last)
+        await owner.default.present(SettingsRoute())
+        let defaultScope = try #require(owner.engine.defaultSpace.rootPath.last)
         if priority == .high { await owner.current.present(LoginRoute()) }
         else { await owner.current.present(LockRoute()) }
         let elevated = try #require(owner.engine.spaces.space(for: priority))
         let probe = AuthorityProbe()
-        normalScope.installHookDeclarations(hookDeclarations: [
+        defaultScope.installHookDeclarations(hookDeclarations: [
             ActionInterceptor(AuthorityAction.self) { invocation in
                 probe.events.append("interceptor")
                 try? await invocation()
@@ -22,7 +22,7 @@ struct SpaceAuthorityTests {
         ])
 
         // Capture after the covering space appears, as an external callback would.
-        let external = owner.normal
+        let external = owner.default
         await external.perform(AuthorityAction(probe: probe))
         await external.present(HomeDetailRoute())
         await external.present(LockRoute())
@@ -30,7 +30,7 @@ struct SpaceAuthorityTests {
         #expect(!((await external.unwind(to: .topmostAncestor))))
         #expect(!((await external.dismissSpace())))
         #expect(probe.events.isEmpty)
-        #expect(owner.engine.normalSpace.rootPath.last === normalScope)
+        #expect(owner.engine.defaultSpace.rootPath.last === defaultScope)
         #expect(owner.engine.spaces.activeSpace === elevated)
 
         await owner.current.perform(AuthorityAction(probe: probe))
@@ -46,7 +46,7 @@ struct SpaceAuthorityTests {
         owner.engine.root.installHookDeclarations(hookDeclarations: [
             ActionInterceptor(AuthorityAction.self) { invocation in probe.invocation = invocation }.declaration,
         ])
-        await owner.normal.perform(AuthorityAction(probe: probe))
+        await owner.default.perform(AuthorityAction(probe: probe))
         let invocation = try #require(probe.invocation)
         probe.invocation = nil
         await owner.current.present(LockRoute())
@@ -62,7 +62,7 @@ struct SpaceAuthorityTests {
         let owner = fixture()
         let probe = AuthorityProbe()
         let gate = AuthorityGate()
-        await owner.normal.perform(AuthorityRerouteAction(probe: probe, gate: gate))
+        await owner.default.perform(AuthorityRerouteAction(probe: probe, gate: gate))
         await gate.waitUntilEntered()
         await owner.current.present(LockRoute())
         let lock = try #require(owner.engine.spaces.criticalSpace?.root)
@@ -73,14 +73,14 @@ struct SpaceAuthorityTests {
         gate.release()
         for _ in 0..<1000 { await Task.yield() }
         #expect(probe.events == ["reroute"])
-        #expect(owner.engine.normalSpace.rootPath.isEmpty)
+        #expect(owner.engine.defaultSpace.rootPath.isEmpty)
         #expect(owner.engine.spaces.criticalSpace?.root === lock)
     }
 
     @Test func intentionalRerouteIntoHigherPriorityStillRetriesAtItsDestination() async throws {
         let owner = fixture()
         let probe = AuthorityProbe()
-        await owner.normal.perform(AuthorityElevatedAction(probe: probe))
+        await owner.default.perform(AuthorityElevatedAction(probe: probe))
         for _ in 0..<1000 where owner.engine.spaces.highSpace == nil { await Task.yield() }
         let destination = try #require(owner.engine.spaces.highSpace?.root)
         #expect(probe.events == ["reroute"])
