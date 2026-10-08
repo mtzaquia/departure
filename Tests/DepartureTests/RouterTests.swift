@@ -2648,7 +2648,7 @@ struct RouterTests {
 
         #expect(router.pendingRoute == nil)
         #expect(router.defaultSpace.rootPath.isEmpty)
-        await router.finishNavigationOperation(transaction)
+        router.finishNavigationOperation(transaction)
     }
 
     @Test func pendingPresentationWaitsForEveryOverlappingNavigationTransaction() async throws {

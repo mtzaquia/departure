@@ -224,7 +224,7 @@ extension RouterEngine {
                 operation.outgoing = [:]
                 appendPreparedRoute(operation)
             }
-            await finishNavigationOperation(operation)
+            finishNavigationOperation(operation)
             let destination = await operation.waitForPresentation()
             return !Task.isCancelled ? destination : nil
         } onCancel: {
@@ -398,7 +398,7 @@ extension RouterEngine {
         }
         log.departureDebug(.elevatedSpaceStarted)
         await waitForNavigationOperation(operation)
-        await finishNavigationOperation(operation)
+        finishNavigationOperation(operation)
         return isNavigationEligible(scope) && !Task.isCancelled ? scope : nil
     }
 
@@ -591,7 +591,7 @@ extension RouterEngine {
     ) async -> Bool {
         await deliverUnwindHandlers(for: sourceScope, payload: payload, in: targetScope, removing: operation.removedScopes)
         guard sourceScope.map(isNavigationEligible) ?? true, !Task.isCancelled else {
-            await finishNavigationOperation(operation)
+            finishNavigationOperation(operation)
             return false
         }
         commitNavigationOperation(operation)
@@ -604,7 +604,7 @@ extension RouterEngine {
         if logsCompletion {
             log.departureDebug(.unwindCompleted(path: spaces.activeSpace.currentRoutePath.departureDebugPathDescription))
         }
-        await finishNavigationOperation(operation)
+        finishNavigationOperation(operation)
     }
 
     @discardableResult
@@ -622,12 +622,12 @@ extension RouterEngine {
             await deliverUnwindHandlers(for: space.root, payload: payload, in: nil, removing: operation.removedScopes)
         }
         guard !Task.isCancelled, source.map(isNavigationEligible) ?? true else {
-            await finishNavigationOperation(operation)
+            finishNavigationOperation(operation)
             return false
         }
         commitNavigationOperation(operation)
         await waitForNavigationOperation(operation)
-        await finishNavigationOperation(operation)
+        finishNavigationOperation(operation)
         return true
     }
 
@@ -824,12 +824,12 @@ extension RouterEngine {
         return operation
     }
 
-    func finishNavigationOperation(_ operation: NavigationOperation) async {
+    func finishNavigationOperation(_ operation: NavigationOperation) {
         guard let index = navigationOperations.firstIndex(where: { $0 === operation }) else { return }
         operation.outgoing = [:]
         operation.finishTeardown(awaitingHost: isPendingPresentation(operation))
         navigationOperations.remove(at: index)
-        if !isNavigating { await drainPendingRouteRequests() }
+        if !isNavigating { pendingRoute?.request?.resume(true) }
     }
 
     func outgoingPresentation(for key: PresentationKey) -> NavigationOperation.Outgoing? {
@@ -839,20 +839,6 @@ extension RouterEngine {
     enum RouteRequestStage {
         case resolve
         case presentResolved
-    }
-
-    func drainPendingRouteRequests() async {
-        guard case let .request(request) = pendingRoute else { return }
-        pendingRoute = nil
-        // Queued work runs from the completing operation, but cancellation still belongs
-        // to its original caller. The request owns that execution until it finishes.
-        let execution = Task { @MainActor in
-            await requestRouteWhenReady(request.route, stage: request.stage, origin: request.origin)
-        }
-        request.execution = execution
-        let destination = await execution.value
-        request.execution = nil
-        request.resume(destination)
     }
 
     private func isPendingPresentation(_ operation: NavigationOperation) -> Bool {
@@ -871,7 +857,7 @@ extension RouterEngine {
     }
 
     func replacePendingRoute(_ pendingRoute: PendingNavigation?) {
-        if case let .request(request) = self.pendingRoute { request.resume() }
+        self.pendingRoute?.request?.resume()
         if let previous = self.pendingRoute?.operation, previous !== pendingRoute?.operation {
             previous.discardPresentation()
         }
@@ -888,29 +874,41 @@ extension RouterEngine {
         // A live lower-space handler can request its follow-up before unwind commits.
         // Coverage is evaluated after the global operation completes.
         guard Task.isCancelled == false, resolveRequestOrigin(origin) != nil else { return nil }
-        guard isNavigating == false else {
-            let request = PendingNavigation.Request(route: route, stage: stage, origin: origin)
-            return await withTaskCancellationHandler {
-                await withCheckedContinuation { continuation in
-                    guard Task.isCancelled == false else {
-                        continuation.resume(returning: nil)
-                        return
-                    }
-
-                    request.continuation = continuation
-                    replacePendingRoute(.request(request))
+        if isNavigating {
+            let request = PendingNavigation.Request(route: route)
+            let ready = await withTaskCancellationHandler {
+                defer {
+                    if pendingRoute?.request === request { pendingRoute = nil }
                 }
+                repeat {
+                    let ready = await withCheckedContinuation { continuation in
+                        guard !Task.isCancelled else {
+                            continuation.resume(returning: false)
+                            return
+                        }
+                        request.continuation = continuation
+                        if pendingRoute?.request !== request { replacePendingRoute(.request(request)) }
+                    }
+                    // A wake-up does not claim the slot. A newer attempt may win,
+                    // or another unwind may start before this caller gets its turn.
+                    guard ready, !Task.isCancelled, pendingRoute?.request === request,
+                          resolveRequestOrigin(origin) != nil else { return false }
+                } while isNavigating
+                return true
             } onCancel: {
                 Task { @MainActor [weak self] in
-                    request.execution?.cancel()
-                    if case let .request(pending) = self?.pendingRoute, pending === request {
+                    if self?.pendingRoute?.request === request {
                         self?.replacePendingRoute(nil)
                     }
                 }
             }
+            guard ready else { return nil }
         }
 
-        guard navigationSource(origin) != nil else { return nil }
+        guard !Task.isCancelled, navigationSource(origin) != nil else { return nil }
+        // A ready caller still occupies the latest slot until it resumes. An
+        // eligible new attempt supersedes it even after teardown has finished.
+        if pendingRoute?.request != nil { replacePendingRoute(nil) }
         switch stage {
         case .resolve:
             return await requestRoute(route, origin: origin)

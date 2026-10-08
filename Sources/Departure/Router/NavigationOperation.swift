@@ -140,26 +140,26 @@ extension RouterEngine {
     enum PendingNavigation {
         final class Request {
             let route: any Route
-            let stage: RouteRequestStage
-            let origin: RouteRequestOrigin
-            var continuation: CheckedContinuation<RouteScope?, Never>?
-            var execution: Task<RouteScope?, Never>?
+            var continuation: CheckedContinuation<Bool, Never>?
 
-            init(route: any Route, stage: RouteRequestStage, origin: RouteRequestOrigin) {
+            init(route: any Route) {
                 self.route = route
-                self.stage = stage
-                self.origin = origin
             }
 
-            func resume(_ destination: RouteScope? = nil) {
+            func resume(_ ready: Bool = false) {
                 let continuation = self.continuation
                 self.continuation = nil
-                continuation?.resume(returning: destination)
+                continuation?.resume(returning: ready)
             }
         }
 
         case request(Request)
         case presentation(NavigationOperation)
+
+        var request: Request? {
+            if case let .request(request) = self { return request }
+            return nil
+        }
 
         var operation: NavigationOperation? {
             if case let .presentation(operation) = self { return operation }

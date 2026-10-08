@@ -103,7 +103,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         router.commitNavigationOperation(operation, preservesModalPresentationBindings: false)
         await router.waitForNavigationOperation(operation)
         let wasSuperseded = router.pendingRoute != nil
-        await router.finishNavigationOperation(operation)
+        router.finishNavigationOperation(operation)
         return wasSuperseded
     }
 

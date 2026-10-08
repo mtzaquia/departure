@@ -340,7 +340,7 @@ struct ScopedRouterTests {
         for _ in 0..<100 where fixture.engine.pendingRoute == nil { await Task.yield() }
         #expect(fixture.engine.pendingRoute != nil)
         fixture.selection.value = "detail"
-        await fixture.engine.finishNavigationOperation(transaction)
+        fixture.engine.finishNavigationOperation(transaction)
         await request.value
         #expect(fixture.content.path.last?.route is HomeDetailRoute)
         #expect(fixture.detail.path.isEmpty)

@@ -108,6 +108,8 @@ public struct Router: Equatable {
     /// Unwinds from this router's scope, to an explicit target in its priority space.
     ///
     /// `.root` retains this space's root. Use `dismissSpace()` for whole-space removal.
+    /// Waits for this unwind's native teardown. A buffered presentation waits for all
+    /// ongoing unwinds, then continues in its own caller without delaying this return.
     /// - Returns: Whether an unwind target was found for a live scope in the top space.
     @discardableResult
     public func unwind(to target: UnwindTarget) async -> Bool {
@@ -116,6 +118,7 @@ public struct Router: Equatable {
     }
 
     /// Unwinds from this router's scope, and delivers a payload to a matching handler.
+    /// Waits for this unwind's native teardown, independently of any buffered presentation.
     /// - Returns: Whether an unwind target was found for a live scope in the top space.
     @discardableResult
     public func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {

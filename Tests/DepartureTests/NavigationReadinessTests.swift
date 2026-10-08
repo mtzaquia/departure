@@ -25,8 +25,147 @@ import Testing
 @testable import Departure
 
 @MainActor
-@Suite
+@Suite(.timeLimit(.minutes(1)))
 struct NavigationReadinessTests {
+    @Test func awakenedRequestCanStillBeSupersededBeforeClaimingItsTurn() async {
+        let engine = queuedRequestFixture()
+        let operation = engine.beginNavigationOperation()
+        let original = Task { await engine.requestRouteWhenReady(SettingsRoute()) }
+        for _ in 0..<1000 where engine.pendingRoute == nil { await Task.yield() }
+        engine.finishNavigationOperation(operation)
+        #expect(engine.pendingRoute?.request != nil)
+        let latest = await engine.requestRouteWhenReady(LoginRoute())
+        #expect(await original.value == nil)
+        #expect(latest === engine.defaultSpace.rootPath.last)
+        #expect(engine.defaultSpace.rootPath.last?.route is LoginRoute)
+        #expect(engine.pendingRoute == nil)
+    }
+
+    @Test func anotherUnwindBeforeAnAwakenedCallerRunsKeepsItSuspended() async {
+        let engine = queuedRequestFixture()
+        let first = engine.beginNavigationOperation()
+        var finished = false
+        let presentation = Task {
+            let scope = await engine.requestRouteWhenReady(SettingsRoute())
+            finished = true
+            return scope
+        }
+        for _ in 0..<1000 where engine.pendingRoute == nil { await Task.yield() }
+        let request = engine.pendingRoute?.request
+        engine.finishNavigationOperation(first)
+        let next = engine.beginNavigationOperation()
+        for _ in 0..<1000 where request?.continuation == nil { await Task.yield() }
+        #expect(request?.continuation != nil)
+        #expect(engine.pendingRoute?.request === request)
+        #expect(!finished)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
+        engine.finishNavigationOperation(next)
+        #expect(await presentation.value === engine.defaultSpace.rootPath.last)
+        #expect(engine.defaultSpace.rootPath.last?.route is SettingsRoute)
+        #expect(engine.pendingRoute == nil)
+    }
+
+    @Test func cancellingAnAwakenedRequestPreventsItsPresentation() async {
+        let engine = queuedRequestFixture()
+        let operation = engine.beginNavigationOperation()
+        let presentation = Task { await engine.requestRouteWhenReady(SettingsRoute()) }
+        for _ in 0..<1000 where engine.pendingRoute == nil { await Task.yield() }
+        engine.finishNavigationOperation(operation)
+        presentation.cancel()
+        #expect(await presentation.value == nil)
+        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.pendingRoute == nil)
+    }
+
+    @Test func coveredAttemptCannotSupersedeAnAwakenedTopSpaceRequest() async throws {
+        let owner = RootRouter()
+        _ = WithRouter(routes: RootRouteMap {
+            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+        } highPriority: {
+            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
+                Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
+            }
+        }, router: owner) { EmptyView() }
+        await owner.current.present(LoginRoute())
+        let high = try #require(owner.engine.spaces.highSpace)
+        let operation = owner.engine.beginNavigationOperation()
+        let origin = RouteRequestOrigin(scope: high.root)
+        let request = Task { await owner.engine.requestRouteWhenReady(HomeDetailRoute(), origin: origin) }
+        for _ in 0..<1000 where owner.engine.pendingRoute == nil { await Task.yield() }
+        owner.engine.finishNavigationOperation(operation)
+        await owner.default.present(SettingsRoute())
+        #expect(await request.value === high.rootPath.last)
+        #expect(high.rootPath.last?.route is HomeDetailRoute)
+        #expect(owner.engine.defaultSpace.rootPath.isEmpty)
+        #expect(owner.engine.pendingRoute == nil)
+    }
+
+    @Test func unwindCompletesWhileItsFollowupIsStillResolving() async throws {
+        let owner = RootRouter()
+        _ = WithRouter(routes: RootRouteMap {
+            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+            Sheet(RouteDestination(DelayedResolutionRoute.self) { _, _ in EmptyView() })
+        }, router: owner) { EmptyView() }
+        let root = owner.default
+        await root.present(SettingsRoute())
+        let outgoing = try #require(owner.engine.defaultSpace.rootPath.last)
+        owner.engine.routeScopeDidInstallInView(outgoing)
+        var unwindFinished = false, presentationFinished = false
+        let unwind = Task {
+            let result = await owner.current.unwind(to: .root)
+            unwindFinished = true
+            return result
+        }
+        for _ in 0..<1000 where !owner.engine.isNavigating { await Task.yield() }
+        let gate = ResolutionGate()
+        let presentation = Task {
+            await root.present(DelayedResolutionRoute(gate: gate))
+            presentationFinished = true
+        }
+        for _ in 0..<1000 where owner.engine.pendingRoute == nil { await Task.yield() }
+        #expect(!unwindFinished)
+        #expect(!presentationFinished)
+        #expect(gate.resolutionCount == 0)
+        owner.engine.routeScopeDidLeaveView(outgoing)
+        await gate.waitForResolutionToStart()
+        for _ in 0..<1000 where !unwindFinished { await Task.yield() }
+        #expect(unwindFinished)
+        #expect(!presentationFinished)
+        #expect(!owner.engine.isNavigating)
+        gate.release()
+        #expect(await unwind.value)
+        await presentation.value
+        #expect(owner.engine.defaultSpace.rootPath.last?.route is DelayedResolutionRoute)
+    }
+
+    @Test func bufferedResolutionRunsInItsOriginalCallersTaskContext() async throws {
+        let owner = RootRouter()
+        _ = WithRouter(routes: RootRouteMap {
+            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+            Sheet(RouteDestination(CallerContextRoute.self) { _, _ in EmptyView() })
+        }, router: owner) { EmptyView() }
+        let root = owner.default
+        await root.present(SettingsRoute())
+        let outgoing = try #require(owner.engine.defaultSpace.rootPath.last)
+        owner.engine.routeScopeDidInstallInView(outgoing)
+        let unwind = Task {
+            await CallerContext.$name.withValue("unwind") { await owner.current.unwind(to: .root) }
+        }
+        for _ in 0..<1000 where !owner.engine.isNavigating { await Task.yield() }
+        var context: String?
+        let presentation = Task {
+            await CallerContext.$name.withValue("presentation") {
+                await root.present(CallerContextRoute { context = $0 })
+            }
+        }
+        for _ in 0..<1000 where owner.engine.pendingRoute == nil { await Task.yield() }
+        #expect(context == nil)
+        owner.engine.routeScopeDidLeaveView(outgoing)
+        #expect(await unwind.value)
+        await presentation.value
+        #expect(context == "presentation")
+    }
+
     @Test func cancellingCommittedUnwindDoesNotCancelAnUnrelatedQueuedPresentation() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
@@ -51,7 +190,7 @@ struct NavigationReadinessTests {
         #expect(owner.engine.defaultSpace.rootPath.last?.route is LoginRoute)
     }
 
-    @Test func cancellingDequeuedRequestStillCancelsItsResolution() async throws {
+    @Test func cancellingResumedRequestCancelsItsOwnResolution() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
             Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
@@ -122,6 +261,13 @@ struct NavigationReadinessTests {
             #expect(router.defaultSpace.rootPath.last?.route is DelayedResolutionRoute)
         }
     }
+
+    private func queuedRequestFixture() -> RouterEngine {
+        RouterEngine(routes: RootRouteMap {
+            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+        })
+    }
 }
 
 @MainActor
@@ -159,4 +305,17 @@ private struct DelayedResolutionRoute: Route {
     }
 
     func destination() -> some View { Text("Delayed resolution") }
+}
+
+private enum CallerContext {
+    @TaskLocal static var name = "none"
+}
+
+@MainActor
+private struct CallerContextRoute: Route {
+    let record: (String) -> Void
+    func resolveRoute() async -> RouteResolution {
+        record(CallerContext.name)
+        return .allow
+    }
 }
