@@ -91,7 +91,6 @@ struct LoginView: View {
         }
         .navigationTitle("Login")
         .navigationBarTitleDisplayMode(.inline)
-        .routing()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Probe", systemImage: "hand.tap") { presentationProbeCount += 1 }

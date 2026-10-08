@@ -147,3 +147,21 @@ Production Swift source decreases from 8,025 lines at `a4c584c` to 7,904 lines: 
 Three unchanged iOS 27 UI cases passed for retaining two pushes during native sheet dismissal, high-window replacement and continuation, and critical overlay/replacement above the high flow. Both unchanged iOS 17.5 cases passed for native Back/re-push and concurrent split targeting with local dismissal. The separately mounted macOS suite passed all five tests, including both elevated fade priorities. The complete UI matrix was not repeated.
 
 Evidence: `/tmp/departure-presentations-focused-final.log`, `/tmp/departure-presentations-release.log`, `/tmp/departure-presentations-mounted-macos.log`, `/tmp/departure-presentations-native-27.log`, and `/tmp/departure-presentations-native-17.log`. XcodeBuildMCP bundles are `test_sim_2026-10-08T16-27-56-565Z_pid58372_5ea2c8d0.xcresult` (iOS 27) and `test_sim_2026-10-08T16-31-18-308Z_pid59174_c7fb9cfd.xcresult` (iOS 17.5).
+
+## Full UI checkpoint (2026-10-08)
+
+The full UI matrix was run against library checkpoint `8ace2ee`. The first iPhone run passed 38 cases, failed one, and skipped the two expected iPad-only cases. The failure reproduced in isolation with the checkpoint unchanged: pushing login detail could not find its destination view.
+
+`LoginRoute` builds a `RoutedNavigationStack`, which already binds its root. `LoginView` also declared an explicit `.routing()`, creating two presentation owners in the same scope and correctly disabling local presentation under the single-owner rule. Removing that redundant sample modifier fixes the configuration. The failing case then passed in isolation, followed by a complete iPhone rerun. Library source and UI assertions remain unchanged.
+
+| Final check | Result |
+| --- | --- |
+| Full iPhone/iOS 27 UI suite | 39 passed, zero failures, two expected iPad-only skips. |
+| iPad/iOS 27 UI cases | Both passed, zero failures or skips. |
+| iPhone/iOS 17.5 native regressions | All five passed, zero failures or skips. |
+
+Together the iPhone and iPad runs exercise all 41 UI cases. Older-system coverage verifies native Back/re-push, replacement without a Back entry and with child-navigation cleanup, outgoing sheet-stack retention, elevated-root reset/removal followed by default presentation, and owner removal of covered high while critical remains visible. The full suite was not repeated on iOS 17.5. No source changes followed the corrected sample's successful isolated check and final matrix.
+
+Evidence: `/tmp/departure-checkpoint-full-iphone-27.log` (initial full run), `/tmp/departure-checkpoint-high-flow-baseline.log` (isolated reproduction), `/tmp/departure-checkpoint-high-flow-fixed.log` (isolated fix), `/tmp/departure-checkpoint-full-iphone-27-final.log` (full rerun), `/tmp/departure-checkpoint-ipad-27.log`, and `/tmp/departure-checkpoint-native-17.log`.
+
+Final XcodeBuildMCP result bundles are `test_sim_2026-10-08T17-02-49-496Z_pid63442_a39386f0.xcresult` (full iPhone), `test_sim_2026-10-08T17-26-10-698Z_pid66279_65ee2477.xcresult` (iPad), and `test_sim_2026-10-08T17-28-13-002Z_pid66757_29975caf.xcresult` (iOS 17.5 regressions).
