@@ -27,11 +27,11 @@ let routes = RootRouteMap {
 
 ## Install
 
-Departure requires Swift 6.3+, iOS 17+, or macOS 14+. The map API described here is under development on `zaquia/predefined-route-maps`.
+Departure requires Swift 6.3+, iOS 17+, or macOS 14+. The map API described here is available in the `v3.0.0-beta.1` prerelease.
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/mtzaquia/departure.git", branch: "zaquia/predefined-route-maps"),
+  .package(url: "https://github.com/mtzaquia/departure.git", exact: "3.0.0-beta.1"),
 ]
 ```
 
