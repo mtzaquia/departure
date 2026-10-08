@@ -52,7 +52,7 @@ import RouteDomainFixtures
         await engine.present(DomainOnlyRoute())
         let scope = try #require(engine.defaultSpace.rootPath.last)
         #expect(!scope.isInstalledInView)
-        #expect(scope.firstRouteAttachment(for: SettingsRoute.self) != nil)
+        #expect(scope.definitions.routeBinding(for: SettingsRoute.self) != nil)
     }
     @Test(arguments: [RoutePriority.high, .critical])
     func effectivePrioritySurvivesRemovalFromLiveGraph(priority: RoutePriority) async throws {

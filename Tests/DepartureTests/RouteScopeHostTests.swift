@@ -7,7 +7,7 @@ import Testing
         let engine = RouterEngine(routes: RootRouteMap { Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }) })
         engine.routeScopeDidInstallInView(engine.root)
         engine.routeScopeDidLeaveView(engine.root)
-        #expect(engine.root.firstRouteAttachment(for: HomeDetailRoute.self) != nil)
+        #expect(engine.root.definitions.routeBinding(for: HomeDetailRoute.self) != nil)
         #expect(!engine.root.isInstalledInView)
     }
     @Test func environmentUpdatesDoNotReplaceDefinitions() {
@@ -39,7 +39,7 @@ import Testing
         engine.routeScopeDidInstallInView(branch)
         engine.routeScopeDidLeaveView(branch)
         #expect(engine.root.branchScopes["tab"] === branch)
-        #expect(branch.firstRouteAttachment(for: HomeDetailRoute.self) != nil)
+        #expect(branch.definitions.routeBinding(for: HomeDetailRoute.self) != nil)
     }
     @Test func staleManagedViewTeardownKeepsReplacement() {
         let scope = RouteScope(id: "root", route: nil)

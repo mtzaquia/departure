@@ -1,6 +1,6 @@
 # Branch discovery and reveal
 
-Status: investigation and proposal. Automatic selection of a matching tab is desired. The alternative matching rules below are not accepted runtime changes.
+Status: current discovery consolidated with its existing rules retained. Automatic selection of a matching tab is desired. The alternative matching rules below remain proposals and are not accepted runtime changes.
 
 ## Intended behavior
 
@@ -12,7 +12,7 @@ This intent replaces the suggestion in audit L4 and the opening discovery decisi
 
 ## What the implementation does today
 
-[Scoped discovery](../../Sources/Departure/Router/RouteSpaces.swift) walks the requesting source's live ancestry. At a container, [attachment lookup](../../Sources/Departure/Router/RouteScope+Declarations.swift) prefers the selected branch's current local scope, its root definitions, the container's definitions, then inactive branch roots in declaration order. Conflicting declarations stop lookup.
+[Ordered discovery](../../Sources/Departure/Router/RouteSpaces.swift) walks the requesting source's live ancestry. At a container, it prefers the selected branch's current local scope, its root definitions, the container's definitions, then inactive branch roots in declaration order. Conflicting declarations stop lookup.
 
 [Accepted navigation](../../Sources/Departure/Router/Router+RouteDeclaration.swift) already separates matching from activation. It reveals enclosing branches through runtime ancestry; [append and reuse](../../Sources/Departure/Router/Router+Navigation.swift) activate the directly matched branch. Host readiness can defer insertion after selection. There is no need for a consumer to issue a separate tab-selection command.
 
@@ -40,7 +40,7 @@ Uniqueness would apply to that fallback, not to the whole map. Repeated route ty
 
 Investigate following nested **branch-root edges** during fallback. Those scopes already exist from the map and can be revealed by selecting their ancestors, without inventing route values. Preserve the boundary against searching arbitrary sibling destination history or descending through unpresented destination declarations. A declaration under `Push(Parent.destination)` requires a concrete parent route instance; knowing the child's type does not supply one.
 
-The existing matching and activation split is a useful foundation. A possible simplification is for a candidate to identify the actual declaring scope and declaration, with its required branch ancestry derived from the live tree. Evaluate that against existing presentation-owner and modal-lane rules before removing the current location/anchor distinctions. Presentation and declaration ownership can differ; changing candidate discovery must not silently change unwind planning or snapshot policy.
+The existing matching and activation split remains the foundation. The consolidation below derives branch association from the live tree while preserving distinct presentation and container anchors. Proposed changes to candidate discovery must not silently change unwind planning or snapshot policy.
 
 ## Decisions still open
 
@@ -52,3 +52,19 @@ The existing matching and activation split is a useful foundation. A possible si
 - How to ensure revealing several nested branches does not leave partial selection changes when an inner selection binding cannot represent its branch. Current ancestry activation writes outer selections before attempting inner ones; this needs a reachable public-routing regression before changing it.
 
 Priority authority, delayed coverage evaluation, equality reuse, branch-path retention, shared modal lanes, and outgoing snapshots remain the existing contracts. Selection reveals an accepted destination; it does not grant authority to a covered source or infer missing parent routes.
+
+## Ordered resolver consolidation on 2026-10-08
+
+One ordered resolver reads each candidate's immutable definitions and constructs the resolved target once. The separate ancestry lookup and branch attachment helpers, including the helper that rebuilt an existing match, are removed. Selected-destination look-forward, selected-root precedence, container precedence, declaration-order sibling fallback, explicit branch boundaries, and conflict stopping retain their existing order. Root-owned elevated entries use the same definition resolver with selected-destination look-forward disabled; they remain a separate fallback across space boundaries.
+
+The target retains both its presentation anchor and enclosing declaration/container anchor. A push declared at a branch root can discard that branch's current detail; a push declared on that detail retains it. In both cases discovery through an enclosing modal can remove the enclosing modal without discarding unrelated branch history. The target's branch association derives from its presentation anchor's ancestry relative to its container anchor, rather than storing another branch ID. Enclosing selections still validate together, while the final branch activation and host wait remain at their existing staging boundary.
+
+The resolver adds no persistent state, registry, route-address API, or scope. Equality, unwind plans, outgoing snapshots, source authority, and native readiness still operate after discovery. This pass removes **30 net production Swift lines**. Tests that inspected the removed helpers now inspect compiled definitions or the canonical resolver; no test-only lookup wrapper is retained.
+
+Public-routing regressions verify both push anchors behind an enclosing modal and a selected destination inside nested branches. The latter retains its exact detail while resolving its outer container and branch correctly. These scenarios use `RootRouter`, `WithRouter`, and public presentation requests without synthesizing destination paths.
+
+Validation: **255 package tests in 15 affected suites passed**, and the optimized Release build passed. Evidence: `/tmp/departure-ordered-resolver-focused-final.log` and `/tmp/departure-ordered-resolver-release.log`.
+
+All **five mounted macOS tests** passed, including both elevated fade priorities. Four unchanged iOS 27 UI cases passed for ancestor push replacement, automatic branch crawl and stack persistence, tab-host replacement, and split-column targeting/local dismissal. Both unchanged iOS 17.5 cases passed for automatic branch crawl and native Back/re-push. These are focused checks; the complete UI suite was not repeated after the preceding beta checkpoint. No resolver or UI-test source changed during the final native checks.
+
+Evidence: `/tmp/departure-ordered-resolver-mounted-macos.log`, `/tmp/departure-ordered-resolver-native-27.log`, and `/tmp/departure-ordered-resolver-native-17.log`. XcodeBuildMCP bundles are `test_sim_2026-10-08T20-12-30-902Z_pid99910_f8046b9c.xcresult` (iOS 27) and `test_sim_2026-10-08T20-17-18-822Z_pid3694_0f20af2c.xcresult` (iOS 17.5).

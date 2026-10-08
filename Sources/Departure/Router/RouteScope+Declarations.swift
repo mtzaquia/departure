@@ -30,48 +30,6 @@ extension RouteScope {
         definitions.routeAttachments
     }
 
-    func firstRouteAttachment(for routeType: (some Route).Type, includingOtherBranches: Bool = true, lookupStrategy: RouterEngine.ResolvedRouteTarget.LookupStrategy = .defaultRootDeclarations) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
-        guard let space else { return nil }
-        if includingOtherBranches, branchContainer != nil,
-           let branchScope = branchScopes[activeBranch],
-           let binding = branchScope.definitions.routeBinding(for: routeType) {
-            return binding.map { RouterEngine.ResolvedRouteTarget(space: space, presentingScope: branchScope, declaringScope: self, branchID: activeBranch, declaration: $0, lookupStrategy: lookupStrategy) }
-        }
-
-        if let binding = definitions.routeBinding(for: routeType) {
-            return binding.map { RouterEngine.ResolvedRouteTarget(space: space, presentingScope: self, declaringScope: branchID == nil ? self : parent ?? self, branchID: branchID, declaration: $0, lookupStrategy: lookupStrategy) }
-        }
-
-        if includingOtherBranches, branchContainer != nil {
-            for branchID in branchScopes.keys where branchID != activeBranch {
-                guard let branchScope = branchScopes[branchID],
-                      let binding = branchScope.definitions.routeBinding(for: routeType) else {
-                    continue
-                }
-
-                return binding.map { RouterEngine.ResolvedRouteTarget(space: space, presentingScope: branchScope, declaringScope: self, branchID: branchID, declaration: $0, lookupStrategy: lookupStrategy) }
-            }
-        }
-
-        return nil
-    }
-
-    func firstBranchScopeRouteAttachment(
-        for routeType: (some Route).Type,
-        in branch: AnyHashable
-    ) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
-        guard
-            let space,
-            let branchScope = branchScopes[branch]?.activeLocalScope,
-            branchScope !== branchScopes[branch],
-            let binding = branchScope.firstRouteAttachment(for: routeType)
-        else {
-            return nil
-        }
-
-        return binding.map { RouterEngine.ResolvedRouteTarget(space: space, presentingScope: branchScope, declaringScope: self, branchID: branch, declaration: $0.declaration, lookupStrategy: .defaultRootActiveBranchScope) }
-    }
-
     func attachedPresentationDeclaration(
         presentedBy host: RouteScope,
         matching presentationKind: RoutePresentationKind,

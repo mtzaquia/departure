@@ -129,10 +129,12 @@ extension RouterEngine {
         let space: RouteSpace
         let presentingScope: RouteScope
         let declaringScope: RouteScope
-        let branchID: AnyHashable?
         let declaration: AnyRouteDeclaration
         let lookupStrategy: LookupStrategy
 
+        var branchID: AnyHashable? {
+            presentingScope.ancestry.first { $0.branchID != nil && $0.parent === declaringScope }?.branchID
+        }
         var presentationPath: RoutePath { presentingScope.routePath }
         var declaringPath: RoutePath { declaringScope.routePath }
         var presentationHostID: RoutePresentationHostID? { presentingScope.presentationHostID }

@@ -28,6 +28,74 @@ import Testing
 @Suite
 struct NestedBranchLookupTests {
     @Test(arguments: [false, true])
+    func publicBranchPushBehindModalKeepsItsExactAnchor(declaredAtBranchRoot: Bool) async throws {
+        let owner = RootRouter()
+        let settings = RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }
+        _ = WithRouter(routes: RootRouteMap {
+            Sheet(RouteDestination(MessageRoute.self) { _, _ in EmptyView() })
+            Branches {
+                Branch("wallet") {
+                    if declaredAtBranchRoot { Push(settings) }
+                    Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }) {
+                        if !declaredAtBranchRoot { Push(settings) }
+                    }
+                }
+            }
+        }, router: owner) { EmptyView() }
+        let engine = owner.engine
+        let branch = try #require(engine.root.branchScopes["wallet"])
+        await owner.default.present(HomeDetailRoute())
+        let detail = try #require(branch.path.last)
+        await owner.default.present(MessageRoute())
+        let modal = try #require(engine.defaultSpace.rootPath.last)
+        let match = try #require(engine.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        #expect(match.presentingScope === (declaredAtBranchRoot ? branch : detail))
+        #expect(match.declaringScope === engine.root)
+        #expect(match.branchID == AnyHashable("wallet"))
+
+        await owner.default.present(SettingsRoute())
+        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.spaces.routePath(containing: modal) == nil)
+        #expect(branch.path.count == (declaredAtBranchRoot ? 1 : 2))
+        #expect(branch.path.last?.route is SettingsRoute)
+        #expect(branch.path.last?.presentationOrigin === match.presentingScope)
+        #expect((engine.spaces.routePath(containing: detail) != nil) == !declaredAtBranchRoot)
+    }
+
+    @Test func publicSelectedNestedDestinationKeepsItsOuterContainerAnchor() async throws {
+        let owner = RootRouter()
+        _ = WithRouter(routes: RootRouteMap {
+            Sheet(RouteDestination(MessageRoute.self) { _, _ in EmptyView() })
+            Branches {
+                Branch("outer") {
+                    Branches {
+                        Branch("inner") {
+                            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }) {
+                                Push(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+                            }
+                        }
+                    }
+                }
+            }
+        }, router: owner) { EmptyView() }
+        let engine = owner.engine
+        let outer = try #require(engine.root.branchScopes["outer"])
+        let inner = try #require(outer.branchScopes["inner"])
+        await owner.default.present(HomeDetailRoute())
+        let detail = try #require(inner.path.last)
+        await owner.default.present(MessageRoute())
+        let match = try #require(engine.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        #expect(match.presentingScope === detail)
+        #expect(match.declaringScope === engine.root)
+        #expect(match.branchID == AnyHashable("outer"))
+        await owner.default.present(SettingsRoute())
+        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(inner.path.first === detail)
+        #expect(inner.path.count == 2)
+        #expect(inner.path.last?.presentationOrigin === detail)
+    }
+
+    @Test(arguments: [false, true])
     func enclosingLocalDeclarationWinsOverLazyContainer(hasLazyDeclaration: Bool) async throws {
         let (router, outer, _) = makeNestedBranches(hasLazyDeclaration: hasLazyDeclaration)
         outer.defineTestMap(id: nil, selection: nil, definitions: [

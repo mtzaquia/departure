@@ -223,34 +223,44 @@ extension RouteSpaces {
 
     func firstDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin? = nil) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
         let origin = origin ?? RouteRequestOrigin(scope: activeSpace.currentRouteScope)
-        if let match = scopedDeclaration(including: routeType, origin: origin) { return match }
+        if let originScope = origin.resolve(in: self) {
+            for source in originScope.ancestry {
+                guard routePath(containing: source) != nil else { break }
+                if let binding = resolveDefinitions(at: source, includingBranches: origin.branches.isEmpty) { return binding }
+            }
+        }
         // The owner's entry catalog is independent of every live navigation tree.
         // Only elevated definitions are visible across the space boundary.
-        guard let binding = defaultSpace.root.firstRouteAttachment(for: routeType) else { return nil }
+        guard let binding = resolveDefinitions(at: defaultSpace.root, includingBranches: true, includingSelectedDestination: false) else { return nil }
         guard let attachment = binding.declaration else { return .conflict }
         guard attachment.declaration.priority != .default else { return nil }
         return binding
-    }
-}
 
-
-private extension RouteSpaces {
-    func scopedDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
-        guard let originScope = origin.resolve(in: self) else { return nil }
-        for source in originScope.ancestry {
-            guard let path = routePath(containing: source), let space = space(containing: path) else { break }
-            if origin.branches.isEmpty,
-               let binding = source.firstBranchScopeRouteAttachment(for: routeType, in: source.activeBranch) {
-                return binding
+        // One ordered search reads definitions without constructing intermediate matches.
+        // Explicit branch handles omit branch look-forward and sibling fallback.
+        func resolveDefinitions(at source: RouteScope, includingBranches: Bool,
+                                includingSelectedDestination: Bool = true) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
+            guard let space = source.space else { return nil }
+            let selectedRoot = source.branchScopes[source.activeBranch]
+            let selectedDestination = includingBranches && includingSelectedDestination ? selectedRoot?.activeLocalScope : nil
+            let locations = [selectedDestination !== selectedRoot ? selectedDestination : nil, source].compactMap { $0 }
+            for location in locations where location.space != nil {
+                let owners = includingBranches && location.branchContainer != nil
+                    ? [location.branchScopes[location.activeBranch], location].compactMap { $0 }
+                        + location.branchScopes.keys.filter { $0 != location.activeBranch }.compactMap { location.branchScopes[$0] }
+                    : [location]
+                for owner in owners {
+                    guard let binding = owner.definitions.routeBinding(for: routeType) else { continue }
+                    let looksForward = location !== source
+                    let presentingScope = looksForward ? location : owner
+                    let declaringScope = looksForward ? source : (owner.branchID == nil ? owner : owner.parent ?? owner)
+                    let strategy: RouterEngine.ResolvedRouteTarget.LookupStrategy = looksForward ? .defaultRootActiveBranchScope
+                        : source === defaultSpace.root ? .defaultRootDeclarations : .currentPath(spacePriority: space.priority)
+                    return binding.map { .init(space: space, presentingScope: presentingScope,
+                        declaringScope: declaringScope, declaration: $0, lookupStrategy: strategy) }
+                }
             }
-            // Plain requests can discover branch maps while climbing out of their
-            // local scope. Explicit branch handles keep their chosen search boundary.
-            if let binding = source.firstRouteAttachment(for: routeType,
-                includingOtherBranches: origin.branches.isEmpty,
-                lookupStrategy: source === defaultSpace.root ? .defaultRootDeclarations : .currentPath(spacePriority: space.priority)) {
-                return binding
-            }
+            return nil
         }
-        return nil
     }
 }

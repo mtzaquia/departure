@@ -50,7 +50,7 @@ struct MacOSPresentationTests {
 
         try #require(await waitUntil {
             router.engine.root.branchScopes["detail"]?
-                .firstRouteAttachment(for: MacOSPresentingRoute.self) != nil
+                .definitions.routeBinding(for: MacOSPresentingRoute.self) != nil
         })
         #expect(router.engine.root.definitions.routeBinding(for: MacOSPresentingRoute.self) == nil)
     }
@@ -71,14 +71,14 @@ struct MacOSPresentationTests {
         defer { window.close() }
 
         try #require(await waitUntil {
-            router.engine.root.firstRouteAttachment(for: MacOSPresentingRoute.self) != nil
+            router.engine.root.definitions.routeBinding(for: MacOSPresentingRoute.self) != nil
         })
 
         control.showsSheet = true
         try #require(await waitUntil { window.attachedSheet != nil })
 
-        #expect(router.engine.root.firstRouteAttachment(for: MacOSPresentingRoute.self) != nil)
-        #expect(router.engine.root.firstRouteAttachment(for: MacOSPresentedOnlyRoute.self) == nil)
+        #expect(router.engine.root.definitions.routeBinding(for: MacOSPresentingRoute.self) != nil)
+        #expect(router.engine.root.definitions.routeBinding(for: MacOSPresentedOnlyRoute.self) == nil)
         #expect(router.engine.root.hookBinding(
             for: .actionInterceptor(ObjectIdentifier(ContextProbeAction.self)), in: router.engine.spaces
         ) == nil)
@@ -86,7 +86,7 @@ struct MacOSPresentationTests {
 
         control.showsSheet = false
         try #require(await waitUntil { window.attachedSheet == nil })
-        #expect(router.engine.root.firstRouteAttachment(for: MacOSPresentingRoute.self) != nil)
+        #expect(router.engine.root.definitions.routeBinding(for: MacOSPresentingRoute.self) != nil)
     }
 
     @Test func replacementPreservesBranchSourceEnvironmentAndContextualDestination() async throws {

@@ -101,7 +101,7 @@ struct RouterTests {
         let teardownTask = teardownDelivery.schedule(for: lifecycleID) { engine.routeScopeDidLeaveView(home) }
         await teardownTask.value
         #expect(engine.root.branchScopes[AppTab.home] === home)
-        #expect(home.firstRouteAttachment(for: HomeDetailRoute.self) != nil)
+        #expect(home.definitions.routeBinding(for: HomeDetailRoute.self) != nil)
         #expect(engine.routePhase(for: home) == .active)
     }
 
@@ -319,7 +319,7 @@ struct RouterTests {
         engine.root.setActiveBranch(AppTab.wallet)
         #expect(selected() == .wallet)
         #expect(engine.root.branchScopes.values.flatMap(\.routeAttachments).map(\.identity) == identity)
-        #expect(engine.root.firstRouteAttachment(for: SettingsRoute.self)?.declaration?.branchID == AnyHashable(AppTab.wallet))
+        #expect(engine.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration?.branchID == AnyHashable(AppTab.wallet))
     }
 
     @Test func repeatedDuplicateRouteDeclarationsAreDisabled() {
@@ -329,7 +329,7 @@ struct RouterTests {
         }
         let engine = RouterEngine(routes: map)
         #expect(engine.root.routeAttachments.isEmpty)
-        guard case .conflict? = engine.root.firstRouteAttachment(for: SettingsRoute.self) else {
+        guard case .conflict? = engine.spaces.firstDeclaration(including: SettingsRoute.self) else {
             Issue.record("Expected a conflicting declaration")
             return
         }
@@ -362,8 +362,8 @@ struct RouterTests {
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
 
-        #expect(homeScope.firstRouteAttachment(for: HomeDetailRoute.self)?.declaration?.declaration.presentationKind == .push)
-        #expect(homeScope.firstRouteAttachment(for: SettingsRoute.self)?.declaration?.declaration.presentationKind == .sheet)
+        #expect(homeScope.definitions.routeBinding(for: HomeDetailRoute.self)?.declaration?.presentationKind == .push)
+        #expect(homeScope.definitions.routeBinding(for: SettingsRoute.self)?.declaration?.presentationKind == .sheet)
         #expect(homeScope.id == AnyHashable("home-root"))
 
         await router.requestRoute(HomeDetailRoute())
@@ -1049,7 +1049,6 @@ struct RouterTests {
             space: router.defaultSpace,
             presentingScope: homeScope,
             declaringScope: landingScope,
-            branchID: AnyHashable(AppTab.home),
             declaration: pushDeclaration,
             lookupStrategy: .currentPath(spacePriority: .default)
         )
