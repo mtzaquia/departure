@@ -23,3 +23,4 @@ Keep each specification focused on one major part of the design. Record agreed c
 5. [Independent priority spaces](005-independent-priority-spaces.md) — actual space roots, local root reset, navigation originating only from the top space, and explicit owner-level dismissal.
 6. [Navigation operations](006-navigation-operations.md) — one owner for each transition's plan, outgoing projections, native waits, and pending presentation, with global request sequencing.
 7. [Behavioral audit](007-behavioral-audit.md) — discovery, equality, command authority, branches, priorities, unwinds, resolution, buffering, hooks, actions, configuration errors, and native hosting, with open decisions separated from current behavior.
+8. [Branch discovery and reveal](008-branch-discovery-and-reveal.md) — investigation of automatic tab selection, ambiguous branch matches, nested branch roots, and a proposed bounded matching rule.
