@@ -184,6 +184,45 @@ import Testing
         #expect(engine.root.participates(inBranch: AppTab.home))
         #expect(engine.root.participates(inBranch: AppTab.wallet))
     }
+
+    @Test(arguments: [false, true], [false, true])
+    func aScopeRejectsMultipleBranchGroupsEvenWhenTheirConcurrencyAgrees(concurrent: Bool, composed: Bool) async {
+        let feature = RouteMap {
+            Branches(concurrent: concurrent) { Branch("second") { Sheet(settings) } }
+        }
+        let engine = RouterEngine(routes: RootRouteMap {
+            Branches(concurrent: concurrent) { Branch("first") { Push(detail) } }
+            if composed { feature }
+            else { Branches(concurrent: !concurrent) { Branch("second") { Sheet(settings) } } }
+            Sheet(login)
+        })
+        guard case .conflict? = engine.root.definitions.branchContainer else {
+            Issue.record("A receiving scope must accept exactly one Branches group")
+            return
+        }
+        #expect(engine.root.branchScopes.keys.isEmpty)
+        await engine.present(HomeDetailRoute())
+        #expect(engine.defaultSpace.rootPath.isEmpty)
+        await engine.present(LoginRoute())
+        #expect(engine.defaultSpace.rootPath.last?.route is LoginRoute)
+    }
+
+    @Test func composedMapContributesOneContainerWithItsOwnConcurrency() async throws {
+        let feature = RouteMap {
+            Branches(concurrent: true) {
+                Branch("first") { Push(detail) }
+                Branch("second") { Push(settings) }
+            }
+        }
+        let engine = RouterEngine(routes: RootRouteMap { feature })
+        #expect(engine.root.isConcurrent)
+        let router = Router(engine: engine, scope: engine.root)
+        await router.branch("first").present(HomeDetailRoute())
+        await router.branch("second").present(SettingsRoute())
+        #expect(engine.root.branchScopes["first"]?.path.last?.route is HomeDetailRoute)
+        #expect(engine.root.branchScopes["second"]?.path.last?.route is SettingsRoute)
+        #expect(engine.pendingRoute == nil)
+    }
     @Test(arguments: [false, true])
     func duplicateTypeDisablesOnlyConflictingKey(reverse: Bool) async {
         let conflicting = RouteMap { Sheet(settings); Push(settings) }

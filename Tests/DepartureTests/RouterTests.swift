@@ -114,7 +114,7 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -250,12 +250,12 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -315,7 +315,7 @@ struct RouterTests {
         } })
         let identity = engine.root.branchScopes.values.flatMap(\.routeAttachments).map(\.identity)
         let (selection, selected) = tabSelection(.home)
-        engine.root.branchContainer?.selection = AnyRouteBranchSelection(selection)
+        engine.root.bindTestBranchSelection(AnyRouteBranchSelection(selection))
         engine.root.setActiveBranch(AppTab.wallet)
         #expect(selected() == .wallet)
         #expect(engine.root.branchScopes.values.flatMap(\.routeAttachments).map(\.identity) == identity)
@@ -343,7 +343,7 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
@@ -389,12 +389,12 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -435,12 +435,12 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -479,12 +479,12 @@ struct RouterTests {
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -543,7 +543,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -600,12 +600,12 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -668,12 +668,12 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -740,7 +740,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -802,7 +802,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -891,7 +891,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -950,7 +950,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -991,7 +991,7 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
@@ -1135,7 +1135,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -1187,7 +1187,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -1245,7 +1245,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) // top-level (shared) sheet
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) // branch-local sheet
                     }
@@ -1296,7 +1296,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade)) // top-level cover
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) // branch-local sheet
                     }
@@ -1386,7 +1386,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -1456,7 +1456,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -1558,12 +1558,12 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -1808,12 +1808,12 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, kind: .push)
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
@@ -2136,7 +2136,7 @@ struct RouterTests {
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -2177,7 +2177,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -2221,13 +2221,13 @@ struct RouterTests {
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                         AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -2283,13 +2283,13 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                         AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
@@ -2353,7 +2353,7 @@ struct RouterTests {
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -2391,7 +2391,7 @@ struct RouterTests {
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -2790,12 +2790,12 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -2856,12 +2856,12 @@ struct RouterTests {
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .fade))
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -3613,12 +3613,12 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -3679,12 +3679,12 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))
                     }
@@ -3737,12 +3737,12 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
@@ -3829,12 +3829,12 @@ struct RouterTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }
@@ -4063,7 +4063,7 @@ struct RouterTests {
                 RouteDeclarationBuilder.buildExpression(
                     AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                     }

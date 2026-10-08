@@ -49,6 +49,7 @@ final class RouteScope: Identifiable {
     private struct RoutingHost {
         let automatic: Bool
         let environment: EnvironmentValues
+        let selection: AnyRouteBranchSelection?
     }
     private struct WeakAttachment { weak var value: RouteScopeAttachment? }
     @ObservationIgnored private var host: Host?
@@ -104,13 +105,14 @@ final class RouteScope: Identifiable {
         case .conflict: self.id = UUID()
         case nil: break
         }
-        for branch in definitions.branches.keys where branchScopes[branch] == nil {
-            guard let definition = definitions.branches[branch]?.declaration else { continue }
-            let scope = RouteScope(id: branch, route: nil, parent: self, definitions: definition.scope)
+        guard let container = definitions.branchContainer?.declaration else { return }
+        for branch in container.branches.keys where branchScopes[branch] == nil {
+            guard let definition = container.branches[branch]?.declaration else { continue }
+            let scope = RouteScope(id: branch, route: nil, parent: self, definitions: definition)
             scope.branchID = branch
             branchScopes[branch] = scope
             if branchContainer == nil {
-                branchContainer = BranchContainerState(selectedBranch: branch, selection: nil, concurrent: definition.concurrent)
+                branchContainer = BranchContainerState(selectedBranch: branch, concurrent: container.concurrent)
             }
         }
     }
@@ -245,9 +247,9 @@ extension RouteScope {
         hosts.keys.last { hosts[$0]?.automatic == false } ?? hosts.keys.last
     }
 
-    func bindRoutingHost(_ id: RoutePresentationHostID, automatic: Bool, environment: EnvironmentValues) {
+    func bindRoutingHost(_ id: RoutePresentationHostID, automatic: Bool, environment: EnvironmentValues, selection: AnyRouteBranchSelection? = nil) {
         var hosts = routingHosts
-        hosts[id] = RoutingHost(automatic: automatic, environment: environment)
+        hosts[id] = RoutingHost(automatic: automatic, environment: environment, selection: selection)
         updateRoutingHosts(hosts)
     }
 
@@ -258,6 +260,7 @@ extension RouteScope {
     }
 
     private func updateRoutingHosts(_ hosts: OrderedStorage<RoutePresentationHostID, RoutingHost>) {
+        let previouslyConflicted = hasConflictingBranchSelection
         if selectedHost(in: hosts) != selectedHost(in: routingHosts) {
             withMutation(keyPath: \.presentationHostID) { routingHosts = hosts }
         } else {
@@ -265,6 +268,36 @@ extension RouteScope {
         }
         if let id = selectedHost(in: hosts), let host = hosts[id] {
             sourceEnvironmentReference.update(host.environment)
+        }
+        if hasConflictingBranchSelection && !previouslyConflicted {
+            log.departureWarning(
+                "Scope `\(id)` has multiple `.routing(branch:)` selection owners. "
+                    + "Keep exactly one selection binding on this container; "
+                    + "use `.routing(branchValue)` on its branch content. "
+                    + "Branch selection is disabled until only one owner remains."
+            )
+        }
+    }
+
+    // Selection ownership is a projection of routing attachments, not another registry.
+    var hasConflictingBranchSelection: Bool {
+        routingHosts.values.lazy.compactMap(\.selection).count > 1
+    }
+
+    var branchSelection: AnyRouteBranchSelection? {
+        let selections = routingHosts.values.compactMap(\.selection)
+        return selections.count == 1 ? selections.first : nil
+    }
+
+    func branchSelection(ownedBy id: RoutePresentationHostID) -> AnyRouteBranchSelection? {
+        guard !hasConflictingBranchSelection else { return nil }
+        return routingHosts[id]?.selection
+    }
+
+    func restoreBranchSelection() {
+        guard branchContainer != nil else { return }
+        for selection in routingHosts.values.compactMap(\.selection) where selection.value() != activeBranch {
+            _ = selection.setValue(activeBranch)
         }
     }
 

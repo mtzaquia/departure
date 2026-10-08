@@ -33,7 +33,6 @@ public enum RouteDeclarationBuilder {
     public static func buildExpression(_ expression: RouteMap) -> [RouteScopeDeclaration] { expression.declarations }
     public static func buildExpression(_ expression: ModalRouteMap) -> [RouteScopeDeclaration] { expression.declarations }
     public static func buildExpression(_ expression: Branches) -> [RouteScopeDeclaration] { expression.declarations }
-    public static func buildExpression<S>(_ expression: Branch<S>) -> [RouteScopeDeclaration] { expression.routeScopeDeclarations }
 }
 
 /// Builds elevated space entries. Only modal declarations can start a space;

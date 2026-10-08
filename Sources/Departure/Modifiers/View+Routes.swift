@@ -32,9 +32,10 @@ public extension View {
     }
 
     /// Connects a branch container's presentation and selection to its mapped scope.
+    /// Use exactly one selection binding per container. Its `Branch` values must
+    /// be representable by the binding's selection type.
     func routing<Selection: Hashable & Sendable>(branch selection: Binding<Selection>) -> some View {
-        modifier(BranchSelectionModifier(selection: AnyRouteBranchSelection(selection)))
-            .routing()
+        modifier(RoutingModifier(selection: AnyRouteBranchSelection(selection)))
     }
 }
 
@@ -47,6 +48,7 @@ private struct RoutingModifier: ViewModifier {
     @Environment(\.routeScope) private var scope
     @Environment(\.self) private var environment
     var automatic = false
+    var selection: AnyRouteBranchSelection?
     @State private var hostID = RoutePresentationHostID()
     @State private var attachment = RouteScopeAttachment(kind: .routing)
 
@@ -67,16 +69,30 @@ private struct RoutingModifier: ViewModifier {
                             guard let view else { return }
                             attachment.update(target: scope, view: view,
                                 apply: { scope in
-                                    scope.bindRoutingHost(hostID, automatic: automatic, environment: environment)
+                                    scope.bindRoutingHost(hostID, automatic: automatic, environment: environment, selection: selection)
+                                    if selection != nil {
+                                        // Representable updates run inside SwiftUI's view update.
+                                        // Revalidate the attachment before synchronizing on the next turn.
+                                        Task { @MainActor in
+                                            router.synchronizeBranchSelection(ownedBy: hostID, in: scope)
+                                        }
+                                    }
                                 },
                                 remove: { scope in
                                     scope.unbindRoutingHost(hostID)
+                                    if selection != nil {
+                                        Task { @MainActor in router.restoreBranchSelection(in: scope) }
+                                    }
                                 })
                         case .updated(isInstalledInWindow: false): break
                         case .dismantled, .deinitialized:
                             attachment.detach()
                         }
                     }
+            }
+            .onChange(of: selection?.value(), initial: true) { _, _ in
+                guard let scope else { return }
+                router.synchronizeBranchSelection(ownedBy: hostID, in: scope)
             }
     }
 }
@@ -102,18 +118,6 @@ private struct BranchRoutingModifier: ViewModifier {
                 }
         } else {
             content
-        }
-    }
-}
-
-private struct BranchSelectionModifier: ViewModifier {
-    let selection: AnyRouteBranchSelection
-    @RouterEnvironment private var router
-    @Environment(\.routeScope) private var scope
-    func body(content: Content) -> some View {
-        content.onChange(of: selection.value(), initial: true) { _, _ in
-            guard let scope else { return }
-            router.bindBranchSelection(selection, in: scope)
         }
     }
 }

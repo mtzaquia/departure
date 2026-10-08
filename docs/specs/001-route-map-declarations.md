@@ -124,6 +124,10 @@ The public view binding surface has three forms:
 | `.routing(AppTab.home)` | Annotate and wire branch content for the matching `Branch` in the current mapped scope. |
 | `.routing(branch: $tab)` | Connect presentation at the branch container and its selection binding to the current mapped scope. |
 
+A receiving scope accepts exactly one `Branches` group across its containing and composed maps. `Branch` expressions are accepted only inside that group. Concurrency belongs to the group, rather than individual branches or view bindings. Multiple groups diagnose and disable the branch container while retaining sibling routes.
+
+The container's selected value belongs to the model. A mounted container accepts exactly one external selection owner through `.routing(branch:)`; multiple owners diagnose and disable selection changes until one remains. An unmounted container retains its model selection and mapped discoverability. Selection callbacks belong to the existing routing attachment and leave with that attachment. Branch values must be representable by the binding's selection type; an incompatible activation diagnoses the types and leaves navigation unchanged.
+
 The branch-value form replaces the proposed `.routeBranch` spelling. The binding form applies to the container, while the value form applies to each branch's content. Neither form contributes declarations to the map.
 
 The unqualified modifier uses the current scope; it does not create another one. A branch-value modifier connects to a mapped child branch scope. Repeated wiring for the same scope must not create duplicate route scopes or competing presentation owners. Exact host reconciliation is an implementation concern.

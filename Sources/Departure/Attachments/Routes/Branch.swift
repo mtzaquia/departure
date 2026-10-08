@@ -36,11 +36,8 @@ public struct Branches: Sendable {
     let declarations: [RouteScopeDeclaration]
     /// Creates independent branch paths with optional concurrent participation.
     /// Put push, replace, sheet, and cover declarations beside this group in its map.
+    /// A receiving scope accepts exactly one group, including through composed maps.
     public init(concurrent: Bool = false, @BranchDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration]) {
-        self.declarations = declarations().map { declaration in
-            var branch = declaration
-            branch.concurrent = concurrent
-            return branch
-        }
+        self.declarations = [.init(branches: declarations(), concurrent: concurrent)]
     }
 }

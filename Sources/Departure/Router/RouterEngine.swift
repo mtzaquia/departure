@@ -152,12 +152,22 @@ extension RouterEngine {
         scope.belongs(to: spaces.activeSpace)
     }
 
-    func bindBranchSelection(_ selection: AnyRouteBranchSelection, in scope: RouteScope) {
+    func synchronizeBranchSelection(ownedBy owner: RoutePresentationHostID, in scope: RouteScope) {
+        guard spaces.routePath(containing: scope) != nil else { return }
+        guard let selection = scope.branchSelection(ownedBy: owner) else {
+            scope.restoreBranchSelection()
+            return
+        }
         guard isNavigationEligible(scope) else {
             _ = selection.setValue(scope.activeBranch)
             return
         }
         scope.bindBranchSelection(selection)
+    }
+
+    func restoreBranchSelection(in scope: RouteScope) {
+        guard spaces.routePath(containing: scope) != nil else { return }
+        scope.restoreBranchSelection()
     }
 
     func navigationSource(_ origin: RouteRequestOrigin?) -> RouteScope? {

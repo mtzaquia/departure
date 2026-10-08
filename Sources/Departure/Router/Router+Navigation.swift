@@ -352,7 +352,7 @@ extension RouterEngine {
     }
 
     func activateBranch(_ branchID: AnyHashable, in scope: RouteScope) -> Bool {
-        guard isNavigationEligible(scope) else { return false }
+        guard isNavigationEligible(scope), !scope.hasConflictingBranchSelection else { return false }
         guard scope.activeBranch != branchID else {
             log.departureDebug(.branchActivationSkipped(branch: branchID, scope: scope))
             return true

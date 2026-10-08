@@ -26,17 +26,29 @@ import SwiftUI
 // Unit scenarios compile definitions before issuing routing operations. Selection and
 // environment are explicit test inputs instead of requiring a mounted platform view.
 extension RouteScope {
-    func define(_ declarations: [RouteScopeDeclaration]) { useDefinitions(RouteDefinitions(declarations)) }
+    static let testSelectionOwner = RoutePresentationHostID()
+
+    func bindTestBranchSelection(_ selection: AnyRouteBranchSelection, concurrent: Bool? = nil) {
+        bindRoutingHost(Self.testSelectionOwner, automatic: false, environment: sourceEnvironment, selection: selection)
+        if let concurrent { branchContainer?.concurrent = concurrent }
+        bindBranchSelection(selection)
+    }
+
+    func define(_ declarations: [RouteScopeDeclaration]) {
+        // Legacy fixtures express their one container as individual branch records.
+        let branches = declarations.filter { $0.branch != nil }
+        let definitions = declarations.filter { $0.branch == nil }
+            + (branches.isEmpty ? [] : [.init(branches: branches, concurrent: false)])
+        useDefinitions(RouteDefinitions(definitions))
+    }
     @discardableResult
-    func defineTestMap(sourceID: AnyHashable = "fixture", id: AnyHashable? = nil, selection: AnyRouteBranchSelection? = nil, definitions: [RouteScopeDeclaration], environment: EnvironmentValues? = nil) -> Bool {
+    func defineTestMap(sourceID: AnyHashable = "fixture", id: AnyHashable? = nil, selection: AnyRouteBranchSelection? = nil, concurrent: Bool? = nil, definitions: [RouteScopeDeclaration], environment: EnvironmentValues? = nil) -> Bool {
         if let id { self.id = id }
         if let environment { updateSourceEnvironment(environment) }
         define(definitions)
         if let selection {
-            if branchContainer == nil { branchContainer = BranchContainerState(selectedBranch: selection.value(), selection: selection, concurrent: selection.concurrent) }
-            branchContainer?.selection = selection
-            branchContainer?.selectedBranch = selection.value()
-            branchContainer?.concurrent = selection.concurrent
+            if branchContainer == nil { branchContainer = BranchContainerState(selectedBranch: selection.value()) }
+            bindTestBranchSelection(selection, concurrent: concurrent)
         }
         return true
     }
@@ -74,6 +86,10 @@ extension RouteScope {
 }
 
 extension RouterEngine {
+    func bindTestBranchSelection(_ selection: AnyRouteBranchSelection, in scope: RouteScope) {
+        scope.bindRoutingHost(RouteScope.testSelectionOwner, automatic: false, environment: scope.sourceEnvironment, selection: selection)
+        synchronizeBranchSelection(ownedBy: RouteScope.testSelectionOwner, in: scope)
+    }
     func routeScopeDidInstallInView(_ scope: RouteScope) { hostDidAttach(scope, view: nil, id: UUID()) }
     func routeScopeDidLeaveView(_ scope: RouteScope) {
         if let id = scope.hostID { hostDidDetach(scope, id: id) }

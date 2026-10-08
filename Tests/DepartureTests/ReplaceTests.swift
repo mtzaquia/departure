@@ -34,7 +34,7 @@ struct ReplaceTests {
         #expect(!declaration.presentationKind.isModal)
         #expect(declaration.priority == .default)
         #expect(Branch("wallet") { AnyRouteDeclaration(RouteDestination(SelectedRoute.self) { route, _ in EmptyView() }, kind: .replace) }
-            .routeScopeDeclarations[0].children[0].routes[0].presentationKind == .replace)
+            .declarations[0].routes[0].presentationKind == .replace)
     }
 
     @Test(arguments: [true, false], [true, false])
@@ -319,7 +319,7 @@ private struct ReplaceFixture {
         let engine = owner.engine
         @Bindable var selection = selection
         engine.root.defineTestMap(id: nil,
-            selection: AnyRouteBranchSelection($selection.value, concurrent: concurrent),
+            selection: AnyRouteBranchSelection($selection.value), concurrent: concurrent,
             definitions: Branch("sidebar") { AnyRouteDeclaration(RouteDestination(SiblingRoute.self) { route, _ in EmptyView() }, kind: .push) }.routeScopeDeclarations
                 + Branch("wallet") { AnyRouteDeclaration(RouteDestination(SelectedRoute.self) { route, _ in EmptyView() }, kind: .replace) }.routeScopeDeclarations)
         sidebar = engine.root.branchScopes["sidebar"]!

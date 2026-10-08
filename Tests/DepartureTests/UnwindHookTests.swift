@@ -563,7 +563,7 @@ struct UnwindHookTests {
             id: RootRoute().id,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }

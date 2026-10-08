@@ -22,36 +22,60 @@
 
 /// Immutable definitions shared by every runtime instance of one map occurrence.
 final class RouteDefinitions: Sendable {
-    struct Branch {
-        let scope: RouteDefinitions
+    struct BranchContainer {
         let concurrent: Bool
+        let branches: OrderedStorage<AnyHashable, DeclarationBinding<RouteDefinitions>>
+
+        init(concurrent: Bool, declarations: [RouteScopeDeclaration]) {
+            self.concurrent = concurrent
+            var branches = OrderedStorage<AnyHashable, DeclarationBinding<RouteDefinitions>>()
+            for declaration in declarations {
+                guard case let .branch(branch, children) = declaration.content else {
+                    preconditionFailure("A Branches group accepts only Branch declarations.")
+                }
+                if branches[branch] == nil {
+                    branches[branch] = .declared(RouteDefinitions(children))
+                } else {
+                    branches[branch] = .conflict
+                    log.departureWarning("Conflicting branch declarations for `\(branch)`; the branch is disabled.")
+                }
+            }
+            self.branches = branches
+        }
     }
 
     static let empty = RouteDefinitions([])
     let scopeID: DeclarationBinding<AnyHashable>?
     private let routesByType: OrderedStorage<ObjectIdentifier, DeclarationBinding<AnyRouteDeclaration>>
-    let branches: OrderedStorage<AnyHashable, DeclarationBinding<Branch>>
+    let branchContainer: DeclarationBinding<BranchContainer>?
 
     init(_ declarations: [RouteScopeDeclaration], id: AnyHashable? = nil) {
         var scopeID = id.map { DeclarationBinding.declared($0) }
         var routes = OrderedStorage<ObjectIdentifier, DeclarationBinding<AnyRouteDeclaration>>()
-        var branches = OrderedStorage<AnyHashable, DeclarationBinding<Branch>>()
+        var branchContainer: DeclarationBinding<BranchContainer>?
         for declaration in declarations {
-            if let id = declaration.scopeID {
+            switch declaration.content {
+            case .scopeID(let id):
                 if scopeID == nil { scopeID = .declared(id) }
                 else {
                     scopeID = .conflict
                     log.departureWarning("A scope accepts one explicit map ID; conflicting IDs disable its unwind target.")
                 }
-            } else if let branch = declaration.branch {
-                guard branches[branch] == nil else {
-                    branches[branch] = .conflict
-                    log.departureWarning("Conflicting branch declarations for `\(branch)`; the branch is disabled.")
-                    continue
+            case let .branches(concurrent, children):
+                if branchContainer == nil {
+                    branchContainer = .declared(BranchContainer(concurrent: concurrent, declarations: children))
+                } else {
+                    branchContainer = .conflict
+                    log.departureWarning(
+                        "A scope accepts exactly one `Branches` group, including through composed RouteMaps. "
+                            + "Combine its Branch declarations in one group and set `concurrent` there. "
+                            + "Conflicting groups disable this scope's branch container."
+                    )
                 }
-                branches[branch] = .declared(Branch(scope: RouteDefinitions(declaration.children), concurrent: declaration.concurrent))
-            } else {
-                for route in declaration.routes {
+            case .branch:
+                preconditionFailure("Declare Branch values inside one Branches group.")
+            case .routes(let declarations):
+                for route in declarations {
                     let type = ObjectIdentifier(route.routeType)
                     guard routes[type] == nil else {
                         routes[type] = .conflict
@@ -64,7 +88,7 @@ final class RouteDefinitions: Sendable {
         }
         routesByType = routes
         self.scopeID = scopeID
-        self.branches = branches
+        self.branchContainer = branchContainer
     }
 
     var routeAttachments: [AnyRouteDeclaration] { routesByType.values.compactMap(\.declaration) }

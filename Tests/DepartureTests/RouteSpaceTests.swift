@@ -80,7 +80,7 @@ struct RouteSpaceTests {
         let wallet = try #require(engine.root.branchScopes[AppTab.wallet])
         let (selection, _) = tabSelection(.home)
         let binding = AnyRouteBranchSelection(selection)
-        engine.root.bindBranchSelection(binding)
+        engine.bindTestBranchSelection(binding, in: engine.root)
         let changes = ObservationCount()
         withObservationTracking {
             #expect(engine.activeRouteScopeID == ObjectIdentifier(home))
@@ -88,7 +88,7 @@ struct RouteSpaceTests {
             MainActor.assumeIsolated { changes.value += 1 }
         }
         // A native refresh with the same selection must not invalidate its own projection.
-        engine.root.bindBranchSelection(binding)
+        engine.bindTestBranchSelection(binding, in: engine.root)
         #expect(changes.value == 0)
         #expect(engine.root.setActiveBranch(AppTab.wallet))
         #expect(changes.value == 1)

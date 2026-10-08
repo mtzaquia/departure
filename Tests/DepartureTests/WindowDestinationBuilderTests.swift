@@ -314,9 +314,9 @@ struct WindowDestinationBuilderTests {
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default))
                 ),
                 RouteDeclarationBuilder.buildExpression(
-                    Branch(AppTab.home) {
+                    Branches { Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push)
-                    }
+                    } }
                 )
             ), environment: containerEnvironment)
 

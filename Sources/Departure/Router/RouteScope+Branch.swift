@@ -37,12 +37,12 @@ extension RouteScope {
 
     var activeBranch: AnyHashable {
         access(keyPath: \.branchContainer)
-        return branchContainer?.activeBranch ?? id
+        return branchContainer?.selectedBranch ?? id
     }
 
     var isConcurrent: Bool {
         access(keyPath: \.branchContainer)
-        return branchContainer?.isConcurrent == true
+        return branchContainer?.concurrent == true
     }
 
     var activeLocalScope: RouteScope {
@@ -73,23 +73,23 @@ extension RouteScope {
 extension RouteScope {
     @discardableResult
     func setActiveBranch(_ branch: AnyHashable) -> Bool {
-        var container = branchContainer ?? BranchContainerState(selectedBranch: branch, selection: nil)
-        var didSet = false
+        guard !hasConflictingBranchSelection else { return false }
+        if let selection = branchSelection, !selection.setValue(branch) { return false }
+        var container = branchContainer ?? BranchContainerState(selectedBranch: branch)
         let update = {
-            didSet = container.setActiveBranch(branch)
+            container.selectedBranch = branch
             self.branchContainer = container
         }
         if activeBranch != branch { withMutation(keyPath: \.branchContainer, update) }
         else { update() }
-        return didSet
+        return true
     }
 
     func bindBranchSelection(_ selection: AnyRouteBranchSelection) {
         guard var container = branchContainer else { return }
-        container.selection = selection
         container.selectedBranch = selection.value()
         let update = { self.branchContainer = container }
-        if activeBranch != container.activeBranch || isConcurrent != container.isConcurrent {
+        if activeBranch != container.selectedBranch {
             withMutation(keyPath: \.branchContainer, update)
         } else { update() }
     }

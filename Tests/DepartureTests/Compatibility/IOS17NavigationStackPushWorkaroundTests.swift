@@ -42,18 +42,16 @@ struct IOS17NavigationStackPushWorkaroundTests {
     @Test func pushHostIdentityChangesOnlyForConcurrentBranchSelection() {
         let router = makeRouterWithWorkaround()
         let workaround = IOS17NavigationStackPushWorkaround()
-        let (selection, _) = tabSelection(.home)
         router.root.branchContainer = BranchContainerState(
             selectedBranch: AnyHashable(AppTab.home),
-            selection: AnyRouteBranchSelection(selection, concurrent: true)
+            concurrent: true
         )
 
         #expect(workaround.pushHostIdentity(for: AppTab.home, in: router.root, router: router))
         #expect(!workaround.pushHostIdentity(for: AppTab.wallet, in: router.root, router: router))
 
         router.root.branchContainer = BranchContainerState(
-            selectedBranch: AnyHashable(AppTab.home),
-            selection: AnyRouteBranchSelection(selection)
+            selectedBranch: AnyHashable(AppTab.home)
         )
         #expect(workaround.pushHostIdentity(for: AppTab.wallet, in: router.root, router: router))
     }
@@ -221,12 +219,12 @@ struct IOS17NavigationStackPushWorkaroundTests {
             id: nil,
             selection: AnyRouteBranchSelection(selection),
             definitions: RouteDeclarationBuilder.buildBlock(
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
                         AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }
                 ),
-                RouteDeclarationBuilder.buildExpression(
+                BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
                         AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, kind: .push)
                     }

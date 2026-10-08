@@ -32,6 +32,9 @@ A shared modal level within a space, with capacity for one outgoing modal. That 
 **Branch (Z)**:
 An independently retained sub-path owned by a branch container; its lifetime is bounded by that container's membership in navigation. Branches split path progression while sharing the enclosing modal lane.
 
+**Branch container**:
+One `Branches` group at a mapped scope, with one concurrency setting and one model-owned selected value. Its mounted view may connect exactly one selection binding owner. Composition contributes to the receiving scope and cannot add a second container there.
+
 **Scope**:
 A particular routing position with its own definition context and enclosing navigation ancestry. A root, branch root, or live destination can establish a scope.
 

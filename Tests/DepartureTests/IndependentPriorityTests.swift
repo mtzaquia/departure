@@ -183,7 +183,7 @@ struct IndependentPriorityTests {
         let rootRouter = owner.current
         let selection = SpaceBranchSelection()
         let binding = AnyRouteBranchSelection(Binding(get: { selection.value }, set: { selection.value = $0 }))
-        owner.engine.bindBranchSelection(binding, in: high.root)
+        owner.engine.bindTestBranchSelection(binding, in: high.root)
         await rootRouter.branch("other").present(HighModal())
         for _ in 0..<1000 where owner.engine.pendingRoute != nil { await Task.yield() }
         let other = try #require(high.root.branchScopes["other"])
@@ -195,7 +195,7 @@ struct IndependentPriorityTests {
         #expect(other.path.last === inactivePush)
         await owner.current.present(CriticalEntry())
         selection.value = "other"
-        owner.engine.bindBranchSelection(binding, in: high.root)
+        owner.engine.bindTestBranchSelection(binding, in: high.root)
         #expect(selection.value == "main")
         #expect(high.root.activeBranch == AnyHashable("main"))
         await rootRouter.branch("other").present(HighModal())

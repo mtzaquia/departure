@@ -4,6 +4,8 @@
 
 A branch owns an independent navigation path. `Branches(concurrent:)` declares whether one branch or several branches participate at once; all branches share their enclosing modal lane.
 
+A scope accepts exactly one `Branches` group, including through composed `RouteMap` values. Declare `Branch` values inside that group. To compose features, put their maps inside the corresponding `Branch` builders. Multiple groups report a diagnostic and disable that scope's branch container; sibling route declarations remain available.
+
 ## Map tabs and connect selection
 
 ```swift
@@ -32,6 +34,10 @@ struct RootView: View {
 ```
 
 `WithRouter(routes: routes) { RootView() }` seeds the scope. `.routing(branchValue)` enters its mapped branch and binds presentation. `.routing(branch: binding)` connects the container's presentation and selection to its existing mapped scope; a separate `.routing()` is unnecessary. `Branches` defaults to exclusive participation and the first declared branch supplies the initial selection when there is no binding.
+
+The model owns one selected value. When connected to a view, the container accepts exactly one `.routing(branch:)` binding owner. Multiple owners report a diagnostic, retain the current selection, and disable selection changes until one remains. Removing a binding retains the model's selection and branch history. Once the scope leaves the live tree, outgoing attachments cannot synchronize or restore its bindings. Plain `.routing()` hosts and branch-content `.routing(branchValue)` modifiers do not own the container's selection.
+
+Use branch values representable by the binding's selection type. For example, enum branch values should use a binding to that enum rather than to strings. An incompatible write reports the branch value and both types, rejects activation, and leaves navigation unchanged. Optional bindings can represent their corresponding nonoptional branch values.
 
 Definitions outside `Branch` belong to the enclosing container. Route builders can contain further branch maps, allowing nested containers without a view registration step.
 

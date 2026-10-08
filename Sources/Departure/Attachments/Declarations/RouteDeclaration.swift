@@ -114,25 +114,37 @@ public enum RoutePriority: Int, Comparable, Hashable, Sendable {
 
 /// A declaration group in a map. Branch groups preserve their own child definitions.
 public struct RouteScopeDeclaration: Sendable, Hashable {
-    let scopeID: AnyHashable?
-    let branch: AnyHashable?
-    let routes: [AnyRouteDeclaration]
-    let children: [RouteScopeDeclaration]
-    var concurrent: Bool
-    init(routes: [AnyRouteDeclaration]) {
-        scopeID = nil; branch = nil; self.routes = routes; children = []; concurrent = false
+    enum Content: Sendable, Hashable {
+        case scopeID(AnyHashable)
+        case routes([AnyRouteDeclaration])
+        case branch(AnyHashable, children: [RouteScopeDeclaration])
+        case branches(concurrent: Bool, children: [RouteScopeDeclaration])
     }
-    init<Selection: Hashable>(branch: Selection, children: [RouteScopeDeclaration], concurrent: Bool = false) {
-        scopeID = nil
-        self.branch = AnyHashable(branch)
-        routes = []; self.children = children; self.concurrent = concurrent
+    let content: Content
+    var branch: AnyHashable? {
+        if case let .branch(value, _) = content { return value }
+        return nil
+    }
+    var routes: [AnyRouteDeclaration] {
+        if case let .routes(routes) = content { return routes }
+        return []
+    }
+    init(routes: [AnyRouteDeclaration]) {
+        content = .routes(routes)
+    }
+    init<Selection: Hashable>(branch: Selection, children: [RouteScopeDeclaration]) {
+        content = .branch(AnyHashable(branch), children: children)
+    }
+    init(branches: [RouteScopeDeclaration], concurrent: Bool) {
+        content = .branches(concurrent: concurrent, children: branches)
     }
     init(scopeID: AnyHashable) {
-        self.scopeID = scopeID
-        branch = nil; routes = []; children = []; concurrent = false
+        content = .scopeID(scopeID)
     }
     func withPriority(_ priority: RoutePriority) -> Self {
-        precondition(branch == nil, "Root priority builders cannot contain branches.")
+        guard case let .routes(routes) = content else {
+            preconditionFailure("Root priority builders accept only modal route declarations.")
+        }
         return Self(routes: routes.map { $0.withPriority(priority) })
     }
 }

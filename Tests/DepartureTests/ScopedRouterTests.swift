@@ -168,7 +168,7 @@ struct ScopedRouterTests {
         let engine = router.engine!
         @Bindable var selection = PaneSelection()
         engine.root.defineTestMap(id: nil,
-            selection: AnyRouteBranchSelection($selection.value, concurrent: true),
+            selection: AnyRouteBranchSelection($selection.value), concurrent: true,
             definitions: [RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(ScopedLoginRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))._routeDeclarations)]
                 + Branch("sidebar") { AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, kind: .push) }.routeScopeDeclarations
                 + Branch("detail") { AnyRouteDeclaration(RouteDestination(ScopedGuardedRoute.self) { route, _ in EmptyView() }, kind: .push) }.routeScopeDeclarations)
@@ -275,8 +275,8 @@ struct ScopedRouterTests {
             }
         })
         let selection = PaneSelection()
-        engine.root.branchContainer?.selection = AnyRouteBranchSelection(
-            Binding(get: { selection.value }, set: { selection.value = $0 }), concurrent: concurrent)
+        engine.root.bindTestBranchSelection(AnyRouteBranchSelection(
+            Binding(get: { selection.value }, set: { selection.value = $0 })))
         let detail = try #require(engine.root.branchScopes["detail"])
         let root = Router(engine: engine, scope: engine.root)
         let router = explicit ? root.branch("detail") : Router(engine: engine, scope: engine.root.branchScopes["sidebar"]!)
@@ -413,7 +413,7 @@ struct ScopedRouterTests {
     @Test func detachedModalRouterFindsItsDeclaringAncestor() async throws {
         let fixture = Fixture(concurrent: true)
         fixture.engine.root.defineTestMap(id: nil,
-            selection: AnyRouteBranchSelection(Binding.constant("sidebar"), concurrent: true),
+            selection: AnyRouteBranchSelection(Binding.constant("sidebar")), concurrent: true,
             definitions: [RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LockRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .high, transition: .slide))._routeDeclarations)])
         await fixture.root.present(LockRoute())
         let modal = try #require(fixture.engine.currentRouteScope.route is LockRoute ? fixture.engine.currentRouteScope : nil)
@@ -435,7 +435,7 @@ struct ScopedRouterTests {
         await root.present(RootRoute())
         let modal = try #require(engine.defaultSpace.rootPath.last)
         modal.defineTestMap(id: nil,
-            selection: AnyRouteBranchSelection(Binding.constant("a"), concurrent: true),
+            selection: AnyRouteBranchSelection(Binding.constant("a")), concurrent: true,
             definitions: Branch("a") { AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, kind: .push) }.routeScopeDeclarations
                 + Branch("b") { AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push) }.routeScopeDeclarations)
         let a = RouteScope(id: "a", route: nil)
@@ -471,7 +471,7 @@ private struct Fixture {
     init(concurrent: Bool) {
         @Bindable var selection = selection
         engine.root.defineTestMap(id: nil,
-            selection: AnyRouteBranchSelection($selection.value, concurrent: concurrent),
+            selection: AnyRouteBranchSelection($selection.value),
             definitions:
                 Branch("sidebar") { AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, kind: .push) }.routeScopeDeclarations
                 + Branch("content") { AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, kind: .push); AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, kind: .sheet(priority: .default)) }.routeScopeDeclarations
@@ -481,6 +481,7 @@ private struct Fixture {
                     AnyRouteDeclaration(RouteDestination(DroppedRoute.self) { route, _ in EmptyView() }, kind: .push)
                     AnyRouteDeclaration(RouteDestination(MessageRoute.self) { route, _ in EmptyView() }, kind: .cover(priority: .default, transition: .slide))
                 }.routeScopeDeclarations)
+        engine.root.branchContainer?.concurrent = concurrent
         engine.mutateRouteGraph {
             engine.root.attachTestBranch(sidebar, for: "sidebar")
             engine.root.attachTestBranch(content, for: "content")
@@ -490,8 +491,8 @@ private struct Fixture {
 
     func select(_ value: String) {
         selection.value = value
-        if let binding = engine.root.branchContainer?.selection {
-            engine.bindBranchSelection(binding, in: engine.root)
+        if let binding = engine.root.branchSelection {
+            engine.bindTestBranchSelection(binding, in: engine.root)
         }
     }
 
