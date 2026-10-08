@@ -49,6 +49,56 @@ import Testing
 @MainActor
 @Suite
 struct UnwindHookTests {
+    @Test(arguments: [UnwindSource.explicit, .native, .repeatedNative, .repeatedExplicit])
+    func nativeAndExplicitUnwindsEnterHandlerBeforeCommitAndDeferPresentation(native: UnwindSource) async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+            Push(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+        })
+        let root = Router(engine: engine, scope: engine.root)
+        await root.present(LoginRoute())
+        let source = try #require(engine.normalSpace.rootPath.last)
+        engine.routeScopeDidInstallInView(source)
+        let recorder = UnwindRecorder()
+        engine.root.installHookDeclarations(hookDeclarations: [
+            UnwindHandler(LoginRoute.self) {
+                #expect(engine.spaces.routePath(containing: source) != nil)
+                #expect(engine.normalSpace.rootPath.last === source)
+                #expect(engine.isNavigating)
+                recorder.events.append("handler")
+                await root.present(SettingsRoute())
+                recorder.events.append("presented")
+            }.declaration,
+        ])
+
+        let unwind = Task {
+            if native == .native || native == .repeatedNative {
+                let binding = engine.routePresentationBinding(from: engine.root, matching: .sheet)
+                binding.wrappedValue = nil
+                if native == .repeatedNative { binding.wrappedValue = nil }
+            } else if native == .repeatedExplicit {
+                let scoped = Router(engine: engine, scope: source)
+                async let first = scoped.unwind(to: .topmostAncestor)
+                async let second = scoped.unwind(to: .topmostAncestor)
+                let results = await (first, second)
+                #expect(results.0 || results.1)
+            } else {
+                #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor))
+            }
+        }
+        await waitUntil { engine.normalSpace.rootPath.isEmpty && recorder.events == ["handler"] }
+        #expect(engine.normalSpace.rootPath.isEmpty)
+        #expect(recorder.events == ["handler"])
+        #expect(engine.isNavigating)
+        #expect(engine.pendingRoute != nil)
+
+        engine.routeScopeDidLeaveView(source)
+        await unwind.value
+        await recorder.waitForEventCount(2)
+        #expect(recorder.events == ["handler", "presented"])
+        #expect(engine.normalSpace.rootPath.last?.route is SettingsRoute)
+    }
+
     @Test func ancestorHandlerFiresWhenUnwindLandsOnDescendantScope() async {
         let router = RouterEngine()
         let recorder = UnwindRecorder()
@@ -729,6 +779,7 @@ struct UnwindHookTests {
 
         router.routePresentationBinding(from: parentScope, matching: .sheet).wrappedValue = nil
         await recorder.waitForEventCount(1)
+        await waitUntil { router.normalSpace.rootPath.scopes.count == 1 }
 
         #expect(router.normalSpace.rootPath.scopes.count == 1)
         #expect(router.normalSpace.rootPath.scopes.first === parentScope)
@@ -837,7 +888,7 @@ struct UnwindHookTests {
             targetScopeID: parentScope.id
         )
         router.deliveredUnwindHandlers[collidingKey] = RouterEngine.DeliveredUnwindHandler(
-            sourceScope: staleSourceScope
+            sourceScope: staleSourceScope, entry: Task {}
         )
         staleSourceScope = nil
 
@@ -920,6 +971,8 @@ struct UnwindHookTests {
         #expect(recorder.events.isEmpty)
     }
 }
+
+enum UnwindSource: Sendable { case explicit, native, repeatedNative, repeatedExplicit }
 
 @MainActor
 private final class UnwindRecorder {

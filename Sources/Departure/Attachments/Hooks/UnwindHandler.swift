@@ -26,9 +26,10 @@
 /// captured route-scope dismissal, or with ``Router/unwind(to:)`` and
 /// ``Router/unwind(to:payload:)`` for explicit router-level targets.
 ///
-/// The handler runs after the unwind request is accepted. The router does not wait for the handler
-/// body to finish before continuing the unwind. If the handler presents another route, that request
-/// is deferred until the active navigation has finished.
+/// Native and explicit unwinds enter the handler after acceptance and before the
+/// path changes. The router continues once the handler suspends; it does not wait
+/// for the asynchronous body to finish. A presentation requested by the handler
+/// waits until the active navigation has finished.
 ///
 /// ```swift
 /// .hooks {
@@ -44,7 +45,7 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
     ///
     /// If this handler matches an ``UnwindRouteAction/callAsFunction(payload:)`` or
     /// ``Router/unwind(to:payload:)`` request, `handle` is scheduled when the unwind is accepted.
-    /// The router does not wait for `handle` to return.
+    /// Delivery starts before the path changes. The router does not wait for `handle` to return.
     public init<Payload>(
         _ routeType: R.Type,
         expecting payloadType: Payload.Type,
@@ -74,6 +75,7 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
     ///
     /// If this handler matches an ``UnwindRouteAction/callAsFunction()`` or
     /// ``Router/unwind(to:)`` request, `handle` is scheduled when the unwind is accepted.
+    /// Native dismissal uses the same before-commit timing.
     public init(
         _ routeType: R.Type,
         handle: @escaping @MainActor @Sendable () async -> Void

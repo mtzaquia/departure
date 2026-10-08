@@ -30,6 +30,7 @@ extension RouterEngine {
 
     struct DeliveredUnwindHandler {
         weak var sourceScope: RouteScope?
+        let entry: Task<Void, Never>
     }
 
     @discardableResult
@@ -68,7 +69,7 @@ extension RouterEngine {
                 for: sourceScope,
                 payload: payload,
                 in: space.root,
-                plan: plan
+                operation: beginNavigationOperation(plan: plan)
             )
         }
 
@@ -116,7 +117,7 @@ extension RouterEngine {
                 for: sourceScope,
                 payload: payload,
                 in: targetScope,
-                plan: plan
+                operation: beginNavigationOperation(plan: plan)
             )
 
         case let .keepPathThrough(targetPosition):
@@ -136,7 +137,7 @@ extension RouterEngine {
                 for: sourceScope,
                 payload: payload,
                 in: targetScope,
-                plan: plan
+                operation: beginNavigationOperation(plan: plan)
             )
         }
     }
@@ -178,7 +179,7 @@ extension RouterEngine {
             for: sourceScope,
             payload: payload,
             in: targetScope,
-            plan: plan
+            operation: beginNavigationOperation(plan: plan)
         )
     }
 
@@ -275,7 +276,7 @@ extension RouterEngine {
             if let current = path.scope(at: position)?.route { log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: current)) }
             return true
         }
-        await performPlannedUnwind(for: plan.removedScopes.last, payload: nil, in: path.scope(at: position), plan: plan,
+        await performPlannedUnwind(for: plan.removedScopes.last, payload: nil, in: path.scope(at: position), operation: beginNavigationOperation(plan: plan),
             preservesModalPresentationBindings: false, logsCompletion: false)
         return true
     }
@@ -609,23 +610,26 @@ extension RouterEngine {
         for sourceScope: RouteScope?,
         payload: Any?,
         in targetScope: RouteScope?,
-        plan: RouteSpaces.UnwindPlan,
+        operation: NavigationOperation,
         preservesModalPresentationBindings: Bool = true,
         logsCompletion: Bool = true
     ) async -> Bool {
-        let operation = beginNavigationOperation(plan: plan)
-        await deliverUnwindHandlers(for: sourceScope, payload: payload, in: targetScope, removing: plan.removedScopes)
+        await deliverUnwindHandlers(for: sourceScope, payload: payload, in: targetScope, removing: operation.removedScopes)
         guard sourceScope.map(isNavigationEligible) ?? true, !Task.isCancelled else {
             await finishNavigationOperation(operation)
             return false
         }
         commitNavigationOperation(operation, preservesModalPresentationBindings: preservesModalPresentationBindings)
+        await completeUnwindOperation(operation, logsCompletion: logsCompletion)
+        return true
+    }
+
+    private func completeUnwindOperation(_ operation: NavigationOperation, logsCompletion: Bool) async {
         await waitForNavigationOperation(operation)
         if logsCompletion {
             log.departureDebug(.unwindCompleted(path: spaces.activeSpace.currentRoutePath.departureDebugPathDescription))
         }
         await finishNavigationOperation(operation)
-        return true
     }
 
     @discardableResult
@@ -791,16 +795,24 @@ extension RouterEngine {
             sourceScopeID: ObjectIdentifier(sourceScope),
             targetScopeID: match.scope.id
         )
-        guard deliveredUnwindHandlers[key] == nil else {
+        if let delivery = deliveredUnwindHandlers[key] {
+            await delivery.entry.value
             return
         }
-        deliveredUnwindHandlers[key] = DeliveredUnwindHandler(sourceScope: sourceScope)
 
-        Task { @MainActor in
-            guard self.spaces.routePath(containing: match.scope) != nil else { return }
-            await match.handler.invoke(sourceRoute, payload, match.scope.id)
+        let entry = Task { @MainActor in
+            await withCheckedContinuation { started in
+                Task { @MainActor in
+                    // The callback enters before the entry task resumes. Every
+                    // unwind sharing this delivery waits for that same boundary.
+                    started.resume()
+                    guard self.spaces.routePath(containing: match.scope) != nil else { return }
+                    await match.handler.invoke(sourceRoute, payload, match.scope.id)
+                }
+            }
         }
-        await Task.yield()
+        deliveredUnwindHandlers[key] = DeliveredUnwindHandler(sourceScope: sourceScope, entry: entry)
+        await entry.value
     }
 
     func beginNavigationOperation(plan: RouteSpaces.UnwindPlan? = nil,
@@ -887,12 +899,17 @@ extension RouterEngine {
     func performPresentationDismissalUnwind(for sourceScope: RouteScope?, in targetScope: RouteScope?, plan: RouteSpaces.UnwindPlan) {
         guard !plan.removedScopes.isEmpty else { applyUnwindPlan(plan); return }
         let operation = beginNavigationOperation(plan: plan)
-        // Native binding write-back must change live state in this call stack.
-        commitNavigationOperation(operation)
+        // Without a callback, native write-back can commit in this call stack.
+        // With a callback, use the same before-commit boundary as explicit unwind.
+        guard let route = sourceScope?.route,
+              targetScope?.firstUnwindHandlerMatch(for: type(of: route), in: spaces) != nil else {
+            commitNavigationOperation(operation)
+            Task { @MainActor in await completeUnwindOperation(operation, logsCompletion: false) }
+            return
+        }
         Task { @MainActor in
-            await deliverUnwindHandlers(for: sourceScope, payload: nil, in: targetScope, removing: operation.removedScopes)
-            await waitForNavigationOperation(operation)
-            await finishNavigationOperation(operation)
+            await performPlannedUnwind(for: sourceScope, payload: nil, in: targetScope,
+                operation: operation)
         }
     }
 

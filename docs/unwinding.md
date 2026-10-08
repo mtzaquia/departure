@@ -64,6 +64,8 @@ await unwindRoute(payload: SaveResult.saved)
 
 SwiftUI’s `dismiss()` follows the same payload-free unwind path and triggers a matching handler.
 
+Native and explicit unwinds enter the matching handler before committing the path change, while the outgoing source is still live. The handler may start asynchronous work; the unwind continues once it suspends and does not wait for that work to finish. A presentation requested by the handler waits for unwind completion and then rechecks its captured source and the normal routing rules.
+
 Handlers are found from the surviving landing scope toward its space root. An outgoing scope stops participating when it leaves navigation, even if its view is retained for dismissal. Distinct hook types compose across `.hooks` modifiers in the same scope; duplicate handlers for one route type disable that handler and report a diagnostic. An ambiguous handler does not fall back to an ancestor's handler.
 
 Next: [Branches](branches.md)
