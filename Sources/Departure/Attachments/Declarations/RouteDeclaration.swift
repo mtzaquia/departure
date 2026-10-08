@@ -152,9 +152,3 @@ public struct RouteScopeDeclaration: Sendable, Hashable {
 public protocol RouteDeclaration {
     var _routeDeclarations: [AnyRouteDeclaration] { get }
 }
-
-extension [RouteScopeDeclaration] {
-    func containsPresentationKind(_ kind: RoutePresentationKind) -> Bool {
-        flatMap(\.routes).contains { $0.presentationKind == kind }
-    }
-}

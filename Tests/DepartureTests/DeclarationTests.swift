@@ -55,8 +55,10 @@ import Testing
         let engine = RouterEngine(routes: RootRouteMap {} highPriority: { entries }
             criticalPriority: { ModalRouteMap { Sheet(alert) } })
         #expect(engine.root.routeAttachments.map(\.priority) == [.high, .high, .critical])
+        #expect(engine.root.definitions.presentationStyles == [.cover(.slide), .sheet])
         let children = engine.root.firstRouteAttachment(for: LoginRoute.self)?.declaration?.declaration.childScope
         #expect(children?.routeBinding(for: HomeDetailRoute.self)?.declaration?.priority == .default)
+        #expect(children?.presentationStyles == [.push])
         #expect(engine.root.branchScopes.keys.isEmpty)
     }
 
@@ -173,6 +175,8 @@ import Testing
             Branches { Branch(AppTab.home) { Push(detail) }; Branch(AppTab.wallet) { Sheet(settings) } }
         })
         let wallet = try #require(engine.root.branchScopes[AppTab.wallet])
+        #expect(engine.root.definitions.presentationStyles.isEmpty)
+        #expect(wallet.definitions.presentationStyles == [.sheet])
         #expect(wallet.routeAttachments.count == 1)
         #expect(!wallet.isInstalledInView)
         #expect(wallet.firstRouteAttachment(for: SettingsRoute.self) != nil)
@@ -233,6 +237,7 @@ import Testing
         })
         let router = Router(engine: engine, scope: engine.root)
         #expect(engine.root.routeAttachments.count == 1)
+        #expect(engine.root.definitions.presentationStyles == [.push])
         guard case .conflict? = engine.root.firstRouteAttachment(for: SettingsRoute.self) else {
             Issue.record("A conflicting route key must remain a lookup barrier")
             return

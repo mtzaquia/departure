@@ -57,12 +57,12 @@ private struct RoutingModifier: ViewModifier {
         let pushHostIdentity = scope?.branchID.map {
             router.ios17NavigationStackPushWorkaround?.pushHostIdentity(for: $0, in: scope?.parent, router: router) ?? true
         } ?? true
-        let declarations = scope.map { [RouteScopeDeclaration(routes: $0.routeAttachments)] } ?? []
+        let styles = owns ? scope?.definitions.presentationStyles ?? [] : []
         content
-            .modifier(ReplacePresentationStyleModifier(presentationHostID: hostID, isEnabled: owns && declarations.containsPresentationKind(.replace)))
+            .modifier(ReplacePresentationStyleModifier(presentationHostID: hostID, isEnabled: styles.contains(.replace)))
             .background {
                 Color.clear.frame(width: 0, height: 0)
-                    .routePresentationStyleModifiers(for: owns ? declarations : [], hostedBy: hostID, pushHostIdentity: pushHostIdentity)
+                    .routePresentationStyleModifiers(for: styles, hostedBy: hostID, pushHostIdentity: pushHostIdentity)
                     .onLifecycleEvent { view, _, event in
                         switch event {
                         case .installedInWindow, .updated(isInstalledInWindow: true):

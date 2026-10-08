@@ -48,6 +48,7 @@ final class RouteDefinitions: Sendable {
     let scopeID: DeclarationBinding<AnyHashable>?
     private let routesByType: OrderedStorage<ObjectIdentifier, DeclarationBinding<AnyRouteDeclaration>>
     let branchContainer: DeclarationBinding<BranchContainer>?
+    let presentationStyles: Set<RoutePresentationKind>
 
     init(_ declarations: [RouteScopeDeclaration], id: AnyHashable? = nil) {
         var scopeID = id.map { DeclarationBinding.declared($0) }
@@ -87,6 +88,7 @@ final class RouteDefinitions: Sendable {
             }
         }
         routesByType = routes
+        presentationStyles = Set(routes.values.compactMap { $0.declaration?.presentationKind })
         self.scopeID = scopeID
         self.branchContainer = branchContainer
     }
