@@ -23,13 +23,15 @@
 import Foundation
 
 extension RouterEngine {
-    func requestRoute(_ route: some Route, origin: RouteRequestOrigin? = nil) async {
+    // Return the matched space so action retry cannot acquire an unrelated
+    // foreground space's authority after resolution or queued work is rejected.
+    @discardableResult
+    func requestRoute(_ route: some Route, origin: RouteRequestOrigin? = nil) async -> RouteSpace? {
         #if DEBUG
         guard DepartureLogTrace.id != nil else {
-            await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "r")) {
+            return await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "r")) {
                 await requestRoute(route, origin: origin)
             }
-            return
         }
         #endif
 
@@ -37,51 +39,52 @@ extension RouterEngine {
         log.departureDebug(.routeRequested(route: route))
 
         let resolvedRoute = await resolveRouteChain(startingWith: route)
-        guard let resolvedRoute else { return }
+        guard let resolvedRoute else { return nil }
 
         // Resolution can suspend while another command starts an unwind. Re-enter the
         // readiness gate without evaluating the resolved route a second time.
-        await requestRouteWhenReady(resolvedRoute, stage: .presentResolved, origin: origin)
+        return await requestRouteWhenReady(resolvedRoute, stage: .presentResolved, origin: origin)
     }
 
-    func presentResolvedRoute(_ resolvedRoute: any Route, origin: RouteRequestOrigin? = nil) async {
+    @discardableResult
+    func presentResolvedRoute(_ resolvedRoute: any Route, origin: RouteRequestOrigin? = nil) async -> RouteSpace? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
-        guard navigationSource(origin) != nil, !Task.isCancelled else { return }
+        guard let source = navigationSource(origin), !Task.isCancelled else { return nil }
         switch transitionPlan(for: resolvedRoute, origin: origin) {
         case .noOp(let currentRoute):
-            guard activateOrigin(origin) else { return }
+            guard activateOrigin(origin) else { return nil }
             log.departureDebug(.routeNoOpEquivalent(route: resolvedRoute, currentRoute: currentRoute))
-            return
+            return source.space
 
         case .dropNoDeclaration(let routeType):
             log.departureWarning(.routeDroppedNoDeclaration(routeType: routeType))
-            return
+            return nil
 
         case .dropConflictingDeclaration(let routeType):
             log.departureWarning("Route `\(routeType)` was ignored because its declarations conflict.")
-            return
+            return nil
 
         case .dropBlockedByElevatedPriority(let match):
             logMatchedRoute(resolvedRoute, to: match)
             log.departureDebug(.routeBlockedByElevatedPriority(route: resolvedRoute))
-            return
+            return nil
 
         case .append(let match):
-            guard activatePresentationOwner(match) else { return }
+            guard activatePresentationOwner(match) else { return nil }
             logMatchedRoute(resolvedRoute, to: match)
             log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
             await appendRoute(resolvedRoute, after: match, origin: origin)
-            return
+            return Task.isCancelled ? nil : match.space
 
         case .replaceElevatedSpace(let priority, let match):
             logMatchedRoute(resolvedRoute, to: match)
+            let existingSpace = spaces.space(for: priority)
             if await unwindToExistingEquivalentRouteInPrioritySpaceIfNeeded(resolvedRoute, priority: priority) {
-                return
+                return existingSpace
             }
 
             log.departureDebug(.routeAcceptedReplaceElevatedPriority(route: resolvedRoute))
-            await replaceElevatedSpace(priority, with: resolvedRoute, after: match)
-            return
+            return await replaceElevatedSpace(priority, with: resolvedRoute, after: match)
         }
     }
 

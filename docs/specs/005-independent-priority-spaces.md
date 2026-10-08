@@ -18,7 +18,7 @@ Branch lifetime follows container ownership, rather than a blanket inactive-path
 
 Calling `unwindRoute` from the root destination of a high or critical space dismisses that entire space. From a descendant it dismisses that destination as usual. The permanent normal root cannot be dismissed this way. The covered-space navigation gate still applies to this local unwind action.
 
-Only the top space may originate navigation. Every other space is covered and rejects presentations, replacements, unwinds, root resets, and branch selection or activation. This includes requests to create or replace an equal-or-higher priority space: a covered normal space cannot open critical while high is on top. The lower space retains its navigation state while covered.
+Only the top space may originate navigation or dispatch router actions. Every other space is covered and rejects presentations, replacements, unwinds, root resets, branch selection or activation, and action dispatch including interception. Deferred invocations recheck the same authority. This includes requests to create or replace an equal-or-higher priority space: a covered normal space cannot open critical while high is on top. The lower space retains its navigation state while covered.
 
 The source space determines eligibility, not the destination's priority or the scope that owns its declaration. A captured router remains bound to its source space; the normal root's router has no implicit owner privilege. Rejected requests are dropped rather than queued for later. Requests that suspend during resolution or readiness must still originate from the exact live top space when they commit; losing that eligibility prevents the navigation from committing.
 
@@ -54,7 +54,7 @@ Local definition lookup, action interceptors, unwind handlers, and payload recip
 
 The top space is the highest-priority space present in logical navigation state, including accepted presentations before their native host mounts. Environment forwarding for detached hosts remains sourced from the owner as agreed in specification 1; environment forwarding does not imply navigation ancestry.
 
-Blocking applies to all navigation mutations, including binding write-back and branch activation. It does not suppress unrelated background actions or application work; any navigation produced by an action still passes the same source-space gate. Physical host attachment, detachment, snapshot cleanup, and completion of an already committed transition remain possible while covered. Those lifecycle events cannot authorize a new navigation request or dismiss a replacement instance.
+Blocking applies to all navigation mutations, including binding write-back and branch activation, and to router-dispatched actions including interception and deferred invocation. It does not cancel unrelated application background work or an action body already executing; further routing work must recheck authority. Physical host attachment, detachment, snapshot cleanup, and completion of an already committed transition remain possible while covered. Those lifecycle events cannot authorize a new navigation request or dismiss a replacement instance.
 
 Unwind plans, outgoing snapshots, equal-route stopping, branch targeting, native readiness, cancellation, and stale-instance protection remain necessary. The owner coordinates their transitions globally over independent space state. Cross-space ancestry recovery, lower-space ID fallback, and implicit global root unwind can be removed. Synthetic presentation bases and global transition sequencing remain required.
 
@@ -82,7 +82,8 @@ The owner handle and scope-bound navigation handle are distinct:
 
 - `RootRouter` owns the routing container and is the optional explicit handle passed to `WithRouter`.
 - `Router` is bound to one scope. It is supplied through the environment and `RouteContext.router`; it has no owner-level removal operation.
-- `RootRouter.current` returns a `Router` bound to the current position in the top space at the time of access. External entry points use the same scoped navigation operations as views. Keeping that returned router captures its source identity rather than dynamically retargeting it after an asynchronous wait.
+- `RootRouter.current` returns a `Router` bound to the current position in the top space at the time of access. It carries that space's local authority.
+- `RootRouter.normal` returns a `Router` bound to the current position in the normal flow, even while covered. Deep links and notifications use this handle so they cannot navigate behind or dismiss a high/critical flow. Both properties capture exact source identity rather than dynamically retargeting after suspension or removal.
 
 ```swift
 @State private var rootRouter = RootRouter()
@@ -91,8 +92,8 @@ WithRouter(routes: AppRoutes.root, router: rootRouter) {
     AppView()
 }
 
-// Ordinary external navigation captures a scope in the current top space.
-await rootRouter.current.present(LoginRoute())
+// Ordinary external navigation captures a scope in the normal flow.
+await rootRouter.normal.present(LoginRoute())
 
 // Inside any destination in the top elevated space:
 await context.router.dismissSpace()
@@ -112,6 +113,7 @@ extension Router {
 
 extension RootRouter {
     public var current: Router { get }
+    public var normal: Router { get }
 
     @discardableResult
     public func dismissSpace(_ priority: RoutePriority) async -> Bool
@@ -142,7 +144,7 @@ This replaces the dual role of `Router()` as an unscoped owner and scoped handle
 - Whether to retain an explicit owner-level reset of all spaces, separately from local root unwind.
 - Whether cross-space results need an explicit completion or action mechanism; ordinary unwind payloads do not cross roots.
 
-The implemented surface uses `RootRouter.current`, `Router.dismissSpace()`, `RootRouter.dismissSpace(_:)`, and `RootRouter.dismissSpaces()`. Owner-level global reset and cross-space result delivery remain outside this change.
+The implemented surface uses `RootRouter.current`, `RootRouter.normal`, `Router.dismissSpace()`, `RootRouter.dismissSpace(_:)`, and `RootRouter.dismissSpaces()`. Owner-level global reset and cross-space result delivery remain outside this change.
 
 ## Implementation notes (2026-10-08)
 

@@ -57,8 +57,8 @@ extension RouterEngine {
             let route: any Route
             let stage: RouteRequestStage
             let origin: RouteRequestOrigin
-            var continuation: CheckedContinuation<Void, Never>?
-            var execution: Task<Void, Never>?
+            var continuation: CheckedContinuation<RouteSpace?, Never>?
+            var execution: Task<RouteSpace?, Never>?
 
             init(route: any Route, stage: RouteRequestStage, origin: RouteRequestOrigin) {
                 self.route = route
@@ -66,10 +66,10 @@ extension RouterEngine {
                 self.origin = origin
             }
 
-            func resume() {
+            func resume(_ targetSpace: RouteSpace? = nil) {
                 let continuation = self.continuation
                 self.continuation = nil
-                continuation?.resume()
+                continuation?.resume(returning: targetSpace)
             }
         }
 

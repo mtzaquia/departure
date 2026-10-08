@@ -392,11 +392,12 @@ extension RouterEngine {
         }
     }
 
+    @discardableResult
     func replaceElevatedSpace(
         _ priority: RoutePriority,
         with route: any Route,
         after match: DeclarationMatch
-    ) async {
+    ) async -> RouteSpace {
         log.departureDebug(.elevatedPriorityReplacePreparing(route: route))
 
         // Commit the incoming root before awaiting native teardown: replacement
@@ -405,15 +406,17 @@ extension RouterEngine {
             spaces.unwindPlan(for: .space($0))
         })
         commitNavigationOperation(operation, preservesModalPresentationBindings: false)
+        let scope = RouteScope(id: match.declaration.scopeID ?? AnyHashable(route.id),
+            route: route, definitions: match.declaration.childScope ?? .empty)
+        scope.attachPresentation(to: root, declaration: match.declaration, priority: priority)
+        let space = RouteSpace(priority: priority, root: scope)
         mutateRouteGraph {
-            let scope = RouteScope(id: match.declaration.scopeID ?? AnyHashable(route.id),
-                route: route, definitions: match.declaration.childScope ?? .empty)
-            scope.attachPresentation(to: root, declaration: match.declaration, priority: priority)
-            spaces.setElevatedSpace(RouteSpace(priority: priority, root: scope), for: priority)
+            spaces.setElevatedSpace(space, for: priority)
         }
         log.departureDebug(.elevatedSpaceStarted)
         await waitForNavigationOperation(operation)
         await finishNavigationOperation(operation)
+        return space
     }
 
     func appendOrPendRoute(_ operation: NavigationOperation, waitsForBranchActivation: Bool = false) {
@@ -833,9 +836,9 @@ extension RouterEngine {
             await requestRouteWhenReady(request.route, stage: request.stage, origin: request.origin)
         }
         request.execution = execution
-        await execution.value
+        let targetSpace = await execution.value
         request.execution = nil
-        request.resume()
+        request.resume(targetSpace)
     }
 
     func replacePendingRoute(_ pendingRoute: PendingNavigation?) {
@@ -843,19 +846,20 @@ extension RouterEngine {
         self.pendingRoute = pendingRoute
     }
 
+    @discardableResult
     func requestRouteWhenReady(
         _ route: any Route,
         stage: RouteRequestStage = .resolve,
         origin: RouteRequestOrigin? = nil
-    ) async {
+    ) async -> RouteSpace? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
-        guard Task.isCancelled == false, navigationSource(origin) != nil else { return }
+        guard Task.isCancelled == false, navigationSource(origin) != nil else { return nil }
         guard isNavigating == false else {
             let request = PendingNavigation.Request(route: route, stage: stage, origin: origin)
-            await withTaskCancellationHandler {
+            return await withTaskCancellationHandler {
                 await withCheckedContinuation { continuation in
                     guard Task.isCancelled == false else {
-                        continuation.resume()
+                        continuation.resume(returning: nil)
                         return
                     }
 
@@ -870,14 +874,13 @@ extension RouterEngine {
                     }
                 }
             }
-            return
         }
 
         switch stage {
         case .resolve:
-            await requestRoute(route, origin: origin)
+            return await requestRoute(route, origin: origin)
         case .presentResolved:
-            await presentResolvedRoute(route, origin: origin)
+            return await presentResolvedRoute(route, origin: origin)
         }
     }
 

@@ -44,7 +44,7 @@ extension RouterEngine {
         logsStart: Bool = true,
         origin: RouteRequestOrigin? = nil
     ) async throws -> A.Output {
-        guard let source = resolveRequestOrigin(origin) else { throw CancellationError() }
+        guard let source = navigationSource(origin) else { throw CancellationError() }
         do {
             let currentRoute: (any Route.Type)? = source.currentRoute.map { type(of: $0) }
             if logsStart {
@@ -64,10 +64,11 @@ extension RouterEngine {
                 Task {
                     let sourceScope = source
                     let continuationOwner = origin == nil ? nil : (nearestBranchPath(from: source)?.owner ?? source.space?.root)
-                    await requestRouteWhenReady(route, origin: origin)
-                    let targetScope = continuationOwner?.space === spaces.activeSpace
-                        ? continuationOwner?.activeLocalScope ?? currentRouteScope
-                        : currentRouteScope
+                    guard let targetSpace = await requestRouteWhenReady(route, origin: origin),
+                          targetSpace === spaces.activeSpace else { return }
+                    let targetScope = continuationOwner?.space === targetSpace
+                        ? continuationOwner?.activeLocalScope ?? targetSpace.currentRouteScope
+                        : targetSpace.currentRouteScope
 
                     if targetScope !== sourceScope || targetScope.isInstalledInView {
                         await waitForRouteScopeToInstall(targetScope)
@@ -92,7 +93,7 @@ private extension RouterEngine {
     }
 
     func performAction<A: Action>(_ action: A, hasRerouted: Bool, origin: RouteRequestOrigin? = nil) async {
-        guard let source = resolveRequestOrigin(origin) else { return }
+        guard let source = navigationSource(origin) else { return }
         if let binding = source.hookBinding(for: .actionInterceptor(ObjectIdentifier(A.self)), in: spaces) {
             guard let interceptor = binding.declaration?.interceptor(for: A.self) else { return }
             log.departureDebug(.actionIntercepted(action: action, scope: source))
