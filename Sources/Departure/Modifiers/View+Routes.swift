@@ -130,12 +130,14 @@ private struct RoutesModifier: ViewModifier {
             .onChange(of: declarations) { _, _ in
                 configureAttachment()
             }
-            // Presentation hosts live in a detached background layer. They are installed only for
-            // the declared styles (so e.g. `navigationDestination` is never attached without a
-            // push declaration), which means the host set changes as declarations change. Keeping
-            // that conditional structure off the primary content prevents its `_ConditionalContent`
-            // churn from tearing down the lifecycle bridge above, which would otherwise uninstall
-            // the scope's freshly installed route declarations.
+            // Keep the sheet presenter on primary content throughout keyboard/layout updates.
+            .modifier(SheetPresentationStyleModifier(presentationHostID: presentationHostID))
+            // Push and cover hosts remain in a detached background layer. They are installed
+            // only for the declared styles (so e.g. `navigationDestination` is never attached
+            // without a push declaration), which means the host set changes as declarations
+            // change. Keeping that conditional structure off the primary content prevents its
+            // `_ConditionalContent` churn from tearing down the lifecycle bridge above, which
+            // would otherwise uninstall the scope's freshly installed route declarations.
             .background {
                 Color.black.frame(width: .zero, height: .zero)
                     .routePresentationStyleModifiers(

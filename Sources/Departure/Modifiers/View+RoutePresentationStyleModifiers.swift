@@ -23,12 +23,12 @@
 import SwiftUI
 
 extension View {
-    /// Installs the detached navigation and modal hosts for the styles in `declarations`.
+    /// Installs detached push and cover hosts; sheet presenters attach to primary content.
     ///
     /// Replace wraps the caller's actual content separately, before its environment and registration
     /// modifiers. Keeping this background outside those modifiers preserves source-environment cascading.
     ///
-    /// Each style occupies an independent, stable background slot. The slot's host is present only
+    /// Each detached style occupies an independent, stable background slot. Its host is present only
     /// while that style is declared — notably `navigationDestination` (push) is never attached when
     /// no push exists, so scopes that never push don't require a surrounding `NavigationStack`.
     func routePresentationStyleModifiers(
@@ -42,12 +42,6 @@ extension View {
                     presentationHost
                         .modifier(PushPresentationStyleModifier(presentationHostID: presentationHostID))
                         .id(pushHostIdentity)
-                }
-            }
-            .background {
-                if declarations.containsPresentationKind(.sheet) {
-                    presentationHost
-                        .modifier(SheetPresentationStyleModifier(presentationHostID: presentationHostID))
                 }
             }
             .background {

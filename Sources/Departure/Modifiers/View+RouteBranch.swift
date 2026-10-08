@@ -89,7 +89,12 @@ private struct RouteBranchModifier: ViewModifier {
             .onChange(of: branch) { _, _ in
                 configureAttachment()
             }
-            // Presentation hosts live in a detached background layer so their per-declaration
+            // Keep branch sheets anchored on primary content throughout keyboard/layout updates.
+            .modifier(SheetPresentationStyleModifier(presentationHostID: presentationHostID))
+            // This modifier sits outside the branch's `routeScopeEnvironment`, so it must be
+            // given `branchScope` explicitly to resolve the branch's own presentations.
+            .routeScopeEnvironment(branchScope)
+            // Push and cover hosts live in a detached background layer so their per-declaration
             // structural changes never tear down the registration bridge above. See
             // `routePresentationStyleModifiers()`.
             .background {

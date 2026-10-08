@@ -88,7 +88,9 @@ struct DepartureSampleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if ProcessInfo.processInfo.arguments.contains("--nested-modal-probe") {
+            if ProcessInfo.processInfo.arguments.contains("--sheet-focus-probe") {
+                WithRouter(router: router) { SheetFocusProbeRoot() }
+            } else if ProcessInfo.processInfo.arguments.contains("--nested-modal-probe") {
                 WithRouter(router: router) {
                     NavigationStack {
                         NestedModalProbeRoot()

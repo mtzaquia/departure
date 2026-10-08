@@ -28,20 +28,80 @@ struct SheetPresentationStyleModifier: ViewModifier {
     @Environment(RouterEngine.self) private var router
     @Environment(\.routeScope) private var routeScope
 
+    @State private var presentationState = SheetPresentationState()
+
     func body(content: Content) -> some View {
         let presentation = router.routePresentationBinding(
             from: routeScope,
             matching: .sheet,
             hostedBy: presentationHostID
         )
-
-        content
-            .sheet(item: presentation) { route in
-                RouteView(
-                    scope: route.scope,
-                    providesNavigation: route.providesNavigation
-                )
+        // Read the retained route here so the first presentation receives populated content.
+        let route = presentationState.route
+        let isPresented = Binding(
+            get: { presentationState.isPresented },
+            set: { value in
+                guard !value, presentationState.beginDismissal(id: route?.id) else { return }
+                dismissRoute(route, through: presentation)
             }
+        )
+
+        return content
+            .onChange(of: presentation.wrappedValue, initial: true) { _, route in
+                presentationState.synchronize(route)
+            }
+            .sheet(isPresented: isPresented, onDismiss: {
+                // Native dismissal may arrive without a binding write (for example, host removal).
+                // A completed older presentation must never clear a successor in the route graph.
+                if presentationState.beginDismissal(id: route?.id) {
+                    dismissRoute(route, through: presentation)
+                }
+                guard presentationState.completeDismissal(id: route?.id) else { return }
+                presentationState.synchronize(presentation.wrappedValue)
+            }) {
+                if let route {
+                    RouteView(scope: route.scope, providesNavigation: route.providesNavigation)
+                        .id(route.id)
+                }
+            }
+    }
+
+    private func dismissRoute(_ route: RoutePresentation?, through presentation: Binding<RoutePresentation?>) {
+        guard let route, presentation.wrappedValue?.id == route.id else { return }
+        presentation.wrappedValue = nil
+    }
+}
+
+/// Retains the exiting destination until native dismissal finishes, before admitting a successor.
+struct SheetPresentationState {
+    private(set) var route: RoutePresentation?
+    private(set) var isPresented = false
+
+    mutating func synchronize(_ incoming: RoutePresentation?) {
+        guard let route else {
+            self.route = incoming
+            isPresented = incoming != nil
+            return
+        }
+        guard isPresented else { return }
+        guard incoming?.id == route.id else {
+            isPresented = false
+            return
+        }
+        self.route = incoming
+    }
+
+    mutating func beginDismissal(id: AnyHashable?) -> Bool {
+        guard let route, route.id == id, isPresented else { return false }
+        isPresented = false
+        return true
+    }
+
+    mutating func completeDismissal(id: AnyHashable?) -> Bool {
+        guard let route, route.id == id else { return false }
+        self.route = nil
+        isPresented = false
+        return true
     }
 }
 
