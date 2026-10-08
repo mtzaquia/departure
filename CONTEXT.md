@@ -53,6 +53,9 @@ One accepted occurrence of a route in navigation state. Its identity is distinct
 **Presentation host**:
 The physical view or native container that presents a scope's content. Its lifetime and readiness are distinct from the scope's membership in navigation state.
 
+**Resolved route target**:
+A matched declaration, its declaring owner, the scope that presents it, and any required branch selection. The scope identities determine its paths and coordinates.
+
 **Navigation operation**:
 One accepted navigation change and its completion. Logical navigation changes when committed; outgoing presentations may finish later before a requested destination continues.
 

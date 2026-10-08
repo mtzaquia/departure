@@ -26,12 +26,12 @@ import Foundation
 extension RouterEngine {
     /// One accepted transition owns its plan, outgoing views and continuation anchor.
     /// A branch awaiting its host retains this same operation after native teardown;
-    /// completion releases the plan so that only the pending presentation remains.
+    /// explicit stages prevent completed teardown from retaining a captured plan.
     @Observable
     final class NavigationOperation {
         struct Presentation {
             let route: any Route
-            let match: DeclarationMatch
+            let match: ResolvedRouteTarget
         }
 
         struct Outgoing {
@@ -40,15 +40,70 @@ extension RouterEngine {
             let disablesAnimation: Bool
         }
 
-        @ObservationIgnored var plan: RouteSpaces.UnwindPlan?
-        @ObservationIgnored var presentation: Presentation?
+        enum Stage {
+            case preparingUnwind(RouteSpaces.UnwindPlan)
+            case preparingPresentation(RouteSpaces.UnwindPlan, Presentation)
+            case unwinding(RouteSpaces.UnwindPlan)
+            case unwindingForPresentation(RouteSpaces.UnwindPlan, Presentation)
+            case awaitingHost(Presentation)
+            case finished
+        }
+
+        @ObservationIgnored private(set) var stage: Stage
         var outgoing: [PresentationKey: Outgoing] = [:]
+
+        var plan: RouteSpaces.UnwindPlan? {
+            switch stage {
+            case .preparingUnwind(let plan), .preparingPresentation(let plan, _),
+                 .unwinding(let plan), .unwindingForPresentation(let plan, _): plan
+            case .awaitingHost, .finished: nil
+            }
+        }
+
+        var presentation: Presentation? {
+            switch stage {
+            case .preparingPresentation(_, let presentation),
+                 .unwindingForPresentation(_, let presentation), .awaitingHost(let presentation): presentation
+            case .preparingUnwind, .unwinding, .finished: nil
+            }
+        }
+
         var removedScopes: [RouteScope] { plan?.removedScopes ?? [] }
 
-        init(plan: RouteSpaces.UnwindPlan? = nil, presentation: Presentation? = nil) {
-            self.plan = plan
-            self.presentation = presentation
+        init(plan: RouteSpaces.UnwindPlan, presentation: Presentation? = nil) {
+            if let presentation { stage = .preparingPresentation(plan, presentation) }
+            else { stage = .preparingUnwind(plan) }
         }
+
+        init(awaitingHost presentation: Presentation) { stage = .awaitingHost(presentation) }
+
+        /// Committing twice must not reapply a captured plan to a changed tree.
+        func commit() -> RouteSpaces.UnwindPlan? {
+            switch stage {
+            case .preparingUnwind(let plan):
+                stage = .unwinding(plan)
+                return plan
+            case .preparingPresentation(let plan, let presentation):
+                stage = .unwindingForPresentation(plan, presentation)
+                return plan
+            default: return nil
+            }
+        }
+
+        func discardPresentation() {
+            switch stage {
+            case .preparingPresentation(let plan, _): stage = .preparingUnwind(plan)
+            case .unwindingForPresentation(let plan, _): stage = .unwinding(plan)
+            case .awaitingHost: stage = .finished
+            default: break
+            }
+        }
+
+        func finishTeardown(awaitingHost: Bool) {
+            if awaitingHost, let presentation { stage = .awaitingHost(presentation) }
+            else { stage = .finished }
+        }
+
     }
 
     /// The global latest request slot may await either coordination or a branch host.

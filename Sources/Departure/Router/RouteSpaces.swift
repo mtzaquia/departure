@@ -283,7 +283,7 @@ extension RouteSpaces {
     }
 
     func presentationTransitionPlan(
-        after match: RouterEngine.DeclarationMatch,
+        after match: RouterEngine.ResolvedRouteTarget,
         transition: PresentationTransition
     ) -> UnwindPlan {
         var requests: [UnwindPlanRequest] = []
@@ -291,37 +291,35 @@ extension RouteSpaces {
         switch transition {
         case .keepEquivalent(let targetPosition):
             requests.append(.scoped(
-                routePath: match.presentationLocation.path,
+                routePath: match.presentationPath,
                 after: targetPosition
             ))
 
         case .append where !match.declaration.presentationKind.isModal:
             requests.append(.scoped(
-                routePath: match.presentationLocation.path,
-                after: match.presentationLocation.position
+                routePath: match.presentationPath,
+                after: match.presentationPosition
             ))
 
         case .append:
-            guard let presentationOrigin = match.presentationLocation.scope else {
-                break
-            }
+            let presentationOrigin = match.presentingScope
 
             if let modal = presentationOrigin.lane.modal, let path = modal.owningPath {
                 requests.append(.scoped(routePath: path, after: path.positionBefore(modal) ?? .owner))
             }
         }
 
-        if match.presentationLocation.path !== match.declarationLocation.path {
+        if match.presentationPath !== match.declaringPath {
             requests.append(.scoped(
-                routePath: match.declarationLocation.path,
-                after: match.declarationLocation.position
+                routePath: match.declaringPath,
+                after: match.declaringPosition
             ))
         }
 
         return unwindPlan(for: .combined(requests))
     }
 
-    func firstDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin? = nil) -> DeclarationBinding<RouterEngine.DeclarationMatch>? {
+    func firstDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin? = nil) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
         let origin = origin ?? RouteRequestOrigin(scope: activeSpace.currentRouteScope)
         if let match = scopedDeclaration(including: routeType, origin: origin) { return match }
         // The owner's entry catalog is independent of every live navigation tree.
@@ -329,120 +327,25 @@ extension RouteSpaces {
         guard let binding = defaultSpace.root.firstRouteAttachment(for: routeType) else { return nil }
         guard let attachment = binding.declaration else { return .conflict }
         guard attachment.declaration.priority != .default else { return nil }
-        return .declared(RouterEngine.DeclarationMatch(
-            presentationLocation: .init(path: defaultSpace.rootPath, position: .owner),
-            space: defaultSpace, declarationLocation: .init(path: defaultSpace.rootPath, position: .owner),
-            branchID: nil, declaration: attachment.declaration,
-            lookupStrategy: .defaultRootDeclarations))
+        return binding
     }
-
-    private func declarationMatch(
-        _ attachment: RouteScope.RouteAttachmentMatch,
-        under routeScope: RouteScope,
-        space: RouteSpace,
-        declaringPath: RoutePath,
-        declaringPosition: RoutePath.Position,
-        lookupStrategy: RouterEngine.DeclarationMatch.LookupStrategy
-    ) -> RouterEngine.DeclarationMatch {
-        if attachment.branchID == nil, let branch = routeScope.branchID, let parent = routeScope.parent,
-           let parentPath = space.routePath(containing: parent) {
-            return declarationMatch(.init(branchID: branch, declaration: attachment.declaration),
-                under: parent, space: space, declaringPath: parentPath,
-                declaringPosition: parentPath.position(of: parent) ?? .owner,
-                lookupStrategy: lookupStrategy)
-        }
-        let presentationLocation = routePath(
-            for: attachment,
-            under: routeScope,
-            space: space,
-            fallbackPath: declaringPath,
-            fallbackPosition: declaringPosition
-        )
-
-        return RouterEngine.DeclarationMatch(
-            routePath: presentationLocation,
-            space: space,
-            declaringPath: declaringPath,
-            declaringPosition: declaringPosition,
-            attachment: attachment,
-            lookupStrategy: lookupStrategy
-        )
-    }
-
-    private func routePath(
-        for match: RouteScope.RouteAttachmentMatch,
-        under routeScope: RouteScope,
-        space: RouteSpace,
-        fallbackPath: RoutePath,
-        fallbackPosition: RoutePath.Position
-    ) -> (path: RoutePath, position: RoutePath.Position) {
-        switch match.presentationAnchor {
-        case .declarationLocation:
-            return (path: fallbackPath, position: fallbackPosition)
-
-        case .branchOwner:
-            guard let branchID = match.branchID else {
-                return (path: fallbackPath, position: fallbackPosition)
-            }
-
-            return routePath(
-                forBranch: branchID,
-                under: routeScope,
-                declaration: match.declaration,
-                fallbackPath: fallbackPath,
-                fallbackPosition: fallbackPosition
-            )
-
-        case .activeLocalScope:
-            guard
-                let branchID = match.branchID,
-                let activeLocalScope = routeScope.branchScopes[branchID]?.activeLocalScope,
-                let activeLocalPath = space.routePath(containing: activeLocalScope)
-            else {
-                return (path: fallbackPath, position: fallbackPosition)
-            }
-
-            return (
-                path: activeLocalPath,
-                position: activeLocalPath.position(of: activeLocalScope) ?? .owner
-            )
-        }
-    }
-
-    private func routePath(
-        forBranch branchID: AnyHashable,
-        under routeScope: RouteScope,
-        declaration: AnyRouteDeclaration,
-        fallbackPath: RoutePath,
-        fallbackPosition: RoutePath.Position
-    ) -> (path: RoutePath, position: RoutePath.Position) {
-        guard let branchScope = routeScope.branchScopes[branchID] else {
-            return (path: fallbackPath, position: fallbackPosition)
-        }
-
-        return (path: branchScope.path, position: .owner)
-    }
-
-
 }
 
+
 private extension RouteSpaces {
-    func scopedDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin) -> DeclarationBinding<RouterEngine.DeclarationMatch>? {
+    func scopedDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
         guard var source = origin.resolve(in: self) else { return nil }
         while let path = routePath(containing: source), let space = space(containing: path) {
             if origin.branches.isEmpty,
                let binding = source.firstBranchScopeRouteAttachment(for: routeType, in: source.activeBranch) {
-                return binding.map { declarationMatch($0, under: source, space: space,
-                    declaringPath: path, declaringPosition: path.position(of: source) ?? .owner,
-                    lookupStrategy: .defaultRootActiveBranchScope) }
+                return binding
             }
             // Plain requests can discover branch maps while climbing out of their
             // local scope. Explicit branch handles keep their chosen search boundary.
             if let binding = source.firstRouteAttachment(for: routeType,
-                includingOtherBranches: origin.branches.isEmpty) {
-                return binding.map { declarationMatch($0, under: source, space: space,
-                    declaringPath: path, declaringPosition: path.position(of: source) ?? .owner,
-                    lookupStrategy: source === defaultSpace.root ? .defaultRootDeclarations : .currentPath(spacePriority: space.priority)) }
+                includingOtherBranches: origin.branches.isEmpty,
+                lookupStrategy: source === defaultSpace.root ? .defaultRootDeclarations : .currentPath(spacePriority: space.priority)) {
+                return binding
             }
             guard let previous = enclosingScope(before: source) else { break }
             source = previous

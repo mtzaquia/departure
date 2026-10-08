@@ -106,14 +106,14 @@ enum DepartureLogEvent {
     case routeAcceptedAppend(route: any Route)
     case routeAcceptedReplaceElevatedPriority(route: any Route)
     case routeAppendSuperseded(route: any Route)
-    case routeAppendPreparing(route: any Route, match: RouterEngine.DeclarationMatch)
+    case routeAppendPreparing(route: any Route, match: RouterEngine.ResolvedRouteTarget)
     case routeAppended(route: any Route, path: String)
     case routeBlockedByElevatedPriority(route: any Route)
     case routeDroppedBranchActivationFailed(branch: AnyHashable)
     case routeDroppedResolution
     case routeLookupStarted(routeType: any Route.Type, activePath: String)
     case routeNoOpEquivalent(route: any Route, currentRoute: any Route)
-    case routeMatched(route: any Route, match: RouterEngine.DeclarationMatch)
+    case routeMatched(route: any Route, match: RouterEngine.ResolvedRouteTarget)
     case routePendingWaitingForActivatedBranchHost(route: any Route, branch: AnyHashable)
     case routeRequested(route: any Route)
     case routeRerouted(from: any Route, to: any Route)
@@ -428,7 +428,7 @@ extension DepartureLogEvent {
     }
 }
 
-extension RouterEngine.DeclarationMatch {
+extension RouterEngine.ResolvedRouteTarget {
     var departureDebugDescription: String {
         let placementDescription = branchID.map {
             "branch \($0.departureDebugDescription)"
@@ -436,17 +436,17 @@ extension RouterEngine.DeclarationMatch {
 
         let description = "\(declaration.departureDebugDescription) • \(placementDescription)"
             + " • lookup=\(lookupStrategy.departureDebugDescription)"
-        guard presentationLocation.path !== declarationLocation.path
-            || presentationLocation.position != declarationLocation.position
+        guard presentationPath !== declaringPath
+            || presentationPosition != declaringPosition
         else {
             return description
         }
 
-        return "\(description) • declared at \(declarationLocation.position) • presents at \(presentationLocation.position)"
+        return "\(description) • declared at \(declaringPosition) • presents at \(presentationPosition)"
     }
 }
 
-private extension RouterEngine.DeclarationMatch.LookupStrategy {
+private extension RouterEngine.ResolvedRouteTarget.LookupStrategy {
     var departureDebugDescription: String {
         switch self {
         case let .currentPath(spacePriority):

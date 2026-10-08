@@ -29,7 +29,7 @@ protocol IOS17NavigationStackPushWorkaroundHandling: AnyObject {
         router: RouterEngine
     ) -> Bool
     /// Returns true when a newer route request superseded the append during preparation.
-    func prepareAppend(after match: RouterEngine.DeclarationMatch, in router: RouterEngine) async -> Bool
+    func prepareAppend(after match: RouterEngine.ResolvedRouteTarget, in router: RouterEngine) async -> Bool
     func interceptDismissal(
         of presentation: PresentedRoute,
         matching presentationKind: RoutePresentationKind,
@@ -84,11 +84,10 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         return parentScope?.activeBranch == branch
     }
 
-    func prepareAppend(after match: RouterEngine.DeclarationMatch, in router: RouterEngine) async -> Bool {
+    func prepareAppend(after match: RouterEngine.ResolvedRouteTarget, in router: RouterEngine) async -> Bool {
         guard match.declaration.presentationKind == .replace,
-              let host = match.presentationHost,
               let replacing = router.routePresentation(
-                from: host, matching: .replace, hostedBy: match.presentationHostID
+                from: match.presentingScope, matching: .replace, hostedBy: match.presentationHostID
               )?.scope,
               let path = router.spaces.routePath(containing: replacing),
               let position = path.position(of: replacing),
@@ -101,7 +100,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         // in the same graph update. Pop the child first and preserve latest-request semantics.
         let plan = router.spaces.unwindPlan(for: .scoped(routePath: path, after: position))
         let operation = router.beginNavigationOperation(plan: plan)
-        router.applyUnwindPlan(plan)
+        router.commitNavigationOperation(operation, preservesModalPresentationBindings: false)
         await router.waitForNavigationOperation(operation)
         let wasSuperseded = router.pendingRoute != nil
         await router.finishNavigationOperation(operation)

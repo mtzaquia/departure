@@ -36,7 +36,7 @@ struct NestedBranchLookupTests {
         outer.setActiveBranch("inner")
 
         let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
-        #expect(match.presentationHost === outer)
+        #expect(match.presentingScope === outer)
         #expect(match.lookupStrategy == .currentPath(spacePriority: .default))
         #if DEBUG
         #expect(DepartureLogEvent.routeMatched(route: SettingsRoute(), match: match).message.contains(
@@ -61,7 +61,7 @@ struct NestedBranchLookupTests {
         ])
 
         let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
-        #expect(match.presentationHost === inner)
+        #expect(match.presentingScope === inner)
         await router.present(SettingsRoute())
         #expect(inner.path.last?.route is SettingsRoute)
         #expect(router.routePresentation(from: inner, matching: .cover(.slide)) != nil)
@@ -71,7 +71,7 @@ struct NestedBranchLookupTests {
     @Test func lazyDeclarationRemainsAvailableWithoutLocalOverride() async throws {
         let (router, outer, inner) = makeNestedBranches(hasLazyDeclaration: true)
         let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
-        #expect(match.presentationHost === outer)
+        #expect(match.presentingScope === outer)
         await router.present(SettingsRoute())
         #expect(outer.path.last?.route is SettingsRoute)
         #expect(router.routePresentation(from: outer, matching: .push) != nil)
@@ -93,7 +93,7 @@ struct NestedBranchLookupTests {
 
         #expect(router.currentRouteScope === inner)
         let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
-        #expect(match.presentationHost === container)
+        #expect(match.presentingScope === container)
         await router.present(SettingsRoute())
         #expect(outer.path.first === container)
         #expect(outer.path.last?.route is SettingsRoute)

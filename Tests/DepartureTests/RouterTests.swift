@@ -305,7 +305,7 @@ struct RouterTests {
         scope.attachHost(nil, id: UUID())
         scope.detachHost(id: scope.hostID!)
         #expect(scope.id == AnyHashable("explicit"))
-        #expect(scope.firstRouteAttachment(for: HomeDetailRoute.self) != nil)
+        #expect(scope.definitions.routeBinding(for: HomeDetailRoute.self) != nil)
     }
 
     @Test func changingBranchSelectionKeepsDefinitionsAndScopeIdentityStable() async {
@@ -837,10 +837,10 @@ struct RouterTests {
 
         #expect(match.lookupStrategy == .defaultRootActiveBranchScope)
         #expect(match.declaration.presentationKind == .push)
-        #expect(match.presentationLocation.path === walletScope.path)
-        #expect(match.presentationLocation.position == .scope(walletRouteScope))
-        #expect(match.declarationLocation.path === router.defaultSpace.rootPath)
-        #expect(match.declarationLocation.position == .owner)
+        #expect(match.presentationPath === walletScope.path)
+        #expect(match.presentationPosition == .scope(walletRouteScope))
+        #expect(match.declaringPath === router.defaultSpace.rootPath)
+        #expect(match.declaringPosition == .owner)
         #expect(unwindPlan.removedScopes.count == 1)
         #expect(unwindPlan.removedScopes.first === modalScope)
 
@@ -919,7 +919,7 @@ struct RouterTests {
 
         let match = try #require(router.spaces.firstDeclaration(including: TransactionRoute.self)?.declaration)
         router.appendOrPendRoute(
-            RouterEngine.NavigationOperation(presentation: .init(route: TransactionRoute(), match: match)),
+            RouterEngine.NavigationOperation(awaitingHost: .init(route: TransactionRoute(), match: match)),
             waitsForBranchActivation: true
         )
         router.resumePendingRoute(for: AppTab.wallet, in: router.root)
@@ -972,10 +972,10 @@ struct RouterTests {
 
         #expect(match.lookupStrategy == .defaultRootDeclarations)
         #expect(match.declaration.presentationKind == .push)
-        #expect(match.presentationLocation.path === walletScope.path)
-        #expect(match.presentationLocation.position == .owner)
-        #expect(match.declarationLocation.path === router.defaultSpace.rootPath)
-        #expect(match.declarationLocation.position == .owner)
+        #expect(match.presentationPath === walletScope.path)
+        #expect(match.presentationPosition == .owner)
+        #expect(match.declaringPath === router.defaultSpace.rootPath)
+        #expect(match.declaringPosition == .owner)
         #expect(unwindPlan.removedScopes.count == 2)
         #expect(unwindPlan.removedScopes.contains { $0 === walletRouteScope })
         #expect(unwindPlan.removedScopes.contains { $0 === modalScope })
@@ -1045,13 +1045,10 @@ struct RouterTests {
         router.defaultSpace.rootPath.replaceTestPath([landingScope, modalScope])
         router.routeScopeDidInstallInView(modalScope)
 
-        let match = RouterEngine.DeclarationMatch(
-            presentationLocation: .init(path: homeScope.path, position: .owner),
+        let match = RouterEngine.ResolvedRouteTarget(
             space: router.defaultSpace,
-            declarationLocation: .init(
-                path: router.defaultSpace.rootPath,
-                position: .scope(landingScope)
-            ),
+            presentingScope: homeScope,
+            declaringScope: landingScope,
             branchID: AnyHashable(AppTab.home),
             declaration: pushDeclaration,
             lookupStrategy: .rootPath(spacePriority: .default)
@@ -4024,11 +4021,15 @@ struct RouterTests {
         for _ in 0..<1000 where engine.spaces.highSpace?.root === old { await Task.yield() }
         #expect(engine.spaces.highSpace?.root.route as? NumberedRoute == NumberedRoute(number: 2))
         #expect(engine.isNavigating)
-        await Router(engine: engine, scope: engine.root).present(SettingsRoute())
+        let lowerRequest = Task { await Router(engine: engine, scope: engine.root).present(SettingsRoute()) }
+        for _ in 0..<1000 where engine.pendingRoute == nil { await Task.yield() }
+        #expect(engine.pendingRoute != nil)
         #expect(engine.defaultSpace.rootPath.isEmpty)
         #expect(engine.spaces.highSpace?.root.route as? NumberedRoute == NumberedRoute(number: 2))
         engine.routeScopeDidLeaveView(old)
         await replacing.value
+        await lowerRequest.value
+        #expect(engine.defaultSpace.rootPath.isEmpty)
         #expect(engine.spaces.highSpace?.root.presentationOrigin === engine.root)
     }
 
@@ -4610,7 +4611,7 @@ struct RouterTests {
         let identity = cover.routeAttachments.map(\.identity)
         for _ in 0..<5 { engine.routeScopeDidInstallInView(cover); engine.routeScopeDidLeaveView(cover) }
         #expect(cover.routeAttachments.map(\.identity) == identity)
-        #expect(cover.firstRouteAttachment(for: SettingsRoute.self) != nil)
+        #expect(cover.definitions.routeBinding(for: SettingsRoute.self) != nil)
     }
 }
 
