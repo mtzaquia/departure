@@ -38,15 +38,17 @@ struct ReplaceTests {
     }
 
     @Test(arguments: [true, false], [true, false])
-    func selectionActivatesAndResumesOnLazyHost(concurrent: Bool, explicit: Bool) async {
-        let fixture = ReplaceFixture(concurrent: concurrent, mounted: false)
+    func selectionActivatesAndCompletesWithALazyHost(concurrent: Bool, explicit: Bool) async {
+        let fixture = ReplaceFixture(concurrent: concurrent)
         let source = explicit ? fixture.router.branch("wallet") : fixture.local(fixture.sidebar)
         await source.present(SelectedRoute(number: 1))
         #expect(fixture.selection.value == "wallet")
-        #expect((fixture.engine.pendingRoute != nil) == !concurrent)
+        #expect(fixture.engine.pendingRoute == nil)
+        #expect(fixture.wallet.path.first?.route as? SelectedRoute == SelectedRoute(number: 1))
         #expect(fixture.engine.defaultSpace.rootPath.isEmpty)
         fixture.mountWallet()
         fixture.engine.resumePendingRoute(for: "wallet", in: fixture.engine.root)
+        #expect(fixture.wallet.path.count == 1)
         #expect(fixture.wallet.path.first?.route as? SelectedRoute == SelectedRoute(number: 1))
         #expect(fixture.engine.pendingRoute == nil)
         #expect(fixture.engine.routePresentation(from: fixture.wallet, matching: .replace) != nil)
@@ -315,7 +317,7 @@ private struct ReplaceFixture {
     let sidebar: RouteScope
     let wallet: RouteScope
 
-    init(concurrent: Bool = true, mounted: Bool = true) {
+    init(concurrent: Bool = true) {
         let engine = owner.engine
         @Bindable var selection = selection
         engine.root.defineTestMap(id: nil,
