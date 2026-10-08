@@ -94,8 +94,8 @@ private final class CoverFadePresentationState {
     var systemPresentation: RouteDestinationSnapshot?
     var isContentVisible = false
     var isDismissing = false
-    var fadeInTaskID: RoutePresentation.ID?
-    var dismissalTaskID: RoutePresentation.ID?
+    var fadeInTaskID: PresentedRoute.ID?
+    var dismissalTaskID: PresentedRoute.ID?
 
     subscript(systemPresentation _: SystemPresentationProjection) -> RouteDestinationSnapshot? {
         get {
@@ -139,7 +139,7 @@ private final class CoverFadePresentationState {
 }
 
 private struct CoverFadeModalPresenter: View {
-    @Binding var route: RoutePresentation?
+    @Binding var route: PresentedRoute?
     @Environment(\.scenePhase) private var scenePhase
     let router: RouterEngine
     @State private var presentationState = CoverFadePresentationState()
@@ -235,7 +235,7 @@ private struct CoverFadeModalPresenter: View {
         presentationState.setSystemPresentation(presentation)
     }
 
-    private func fadeInContentIfNeeded(for id: RoutePresentation.ID) {
+    private func fadeInContentIfNeeded(for id: PresentedRoute.ID) {
         guard presentationState.isDismissing == false,
               presentationState.systemPresentation?.id == id
         else {
@@ -245,7 +245,7 @@ private struct CoverFadeModalPresenter: View {
         presentationState.fadeInTaskID = id
     }
 
-    private func fadeInContent(for id: RoutePresentation.ID?) async {
+    private func fadeInContent(for id: PresentedRoute.ID?) async {
         guard let id else {
             return
         }
@@ -264,7 +264,7 @@ private struct CoverFadeModalPresenter: View {
         }
     }
 
-    private func finishDismissal(for id: RoutePresentation.ID?) async {
+    private func finishDismissal(for id: PresentedRoute.ID?) async {
         guard let id else {
             return
         }
@@ -363,7 +363,7 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         private var router: RouterEngine?
         private var sourceScenePhase: ScenePhase?
         private var onDismiss: (@MainActor () -> Void)?
-        private var presentedRouteID: RoutePresentation.ID?
+        private var presentedRouteID: PresentedRoute.ID?
         private var presentedScenePhase: ScenePhase?
         private var hostingController: PassThroughModalHostingController<AnyView>?
 

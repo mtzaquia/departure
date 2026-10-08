@@ -48,6 +48,27 @@ public struct Cover: RouteDeclaration, Sendable {
         )
     }
 
+    /// Binds a feature destination to a cover declaration.
+    ///
+    /// - Parameters:
+    ///   - destination: The typed builder used for this declaration.
+    ///   - priority: The presentation priority, using the existing routing rules.
+    ///   - transition: The animation style for this cover.
+    ///   - providesNavigation: Whether Departure wraps the view in a `NavigationStack`.
+    ///     Defaults to `true`, matching the route-type initializer.
+    public init<R: Route>(
+        _ destination: RouteDestination<R>,
+        priority: RoutePriority = .normal,
+        transition: Transition = .slide,
+        providesNavigation: Bool = true
+    ) {
+        self.declaration = AnyRouteDeclaration(
+            routeType: R.self,
+            kind: .cover(priority: priority, transition: transition, providesNavigation: providesNavigation),
+            destination: destination.destination
+        )
+    }
+
     public var _routeDeclarations: [AnyRouteDeclaration] {
         [declaration]
     }

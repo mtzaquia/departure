@@ -277,7 +277,7 @@ private struct BranchSetup {
     func binding(
         matching presentationKind: RoutePresentationKind,
         hostedBy presentationHostID: RoutePresentationHostID
-    ) -> Binding<RoutePresentation?> {
+    ) -> Binding<PresentedRoute?> {
         router.routePresentationBinding(
             from: branchScope,
             matching: presentationKind,

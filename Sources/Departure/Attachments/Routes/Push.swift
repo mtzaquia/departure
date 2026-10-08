@@ -40,6 +40,20 @@ public struct Push: RouteDeclaration, Sendable {
         )
     }
 
+    /// Binds a feature destination to a push declaration.
+    ///
+    /// - Parameter destination: The typed builder used for this declaration.
+    /// - Important: The declaring view must be inside a SwiftUI `NavigationStack`.
+    public init<R: Route>(
+        _ destination: RouteDestination<R>
+    ) {
+        self.declaration = AnyRouteDeclaration(
+            routeType: R.self,
+            kind: .push,
+            destination: destination.destination
+        )
+    }
+
     public var _routeDeclarations: [AnyRouteDeclaration] {
         [declaration]
     }

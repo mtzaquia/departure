@@ -86,11 +86,13 @@ extension RouteScope {
 
     func attachPresentation(
         to origin: RouteScope,
-        declaration: AnyRouteDeclaration
+        declaration: AnyRouteDeclaration,
+        priority: RoutePriority = .normal
     ) {
         presentation = RouteScopePresentation(
             origin: origin,
-            declaration: declaration
+            declaration: declaration,
+            priority: priority
         )
     }
 }

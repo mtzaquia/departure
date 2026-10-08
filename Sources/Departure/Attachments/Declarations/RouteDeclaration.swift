@@ -27,7 +27,11 @@ struct RoutePresentationHostID: Hashable, Sendable {
     private let value = UUID()
 }
 
-/// Type-erased route presentation metadata.
+/// Type-erased route presentation metadata and an optional destination binding.
+///
+/// Equality includes the destination builder's identity. Copies of one ``RouteDestination``
+/// preserve that identity; independently created builders remain distinct even for the same
+/// route type and presentation style. Presentation-host installation identity is excluded.
 public struct AnyRouteDeclaration: Sendable, Hashable {
     enum Kind: Hashable, Sendable {
         case push
@@ -39,6 +43,7 @@ public struct AnyRouteDeclaration: Sendable, Hashable {
     let routeType: any Route.Type
     let kind: Kind
     let drivesPresentation: Bool
+    let destination: AnyRouteDestination?
     /// Internal presentation provenance; deliberately excluded from public value equality and hashing.
     let presentationHostID: RoutePresentationHostID?
 
@@ -46,11 +51,13 @@ public struct AnyRouteDeclaration: Sendable, Hashable {
         routeType: any Route.Type,
         kind: Kind,
         drivesPresentation: Bool = true,
+        destination: AnyRouteDestination? = nil,
         presentationHostID: RoutePresentationHostID? = nil
     ) {
         self.routeType = routeType
         self.kind = kind
         self.drivesPresentation = drivesPresentation
+        self.destination = destination
         self.presentationHostID = presentationHostID
     }
 
@@ -58,12 +65,14 @@ public struct AnyRouteDeclaration: Sendable, Hashable {
         lhs.routeType == rhs.routeType
         && lhs.kind == rhs.kind
         && lhs.drivesPresentation == rhs.drivesPresentation
+        && lhs.destination.map(ObjectIdentifier.init) == rhs.destination.map(ObjectIdentifier.init)
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(ObjectIdentifier(routeType))
         hasher.combine(kind)
         hasher.combine(drivesPresentation)
+        hasher.combine(destination.map(ObjectIdentifier.init))
     }
 }
 
@@ -111,6 +120,7 @@ extension AnyRouteDeclaration {
             routeType: routeType,
             kind: kind,
             drivesPresentation: value,
+            destination: destination,
             presentationHostID: presentationHostID
         )
     }
@@ -120,6 +130,7 @@ extension AnyRouteDeclaration {
             routeType: routeType,
             kind: kind,
             drivesPresentation: drivesPresentation,
+            destination: destination,
             presentationHostID: presentationHostID
         )
     }

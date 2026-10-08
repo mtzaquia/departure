@@ -21,26 +21,27 @@ struct ExampleApp: App {
 
 ## Create and present a route
 
-A route is a value that builds its destination. Declare it on the view that owns its presentation, then request it from the environment router.
+A route carries a navigation request and its data. Bind it to a feature view using
+`RouteDestination`, declare that destination on the view that owns its presentation, then
+request the route from the environment router.
 
 ```swift
 struct ProfileRoute: Route {
   let userID: String
-
-  func destination() -> some View {
-    ProfileView(userID: userID)
-  }
 }
 
 struct HomeView: View {
   @Environment(\.router) private var router
+  private static let profile = RouteDestination(ProfileRoute.self) { route, context in
+    ProfileView(userID: route.userID)
+  }
 
   var body: some View {
     Button("View profile") {
       Task { await router.present(ProfileRoute(userID: "42")) }
     }
     .routes {
-      Push(ProfileRoute.self)
+      Push(Self.profile)
     }
   }
 }
@@ -53,8 +54,12 @@ router is inactive and commands do nothing.
 
 Use `Push` inside a `NavigationStack`. `Sheet` and `Cover` present modally and provide a navigation stack around their destination by default.
 
-For an app split into Domain and Feature modules, the route can omit `destination()` and the
-feature can supply it separately. See
+`RouteDestination` is available on this development branch and is not yet in v2.1.0.
+Existing `Route.destination()` implementations and `RouteViewProviding` conformances are
+deprecated but remain functional. Route-type presentation declarations remain supported.
+
+For an app split into Domain and Feature modules, define the route in Domain and its
+`RouteDestination` in the feature. See
 [Supply a view from a feature module](routing.md#supply-a-view-from-a-feature-module).
 
 Next: [Routing](routing.md)

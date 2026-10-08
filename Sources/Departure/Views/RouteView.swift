@@ -57,7 +57,7 @@ public struct RouteView: View {
 
     @ViewBuilder
     private var content: some View {
-        let destination = scope.route.map { routeDestination(for: $0) }
+        let destination = RouteDestinationContent(scope: scope)
 
         if providesNavigation {
             NavigationStack {
@@ -80,4 +80,28 @@ func routeDestination(for route: any Route) -> AnyView {
 
 private func eraseRouteDestination<R: Route>(_ route: R) -> AnyView {
     AnyView(route.destination())
+}
+
+private struct RouteDestinationContent: View {
+    let scope: RouteScope
+    @Environment(\.self) private var environment
+
+    var body: some View {
+        if let route = scope.route {
+            if let presentation = scope.presentation,
+               let destination = presentation.declaration.destination {
+                destination.build(route, RouteContext(
+                    router: environment.router,
+                    unwindRoute: environment.unwindRoute,
+                    presentation: RoutePresentation(
+                        style: .init(presentation.declaration.presentationKind),
+                        priority: presentation.priority
+                    ),
+                    environment: environment
+                ))
+            } else {
+                routeDestination(for: route)
+            }
+        }
+    }
 }

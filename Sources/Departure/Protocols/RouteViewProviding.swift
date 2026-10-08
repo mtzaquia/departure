@@ -24,8 +24,9 @@ import SwiftUI
 
 /// A destination view supplied separately from a route's primary conformance.
 ///
-/// Departure prefers this destination over ``Route/destination()`` when a route conforms to both
-/// protocols. This lets a domain module declare a route while a feature module supplies its view.
+/// Explicit ``RouteDestination`` bindings take precedence. Otherwise Departure prefers this
+/// destination over ``Route/destination()`` when a route conforms to both protocols. This lets a
+/// domain module declare a route while a feature module supplies its view.
 ///
 /// ```swift
 /// // Domain module
@@ -41,6 +42,7 @@ import SwiftUI
 ///
 /// A conformance can be declared only once for a route type. Add `@retroactive` only when the route
 /// belongs to another package; modules in the same package do not need it.
+@available(*, deprecated, message: "Bind a RouteDestination to Push, Replace, Sheet, or Cover instead.")
 public protocol RouteViewProviding {
     /// The view supplied for the route.
     associatedtype ProvidedView: View

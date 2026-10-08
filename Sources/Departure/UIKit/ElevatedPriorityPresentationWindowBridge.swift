@@ -37,7 +37,7 @@ final class ElevatedPriorityCascadedScenePhase {
 
 struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewControllerRepresentable {
     let priority: RoutePriority
-    @Binding var route: RoutePresentation?
+    @Binding var route: PresentedRoute?
     let sourceScenePhase: ScenePhase
     let windowDestinationBuilder: WindowDestinationBuilder
     let content: (RouteDestinationSnapshot, @escaping @MainActor () -> Void) -> HostedContent
@@ -85,7 +85,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
         private var window: PassThroughWindow?
         private var hostingController: WindowRootHostingController<CascadedScenePhaseHost>?
         private var cascadedScenePhase: ElevatedPriorityCascadedScenePhase?
-        private var presentedRouteID: RoutePresentation.ID?
+        private var presentedRouteID: PresentedRoute.ID?
         private var latestSourceScenePhase: ScenePhase?
         private var pendingPresentation: RouteDestinationSnapshot?
         private var clearRoute: (@MainActor () -> Void)?
@@ -105,7 +105,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
 
         func update(
             priority: RoutePriority,
-            route: RoutePresentation?,
+            route: PresentedRoute?,
             sourceScenePhase: ScenePhase,
             windowDestinationBuilder: WindowDestinationBuilder,
             clearRoute: @escaping @MainActor () -> Void
@@ -324,7 +324,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
 }
 #else
 struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
-    @Binding var route: RoutePresentation?
+    @Binding var route: PresentedRoute?
     let windowDestinationBuilder: WindowDestinationBuilder
     @ViewBuilder let content: (
         RouteDestinationSnapshot,
@@ -333,7 +333,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
 
     init(
         priority _: RoutePriority,
-        route: Binding<RoutePresentation?>,
+        route: Binding<PresentedRoute?>,
         sourceScenePhase _: ScenePhase,
         windowDestinationBuilder: WindowDestinationBuilder,
         @ViewBuilder content: @escaping (

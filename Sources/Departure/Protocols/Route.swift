@@ -28,12 +28,10 @@ import SwiftUI
 /// ``Router``.
 ///
 /// ```swift
-/// struct SettingsRoute: Route {
-///     func destination() -> some View {
-///         SettingsView()
-///     }
-/// }
+/// struct SettingsRoute: Route {}
 ///
+/// let settings = RouteDestination(SettingsRoute.self) { _, _ in SettingsView() }
+/// // On the owning view: .routes { Sheet(settings) }
 /// await router.present(SettingsRoute())
 /// ```
 public protocol Route: Identifiable where ID == ObjectIdentifier {
@@ -55,6 +53,7 @@ public protocol Route: Identifiable where ID == ObjectIdentifier {
     associatedtype Destination: View
 
     /// Builds this route's destination.
+    @available(*, deprecated, message: "Bind a RouteDestination to Push, Replace, Sheet, or Cover instead.")
     @ViewBuilder func destination() -> Destination
 }
 
@@ -74,8 +73,9 @@ public extension Route {
     /// Builds the fallback shown when this route does not provide a destination.
     ///
     /// Debug builds show a diagnostic with the route type. Release builds render an empty view.
-    /// Implement ``RouteViewProviding/destination()`` in another module to supply the destination
-    /// separately from the route declaration.
+    /// Bind a ``RouteDestination`` to the presentation declaration to supply a feature view
+    /// separately from the route type. Existing `RouteViewProviding` conformances remain supported.
+    @available(*, deprecated, message: "Bind a RouteDestination to Push, Replace, Sheet, or Cover instead.")
     func destination() -> some View {
         MissingRouteDestination(routeType: Self.self)
     }

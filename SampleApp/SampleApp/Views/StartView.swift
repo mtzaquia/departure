@@ -101,7 +101,7 @@ struct StartView: View {
         .routes(id: SampleAppAccessibility.startScopeID) {
             Cover(LandingRoute.self, providesNavigation: false)
             Cover(SplitBranchesRoute.self, providesNavigation: false)
-            Sheet(StartInfoRoute.self, providesNavigation: false)
+            Sheet(SampleDestinations.startInfo, providesNavigation: false)
         }
         .hooks {
             UnwindHandler(AuthenticationSettingsRoute.self) {
@@ -112,7 +112,8 @@ struct StartView: View {
 }
 
 struct StartInfoView: View {
-    @Environment(\.dismiss) private var dismiss
+    let unwindRoute: UnwindRouteAction
+    let presentation: RoutePresentation
 
     var body: some View {
         ZStack {
@@ -128,7 +129,12 @@ struct StartInfoView: View {
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier(SampleAppAccessibility.startInfoText)
 
-                Button("Done") { dismiss() }
+                Text("Presentation: \(String(describing: presentation.style)) · Priority: \(String(describing: presentation.priority))")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier(SampleAppAccessibility.startInfoPresentation)
+
+                Button("Done") { Task { await unwindRoute() } }
                     .frame(maxWidth: .infinity)
                     .labPrimaryButton()
                     .accessibilityIdentifier(SampleAppAccessibility.startInfoDismissButton)

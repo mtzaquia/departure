@@ -30,9 +30,12 @@ struct LandingRoute: SampleDeepLinkRoute {
     }
 }
 
-struct StartInfoRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        StartInfoView()
+struct StartInfoRoute: SampleDeepLinkRoute {}
+
+@MainActor
+enum SampleDestinations {
+    static let startInfo = RouteDestination(StartInfoRoute.self) { _, context in
+        StartInfoView(unwindRoute: context.unwindRoute, presentation: context.presentation)
             .modifier(SampleRoutingContext())
     }
 }
