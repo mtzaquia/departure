@@ -64,6 +64,15 @@ final class RouteScopeAttachment {
         reconcile()
     }
 
+    func handle(_ event: ViewLifecycleBridge.Event, target: RouteScope?, view: PlatformView?,
+                apply: @escaping (RouteScope) -> Void, remove: @escaping (RouteScope) -> Void) {
+        switch event {
+        case .installedInWindow, .updated:
+            update(target: target, view: view, apply: apply, remove: remove)
+        case .dismantled, .deinitialized: detach()
+        }
+    }
+
     func detach() {
         if let installed {
             remove?(installed)
@@ -83,9 +92,9 @@ final class RouteScopeAttachment {
 
         switch target.ownership(of: view) {
         case .pending:
-            // An anchor can disappear during a transient bridge replacement.
-            // Retain an existing registration until the attachment itself ends.
-            break
+            // Refresh only an exact attachment already admitted by the ownership gate.
+            // Window loss prevents new admission, but does not freeze captured consumer data.
+            if installed === target { apply?(target) }
 
         case .managed:
             installed = target

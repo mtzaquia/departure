@@ -88,7 +88,9 @@ struct DepartureSampleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if ProcessInfo.processInfo.arguments.contains("--independent-space-probe") {
+            if ProcessInfo.processInfo.arguments.contains("--sheet-focus-probe") {
+                WithRouter(routes: SheetFocusProbeRoot.routes) { SheetFocusProbeRoot() }
+            } else if ProcessInfo.processInfo.arguments.contains("--independent-space-probe") {
                 WithRouter(routes: IndependentSpaceProbeMap.root(owner: router), router: router) {
                     NavigationStack {
                         IndependentSpaceProbeRoot()

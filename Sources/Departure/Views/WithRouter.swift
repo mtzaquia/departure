@@ -92,18 +92,8 @@ private struct WindowDestinationBuilderRegistration: View {
         Color.clear
             .frame(width: 0, height: 0)
             .onLifecycleEvent { lifecycleView, lifecycleID, event in
-                switch event {
-                case .installedInWindow, .updated(isInstalledInWindow: true):
-                    router.windowDestinationBuilder = windowDestinationBuilder
-                    guard let lifecycleView else { return }
-                    router.hostDidAttach(router.root, view: lifecycleView, id: lifecycleID)
-
-                case .updated(isInstalledInWindow: false):
-                    router.windowDestinationBuilder = windowDestinationBuilder
-
-                case .dismantled, .deinitialized:
-                    router.hostDidDetach(router.root, id: lifecycleID)
-                }
+                router.windowDestinationBuilder = windowDestinationBuilder
+                router.handleHostEvent(event, scope: router.root, view: lifecycleView, id: lifecycleID)
             }
     }
 }

@@ -64,30 +64,18 @@ private struct RoutingModifier: ViewModifier {
                 Color.clear.frame(width: 0, height: 0)
                     .routePresentationStyleModifiers(for: styles, hostedBy: hostID, pushHostIdentity: pushHostIdentity)
                     .onLifecycleEvent { view, _, event in
-                        switch event {
-                        case .installedInWindow, .updated(isInstalledInWindow: true):
-                            guard let view else { return }
-                            attachment.update(target: scope, view: view,
-                                apply: { scope in
-                                    scope.bindRoutingHost(hostID, automatic: automatic, environment: environment, selection: selection)
-                                    if selection != nil {
-                                        // Representable updates run inside SwiftUI's view update.
-                                        // Revalidate the attachment before synchronizing on the next turn.
-                                        Task { @MainActor in
-                                            router.synchronizeBranchSelection(ownedBy: hostID, in: scope)
-                                        }
-                                    }
-                                },
-                                remove: { scope in
-                                    scope.unbindRoutingHost(hostID)
-                                    if selection != nil {
-                                        Task { @MainActor in router.restoreBranchSelection(in: scope) }
-                                    }
-                                })
-                        case .updated(isInstalledInWindow: false): break
-                        case .dismantled, .deinitialized:
-                            attachment.detach()
-                        }
+                        attachment.handle(event, target: scope, view: view,
+                            apply: { scope in
+                                scope.bindRoutingHost(hostID, automatic: automatic, environment: environment, selection: selection)
+                                if selection != nil {
+                                    Task { @MainActor in router.synchronizeBranchSelection(ownedBy: hostID, in: scope) }
+                                }
+                            }, remove: { scope in
+                                scope.unbindRoutingHost(hostID)
+                                if selection != nil {
+                                    Task { @MainActor in router.restoreBranchSelection(in: scope) }
+                                }
+                            })
                     }
             }
             .onChange(of: selection?.value(), initial: true) { _, _ in
@@ -107,14 +95,7 @@ private struct BranchRoutingModifier: ViewModifier {
                 .routingAutomatically()
                 .routeScopeEnvironment(scope, router: router)
                 .onLifecycleEvent { view, id, event in
-                    switch event {
-                    case .installedInWindow, .updated(isInstalledInWindow: true):
-                        guard let view else { return }
-                        router.hostDidAttach(scope, view: view, id: id)
-                    case .updated(isInstalledInWindow: false): break
-                    case .dismantled, .deinitialized:
-                        router.hostDidDetach(scope, id: id)
-                    }
+                    router.handleHostEvent(event, scope: scope, view: view, id: id)
                 }
         } else {
             content

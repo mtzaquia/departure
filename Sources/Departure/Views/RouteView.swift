@@ -31,14 +31,7 @@ public struct RouteView: View {
             .routingAutomatically()
             .routeScopeEnvironment(scope, router: router)
             .onLifecycleEvent { view, id, event in
-                switch event {
-                case .installedInWindow, .updated(isInstalledInWindow: true):
-                    guard let view else { return }
-                    router.hostDidAttach(scope, view: view, id: id)
-                case .updated(isInstalledInWindow: false): break
-                case .dismantled, .deinitialized:
-                    router.hostDidDetach(scope, id: id)
-                }
+                router.handleHostEvent(event, scope: scope, view: view, id: id)
             }
     }
 }

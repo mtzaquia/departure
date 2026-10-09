@@ -161,10 +161,62 @@ struct RouteScopeHostUIKitTests {
         #expect(installations == 1)
         scope.detachHost(id: firstManagedID)
         #expect(removals == 0)
-        scope.attachHost(managedView, id: UUID())
         #expect(installations == 2)
+        scope.attachHost(managedView, id: UUID())
+        #expect(installations == 3)
         attachment.detach()
         #expect(removals == 1)
+    }
+
+    @Test func destroyedNativeAnchorCannotBecomeAModelOnlyHost() {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        let controller = UIViewController()
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        let scope = RouteScope(id: "root", route: nil)
+        do {
+            let anchor = UIView()
+            controller.view.addSubview(anchor)
+            scope.attachHost(anchor, id: UUID())
+            #expect(scope.isAvailableForPresentation)
+            anchor.removeFromSuperview()
+        }
+        #expect(scope.isInstalledInView)
+        #expect(!scope.isAvailableForPresentation)
+    }
+
+    @Test func admittedAttachmentRefreshesWhileUnavailableWithoutAdmittingANewSource() {
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 320, height: 640))
+        let root = UIViewController()
+        window.rootViewController = root
+        window.makeKeyAndVisible()
+        defer { window.isHidden = true }
+        let managedView = UIView(), declarationView = UIView()
+        root.view.addSubview(managedView)
+        root.view.addSubview(declarationView)
+        let scope = RouteScope(id: "root", route: nil)
+        let hostID = UUID()
+        scope.attachHost(managedView, id: hostID)
+        let existing = RouteScopeAttachment(kind: .hooks)
+        var value = ""
+        existing.update(target: scope, view: declarationView,
+            apply: { _ in value = "initial" }, remove: { _ in })
+        #expect(value == "initial")
+        managedView.removeFromSuperview()
+        declarationView.removeFromSuperview()
+        scope.hostAvailabilityDidChange(id: hostID)
+        #expect(scope.isInstalledInView)
+        #expect(!scope.isAvailableForPresentation)
+        existing.handle(.updated(isInstalledInWindow: false), target: scope, view: declarationView,
+            apply: { _ in value = "refreshed" }, remove: { _ in })
+        #expect(value == "refreshed")
+        let pending = RouteScopeAttachment(kind: .hooks)
+        pending.update(target: scope, view: declarationView,
+            apply: { _ in value = "not authorized" }, remove: { _ in })
+        #expect(value == "refreshed")
+        existing.detach()
+        pending.detach()
     }
 
     @Test func attachmentRebindingRemovesTheExactFormerScope() {

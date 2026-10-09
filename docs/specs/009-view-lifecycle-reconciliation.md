@@ -1,8 +1,8 @@
 # View lifecycle and model reconciliation
 
-Status: investigation and proposed direction, 2026-10-09. No runtime redesign is accepted or implemented by this document.
+Status: accepted and implemented, 2026-10-09. The investigation below records the evidence and limits that led to the implementation.
 
-The investigation compares the main-branch sheet fix at `9276ee9f8e83daaf93c9790e30e2bf491881265a` with the map rewrite at `4128228`. Existing uncommitted work in the shared checkout is preserved. Runtime experiments use isolated copies.
+The investigation compares the main-branch sheet fix at `9276ee9f8e83daaf93c9790e30e2bf491881265a` with the map rewrite at `4128228`. The initial investigation preserved concurrent work and ran experiments in isolated copies. The implementation follows the resulting audit on the map branch.
 
 ## What the sheet fix establishes
 
@@ -76,7 +76,7 @@ The responder probe observed continuing branch registration refreshes, but no re
 
 The redesign should separate refreshing captured environment/handler data from admitting a new attachment and from native presentation readiness. Investigate refreshing an already-authorized exact attachment while its native anchor is temporarily unavailable. Preserve the unmanaged-sheet gate and live-membership rules; do not authorize a never-validated attachment merely because it inherited a scope.
 
-## Proposed direction
+## Accepted direction
 
 Keep the existing definition map, live X/Y/Z topology, and global navigation coordinator. Redesign the boundary around three existing facts:
 
@@ -100,8 +100,45 @@ Focus proof must use the actual native responder and editing transitions, route/
 
 The refined probe uses `UITextField` editing notifications, a weak reference to the actual field, `isFirstResponder`, and object identity. Repeated form-layout updates run independently of keyboard notifications, while a source-environment counter requests parent updates. It verifies no additional editing end/begin transitions or native-field replacement during typing, the expected end/begin sequence for deliberate Done and Save, stable destination state, and a fresh destination after reopening. All five responder comparisons passed: plain SwiftUI, pre-fix main root/branch, and rewrite root/branch. The root registration-refresh assertion exposed the paused refresh described above, rather than focus loss; root focus and reopening passed when checked separately from that assumption.
 
-Before implementing the boundary redesign, retain regressions for first presentation, focus through updates, native and programmatic dismissal, successor isolation, outgoing nested stacks, tab reveal/mounting, covered-space removal and notification, owner destruction, ordinary SwiftUI sheet coexistence, and the existing iOS 17 native behavior. Run focused checks during development and the full UI matrix at the resulting checkpoint.
+The boundary redesign must retain regressions for first presentation, focus through updates, native and programmatic dismissal, successor isolation, outgoing nested stacks, tab reveal/mounting, covered-space removal and notification, owner destruction, ordinary SwiftUI sheet coexistence, and the existing iOS 17 native behavior. Run focused checks during development and the full UI matrix at the resulting checkpoint.
 
 Investigation logs: `/tmp/departure-lifecycle-baseline.log`, `/tmp/departure-lifecycle-ordering-corrected.log`, and `/tmp/departure-lifecycle-legacy-baseline.log`. Native responder results are in `/tmp/departure-lifecycle-legacy-native-responder.log` (plain SwiftUI and pre-fix branch passed), `/tmp/departure-lifecycle-rewrite-native-responder.log` (rewrite branch passed), `/tmp/departure-lifecycle-legacy-root-responder.log`, and `/tmp/departure-lifecycle-rewrite-root-responder.log` (both roots passed). The earlier root-refresh assertion failures in the first two logs are characterized above. Probe refinements and their failed assumptions are retained in `/tmp/departure-lifecycle-*-keyboard*.log` and `/tmp/departure-lifecycle-*-responder*.log`. Isolated source locations are recorded in `/tmp/departure-lifecycle-audit-path.txt` and `/tmp/departure-lifecycle-legacy-path.txt`.
 
-These are Debug simulator checks on iOS 26.5. They do not reproduce the original affected device/composition or constitute the full UI matrix. No production implementation was changed by this investigation; only this audit document is added to the shared checkout.
+These are Debug simulator checks on iOS 26.5. They do not reproduce the original affected device/composition or constitute the full UI matrix. The investigation itself changed no production implementation. The subsequent implementation is recorded below.
+
+
+## Implementation
+
+The live X/Y/Z model and global navigation coordinator remain authoritative for desired navigation and eligibility. `NativePresentationLifetime` owns one rendered occurrence at the adapter boundary. It distinguishes a prepared request, native admission, dismissal, and completion. Preparation is necessary because SwiftUI can coalesce a sheet request with its cancellation before creating any destination; that case has no native dismissal callback to await. Admission comes from destination creation in the lifecycle bridge, or installing the UIKit presentation owner. No animation-duration guess controls navigation completion.
+
+An admitted occurrence remains retained until its native adapter acknowledges completion. Repeated synchronization does not rebuild the destination. A different desired route first dismisses the old occurrence, and the adapter reads the latest model value after completion. There is no pending route stored in a presenter. Exiting callbacks carry the occurrence identity, and a replaced native owner cannot remove the same still-live occurrence owned by its successor. A weak completed-occurrence reference prevents replay while an unwind notification enters before commit, without retaining the old scope or relying on memory-address uniqueness after deallocation.
+
+Ordinary sheets and slide covers use the common lifetime with `onDismiss`. The default fade cover uses the same retained occurrence; opacity-animation completion requests native dismissal, and `onDismiss` acknowledges it. Its duration sleeps and separate pending/dismissal state machine are removed. The elevated UIKit cross-dissolve child renders one fixed occurrence and forwards completion to its owning window instead of maintaining its own successor queue.
+
+The elevated window also owns the common lifetime. It installs its transparent base immediately inside `UIView.performWithoutAnimation`, then allows the modal to animate from that installed base. Dismissal retains the window and destination through UIKit's modal-dismissal completion. Only that completion hides the window and removes its root controller, inside `UIView.performWithoutAnimation`. It restores the previous key window only if the removed window was key, so removing covered high priority does not take key-window ownership away from critical priority.
+
+Modal waits derive from the exact native lifetime, even if a destination bridge has already detached or remains retained afterward. Pushes retain their existing managed-host completion and iOS 17 adapter. Outgoing topology snapshots continue preserving nested stacks until their modal owners complete. No global mount ledger, navigation graph, or command queue is added.
+
+Generic destination-host detachment now ends registration only. Native owner dismissal or destruction requests the common unwind operation for the exact live occurrence, including removal of a covered elevated root. Native and explicit unwind notifications retain their before-commit semantics. A stale outgoing occurrence cannot remove a successor space. Covered-space navigation remains blocked, and buffered follow-up presentations still wait for all operations and recheck coverage.
+
+Managed root, branch, and destination bindings share host-event handling. Hook and routing attachments share event refresh and teardown handling. An exact already-authorized attachment refreshes consumer data while ownership is pending during window disconnection; a never-authorized attachment remains pending. A positively unmanaged attachment is removed and diagnosed. This preserves ordinary SwiftUI-sheet isolation and exact live-membership eligibility for hooks. Native presenter availability is derived separately from retained installation, preserving inactive histories while branch reveal waits for an available anchor.
+
+Ordinary presentation slots remain in their existing locations. The investigation did not establish presenter placement as the original focus failure's cause. This pass unifies lifetime ownership and completion without adding a speculative hierarchy change. Focus probes are now retained in the SampleApp suite and use native editing transitions, a weak field reference, first-responder status, object identity, retained text, and repeated layout/environment updates. Software-keyboard visibility is not their focus signal.
+
+## Implementation validation
+
+The package checkpoint passed **393 tests in 30 suites**. The lifetime tests cover retained outgoing content, stale callbacks and replaced owners, native completion independent of bridge teardown, native destruction of a covered elevated root, buffered follow-up navigation, cancellation before native admission, ARC release, and dismissal completion arriving before the first unwind commits. Completion acknowledges an already-requested dismissal without starting another unwind operation.
+
+The full SampleApp iPhone suite passed **44 tests on iOS 26.5**, with two iPad-only cases skipped. Both skipped cases then passed on an iPad simulator running iOS 27. The full run preceded the final weak-anchor distinction and completion deduplication; affected checks were rerun separately after those narrow refinements.
+
+Native app-hosted UIKit tests on iOS 17.5 passed all ten ownership/availability checks, plus a parameterized high/critical window-lifetime test. The latter observes animation enablement at key-window insertion, holds an actual UIKit dismissal transition open, verifies the window and modal remain intact during that transition, and releases it to verify teardown with animation disabled. This establishes the window completion contract; visual animation quality is covered by the public-routing UI scenarios rather than this controlled renderer.
+
+Mounted macOS checks passed all six test functions, including native modal dismissal completing the routing operation. The final production implementation also built in Release.
+
+The first focused iOS 17.5 run passed eight navigation/dismissal cases, while two focus probes timed out waiting for twelve samples. Diagnostic counters showed one editing start, zero editing ends, the same native field still first responder, and only nine samples. The probe recreated its timer publisher during reevaluation. Its publisher now has stable view-state ownership; timeout diagnostics include the actual native counters. All six final iOS 17.5 checks passed: the five focus/replacement/cancellation cases and native dismissal/handler timing. Three final iOS 26.5 checks also passed: root/branch native focus and elevated replacement/continuation. These reruns used the final production implementation and corrected sampler.
+
+The iOS 27 iPhone runner failed to launch because its Foundation runtime library/dyld cache was unavailable, before any test executed. The iOS 27 iPad runner worked. Neither that launch failure nor the probe's sampling timeout establishes a library regression. The original focus instability from main remains unreproduced on the affected device/composition; this pass improves ownership and completion contracts without claiming a causal reproduction of that bug.
+
+The production Swift implementation has **117 fewer lines** than the starting checkpoint, including the common lifetime type. Tests and the retained SampleApp probe add coverage rather than production machinery.
+
+Checkpoint logs: `/tmp/departure-lifetime-package-checkpoint.log`, `/tmp/departure-lifetime-full-ui.log`, `/tmp/departure-lifetime-ipad.log`, `/tmp/departure-window-lifetime.log`, `/tmp/departure-lifetime-macos-checkpoint.log`, `/tmp/departure-lifetime-release-current.log`, `/tmp/departure-lifetime-ios17-focus-final.log`, and `/tmp/departure-lifetime-final-focus-ui.log`.
