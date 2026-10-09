@@ -80,14 +80,16 @@ extension RouterEngine {
                 log.departureDebug(.unwindAcceptedAncestorTarget(
                     keepThrough: ancestor, removing: ancestorPlan.removedScopes.count
                 ))
-                return await performPlannedUnwind(for: sourceScope, payload: payload, in: ancestor,
-                    operation: beginNavigationOperation(plan: ancestorPlan))
+                return await performPlannedUnwind(beginNavigationOperation(plan: ancestorPlan),
+                    notifying: [sourceScope], payload: payload, in: ancestor,
+                    authority: .scope(sourceScope), logsCompletion: true)
             }
         }
 
         log.departureDebug(.unwindAccepted(keepThrough: retained, removing: plan.removedScopes.count))
-        return await performPlannedUnwind(for: sourceScope, payload: payload, in: handlerScope,
-            operation: beginNavigationOperation(plan: plan))
+        return await performPlannedUnwind(beginNavigationOperation(plan: plan),
+            notifying: [sourceScope], payload: payload, in: handlerScope,
+            authority: .scope(sourceScope), logsCompletion: true)
     }
 
     @discardableResult
@@ -117,12 +119,9 @@ extension RouterEngine {
             removing: plan.removedScopes.count
         ))
 
-        return await performPlannedUnwind(
-            for: sourceScope,
-            payload: payload,
-            in: retained,
-            operation: beginNavigationOperation(plan: plan)
-        )
+        return await performPlannedUnwind(beginNavigationOperation(plan: plan),
+            notifying: [sourceScope], payload: payload, in: retained,
+            authority: .scope(sourceScope), logsCompletion: true)
     }
 
     func appendRoute(_ route: any Route, after match: ResolvedRouteTarget, origin: RouteRequestOrigin? = nil) async -> RouteScope? {
@@ -192,7 +191,7 @@ extension RouterEngine {
         } else {
             let operation = beginNavigationOperation(plan: plan)
             commitNavigationOperation(operation, preservesModalPresentationBindings: false)
-            await completeUnwindOperation(operation, logsCompletion: false)
+            await performPlannedUnwind(operation)
         }
         return isNavigationEligible(destination) && !Task.isCancelled ? destination : nil
     }
@@ -478,29 +477,42 @@ extension RouterEngine {
         }
     }
 
-    @discardableResult
-    func performPlannedUnwind(
-        for sourceScope: RouteScope?,
-        payload: Any?,
-        in targetScope: RouteScope?,
-        operation: NavigationOperation
-    ) async -> Bool {
-        await deliverUnwindHandlers(for: sourceScope, payload: payload, in: targetScope, removing: operation.removedScopes)
-        guard sourceScope.map(isNavigationEligible) ?? true, !Task.isCancelled else {
-            finishNavigationOperation(operation)
-            return false
+    private enum UnwindAuthority {
+        case scope(RouteScope), owner, nativeOwner
+
+        func permitsCommit(in router: RouterEngine) -> Bool {
+            switch self {
+            case .scope(let scope): !Task.isCancelled && router.isNavigationEligible(scope)
+            case .owner: !Task.isCancelled
+            case .nativeOwner: true
+            }
         }
-        commitNavigationOperation(operation)
-        await completeUnwindOperation(operation, logsCompletion: true)
-        return true
     }
 
-    private func completeUnwindOperation(_ operation: NavigationOperation, logsCompletion: Bool) async {
+    /// Every unwind shares notification, commit, native completion and coordinator release.
+    /// Already-committed operations still complete when their requesting task is cancelled.
+    @discardableResult
+    private func performPlannedUnwind(
+        _ operation: NavigationOperation,
+        notifying sources: [RouteScope] = [],
+        payload: Any? = nil,
+        in targetScope: RouteScope? = nil,
+        authority: UnwindAuthority = .owner,
+        logsCompletion: Bool = false
+    ) async -> Bool {
+        defer { finishNavigationOperation(operation) }
+        if case .preparingUnwind = operation.stage {
+            for source in sources {
+                await deliverUnwindHandlers(for: source, payload: payload, in: targetScope, removing: operation.removedScopes)
+            }
+            guard authority.permitsCommit(in: self) else { return false }
+            commitNavigationOperation(operation)
+        }
         await waitForNavigationOperation(operation)
         if logsCompletion {
             log.departureDebug(.unwindCompleted(path: spaces.activeSpace.currentRoutePath.departureDebugPathDescription))
         }
-        finishNavigationOperation(operation)
+        return true
     }
 
     @discardableResult
@@ -511,20 +523,11 @@ extension RouterEngine {
     @discardableResult
     func dismissSpaces(_ candidates: [RouteSpace], source: RouteScope? = nil, payload: Any? = nil) async -> Bool {
         let captured = candidates.filter { $0.priority != .default && spaces.space(for: $0.priority) === $0 }
-        guard !captured.isEmpty, !Task.isCancelled,
-              source.map(isNavigationEligible) ?? true else { return false }
-        let operation = beginNavigationOperation(plan: RouteSpaces.UnwindPlan(removing: captured))
-        for space in captured.sorted(by: { $0.priority > $1.priority }) {
-            await deliverUnwindHandlers(for: space.root, payload: payload, in: nil, removing: operation.removedScopes)
-        }
-        guard !Task.isCancelled, source.map(isNavigationEligible) ?? true else {
-            finishNavigationOperation(operation)
-            return false
-        }
-        commitNavigationOperation(operation)
-        await waitForNavigationOperation(operation)
-        finishNavigationOperation(operation)
-        return true
+        let authority = source.map(UnwindAuthority.scope) ?? .owner
+        guard !captured.isEmpty, authority.permitsCommit(in: self) else { return false }
+        return await performPlannedUnwind(beginNavigationOperation(plan: RouteSpaces.UnwindPlan(removing: captured)),
+            notifying: captured.sorted { $0.priority > $1.priority }.map(\.root), payload: payload,
+            authority: authority)
     }
 
     /// Capture outgoing projections before cutting their owning edges in the live tree.
@@ -587,16 +590,12 @@ extension RouterEngine {
     }
 
     func deliverUnwindHandlers(
-        for sourceScope: RouteScope?,
+        for sourceScope: RouteScope,
         payload: Any?,
         in targetScope: RouteScope?,
         removing removedScopes: [RouteScope]
     ) async {
         guard removedScopes.isEmpty == false else {
-            return
-        }
-
-        guard let sourceScope else {
             return
         }
 
@@ -627,9 +626,9 @@ extension RouterEngine {
     }
 
     private func unwindHandlerBinding(
-        for sourceScope: RouteScope?, in targetScope: RouteScope?, removing removedScopes: [RouteScope]
+        for sourceScope: RouteScope, in targetScope: RouteScope?, removing removedScopes: [RouteScope]
     ) -> DeclarationBinding<RouteScope.UnwindHandlerMatch>? {
-        guard let sourceScope, let route = sourceScope.route, let sourceSpace = sourceScope.space,
+        guard let route = sourceScope.route, let sourceSpace = sourceScope.space,
               spaces.routePath(containing: sourceScope) != nil else { return nil }
         let removed = Set(removedScopes.map(ObjectIdentifier.init))
         if let binding = targetScope?.firstUnwindHandlerBinding(for: type(of: route), in: spaces, excluding: removed) {
@@ -746,24 +745,17 @@ extension RouterEngine {
         }
     }
 
-    func performPresentationDismissalUnwind(for sourceScope: RouteScope?, in targetScope: RouteScope?, plan: RouteSpaces.UnwindPlan, nativeOwner: Bool = false) {
+    func performPresentationDismissalUnwind(for sourceScope: RouteScope, in targetScope: RouteScope?, plan: RouteSpaces.UnwindPlan, nativeOwner: Bool = false) {
         guard !plan.removedScopes.isEmpty else { applyUnwindPlan(plan); return }
         let operation = beginNavigationOperation(plan: plan)
         // Without a callback, native write-back can commit in this call stack.
         // With a callback, use the same before-commit boundary as explicit unwind.
-        guard unwindHandlerBinding(for: sourceScope, in: targetScope, removing: operation.removedScopes)?.declaration != nil else {
-            commitNavigationOperation(operation)
-            Task { @MainActor in await completeUnwindOperation(operation, logsCompletion: false) }
-            return
-        }
+        let hasHandler = unwindHandlerBinding(for: sourceScope, in: targetScope, removing: operation.removedScopes)?.declaration != nil
+        if !hasHandler { commitNavigationOperation(operation) }
         Task { @MainActor in
-            if nativeOwner {
-                await deliverUnwindHandlers(for: sourceScope, payload: nil, in: targetScope, removing: operation.removedScopes)
-                commitNavigationOperation(operation)
-                await completeUnwindOperation(operation, logsCompletion: false)
-            } else {
-                await performPlannedUnwind(for: sourceScope, payload: nil, in: targetScope, operation: operation)
-            }
+            await performPlannedUnwind(operation, notifying: [sourceScope], in: targetScope,
+                authority: nativeOwner ? .nativeOwner : .scope(sourceScope),
+                logsCompletion: hasHandler && !nativeOwner)
         }
     }
 

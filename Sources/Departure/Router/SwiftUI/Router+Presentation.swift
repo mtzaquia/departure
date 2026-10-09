@@ -115,13 +115,6 @@ extension RouterEngine {
         return declaration.priority <= space.priority
     }
 
-    func dismissPresentation(from scope: RouteScope, matching style: RoutePresentationKind, hostedBy hostID: RoutePresentationHostID?) {
-        dismissPresentation(for: .local(scope, hostID), matching: style)
-    }
-    func dismissElevatedPresentation(priority: RoutePriority, matching style: RoutePresentationKind) {
-        dismissPresentation(for: .priority(priority), matching: style)
-    }
-
     /// A native owner ending an exact live occurrence is authoritative even when covered.
     /// Generic destination-view teardown has no navigation authority.
     func nativePresentationDidDismiss(_ scope: RouteScope) {
