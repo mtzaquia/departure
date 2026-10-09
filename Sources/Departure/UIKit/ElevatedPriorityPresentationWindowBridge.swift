@@ -37,6 +37,7 @@ final class ElevatedPriorityCascadedScenePhase {
 
 struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewControllerRepresentable {
     let priority: RoutePriority
+    let router: RouterEngine
     @Binding var route: PresentedRoute?
     let sourceScenePhase: ScenePhase
     let windowDestinationBuilder: WindowDestinationBuilder
@@ -50,12 +51,10 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
         controller.content = content
         controller.update(
             priority: priority,
-            route: route,
+            desiredRoute: { route },
+            router: router,
             sourceScenePhase: sourceScenePhase,
-            windowDestinationBuilder: windowDestinationBuilder,
-            clearRoute: {
-                route = nil
-            }
+            windowDestinationBuilder: windowDestinationBuilder
         )
     }
 
@@ -85,11 +84,12 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
         private var window: PassThroughWindow?
         private var hostingController: WindowRootHostingController<CascadedScenePhaseHost>?
         private var cascadedScenePhase: ElevatedPriorityCascadedScenePhase?
-        private var presentedRouteID: PresentedRoute.ID?
+        private let lifetime = NativePresentationLifetime()
+        private var desiredRoute: (() -> PresentedRoute?)?
+        private var router: RouterEngine?
+        private var priority: RoutePriority?
         private var latestSourceScenePhase: ScenePhase?
-        private var pendingPresentation: RouteDestinationSnapshot?
-        private var clearRoute: (@MainActor () -> Void)?
-        private var isDismissingWindow = false
+        private var windowDestinationBuilder = WindowDestinationBuilder.passthrough
 
         init(content: @escaping (RouteDestinationSnapshot, @escaping @MainActor () -> Void) -> HostedContent) {
             self.content = content
@@ -105,57 +105,41 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
 
         func update(
             priority: RoutePriority,
-            route: PresentedRoute?,
+            desiredRoute: @escaping () -> PresentedRoute?,
+            router: RouterEngine,
             sourceScenePhase: ScenePhase,
-            windowDestinationBuilder: WindowDestinationBuilder,
-            clearRoute: @escaping @MainActor () -> Void
+            windowDestinationBuilder: WindowDestinationBuilder
         ) {
-            self.clearRoute = clearRoute
+            self.priority = priority
+            self.desiredRoute = desiredRoute
+            self.router = router
             self.latestSourceScenePhase = sourceScenePhase
+            self.windowDestinationBuilder = windowDestinationBuilder
+            synchronize()
+        }
 
-            guard isDismissingWindow == false else {
-                guard let route else {
-                    pendingPresentation = nil
-                    return
-                }
-
-                if pendingPresentation?.route.id != route.id {
-                    pendingPresentation = RouteDestinationSnapshot(
-                        route: route,
-                        destinationBuilder: windowDestinationBuilder
-                    )
-                }
-
+        private func synchronize() {
+            let wasPresented = lifetime.isPresented
+            lifetime.synchronize(desiredRoute?()) {
+                RouteDestinationSnapshot(route: $0, destinationBuilder: windowDestinationBuilder)
+            }
+            guard let presentation = lifetime.presentation else { return }
+            if !lifetime.isPresented {
+                if wasPresented { dismissWindow() }
                 return
             }
-
-            guard let route else {
-                pendingPresentation = nil
-                dismissWindow(callClearRoute: false)
-                return
+            if window != nil {
+                cascadedScenePhase?.value = latestSourceScenePhase ?? presentation.route.sourceEnvironment.scenePhase
+            } else if let priority {
+                present(presentation, priority: priority,
+                    sourceScenePhase: latestSourceScenePhase ?? presentation.route.sourceEnvironment.scenePhase)
             }
-
-            if route.id == presentedRouteID {
-                cascadedScenePhase?.value = sourceScenePhase
-                return
-            }
-
-            let presentation = RouteDestinationSnapshot(
-                route: route,
-                destinationBuilder: windowDestinationBuilder
-            )
-
-            if presentedRouteID != nil {
-                pendingPresentation = presentation
-                dismissWindow(callClearRoute: false, presentsPendingRoute: true)
-                return
-            }
-
-            present(presentation, priority: priority, sourceScenePhase: sourceScenePhase)
         }
 
         func detach() {
-            dismissWindow(callClearRoute: false)
+            desiredRoute = nil
+            guard let id = lifetime.presentation?.id else { return }
+            if lifetime.beginDismissal(of: id) { dismissWindow() }
         }
 
         private func present(
@@ -164,7 +148,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
             sourceScenePhase: ScenePhase
         ) {
             guard let scene = resolveScene() else {
-                clearRoute?()
+                if let router { lifetime.completeDismissal(of: presentation.id, in: router) }
                 return
             }
 
@@ -179,15 +163,15 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
             )
             hostingController.view.backgroundColor = .clear
             hostingController.onDismiss = { [weak self] in
-                self?.dismissFromPresentedHost()
+                self?.dismissFromPresentedHost(id: presentation.id)
             }
             window.rootViewController = hostingController
 
             self.window = window
             self.hostingController = hostingController
             self.cascadedScenePhase = cascadedScenePhase
-            self.presentedRouteID = presentation.route.id
 
+            lifetime.didAdmitPresentation(of: presentation.id)
             // Install the transparent native base immediately. The SwiftUI presenter
             // starts its own animation after this base enters the window hierarchy.
             UIView.performWithoutAnimation { window.makeKeyAndVisible() }
@@ -197,96 +181,44 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
             for presentation: RouteDestinationSnapshot,
             scenePhase: ElevatedPriorityCascadedScenePhase
         ) -> CascadedScenePhaseHost {
-            let routeID = presentation.route.id
-            return CascadedScenePhaseHost(
-                scenePhase: scenePhase,
-                content: content(
-                    presentation,
-                    { [weak self] in
-                        guard self?.presentedRouteID == routeID else {
-                            return
-                        }
-
-                        guard self?.isDismissingWindow == false else {
-                            return
-                        }
-
-                        self?.dismissFromPresentedHost()
-                    }
-                )
-            )
+            CascadedScenePhaseHost(scenePhase: scenePhase,
+                content: content(presentation, { [weak self] in
+                    self?.dismissFromPresentedHost(id: presentation.id)
+                }))
         }
 
-        private func dismissFromPresentedHost() {
-            clearRoute?()
-            dismissWindow(callClearRoute: false)
-        }
-
-        private func dismissWindow(
-            callClearRoute: Bool,
-            presentsPendingRoute: Bool = false
-        ) {
-            guard let window else {
-                finishDismissWindow(
-                    window: nil,
-                    callClearRoute: callClearRoute,
-                    presentsPendingRoute: presentsPendingRoute
-                )
-                return
+        private func dismissFromPresentedHost(id: PresentedRoute.ID) {
+            guard lifetime.beginDismissal(of: id) else { return }
+            if let scope = lifetime.presentation?.route.scope, scope.isNativePresentationOwned(by: lifetime) {
+                router?.nativePresentationDidDismiss(scope)
             }
+            dismissWindow()
+        }
 
-            isDismissingWindow = true
+        private func dismissWindow() {
+            guard let presentation = lifetime.presentation else { return }
             hostingController?.onDismiss = nil
-
-            let rootViewController = window.rootViewController
-
-            let completion: () -> Void = { [weak self, weak window] in
-                self?.finishDismissWindow(
-                    window: window,
-                    callClearRoute: callClearRoute,
-                    presentsPendingRoute: presentsPendingRoute
-                )
-            }
-
-            if rootViewController?.presentedViewController != nil {
-                rootViewController?.dismiss(animated: true, completion: completion)
-            } else {
-                completion()
-            }
-        }
-
-        private func finishDismissWindow(
-            window dismissedWindow: PassThroughWindow?,
-            callClearRoute: Bool,
-            presentsPendingRoute: Bool
-        ) {
-            dismissedWindow?.isHidden = true
-            dismissedWindow?.rootViewController = nil
-
-            if window === dismissedWindow {
-                previousKeyWindow?.makeKey()
-
+            let dismissedWindow = window
+            let completion: () -> Void = { [self] in
+                // Retain the native owner through destruction, even if its representable is gone.
+                guard lifetime.presentation?.id == presentation.id else { return }
+                let restoresKeyWindow = dismissedWindow?.isKeyWindow == true
+                UIView.performWithoutAnimation {
+                    dismissedWindow?.isHidden = true
+                    dismissedWindow?.rootViewController = nil
+                    if restoresKeyWindow, previousKeyWindow?.isHidden == false { previousKeyWindow?.makeKey() }
+                }
                 previousKeyWindow = nil
                 window = nil
                 hostingController = nil
                 cascadedScenePhase = nil
-                presentedRouteID = nil
+                if let router { lifetime.completeDismissal(of: presentation.id, in: router) }
+                synchronize()
             }
-
-            isDismissingWindow = false
-
-            if callClearRoute {
-                clearRoute?()
-            }
-
-            if presentsPendingRoute, let pendingPresentation,
-               let priority = pendingPresentation.route.scope.routePresentation?.priority {
-                self.pendingPresentation = nil
-                present(
-                    pendingPresentation,
-                    priority: priority,
-                    sourceScenePhase: latestSourceScenePhase ?? pendingPresentation.route.sourceEnvironment.scenePhase
-                )
+            if let root = dismissedWindow?.rootViewController, root.presentedViewController != nil {
+                root.dismiss(animated: true, completion: completion)
+            } else {
+                completion()
             }
         }
 
@@ -322,42 +254,6 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
             case .default:
                 return UIWindow.Level(rawValue: resolveHighestWindowLevel(in: scene).rawValue + 1)
             }
-        }
-    }
-}
-#else
-struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: View {
-    @Binding var route: PresentedRoute?
-    let windowDestinationBuilder: WindowDestinationBuilder
-    @ViewBuilder let content: (
-        RouteDestinationSnapshot,
-        @escaping @MainActor () -> Void
-    ) -> HostedContent
-
-    init(
-        priority _: RoutePriority,
-        route: Binding<PresentedRoute?>,
-        sourceScenePhase _: ScenePhase,
-        windowDestinationBuilder: WindowDestinationBuilder,
-        @ViewBuilder content: @escaping (
-            RouteDestinationSnapshot,
-            @escaping @MainActor () -> Void
-        ) -> HostedContent
-    ) {
-        self._route = route
-        self.windowDestinationBuilder = windowDestinationBuilder
-        self.content = content
-    }
-
-    @ViewBuilder
-    var body: some View {
-        if let route {
-            content(
-                RouteDestinationSnapshot(route: route, destinationBuilder: windowDestinationBuilder),
-                {
-                    self.route = nil
-                }
-            )
         }
     }
 }

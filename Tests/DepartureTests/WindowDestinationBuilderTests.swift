@@ -369,26 +369,17 @@ struct WindowDestinationBuilderTests {
     }
 
     #if !canImport(UIKit)
-    @Test func elevatedBridgeUsesWindowDestinationBuilderOnMacOS() {
+    @Test func elevatedSnapshotUsesWindowDestinationBuilderOnMacOS() {
         let recorder = WindowDestinationRecorder()
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "macOS elevated"
         let presentation = PresentedRoute(scope: RouteScope(id: SettingsRoute().id, route: SettingsRoute()), sourceEnvironment: environment)
         let builder = WindowDestinationBuilder { destination, environment in
-            RecordingWindowDestinationView(
-                destination: destination, environment: environment, recorder: recorder
-            )
+            RecordingWindowDestinationView(destination: destination, environment: environment, recorder: recorder)
         }
-        let bridge = ElevatedPriorityPresentationWindowBridge(
-            priority: .high,
-            route: .constant(presentation),
-            sourceScenePhase: .active,
-            windowDestinationBuilder: builder
-        ) { snapshot, _ in
-            snapshot.destination
-        }
-
-        _ = bridge.body
+        let lifetime = NativePresentationLifetime()
+        lifetime.synchronize(presentation) { RouteDestinationSnapshot(route: $0, destinationBuilder: builder) }
+        #expect(lifetime.presentation?.id == presentation.id)
         #expect(recorder.values == ["macOS elevated"])
     }
     #endif

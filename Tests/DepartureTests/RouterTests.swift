@@ -3657,7 +3657,7 @@ struct RouterTests {
         #expect(walletScope.path.last === transactionScope)
     }
 
-    @Test func highPrioritySpaceClearsWhenHighRouteLeavesViewOnInactiveBranch() async throws {
+    @Test func highPrioritySpaceClearsWhenNativeOwnerDismissesOnInactiveBranch() async throws {
         let router = RouterEngine()
         let (selection, selectedTab) = tabSelection(.wallet)
 
@@ -3704,6 +3704,8 @@ struct RouterTests {
 
         router.root.setActiveBranch(AnyHashable(AppTab.home))
         router.routeScopeDidLeaveView(highRouteScope)
+        #expect(router.spaces.highSpace != nil)
+        router.nativePresentationDidDismiss(highRouteScope)
 
         #expect(selectedTab() == .home)
         #expect(router.spaces.highSpace == nil)

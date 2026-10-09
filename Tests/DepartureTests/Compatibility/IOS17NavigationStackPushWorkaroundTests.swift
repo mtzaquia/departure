@@ -272,7 +272,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
         let scope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute())
         router.routeScopeDidInstallInView(scope)
 
-        await router.waitForRouteScopesToLeaveView([scope])
+        await router.waitForPresentationsToEnd([scope])
 
         #expect(scope.isInstalledInView == false)
     }
@@ -307,7 +307,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
         await router.present(HomeDetailRoute())
         let scope = try #require(router.defaultSpace.rootPath.last)
         router.hostDidAttach(scope, view: nil, id: UUID())
-        let wait = Task { await router.waitForRouteScopesToLeaveView([scope]) }
+        let wait = Task { await router.waitForPresentationsToEnd([scope]) }
         await Task.yield()
         router.hostDidAttach(scope, view: nil, id: UUID())
         await wait.value

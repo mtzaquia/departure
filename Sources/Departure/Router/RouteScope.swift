@@ -43,8 +43,15 @@ final class RouteScope: Identifiable {
 
     // Physical facts belong to the scope; current projections are derived from them.
     private struct Host {
+        private struct Anchor { weak var view: PlatformView? }
         let id: UUID
-        weak var view: PlatformView?
+        private let anchor: Anchor?
+        var view: PlatformView? { anchor?.view }
+        var isAvailable: Bool { anchor.map { $0.view?.window != nil } ?? true }
+        init(id: UUID, view: PlatformView?) {
+            self.id = id
+            anchor = view.map { Anchor(view: $0) }
+        }
     }
     private struct RoutingHost {
         let automatic: Bool
@@ -53,6 +60,12 @@ final class RouteScope: Identifiable {
     }
     private struct WeakAttachment { weak var value: RouteScopeAttachment? }
     private struct WeakReadiness { weak var value: RouteScopeReadiness? }
+    private struct WeakNativePresentation { weak var value: NativePresentationLifetime? }
+    private enum PresentationCompletion {
+        case host
+        case native(WeakNativePresentation)
+    }
+    @ObservationIgnored private var presentationCompletion: PresentationCompletion = .host
     @ObservationIgnored private var host: Host?
     @ObservationIgnored private var routingHosts = OrderedStorage<RoutePresentationHostID, RoutingHost>()
     @ObservationIgnored private var hookSources: [AnyHashable: [AnyHookDeclaration]] = [:]
@@ -76,6 +89,29 @@ final class RouteScope: Identifiable {
         access(keyPath: \.isInstalledInView)
         return host != nil
     }
+    var isAvailableForPresentation: Bool {
+        access(keyPath: \.isAvailableForPresentation)
+        guard let host else { return false }
+        // Model-only hosts have no anchor; a destroyed native anchor remains unavailable.
+        return host.isAvailable
+    }
+
+    /// Modal completion belongs to its native adapter; pushes use managed-host teardown.
+    var isAwaitingPresentationEnd: Bool {
+        switch presentationCompletion {
+        case .host: isInstalledInView
+        case .native(let owner): owner.value?.presentation?.route.scope === self
+        }
+    }
+    func trackNativePresentation(_ owner: NativePresentationLifetime) {
+        presentationCompletion = .native(WeakNativePresentation(value: owner))
+    }
+    func nativePresentationDidEnd() { checkReadiness() }
+    func isNativePresentationOwned(by owner: NativePresentationLifetime) -> Bool {
+        if case .native(let current) = presentationCompletion { return current.value === owner }
+        return false
+    }
+
     var hostID: UUID? { host?.id }
     var sourceEnvironment: EnvironmentValues { sourceEnvironmentReference.values }
 
@@ -212,11 +248,13 @@ extension RouteScope {
     @discardableResult
     func attachHost(_ view: PlatformView?, id: UUID) -> Bool {
         let becameReady = host == nil
-        if becameReady {
-            withMutation(keyPath: \.isInstalledInView) { host = Host(id: id, view: view) }
-            hasEverInstalled = true
-        } else {
-            host = Host(id: id, view: view)
+        withMutation(keyPath: \.isAvailableForPresentation) {
+            if becameReady {
+                withMutation(keyPath: \.isInstalledInView) { host = Host(id: id, view: view) }
+                hasEverInstalled = true
+            } else {
+                host = Host(id: id, view: view)
+            }
         }
         reconcileAttachments()
         checkReadiness()
@@ -226,10 +264,19 @@ extension RouteScope {
     @discardableResult
     func detachHost(id: UUID) -> Bool {
         guard host?.id == id else { return false }
-        withMutation(keyPath: \.isInstalledInView) { host = nil }
+        withMutation(keyPath: \.isAvailableForPresentation) {
+            withMutation(keyPath: \.isInstalledInView) { host = nil }
+        }
         reconcileAttachments()
         checkReadiness()
         return true
+    }
+
+    func hostAvailabilityDidChange(id: UUID) {
+        guard host?.id == id else { return }
+        withMutation(keyPath: \.isAvailableForPresentation) {}
+        reconcileAttachments()
+        checkReadiness()
     }
 
     var presentationHostID: RoutePresentationHostID? {
@@ -390,7 +437,12 @@ extension RouteScope {
     @discardableResult
     func waitUntilInstalled(in engine: RouterEngine? = nil) async -> Bool {
         let eligible: (() -> Bool)? = engine.map { engine in { engine.isNavigationEligible(self) } }
-        return await RouteScopeReadiness.wait(in: self, while: eligible) { self.isInstalledInView }
+        return await RouteScopeReadiness.wait(in: self, while: eligible) { engine == nil ? self.isInstalledInView : self.isAvailableForPresentation }
+    }
+
+    @discardableResult
+    func waitUntilPresentationEnded() async -> Bool {
+        await RouteScopeReadiness.wait(in: self, cancellable: false) { !self.isAwaitingPresentationEnd }
     }
 
     @discardableResult

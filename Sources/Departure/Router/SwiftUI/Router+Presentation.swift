@@ -122,6 +122,25 @@ extension RouterEngine {
         dismissPresentation(for: .priority(priority), matching: style)
     }
 
+    /// A native owner ending an exact live occurrence is authoritative even when covered.
+    /// Generic destination-view teardown has no navigation authority.
+    func nativePresentationDidDismiss(_ scope: RouteScope) {
+        guard spaces.routePath(containing: scope) != nil, let space = scope.space,
+              scope.presentationDeclaration?.presentationKind.isModal == true else { return }
+        let plan: RouteSpaces.UnwindPlan
+        let retained: RouteScope?
+        if scope === space.root {
+            guard space.priority != .default else { return }
+            plan = RouteSpaces.UnwindPlan(removing: [space])
+            retained = nil
+        } else {
+            guard let previous = scope.routePath.scope(before: scope) else { return }
+            plan = RouteSpaces.UnwindPlan(retaining: [previous])
+            retained = previous
+        }
+        performPresentationDismissalUnwind(for: scope, in: retained, plan: plan, nativeOwner: true)
+    }
+
     private func dismissPresentation(for target: PresentationTarget, matching style: RoutePresentationKind?) {
         guard let presentation = resolvePresentation(for: target, matching: style) else { return }
         let scope = presentation.scope

@@ -39,10 +39,12 @@ import Testing
         #expect(engine.spaces.highSpace == nil)
         #expect(engine.spaces.criticalSpace != nil)
     }
-    @Test func elevatedNativeTeardownClearsOnlyItsOwnPriority() async throws {
+    @Test func elevatedNativeOwnerDismissalClearsOnlyItsOwnPriority() async throws {
         let (engine, defaultScope, high, _) = try await makeChain()
         engine.routeScopeDidInstallInView(high)
         engine.routeScopeDidLeaveView(high)
+        #expect(engine.spaces.highSpace != nil)
+        engine.nativePresentationDidDismiss(high)
         #expect(engine.defaultSpace.rootPath.last === defaultScope)
         #expect(engine.spaces.highSpace == nil)
         #expect(engine.spaces.criticalSpace != nil)

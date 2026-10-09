@@ -70,12 +70,12 @@ import Testing
         #expect(engine.spaces.highSpace === space)
         engine.hostDidDetach(scope, id: replacement)
         #expect(!scope.isInstalledInView)
-        #expect(engine.spaces.highSpace == nil)
+        #expect(engine.spaces.highSpace === space)
         engine.hostDidDetach(scope, id: replacement)
-        #expect(engine.spaces.highSpace == nil)
+        #expect(engine.spaces.highSpace === space)
     }
 
-    @Test func detachingAnElevatedRootRemovesItsEntireOwnedTreeWhileCovered() async throws {
+    @Test func nativeOwnerDismissalRemovesItsEntireOwnedTreeWhileCovered() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
             Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
         } highPriority: {
@@ -110,6 +110,8 @@ import Testing
         let host = UUID()
         engine.hostDidAttach(high.root, view: nil, id: host)
         engine.hostDidDetach(high.root, id: host)
+        #expect(engine.spaces.highSpace === high)
+        engine.nativePresentationDidDismiss(high.root)
         #expect(engine.spaces.highSpace == nil)
         #expect(engine.spaces.criticalSpace === critical)
         #expect(engine.defaultSpace.rootPath.last === defaultDestination)

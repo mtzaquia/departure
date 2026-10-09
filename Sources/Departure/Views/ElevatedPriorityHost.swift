@@ -30,14 +30,22 @@ struct ElevatedPriorityHost: View {
     let windowDestinationBuilder: WindowDestinationBuilder
 
     var body: some View {
-        ElevatedPriorityPresentationWindowBridge(priority: priority,
+        #if canImport(UIKit)
+        ElevatedPriorityPresentationWindowBridge(priority: priority, router: router,
             route: router.presentationBinding(for: .priority(priority)), sourceScenePhase: scenePhase,
             windowDestinationBuilder: windowDestinationBuilder) { presentation, onDismiss in
                 presenter(for: presentation, onDismiss: onDismiss).environment(\.routerEngine, router)
             }
             .allowsHitTesting(false)
+        #else
+        Color.clear.frame(width: 0, height: 0)
+            .modifier(SystemModalPresentationModifier(style: .sheet,
+                route: router.presentationBinding(for: .priority(priority)).wrappedValue,
+                destinationBuilder: windowDestinationBuilder))
+        #endif
     }
 
+    #if canImport(UIKit)
     @ViewBuilder
     private func presenter(for presentation: RouteDestinationSnapshot, onDismiss: @escaping @MainActor () -> Void) -> some View {
         if let style = presentation.route.scope.routePresentation?.style {
@@ -45,18 +53,16 @@ struct ElevatedPriorityHost: View {
             case .sheet, .cover(.slide):
                 ElevatedSystemPresenter(style: style, destination: presentation.destination, onDismiss: onDismiss)
             case .cover(.fade):
-                #if canImport(UIKit)
                 ElevatedPriorityCoverFadePresenter(presentation: presentation, router: router, onDismiss: onDismiss)
-                #else
-                ElevatedSystemPresenter(style: .sheet, destination: presentation.destination, onDismiss: onDismiss)
-                #endif
             case .push, .replace:
                 EmptyView()
             }
         }
     }
+    #endif
 }
 
+#if canImport(UIKit)
 private struct ElevatedSystemPresenter: View {
     let style: RoutePresentationKind
     let destination: AnyView
@@ -71,7 +77,6 @@ private struct ElevatedSystemPresenter: View {
 
     @ViewBuilder
     private var systemPresentation: some View {
-        #if canImport(UIKit)
         if style != .sheet {
             Color.clear.ignoresSafeArea()
                 .fullScreenCover(isPresented: $isPresented, onDismiss: onDismiss) { destination }
@@ -79,9 +84,6 @@ private struct ElevatedSystemPresenter: View {
             Color.clear.ignoresSafeArea()
                 .sheet(isPresented: $isPresented, onDismiss: onDismiss) { destination }
         }
-        #else
-        Color.clear.ignoresSafeArea()
-            .sheet(isPresented: $isPresented, onDismiss: onDismiss) { destination }
-        #endif
     }
 }
+#endif

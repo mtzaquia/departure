@@ -101,7 +101,7 @@ struct IndependentPriorityTests {
         let second = try #require(owner.engine.spaces.highSpace)
         #expect(second !== first)
         oldBinding.wrappedValue = nil
-        owner.engine.clearElevatedSpaceIfNeeded(forRemovedViewScope: first.root)
+        owner.engine.nativePresentationDidDismiss(first.root)
         #expect(owner.engine.spaces.highSpace === second)
     }
 

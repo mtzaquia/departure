@@ -20,7 +20,6 @@
 //  SOFTWARE.
 //
 
-import Observation
 import SwiftUI
 
 struct CoverFadePresentationStyleModifier: ViewModifier {
@@ -45,11 +44,7 @@ struct CoverFadePresentationStyleModifier: ViewModifier {
                 )
             }
 #else
-            .sheet(item: presentation) { route in
-                RouteView(
-                    scope: route.scope
-                )
-            }
+            .modifier(SystemModalPresentationModifier(style: .sheet, route: presentation.wrappedValue))
 #endif
     }
 }
@@ -59,237 +54,78 @@ struct CoverFadePresentationStyleModifier: ViewModifier {
 #if canImport(UIKit)
 import UIKit
 
-@Observable
-private final class CoverFadePresentationState {
-    enum SystemPresentationProjection {
-        case value
-    }
-
-    var systemPresentation: RouteDestinationSnapshot?
-    var isContentVisible = false
-    var isDismissing = false
-    var fadeInTaskID: PresentedRoute.ID?
-    var dismissalTaskID: PresentedRoute.ID?
-
-    subscript(systemPresentation _: SystemPresentationProjection) -> RouteDestinationSnapshot? {
-        get {
-            systemPresentation
-        }
-        set {
-            Task { @MainActor [weak self] in
-                await Task.yield()
-                guard let self else {
-                    return
-                }
-
-                guard let newValue else {
-                    dismissWithFade()
-                    return
-                }
-
-                setSystemPresentation(newValue)
-            }
-        }
-    }
-
-    func dismissWithFade() {
-        guard systemPresentation != nil, isDismissing == false else {
-            return
-        }
-
-        isDismissing = true
-        fadeInTaskID = nil
-        dismissalTaskID = systemPresentation?.id
-    }
-
-    func setSystemPresentation(_ presentation: RouteDestinationSnapshot?) {
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-
-        withTransaction(transaction) {
-            systemPresentation = presentation
-        }
-    }
-}
-
 private struct CoverFadeModalPresenter: View {
     @Binding var route: PresentedRoute?
     @Environment(\.scenePhase) private var scenePhase
     let router: RouterEngine
-    @State private var presentationState = CoverFadePresentationState()
+    @State private var lifetime = NativePresentationLifetime()
+    @State private var isContentVisible = false
+    @State private var fadedOutID: PresentedRoute.ID?
 
     var body: some View {
-        @Bindable var presentationState = presentationState
-
+        let rendered = lifetime.presentation
         Color.clear
-            .fullScreenCover(item: $presentationState[systemPresentation: .value], onDismiss: {
-                scheduleStateMutation {
-                    finishSystemDismissal()
+            .fullScreenCover(isPresented: Binding(
+                get: { rendered != nil && fadedOutID != rendered?.id },
+                set: { value in
+                    guard !value, let rendered else { return }
+                    Task { @MainActor in
+                        lifetime.requestDismissal(of: rendered.id, in: router)
+                    }
                 }
-            }) { presentation in
-                destination(for: presentation)
-                    .id(presentation.id)
-                    .opacity(presentationState.isContentVisible ? 1 : 0)
-                    .presentationBackground(.clear)
-                    .onLifecycleEvent { _, _, event in
-                        if case .installedInWindow(isInitial: true) = event {
-                            scheduleStateMutation {
-                                fadeInContentIfNeeded(for: presentation.id)
+            ), onDismiss: {
+                if let rendered { lifetime.completeDismissal(of: rendered.id, in: router) }
+                synchronize()
+            }) {
+                if let rendered {
+                    rendered.destination
+                        .environment(\.routerEngine, router)
+                        .environment(\.scenePhase, scenePhase)
+                        .id(rendered.id)
+                        .opacity(isContentVisible ? 1 : 0)
+                        .presentationBackground(.clear)
+                        .onLifecycleEvent { _, _, event in
+                            switch event {
+                            case .installedInWindow, .updated: lifetime.didAdmitPresentation(of: rendered.id)
+                            case .dismantled, .deinitialized: break
+                            }
+                            if case .installedInWindow(isInitial: true) = event {
+                                Task { @MainActor in
+                                    guard lifetime.presentation?.id == rendered.id, lifetime.isPresented else { return }
+                                    withAnimation(.easeInOut(duration: 0.35)) { isContentVisible = true }
+                                }
                             }
                         }
-                    }
+                }
             }
-            .transaction { transaction in
-                transaction.disablesAnimations = true
-            }
-            .task(id: presentationState.fadeInTaskID) {
-                await fadeInContent(for: presentationState.fadeInTaskID)
-            }
-            .task(id: presentationState.dismissalTaskID) {
-                await finishDismissal(for: presentationState.dismissalTaskID)
+            .transaction { $0.disablesAnimations = true }
+            .onChange(of: route?.id, initial: true) { _, _ in synchronize() }
+            .task(id: lifetime.dismissalID) {
+                guard let id = lifetime.dismissalID else { return }
+                withAnimation(.easeInOut(duration: 0.25), completionCriteria: .removed) {
+                    isContentVisible = false
+                } completion: {
+                    guard lifetime.dismissalID == id else { return }
+                    fadedOutID = id
+                }
             }
             .onLifecycleEvent { _, _, event in
                 switch event {
-                case .installedInWindow, .updated(isInstalledInWindow: true):
-                    scheduleStateMutation {
-                        syncPresentation()
-                    }
-
-                case .updated(isInstalledInWindow: false), .dismantled, .deinitialized:
-                    break
-                }
-            }
-            .onChange(of: route?.id) { _, _ in
-                scheduleStateMutation {
-                    syncPresentation()
-                }
-            }
-            .onChange(of: scenePhase) { _, _ in
-                scheduleStateMutation {
-                    syncPresentation()
+                case .installedInWindow: synchronize()
+                case .dismantled, .deinitialized:
+                    if let id = lifetime.presentation?.id { lifetime.completeDismissal(of: id, in: router) }
+                case .updated: break
                 }
             }
     }
 
-    private func scheduleStateMutation(_ mutation: @escaping @MainActor () -> Void) {
-        Task { @MainActor in
-            await Task.yield()
-            mutation()
+    private func synchronize() {
+        let previousID = lifetime.presentation?.id
+        lifetime.synchronize(route) { RouteDestinationSnapshot(route: $0, destinationBuilder: router.windowDestinationBuilder) }
+        if previousID != lifetime.presentation?.id {
+            isContentVisible = false
+            fadedOutID = nil
         }
-    }
-
-    private func syncPresentation() {
-        if presentationState.isDismissing {
-            guard let route, route.id != presentationState.systemPresentation?.id else {
-                return
-            }
-
-            presentationState.dismissalTaskID = nil
-            presentationState.fadeInTaskID = nil
-            presentationState.isDismissing = false
-        }
-
-        guard let route else {
-            presentationState.dismissWithFade()
-            return
-        }
-
-        let presentation = RouteDestinationSnapshot(
-            route: route,
-            destinationBuilder: router.windowDestinationBuilder
-        )
-
-        guard presentationState.systemPresentation?.id != presentation.id else {
-            return
-        }
-
-        presentationState.dismissalTaskID = nil
-        presentationState.fadeInTaskID = nil
-        presentationState.isContentVisible = false
-        presentationState.setSystemPresentation(presentation)
-    }
-
-    private func fadeInContentIfNeeded(for id: PresentedRoute.ID) {
-        guard presentationState.isDismissing == false,
-              presentationState.systemPresentation?.id == id
-        else {
-            return
-        }
-
-        presentationState.fadeInTaskID = id
-    }
-
-    private func fadeInContent(for id: PresentedRoute.ID?) async {
-        guard let id else {
-            return
-        }
-
-        await Task.yield()
-        guard
-            Task.isCancelled == false,
-            presentationState.isDismissing == false,
-            presentationState.systemPresentation?.id == id
-        else {
-            return
-        }
-
-        withAnimation(.easeInOut(duration: presentationFadeDuration)) {
-            presentationState.isContentVisible = true
-        }
-    }
-
-    private func finishDismissal(for id: PresentedRoute.ID?) async {
-        guard let id else {
-            return
-        }
-
-        withAnimation(.easeInOut(duration: dismissalFadeDuration)) {
-            presentationState.isContentVisible = false
-        }
-
-        try? await Task.sleep(for: .seconds(dismissalFadeDuration))
-        guard
-            Task.isCancelled == false,
-            presentationState.isDismissing,
-            presentationState.systemPresentation?.id == id
-        else {
-            return
-        }
-
-        presentationState.setSystemPresentation(nil)
-        route = nil
-        presentationState.isDismissing = false
-        presentationState.dismissalTaskID = nil
-    }
-
-    private func finishSystemDismissal() {
-        guard presentationState.isDismissing
-            || route == nil
-            || presentationState.systemPresentation == nil
-        else {
-            return
-        }
-
-        presentationState.fadeInTaskID = nil
-        presentationState.dismissalTaskID = nil
-        presentationState.isDismissing = false
-        presentationState.isContentVisible = false
-        presentationState.systemPresentation = nil
-        route = nil
-    }
-
-    private func destination(for presentation: RouteDestinationSnapshot) -> some View {
-        presentation.destination
-            .environment(\.routerEngine, router)
-            .environment(\.scenePhase, scenePhase)
-    }
-
-    private var presentationFadeDuration: TimeInterval {
-        0.35
-    }
-
-    private var dismissalFadeDuration: TimeInterval {
-        0.25
     }
 }
 
@@ -310,7 +146,7 @@ struct ElevatedPriorityCoverFadePresenter: View {
 }
 
 private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
-    let presentation: RouteDestinationSnapshot?
+    let presentation: RouteDestinationSnapshot
     let router: RouterEngine
     let sourceScenePhase: ScenePhase
     let onDismiss: @MainActor () -> Void
@@ -333,11 +169,11 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
     }
 
     final class Controller: UIViewController, UIAdaptivePresentationControllerDelegate {
-        private var pendingPresentation: RouteDestinationSnapshot?
+        private var presentation: RouteDestinationSnapshot?
         private var router: RouterEngine?
         private var sourceScenePhase: ScenePhase?
         private var onDismiss: (@MainActor () -> Void)?
-        private var presentedRouteID: PresentedRoute.ID?
+        private var hasPresented = false
         private var presentedScenePhase: ScenePhase?
         private var hostingController: PassThroughModalHostingController<AnyView>?
 
@@ -349,11 +185,11 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
 
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
-            presentPendingRouteIfNeeded()
+            presentIfNeeded()
         }
 
         func update(
-            presentation: RouteDestinationSnapshot?,
+            presentation: RouteDestinationSnapshot,
             router: RouterEngine,
             sourceScenePhase: ScenePhase,
             onDismiss: @escaping @MainActor () -> Void
@@ -362,84 +198,28 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
             self.sourceScenePhase = sourceScenePhase
             self.onDismiss = onDismiss
 
-            guard let presentation else {
-                pendingPresentation = nil
-                dismissPresentedRoute(animated: true)
-                return
+            self.presentation = presentation
+            if hostingController != nil {
+                updatePresentedScenePhaseIfNeeded(presentation: presentation, router: router, sourceScenePhase: sourceScenePhase)
+            } else {
+                presentIfNeeded()
             }
-
-            if presentedRouteID == presentation.route.id {
-                updatePresentedScenePhaseIfNeeded(
-                    presentation: presentation,
-                    router: router,
-                    sourceScenePhase: sourceScenePhase
-                )
-                return
-            }
-
-            if pendingPresentation?.route.id != presentation.route.id {
-                pendingPresentation = presentation
-            }
-
-            guard view.window != nil else {
-                return
-            }
-
-            presentPendingRouteIfNeeded()
         }
 
         func dismissPresentedRoute(animated: Bool) {
-            guard let hostingController else {
-                return
-            }
-
-            hostingController.dismiss(animated: animated) { [weak self] in
-                self?.finishDismiss()
-            }
+            hostingController?.dismiss(animated: animated) { [self] in finishDismiss() }
         }
 
-        private func presentPendingRouteIfNeeded() {
-            guard
-                let pendingPresentation,
-                let router,
-                let sourceScenePhase
-            else {
-                return
-            }
-
-            if presentedRouteID == pendingPresentation.route.id {
-                hostingController?.rootView = rootView(
-                    router: router,
-                    destination: pendingPresentation.destination,
-                    sourceScenePhase: sourceScenePhase
-                )
-                self.pendingPresentation = nil
-                return
-            }
-
-            if hostingController != nil {
-                dismissPresentedRoute(animated: true)
-                return
-            }
-
-            let hostingController = PassThroughModalHostingController(
-                rootView: rootView(
-                    router: router,
-                    destination: pendingPresentation.destination,
-                    sourceScenePhase: sourceScenePhase
-                )
-            )
+        private func presentIfNeeded() {
+            guard !hasPresented, view.window != nil, let presentation, let router, let sourceScenePhase else { return }
+            let hostingController = PassThroughModalHostingController(rootView: rootView(
+                router: router, destination: presentation.destination, sourceScenePhase: sourceScenePhase))
             hostingController.view.backgroundColor = .clear
             hostingController.presentationController?.delegate = self
-            hostingController.onDismiss = { [weak self] in
-                self?.finishDismiss()
-            }
-
+            hostingController.onDismiss = { [weak self] in self?.finishDismiss() }
             self.hostingController = hostingController
-            self.presentedRouteID = pendingPresentation.route.id
-            self.presentedScenePhase = sourceScenePhase
-            self.pendingPresentation = nil
-
+            hasPresented = true
+            presentedScenePhase = sourceScenePhase
             present(hostingController, animated: true)
         }
 
@@ -473,16 +253,13 @@ private struct CrossDissolveModalPresenter: UIViewControllerRepresentable {
         }
 
         private func finishDismiss() {
-            guard hostingController != nil || presentedRouteID != nil else {
+            guard hostingController != nil else {
                 return
             }
 
             hostingController = nil
-            presentedRouteID = nil
             presentedScenePhase = nil
             onDismiss?()
-
-            presentPendingRouteIfNeeded()
         }
 
         func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {

@@ -57,13 +57,80 @@ struct NativePresentationStyleModifier: ViewModifier {
                     if disablesDismissalAnimations { transaction.disablesAnimations = true }
                 }
         case .sheet:
-            content.sheet(item: presentation) { RouteView(scope: $0.scope) }
+            content.modifier(SystemModalPresentationModifier(style: .sheet, route: presentation.wrappedValue))
         case .cover:
-            #if canImport(UIKit)
-            content.fullScreenCover(item: presentation) { RouteView(scope: $0.scope) }
-            #else
-            content.sheet(item: presentation) { RouteView(scope: $0.scope) }
-            #endif
+            content.modifier(SystemModalPresentationModifier(style: .cover(.slide), route: presentation.wrappedValue))
         }
+    }
+}
+
+/// A stable rendered destination survives logical removal until native `onDismiss`.
+struct SystemModalPresentationModifier: ViewModifier {
+    let style: RoutePresentationKind
+    let route: PresentedRoute?
+    var destinationBuilder: WindowDestinationBuilder?
+    @RouterEnvironment private var router
+    @State private var lifetime = NativePresentationLifetime()
+
+    func body(content: Content) -> some View {
+        let rendered = lifetime.presentation
+        let presented = Binding(get: { lifetime.isPresented }, set: { value in
+            guard !value, let rendered else { return }
+            // Native write-back can arrive inside SwiftUI's update transaction.
+            Task { @MainActor in
+                lifetime.requestDismissal(of: rendered.id, in: router)
+            }
+        })
+        return systemPresentation(content, presented: presented, rendered: rendered)
+            .onChange(of: route?.id, initial: true) { _, _ in synchronize() }
+            .onLifecycleEvent { _, _, event in
+                switch event {
+                case .installedInWindow: synchronize()
+                case .dismantled, .deinitialized:
+                    if let id = lifetime.presentation?.id { lifetime.completeDismissal(of: id, in: router) }
+                case .updated: break
+                }
+            }
+    }
+
+    @ViewBuilder
+    private func systemPresentation(_ content: Content, presented: Binding<Bool>, rendered: RouteDestinationSnapshot?) -> some View {
+        #if canImport(UIKit)
+        if style != .sheet {
+            content.fullScreenCover(isPresented: presented, onDismiss: { complete(rendered) }) {
+                if let rendered { destination(rendered) }
+            }
+        } else {
+            content.sheet(isPresented: presented, onDismiss: { complete(rendered) }) {
+                if let rendered { destination(rendered) }
+            }
+        }
+        #else
+        content.sheet(isPresented: presented, onDismiss: { complete(rendered) }) {
+            if let rendered { destination(rendered) }
+        }
+        #endif
+    }
+
+    private func destination(_ rendered: RouteDestinationSnapshot) -> some View {
+        rendered.destination.id(rendered.id)
+            .onLifecycleEvent { _, _, event in
+                switch event {
+                case .installedInWindow, .updated: lifetime.didAdmitPresentation(of: rendered.id)
+                case .dismantled, .deinitialized: break
+                }
+            }
+    }
+
+    private func synchronize() {
+        lifetime.synchronize(route) {
+            if let destinationBuilder { RouteDestinationSnapshot(route: $0, destinationBuilder: destinationBuilder) }
+            else { RouteDestinationSnapshot(route: $0) }
+        }
+    }
+    private func complete(_ rendered: RouteDestinationSnapshot?) {
+        guard let rendered else { return }
+        lifetime.completeDismissal(of: rendered.id, in: router)
+        synchronize()
     }
 }

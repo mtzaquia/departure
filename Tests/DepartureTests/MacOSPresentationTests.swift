@@ -32,6 +32,27 @@ import Testing
 // and --filter MacOSPresentationTests.
 @Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["DEPARTURE_RUN_HOSTED_UI_TESTS"] == "1"))
 struct MacOSPresentationTests {
+    @Test func modalUnwindWaitsForNativeDismissalCompletion() async throws {
+        let owner = RootRouter()
+        let host = WithRouter(routes: RootRouteMap {
+            Sheet(RouteDestination(SettingsRoute.self) { _, _ in Text("Native modal") })
+        }, router: owner) { Text("Root") }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: host)
+        window.orderFront(nil)
+        defer { window.close() }
+        try #require(await waitUntil { owner.engine.root.isInstalledInView })
+        await owner.current.present(SettingsRoute())
+        let modal = try #require(owner.engine.defaultSpace.rootPath.last)
+        try #require(await waitUntil { modal.isInstalledInView && window.attachedSheet != nil })
+        #expect(await owner.current.unwind(to: .topmostAncestor))
+        #expect(owner.engine.defaultSpace.rootPath.isEmpty)
+        #expect(window.attachedSheet == nil)
+        #expect(!owner.engine.isNavigating)
+    }
+
     @Test func branchLocalDeclarationsRemainAttachedToTheirBranch() async throws {
         let router = RootRouter()
         let host = WithRouter(routes: RootRouteMap { Branches { Branch("detail") { Push(RouteDestination(MacOSPresentingRoute.self) { route, _ in route.destination() }) } } }, router: router) {

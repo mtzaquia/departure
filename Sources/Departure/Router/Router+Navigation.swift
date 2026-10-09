@@ -154,7 +154,7 @@ extension RouterEngine {
         let operation = beginNavigationOperation(plan: plan, presentation: .init(route: route, match: match))
         return await withTaskCancellationHandler {
             commitNavigationOperation(operation, preservesModalPresentationBindings: false)
-            if operation.removedScopes.contains(where: \.isInstalledInView) {
+            if operation.removedScopes.contains(where: \.isAwaitingPresentationEnd) {
                 replacePendingRoute(.presentation(operation))
                 await waitForNavigationOperation(operation, releasesAfterModal: true)
                 if takePendingPresentation(operation) {
@@ -382,7 +382,11 @@ extension RouterEngine {
               let presentation = operation.presentation,
               presentation.match.branchID == branch,
               presentation.match.declaringScope === declaringScope,
-              declaringScope.branchScopes[branch] != nil else { return }
+              let branchScope = declaringScope.branchScopes[branch] else { return }
+        // A selected tab can retain its registration while its native views are disconnected.
+        // Keep the existing selection turn, then wait for the actual presenting host's arrival.
+        if declaringScope.hasEverInstalled,
+           (!branchScope.isAvailableForPresentation || !presentation.match.presentingScope.isAvailableForPresentation) { return }
 
         guard takePendingPresentation(operation) else { return }
         guard presentation.match.space === spaces.activeSpace else { operation.discardPresentation(); return }
@@ -423,14 +427,26 @@ extension RouterEngine {
         }
     }
 
+    func handleHostEvent(_ event: ViewLifecycleBridge.Event, scope: RouteScope, view: PlatformView?, id: UUID) {
+        switch event {
+        case .installedInWindow, .updated(isInstalledInWindow: true):
+            guard let view else { return }
+            hostDidAttach(scope, view: view, id: id)
+        case .updated(isInstalledInWindow: false): scope.hostAvailabilityDidChange(id: id)
+        case .dismantled, .deinitialized: hostDidDetach(scope, id: id)
+        }
+    }
+
     func hostDidAttach(_ scope: RouteScope, view: PlatformView?, id: UUID) {
         let becameReady = scope.attachHost(view, id: id)
         if becameReady {
             log.departureDebug(.scopeInstalledInView(scope: scope))
             ios17NavigationStackPushWorkaround?.routeScopeDidInstall(scope)
         }
-        if let branch = scope.branchID, let parent = scope.parent {
-            resumePendingRoute(for: branch, in: parent)
+        if let match = pendingRoute?.operation?.presentation?.match,
+           let branch = match.branchID,
+           scope === match.presentingScope || scope === match.declaringScope.branchScopes[branch] {
+            resumePendingRoute(for: branch, in: match.declaringScope)
         }
     }
 
@@ -438,25 +454,10 @@ extension RouterEngine {
         guard scope.detachHost(id: id) else { return }
         log.departureDebug(.scopeUninstalledFromView(scope: scope))
         if ios17NavigationStackPushWorkaround?.routeScopeDidLeave(scope, in: self) == true { return }
-        clearElevatedSpaceIfNeeded(forRemovedViewScope: scope)
     }
 
-    func clearElevatedSpaceIfNeeded(forRemovedViewScope routeScope: RouteScope) {
-        for priority in [RoutePriority.critical, .high] {
-            guard
-                let space = spaces.space(for: priority),
-                space.root === routeScope
-            else {
-                continue
-            }
-
-            log.departureDebug(.elevatedSpaceCleared)
-            applyUnwindPlan(RouteSpaces.UnwindPlan(removing: [space]))
-        }
-    }
-
-    func waitForRouteScopesToLeaveView(_ routeScopes: [RouteScope]) async {
-        let installedRouteScopes = routeScopes.filter(\.isInstalledInView)
+    func waitForPresentationsToEnd(_ routeScopes: [RouteScope]) async {
+        let installedRouteScopes = routeScopes.filter(\.isAwaitingPresentationEnd)
 
         guard installedRouteScopes.isEmpty == false else {
             log.departureDebug(.viewExitWaitSkipped)
@@ -470,7 +471,7 @@ extension RouterEngine {
         )
 
         for (index, routeScope) in installedRouteScopes.enumerated() {
-            await routeScope.waitUntilUninstalled()
+            await routeScope.waitUntilPresentationEnded()
             log.departureDebug(.viewExitWaitProgress(
                 remaining: installedRouteScopes.count - index - 1
             ))
@@ -539,14 +540,14 @@ extension RouterEngine {
     func waitForNavigationOperation(_ operation: NavigationOperation, releasesAfterModal: Bool = false) async {
         defer { operation.outgoing = [:] }
         if releasesAfterModal, !operation.outgoing.isEmpty {
-            let modals = operation.removedScopes.filter { $0.isInstalledInView && $0.presentationDeclaration?.presentationKind.isModal == true }
+            let modals = operation.removedScopes.filter { $0.isAwaitingPresentationEnd && $0.presentationDeclaration?.presentationKind.isModal == true }
             if !modals.isEmpty {
-                await waitForRouteScopesToLeaveView(modals)
+                await waitForPresentationsToEnd(modals)
                 operation.outgoing = [:]
                 guard isPendingPresentation(operation) else { return }
             }
         }
-        await waitForRouteScopesToLeaveView(operation.removedScopes)
+        await waitForPresentationsToEnd(operation.removedScopes)
     }
 
     func outgoingPresentations(
@@ -745,7 +746,7 @@ extension RouterEngine {
         }
     }
 
-    func performPresentationDismissalUnwind(for sourceScope: RouteScope?, in targetScope: RouteScope?, plan: RouteSpaces.UnwindPlan) {
+    func performPresentationDismissalUnwind(for sourceScope: RouteScope?, in targetScope: RouteScope?, plan: RouteSpaces.UnwindPlan, nativeOwner: Bool = false) {
         guard !plan.removedScopes.isEmpty else { applyUnwindPlan(plan); return }
         let operation = beginNavigationOperation(plan: plan)
         // Without a callback, native write-back can commit in this call stack.
@@ -756,8 +757,13 @@ extension RouterEngine {
             return
         }
         Task { @MainActor in
-            await performPlannedUnwind(for: sourceScope, payload: nil, in: targetScope,
-                operation: operation)
+            if nativeOwner {
+                await deliverUnwindHandlers(for: sourceScope, payload: nil, in: targetScope, removing: operation.removedScopes)
+                commitNavigationOperation(operation)
+                await completeUnwindOperation(operation, logsCompletion: false)
+            } else {
+                await performPlannedUnwind(for: sourceScope, payload: nil, in: targetScope, operation: operation)
+            }
         }
     }
 
