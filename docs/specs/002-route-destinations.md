@@ -58,15 +58,33 @@ RootRouteMap {
 }
 ```
 
-The trailing builder remains reserved for nested route declarations. View building belongs to the destination value. `profile` and `avatarPicker` represent other typed destination values defined by their features.
+When passing a destination value, the trailing builder declares nested routes. `profile` and `avatarPicker` represent other typed destination values defined by their features.
+
+For app-local views, each style also accepts a route type and an inline destination builder:
+
+```swift
+RootRouteMap {
+    Push(ProfileRoute.self) { route, context in
+        ProfileView(userID: route.userID, onDismiss: { await context.unwindRoute() })
+    } routes: {
+        Sheet(EditProfileRoute.self) { route, context in
+            EditProfileView(userID: route.userID, onDismiss: { await context.unwindRoute() })
+        }
+    }
+}
+```
+
+The first closure is a `@ViewBuilder` receiving the typed route and `RouteContext`. A separate, required `routes:` builder declares nested routes; a leaf overload accepts only the destination closure. This keeps a single trailing closure unambiguous. All four styles retain their `id:` parameter, and `Cover` retains `transition:` with `.slide` as its default.
+
+These overloads construct a `RouteDestination` and use the existing declaration initializer. Destination evaluation remains deferred until view evaluation and receives the same scoped context and environment. Inline and reusable destination forms can be mixed in ordinary and modal maps. Root priority builders still accept only sheets and covers.
 
 Requests continue to use domain route instances, such as `router.present(EditProfileRoute(userID: userID))`. The map binds each declaration to exactly one destination builder. The same route type can be bound to different builders at different map locations.
 
 Reusing a destination value does not identify a unique declaration occurrence. Requests select the nearest eligible declaration relative to their originating scope, as specified in [Route lookup and navigation semantics](003-route-addressing.md).
 
-Every presentation declaration binds a destination value. Bare route-type declarations do not provide a destination through a global registry or a provider conformance. This makes a missing view builder a declaration-time problem rather than something handled by a placeholder view at presentation time. Unregistered route requests are a separate runtime lookup concern.
+Every presentation declaration binds a destination builder, supplied either as a destination value or inline. Bare route-type declarations do not provide a destination through a global registry or a provider conformance. This makes a missing view builder a declaration-time problem rather than something handled by a placeholder view at presentation time. Unregistered route requests are a separate runtime lookup concern.
 
-The map examples in [Route maps and view bindings](001-route-map-declarations.md) use the same destination-value syntax. A direct `destination:` closure overload is deferred; the initial design uses this single binding form.
+The map examples in [Route maps and view bindings](001-route-map-declarations.md) use destination values. Inline destination overloads are an addition on the development branch after `v3.0.0-beta.1`.
 
 ## Context surface
 

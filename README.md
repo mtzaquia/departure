@@ -80,6 +80,8 @@ struct HomeView: View {
 
 The map owns definitions independently of mounted views. `WithRouter` and destinations bind their scopes automatically. When a scope declares pushes, explicitly supply `NavigationStack { content.routing() }`, placing `.routing()` on the root content inside the stack. Destinations choose their containers explicitly.
 
+For app-local views, the development branch also supports [inline destination builders](docs/routing.md#build-a-destination-in-the-map), added after `v3.0.0-beta.1`.
+
 ## Documentation
 
 - [Getting started](docs/getting-started.md) — maps, destinations, and view bindings.

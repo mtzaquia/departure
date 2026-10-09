@@ -115,7 +115,13 @@ struct MacOSPresentationTests {
         let engine = router.engine
         let recorder = MacOSScopeRecorder()
         let destinationRecorder = MacOSScopeRecorder()
-        let host = WithRouter(routes: RootRouteMap { Branches(concurrent: true) { Branch("detail") { Replace(RouteDestination(MacOSScopedReplacementRoute.self) { route, _ in route.destination() }) } } }, router: router) {
+        let host = WithRouter(routes: RootRouteMap { Branches(concurrent: true) { Branch("detail") {
+            Replace(MacOSScopedReplacementRoute.self) { route, context in
+                let _ = #expect(context.router == context.environment.router)
+                let _ = #expect(context.presentation.style == .replace)
+                route.destination()
+            }
+        } } }, router: router) {
             MacOSScopeReader(recorder: recorder)
                 .routing("detail")
                 .routing()

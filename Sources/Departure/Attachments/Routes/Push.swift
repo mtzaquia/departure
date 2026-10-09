@@ -32,5 +32,31 @@ public struct Push: RouteDeclaration, Sendable {
     ) {
         declaration = AnyRouteDeclaration(destination, presentation: .init(style: .push, priority: .default), id: id, children: children())
     }
+
+    /// Declares a push with an inline destination builder.
+    ///
+    /// `destination` receives the requested route and its destination's ``RouteContext``
+    /// when SwiftUI evaluates the view.
+    public init<R: Route, Content: View>(
+        _ route: R.Type,
+        id: AnyHashable? = nil,
+        @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content
+    ) {
+        self.init(RouteDestination(route, destination: destination), id: id)
+    }
+
+    /// Declares a push with an inline destination builder and nested routes.
+    ///
+    /// `destination` builds the view using its scoped ``RouteContext``; `routes`
+    /// declares the navigation available from that destination.
+    public init<R: Route, Content: View>(
+        _ route: R.Type,
+        id: AnyHashable? = nil,
+        @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content,
+        @RouteDeclarationBuilder routes: () -> [RouteScopeDeclaration]
+    ) {
+        self.init(RouteDestination(route, destination: destination), id: id, routes)
+    }
+
     public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }

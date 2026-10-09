@@ -26,6 +26,24 @@ public enum SettingsFeature {
 
 Declare `Sheet(SettingsFeature.destination)` in the application map. Each declaration has a destination builder; no fallback view or retroactive conformance is needed. Different occurrences of the same route type may use different builders.
 
+## Build a destination in the map
+
+For views defined alongside their routes, pass the route type and build the destination directly. These overloads are available on the development branch after `v3.0.0-beta.1`.
+
+```swift
+RootRouteMap {
+  Push(ProfileRoute.self) { route, context in
+    ProfileView(userID: route.userID, close: context.unwindRoute)
+  } routes: {
+    Sheet(EditProfileRoute.self) { route, context in
+      EditProfileView(userID: route.userID, close: context.unwindRoute)
+    }
+  }
+}
+```
+
+`Push`, `Replace`, `Sheet`, and `Cover` all accept this form. The first closure builds the view with typed route data and the same `RouteContext` as a `RouteDestination` builder. Add the labelled `routes:` closure for nested declarations; omit it for a leaf. Nested builders can compose `RouteMap` values and mix inline declarations with reusable destinations. IDs and cover transitions use the same parameters as destination-value declarations.
+
 ## Choose a style and children
 
 ```swift

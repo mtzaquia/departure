@@ -26,6 +26,82 @@ import RouteDomainFixtures
 @testable import Departure
 
 @MainActor @Suite struct RouteDestinationTests {
+    @Test(arguments: [false, true])
+    func inlineBuildersPreserveTypedDataContextAndChildren(nested: Bool) async throws {
+        let recorder = BuildRecorder()
+        let children = RouteMap {
+            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+        }
+        let declarations: [AnyRouteDeclaration]
+        if nested {
+            declarations = [
+                Push(FeatureProvidedRoute.self, id: "push") { route, context in
+                    recorder.view(route, context)
+                } routes: { children }.declaration,
+                Replace(FeatureProvidedRoute.self, id: "replace") { route, context in
+                    recorder.view(route, context)
+                } routes: { children }.declaration,
+                Sheet(FeatureProvidedRoute.self, id: "sheet") { route, context in
+                    recorder.view(route, context)
+                } routes: { children }.declaration,
+                Cover(FeatureProvidedRoute.self, id: "slide") { route, context in
+                    recorder.view(route, context)
+                } routes: { children }.declaration,
+                Cover(FeatureProvidedRoute.self, transition: .fade, id: "fade") { route, context in
+                    recorder.view(route, context)
+                } routes: { children }.declaration,
+            ]
+        } else {
+            declarations = [
+                Push(FeatureProvidedRoute.self, id: "push") { route, context in
+                    recorder.view(route, context)
+                    if context.presentation.style == .push { Text("Push") }
+                }.declaration,
+                Replace(FeatureProvidedRoute.self, id: "replace") { route, context in
+                    recorder.view(route, context)
+                }.declaration,
+                Sheet(FeatureProvidedRoute.self, id: "sheet") { route, context in
+                    recorder.view(route, context)
+                }.declaration,
+                Cover(FeatureProvidedRoute.self, id: "slide") { route, context in
+                    recorder.view(route, context)
+                }.declaration,
+                Cover(FeatureProvidedRoute.self, transition: .fade, id: "fade") { route, context in
+                    recorder.view(route, context)
+                }.declaration,
+            ]
+        }
+        #expect(recorder.context == nil)
+        let styles: [RoutePresentation.Style] = [.push, .replace, .sheet, .cover(.slide), .cover(.fade)]
+        let ids = ["push", "replace", "sheet", "slide", "fade"]
+        for (index, declaration) in declarations.enumerated() {
+            let engine = RouterEngine(routes: RootRouteMap { declaration })
+            var builds = 0
+            let route = FeatureProvidedRoute { builds += 1 }
+            await engine.present(route)
+            let scope = try #require(engine.defaultSpace.rootPath.last)
+            #expect(scope.id == AnyHashable(ids[index]))
+            #expect((scope.definitions.routeBinding(for: SettingsRoute.self) != nil) == nested)
+            #expect(builds == 0)
+            var environment = EnvironmentValues()
+            environment.locale = Locale(identifier: "fr_FR")
+            let context = RouteContext(
+                router: Router(engine: engine, scope: scope),
+                unwindRoute: UnwindRouteAction(router: engine, routeScope: scope),
+                presentation: try #require(scope.routePresentation),
+                environment: environment
+            )
+            _ = try #require(scope.presentationDeclaration).build(route, context)
+            #expect(builds == 1)
+            #expect(recorder.context?.router == context.router)
+            #expect(recorder.context?.presentation.style == styles[index])
+            #expect(recorder.context?.presentation.priority == .default)
+            #expect(recorder.context?.environment.locale.identifier == "fr_FR")
+            #expect(await recorder.context?.unwindRoute() == true)
+            #expect(engine.defaultSpace.rootPath.isEmpty)
+        }
+    }
+
     @Test func domainRouteUsesFeatureDestinationWithoutConformance() async throws {
         let recorder = BuildRecorder()
         let destination = RouteDestination(DomainOnlyRoute.self) { _, context in
@@ -56,13 +132,18 @@ import RouteDomainFixtures
     }
     @Test(arguments: [RoutePriority.high, .critical])
     func effectivePrioritySurvivesRemovalFromLiveGraph(priority: RoutePriority) async throws {
-        let entry = Cover(RouteDestination(DomainOnlyRoute.self) { _, _ in EmptyView() }) {
-                Push(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-            }
         let engine = RouterEngine(routes: RootRouteMap {} highPriority: {
-            if priority == .high { entry }
+            if priority == .high {
+                Cover(DomainOnlyRoute.self) { _, _ in EmptyView() } routes: {
+                    Push(SettingsRoute.self) { _, _ in EmptyView() }
+                }
+            }
         } criticalPriority: {
-            if priority == .critical { entry }
+            if priority == .critical {
+                Sheet(DomainOnlyRoute.self) { _, _ in EmptyView() } routes: {
+                    Push(SettingsRoute.self) { _, _ in EmptyView() }
+                }
+            }
         })
         await engine.present(DomainOnlyRoute())
         await engine.present(SettingsRoute())
@@ -80,4 +161,13 @@ import RouteDomainFixtures
         #expect(parent.identity != parent.children[0].routes[0].identity)
     }
 }
-@MainActor private final class BuildRecorder { var presentation: RoutePresentation? }
+@MainActor private final class BuildRecorder {
+    var presentation: RoutePresentation?
+    var context: RouteContext?
+
+    func view(_ route: FeatureProvidedRoute, _ context: RouteContext) -> some View {
+        route.destinationDidBuild()
+        self.context = context
+        return EmptyView()
+    }
+}
