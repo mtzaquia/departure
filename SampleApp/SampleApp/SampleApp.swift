@@ -90,7 +90,10 @@ struct DepartureSampleApp: App {
         WindowGroup {
             if ProcessInfo.processInfo.arguments.contains("--independent-space-probe") {
                 WithRouter(routes: IndependentSpaceProbeMap.root(owner: router), router: router) {
-                    RoutedNavigationStack { IndependentSpaceProbeRoot() }
+                    NavigationStack {
+                        IndependentSpaceProbeRoot()
+                            .routing()
+                    }
                 }
             } else if ProcessInfo.processInfo.arguments.contains("--nested-modal-probe") {
                 WithRouter(routes: NestedModalProbeMap.root, router: router) {

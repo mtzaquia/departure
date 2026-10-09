@@ -121,10 +121,3 @@ private struct BranchRoutingModifier: ViewModifier {
         }
     }
 }
-
-/// An explicit navigation stack whose root binds the current mapped scope.
-public struct RoutedNavigationStack<Content: View>: View {
-    private let content: Content
-    public init(@ViewBuilder _ content: () -> Content) { self.content = content() }
-    public var body: some View { NavigationStack { content.routing() } }
-}

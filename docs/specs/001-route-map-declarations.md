@@ -138,35 +138,32 @@ An explicit `.routing()` or `.routing(branch: binding)` takes presentation owner
 
 Routing is independent of `NavigationStack`. A view can host sheets, covers, or replacement content without providing stack navigation. `.routing()` does not create a stack, and a branch does not imply one either.
 
-## Stack convenience
+## Explicit navigation stacks
 
-`RoutedNavigationStack` is an optional convenience that creates a native `NavigationStack` and applies `.routing()` to its root content. It uses the current scope and has the same routing semantics as the explicit composition:
+For pushes, application code creates a native `NavigationStack` and applies `.routing()` to its root content inside the stack:
 
 ```swift
-RoutedNavigationStack {
-    HomeView()
-}
-
 NavigationStack {
     HomeView()
         .routing()
 }
 ```
 
-Keep both forms available. Automatic root or destination wiring establishes the scope, while wiring inside an explicit stack connects presentation at the appropriate location in that stack. It does not create a second scope.
+Automatic root or destination wiring establishes the scope, while `.routing()` inside the stack connects presentation at the appropriate location. It does not create a second scope. Departure provides no navigation-stack wrapper.
 
-Departure never automatically wraps root content or a presented destination in a navigation stack. Automatic routing annotation only connects the view to its mapped scope and presentation machinery. The destination itself decides whether to construct a `RoutedNavigationStack`, a plain `NavigationStack` with `.routing()`, another container, or no navigation container.
+Departure never automatically wraps root content or a presented destination in a navigation stack. Automatic routing annotation only connects the view to its mapped scope and presentation machinery. The destination itself decides whether to construct a `NavigationStack` with `.routing()` on its root content, another container, or no navigation container.
 
 For example, a sheet with nested push declarations supplies its stack explicitly in the destination:
 
 ```swift
 // In the destination builder for EditProfileRoute:
-RoutedNavigationStack {
+NavigationStack {
     EditProfileView()
+        .routing()
 }
 ```
 
-Nested `Push` declarations do not cause Departure to infer or create a stack. `RoutedNavigationStack` creates one only when application code explicitly uses the wrapper.
+Nested `Push` declarations do not cause Departure to infer or create a stack. Application code supplies both the stack and its root's routing modifier.
 
 ## Branched scopes
 
@@ -197,8 +194,9 @@ The view connects the container and its content separately:
 ```swift
 WithRouter(routes: AppRoutes.root) {
     TabView(selection: $tab) {
-        RoutedNavigationStack {
+        NavigationStack {
             HomeView()
+                .routing()
         }
         .routing(AppTab.home)
         .tag(AppTab.home)

@@ -152,7 +152,7 @@ Evidence: `/tmp/departure-presentations-focused-final.log`, `/tmp/departure-pres
 
 The full UI matrix was run against library checkpoint `8ace2ee`. The first iPhone run passed 38 cases, failed one, and skipped the two expected iPad-only cases. The failure reproduced in isolation with the checkpoint unchanged: pushing login detail could not find its destination view.
 
-`LoginRoute` builds a `RoutedNavigationStack`, which already binds its root. `LoginView` also declared an explicit `.routing()`, creating two presentation owners in the same scope and correctly disabling local presentation under the single-owner rule. Removing that redundant sample modifier fixes the configuration. The failing case then passed in isolation, followed by a complete iPhone rerun. Library source and UI assertions remain unchanged.
+At this checkpoint, `LoginRoute` supplied a navigation stack with routing bound at its root. `LoginView` also declared an explicit `.routing()`, creating two presentation owners in the same scope and correctly disabling local presentation under the single-owner rule. Removing that redundant sample modifier fixes the configuration. The failing case then passed in isolation, followed by a complete iPhone rerun. Library source and UI assertions remain unchanged.
 
 | Final check | Result |
 | --- | --- |

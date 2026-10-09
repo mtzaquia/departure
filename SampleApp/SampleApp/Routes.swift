@@ -483,15 +483,17 @@ enum Destinations {
     }
     static let loginRoute = RouteDestination(LoginRoute.self) { route, context in
         let nextRoute = route.nextRoute
-        RoutedNavigationStack {
+        NavigationStack {
             LoginView(nextRoute: nextRoute)
-            .modifier(SampleRoutingContext())
+                .modifier(SampleRoutingContext())
+                .routing()
         }
     }
     static let loginReplacementRoute = RouteDestination(LoginReplacementRoute.self) { route, context in
-        RoutedNavigationStack {
+        NavigationStack {
             LoginReplacementView()
-            .modifier(SampleRoutingContext())
+                .modifier(SampleRoutingContext())
+                .routing()
         }
     }
     static let loginDetailRoute = RouteDestination(LoginDetailRoute.self) { route, context in
@@ -503,9 +505,10 @@ enum Destinations {
             .modifier(SampleRoutingContext())
     }
     static let profileRoute = RouteDestination(ProfileRoute.self) { route, context in
-        RoutedNavigationStack {
+        NavigationStack {
             ProfileView()
-            .modifier(SampleRoutingContext())
+                .modifier(SampleRoutingContext())
+                .routing()
         }
     }
     static let authenticationSettingsRoute = RouteDestination(AuthenticationSettingsRoute.self) { route, context in
@@ -542,9 +545,10 @@ enum Destinations {
             .modifier(SampleRoutingContext())
     }
     static let navigationBarFadeOcclusionRoute = RouteDestination(NavigationBarFadeOcclusionRoute.self) { route, context in
-        RoutedNavigationStack {
+        NavigationStack {
             NavigationBarFadeOcclusionView()
-            .modifier(SampleRoutingContext())
+                .modifier(SampleRoutingContext())
+                .routing()
         }
     }
     static let lifecycleTeardownRoute = RouteDestination(LifecycleTeardownRoute.self) { route, context in

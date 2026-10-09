@@ -43,7 +43,10 @@ A nested builder declares routes available in that destination's scope. Insertin
 
 ```swift
 WithRouter(routes: appRoutes) {
-  RoutedNavigationStack { HomeView() }
+  NavigationStack {
+    HomeView()
+      .routing()
+  }
 }
 
 // In HomeView:
@@ -54,11 +57,7 @@ Button("View profile") {
 }
 ```
 
-`WithRouter` binds the root automatically. Every destination receives its own bound scope. `RoutedNavigationStack` places `.routing()` at its root. The equivalent manual form remains available:
-
-```swift
-NavigationStack { HomeView().routing() }
-```
+`WithRouter` binds the root automatically. Every destination receives its own bound scope. For pushes, explicitly provide a `NavigationStack` and apply `.routing()` to its root content inside the stack. Automatic scope binding does not place presentation inside your navigation container.
 
 Use `.routing()` inside a custom container when it should own presentation or capture environment values applied within that container. It uses the same scope and takes precedence over automatic wiring.
 

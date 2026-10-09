@@ -122,7 +122,6 @@ The public modifiers follow the contracts already agreed:
 | `.routing()` | Use the inherited context and install presentation projections at this view. Do not append another logical scope. |
 | `.routing(branchValue)` | Enter the mapped child branch scope for the current owner instance. |
 | `.routing(branch: binding)` | Connect container selection to the owning branch state. Do not create definitions or another scope. |
-| `RoutedNavigationStack` | Create the explicitly requested stack and apply the same unqualified routing projection to its root content. |
 
 Logical route and branch state belongs to the routing owner. A view does not construct a second mutable branch graph in `@State` and register it after mounting. Branch state can be initialized from its owning runtime scope and the map, independently of native host installation.
 

@@ -137,13 +137,14 @@ As agreed in [Route maps and view bindings](001-route-map-declarations.md), rout
 
 ```swift
 let account = RouteDestination(AccountRoute.self) { route, context in
-    RoutedNavigationStack {
+    NavigationStack {
         AccountView(onClose: { await context.unwindRoute() })
+            .routing()
     }
 }
 ```
 
-The stack exists because this destination explicitly constructs it. A destination that needs no stack returns its content directly.
+The destination explicitly constructs the stack and applies `.routing()` to its root content inside it. A destination that needs no stack returns its content directly.
 
 ## Work for later specifications
 

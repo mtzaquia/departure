@@ -78,7 +78,7 @@ struct HomeView: View {
 }
 ```
 
-The map owns definitions independently of mounted views. `WithRouter` and destinations bind their scopes automatically. Use `RoutedNavigationStack` or `NavigationStack { content.routing() }` when a scope declares pushes. Destinations choose their containers explicitly.
+The map owns definitions independently of mounted views. `WithRouter` and destinations bind their scopes automatically. When a scope declares pushes, explicitly supply `NavigationStack { content.routing() }`, placing `.routing()` on the root content inside the stack. Destinations choose their containers explicitly.
 
 ## Documentation
 

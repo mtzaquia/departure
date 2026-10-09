@@ -20,7 +20,7 @@ enum IndependentSpaceProbeMap {
             })
         } highPriority: {
             Sheet(RouteDestination(SpaceProbeHigh.self) { _, context in
-                RoutedNavigationStack {
+                NavigationStack {
                     VStack(spacing: 20) {
                         Text("High space root").accessibilityIdentifier("sample.spaces.high-root")
                         Button("Push within high") { Task { await context.router.present(SpaceProbeDetail()) } }
@@ -37,6 +37,7 @@ enum IndependentSpaceProbeMap {
                         Button("Close high") { Task { await context.unwindRoute() } }
                             .accessibilityIdentifier("sample.spaces.close-high")
                     }
+                    .routing()
                 }
             }) {
                 Push(RouteDestination(SpaceProbeDetail.self) { _, context in
