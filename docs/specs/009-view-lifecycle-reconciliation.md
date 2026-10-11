@@ -154,3 +154,11 @@ Native write-back without a matched handler still commits synchronously in its c
 Validation passed 91 tests in the affected hook, priority, lifetime, readiness, authority, compatibility, and execution suites, plus 153 tests in the router suites. The new execution tests exercise scoped/owner cancellation before and after commit, buffered continuation after cancelled committed removal, coordinator cleanup, and synchronous native write-back. Mounted macOS tests and the final execution tests passed together (eight test functions). Five focused native UI cases passed: iOS 26.5 native/explicit handler timing, elevated-root reset/removal/default continuation, and covered high-space removal; iOS 17.5 native Back/repush and priority-window replacement/continuation. The previous full UI checkpoint was not repeated for this bounded consolidation.
 
 Follow-up logs: `/tmp/departure-unwind-executor-regressions.log`, `/tmp/departure-unwind-executor-router.log`, `/tmp/departure-unwind-executor-hosted.log`, `/tmp/departure-unwind-executor-ui26.log`, and `/tmp/departure-unwind-executor-ui17.log`.
+
+## Main reconciliation, 2026-10-11
+
+The integration of `main` through `ddcbe48c` reconciles its contextual destination backport and `9276ee9` sheet fix with the v3 implementation. The shared native presentation lifetime, predefined maps, independent priority spaces, and inline destination builders remain intact. Legacy provider fallbacks, dynamic `.routes` registration, and automatic navigation-stack wrapping are not restored.
+
+The backport's destination documentation, typed-data and nearest-builder regressions, mounted environment/context checks, and sample context sheet are adapted to `RootRouteMap`, `RootRouter`, explicit `.routing()`, and `.default` priority. Mounted checks verify replacement environment updates, captured actions remaining bound to removed scopes, each local presentation style, and high/critical children inheriting effective priority. The sample's About sheet displays its actual style and priority and closes through its scoped context action.
+
+Focused validation passed 49 package tests and seven mounted rendering cases across three test functions. All three iOS 26.5 UI checks passed: the sample context sheet and root/branch first-responder retention and reopening. The full UI matrix is not repeated for this reconciliation.

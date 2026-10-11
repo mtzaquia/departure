@@ -45,6 +45,7 @@ enum SampleAppAccessibility {
     static let startButton = "sample.start.button"
     static let startShowInfoButton = "sample.start.show-info"
     static let startScopeID = "sample.start.scope"
+    static let startInfoPresentation = "sample.start-info.presentation"
     static let startInfoText = "sample.start-info.text"
     static let startInfoDismissButton = "sample.start-info.dismiss"
     static let landing = "sample.landing"

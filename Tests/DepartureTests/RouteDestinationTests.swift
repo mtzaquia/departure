@@ -119,6 +119,39 @@ import RouteDomainFixtures
         #expect(await context.unwindRoute())
         #expect(engine.defaultSpace.rootPath.isEmpty)
     }
+
+    @Test(arguments: [false, true])
+    func nearestDeclarationBuildsTypedDataInItsOwnContext(nested: Bool) async throws {
+        let recorder = BuildRecorder()
+        let outer = RouteDestination(NumberedRoute.self) { route, context in
+            recorder.number = -route.number
+            recorder.context = context
+            return EmptyView()
+        }
+        let inner = RouteDestination(NumberedRoute.self) { route, context in
+            recorder.number = route.number
+            recorder.context = context
+            return EmptyView()
+        }
+        let engine = RouterEngine(routes: RootRouteMap {
+            Sheet(outer)
+            Push(HomeDetailRoute.self) { _, _ in EmptyView() } routes: { Push(inner) }
+        })
+        if nested { await engine.present(HomeDetailRoute()) }
+        await engine.present(NumberedRoute(number: 42))
+        let scope = try #require(engine.defaultSpace.rootPath.last)
+        let context = RouteContext(
+            router: Router(engine: engine, scope: scope),
+            unwindRoute: UnwindRouteAction(router: engine, routeScope: scope),
+            presentation: try #require(scope.routePresentation), environment: EnvironmentValues()
+        )
+        _ = try #require(scope.presentationDeclaration).build(try #require(scope.route), context)
+        #expect(recorder.number == (nested ? 42 : -42))
+        #expect(recorder.context?.router == context.router)
+        #expect(recorder.context?.presentation.style == (nested ? .push : .sheet))
+        #expect(await context.unwindRoute())
+        #expect(engine.defaultSpace.rootPath.scopes.count == (nested ? 1 : 0))
+    }
     @Test func destinationDefinitionsAreAvailableImmediatelyAfterAppend() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
             Push(RouteDestination(DomainOnlyRoute.self) { _, _ in EmptyView() }) {
@@ -164,6 +197,7 @@ import RouteDomainFixtures
 @MainActor private final class BuildRecorder {
     var presentation: RoutePresentation?
     var context: RouteContext?
+    var number: Int?
 
     func view(_ route: FeatureProvidedRoute, _ context: RouteContext) -> some View {
         route.destinationDidBuild()
