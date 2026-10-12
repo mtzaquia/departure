@@ -86,8 +86,8 @@ struct SheetPresentationStateTests {
         #expect(!duplicateCompletion)
     }
 
-    private func presentation() -> RoutePresentation {
-        RoutePresentation(scope: RouteScope(id: "sheet", route: MessageRoute()),
+    private func presentation() -> PresentedRoute {
+        PresentedRoute(scope: RouteScope(id: "sheet", route: MessageRoute()),
                           declaration: Sheet(MessageRoute.self).declaration)
     }
 }

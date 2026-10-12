@@ -63,7 +63,7 @@ struct RouteScopeLedgerTests {
         #expect(scope.hookAttachments.isEmpty)
     }
 
-    @Test func newerHookSourceReplacesOlderAndRestoresItOnTeardown() {
+    @Test func hookSourcesComposeAndDetachIndependently() {
         let scope = RouteScope(id: "root", route: nil)
         scope.installHookDeclarations(sourceID: "first", hookDeclarations: [
             ActionInterceptor(ContextProbeAction.self) { _ in }.declaration,
@@ -72,8 +72,10 @@ struct RouteScopeLedgerTests {
             UnwindHandler(SettingsRoute.self) {}.declaration,
         ])
 
-        #expect(scope.hookAttachments.count == 1)
-        #expect(scope.hookAttachments.first?.identity == .unwindHandler(ObjectIdentifier(SettingsRoute.self)))
+        #expect(Set(scope.hookAttachments.map(\.identity)) == [
+            .actionInterceptor(ObjectIdentifier(ContextProbeAction.self)),
+            .unwindHandler(ObjectIdentifier(SettingsRoute.self)),
+        ])
         scope.uninstallHookDeclarations(sourceID: "second")
         #expect(scope.hookAttachments.count == 1)
         #expect(scope.hookAttachments.first?.identity == .actionInterceptor(ObjectIdentifier(ContextProbeAction.self)))

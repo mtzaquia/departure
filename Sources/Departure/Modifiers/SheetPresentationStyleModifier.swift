@@ -66,7 +66,7 @@ struct SheetPresentationStyleModifier: ViewModifier {
             }
     }
 
-    private func dismissRoute(_ route: RoutePresentation?, through presentation: Binding<RoutePresentation?>) {
+    private func dismissRoute(_ route: PresentedRoute?, through presentation: Binding<PresentedRoute?>) {
         guard let route, presentation.wrappedValue?.id == route.id else { return }
         presentation.wrappedValue = nil
     }
@@ -74,10 +74,10 @@ struct SheetPresentationStyleModifier: ViewModifier {
 
 /// Retains the exiting destination until native dismissal finishes, before admitting a successor.
 struct SheetPresentationState {
-    private(set) var route: RoutePresentation?
+    private(set) var route: PresentedRoute?
     private(set) var isPresented = false
 
-    mutating func synchronize(_ incoming: RoutePresentation?) {
+    mutating func synchronize(_ incoming: PresentedRoute?) {
         guard let route else {
             self.route = incoming
             isPresented = incoming != nil

@@ -79,7 +79,7 @@ final class RouteScopeLedger {
     var id: AnyHashable { activeRouteSource?.id ?? initialID }
     var selection: AnyRouteBranchSelection? { activeRouteSource?.selection }
     var routeDeclarations: [RouteScopeDeclaration] { activeRouteSource?.declarations ?? [] }
-    var hookDeclarations: [AnyHookDeclaration] { hookSources.values.last ?? [] }
+    var hookDeclarations: [AnyHookDeclaration] { hookSources.values.flatMap { $0 } }
 
     func updateInitialID(_ id: AnyHashable) {
         initialID = id
@@ -99,7 +99,7 @@ final class RouteScopeLedger {
     }
 
     func setHookSource(_ declarations: [AnyHookDeclaration], for id: AnyHashable) {
-        hookSources.setMostRecent(declarations, for: id)
+        hookSources[id] = declarations
     }
 
     @discardableResult

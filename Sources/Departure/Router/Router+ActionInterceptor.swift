@@ -91,7 +91,8 @@ private extension RouterEngine {
 
     func performAction<A: Action>(_ action: A, hasRerouted: Bool, origin: RouteRequestOrigin? = nil) async {
         guard let source = resolveRequestOrigin(origin)?.scope else { return }
-        if let interceptor = source.firstInterceptor(for: A.self) {
+        if let binding = source.hookBinding(for: .actionInterceptor(ObjectIdentifier(A.self))) {
+            guard let interceptor = binding.declaration?.interceptor(for: A.self) else { return }
             log.departureDebug(.actionIntercepted(action: action, scope: source))
             await interceptor.invoke(self, action, hasRerouted, origin)
             log.departureDebug(.actionInterceptorFinished(action: action))
@@ -112,17 +113,5 @@ private extension RouterEngine {
         } catch {
             log.departureDebug(.actionDirectInvocationEnded(action: action, error: error))
         }
-    }
-}
-
-private extension RouteScope {
-    func firstInterceptor(for actionType: (some Action).Type) -> AnyActionInterceptor? {
-        for attachment in self.hookAttachments {
-            if let candidateInterceptor = attachment.interceptor(for: actionType) {
-                return candidateInterceptor
-            }
-        }
-
-        return nil
     }
 }

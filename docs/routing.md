@@ -182,6 +182,6 @@ struct ReceiptRoute: Route, Equatable {
 
 ## One declaration per type
 
-Within one scope, the first route declaration for a route type, action interceptor for an action type, and unwind handler for a route type wins. Later duplicates are ignored and emit a runtime warning.
+Within one scope, the first route declaration for a route type wins. Later route duplicates are ignored and emit a runtime warning. Multiple `.hooks` modifiers combine their declarations; updating or removing one modifier changes only its own hooks. Duplicate hooks emit a runtime warning and are disabled until only one declaration remains. An interceptor is keyed by action type; an unwind handler is keyed by route type and expected payload type. Payload-free handlers have their own key and participate only when no payload is sent.
 
 Next: [Actions](actions.md) · [Unwinding](unwinding.md)
