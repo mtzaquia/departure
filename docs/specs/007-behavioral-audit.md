@@ -186,6 +186,8 @@ Evidence: [hook composition](../../Sources/Departure/Router/RouteScope.swift), [
 
 The 2026-10-12 payload-key refinement passed 74 focused tests across six suites. Coverage includes source composition and refresh, duplicate recovery, conflict barriers, native/explicit timing, cross-priority delivery, cast compatibility, and optional-nil payloads remaining distinct from payload-free requests. A mounted macOS check verifies two actual `.hooks` modifiers compose, update into a conflict, and recover after the duplicate is removed. The Release package build passes. The full UI matrix was not repeated for this refinement.
 
+The subsequent merge of `main` through `cf4c48b` reconciles the same hook contract with the v3 implementation. The source-owned hook model, payload-aware conflict keys, exact live-membership checks, and native unwind timing remain unchanged. Legacy ledger, declaration-store, and sheet-state fixtures are superseded by `HookBindingTests`, `RouteScopeHostTests`, `NativePresentationLifetimeTests`, and the mounted two-builder regression; they are not restored by the merge. Final reconciliation validation passes 84 focused tests in seven suites and the mounted two-builder check.
+
 ## 11. Actions and interception
 
 Evidence: [action API](../../Sources/Departure/Protocols/Action.swift), [action dispatch](../../Sources/Departure/Router/Router+ActionInterceptor.swift), [invocation](../../Sources/Departure/Attachments/Hooks/ActionInterceptor.swift), and `ActionHookTests` / `HookBindingTests` / `ScopedRouterTests`.

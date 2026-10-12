@@ -27,6 +27,7 @@ public extension View {
     /// Declares hooks for the current route scope.
     ///
     /// Multiple modifiers in one scope compose distinct action-interceptor and unwind-handler keys.
+    /// Updating or removing a modifier changes only its own declarations and captured callbacks.
     /// Interceptors are keyed by action type; unwind handlers by route and expected payload type,
     /// with a separate key for payload-free handlers. Duplicate keys disable that hook and report
     /// a warning until only one declaration remains. Hooks stop participating when their scope
