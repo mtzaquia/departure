@@ -35,7 +35,8 @@ struct ActionHookTests {
 
         #expect(scope.installHookDeclarations(sourceID: sourceID, hookDeclarations: declarations))
         #expect(scope.installHookDeclarations(sourceID: sourceID, hookDeclarations: declarations) == false)
-        #expect(scope.installHookDeclarations(sourceID: AnyHashable("replacement"), hookDeclarations: declarations) == false)
+        #expect(scope.installHookDeclarations(sourceID: AnyHashable("replacement"), hookDeclarations: declarations))
+        #expect(scope.hookAttachments.isEmpty)
 
         let changedDeclarations = declarations + [
             UnwindHandler(SettingsRoute.self) {}.declaration,

@@ -30,6 +30,11 @@
 /// body to finish before continuing the unwind. If the handler presents another route, that request
 /// is deferred until the active navigation has finished.
 ///
+/// Handlers in one scope compose by route and expected payload type. An exact payload-type
+/// match takes precedence; otherwise, a sole compatible typed handler can receive the payload.
+/// Duplicate or ambiguous matching handlers report a warning and do not run. The initializer
+/// without an expected payload type handles only payload-free unwinds.
+///
 /// ```swift
 /// .hooks {
 ///     UnwindHandler(TransactionRoute.self, expecting: TransactionResult.self) { result in
@@ -53,7 +58,7 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
         self.declaration = AnyHookDeclaration(
             kind: .unwindHandler(
                 routeType,
-                AnyUnwindHandler { route, payload, declaringScopeID in
+                AnyUnwindHandler(payloadType: payloadType, acceptsPayload: { $0 is Payload }) { route, payload, declaringScopeID in
                     guard let payload = payload as? Payload else {
                         log.departureInfo(
                             "Unwind handler for `\(String(reflecting: routeType))` in scope "
@@ -70,7 +75,7 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
         )
     }
 
-    /// Creates an unwind handler that ignores any payload sent with the unwind request.
+    /// Creates an unwind handler for payload-free unwind requests.
     ///
     /// If this handler matches an ``UnwindRouteAction/callAsFunction()`` or
     /// ``Router/unwind(to:)`` request, `handle` is scheduled when the unwind is accepted.
@@ -96,9 +101,17 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
 // MARK: - Supporting types
 
 struct AnyUnwindHandler {
+    let payloadType: Any.Type?
+    let acceptsPayload: @MainActor (Any?) -> Bool
     let invoke: @MainActor (any Route, Any?, AnyHashable) async -> Void
 
-    init(invoke: @escaping @MainActor (any Route, Any?, AnyHashable) async -> Void) {
+    init(
+        payloadType: Any.Type? = nil,
+        acceptsPayload: @escaping @MainActor (Any?) -> Bool = { $0 == nil },
+        invoke: @escaping @MainActor (any Route, Any?, AnyHashable) async -> Void
+    ) {
+        self.payloadType = payloadType
+        self.acceptsPayload = acceptsPayload
         self.invoke = invoke
     }
 }

@@ -39,8 +39,7 @@ struct RouteAttachmentIdentity: Hashable {
 
 struct ScopeDeclarations {
     private var routesByType = OrderedStorage<ObjectIdentifier, AnyRouteDeclaration>()
-    private var actionInterceptorsByType = OrderedStorage<ObjectIdentifier, AnyHookDeclaration>()
-    private var unwindHandlersByRouteType = OrderedStorage<ObjectIdentifier, AnyHookDeclaration>()
+    private var hooksByIdentity = OrderedStorage<HookDeclarationIdentity, HookDeclarationBinding>()
 
     var routeAttachments: [AnyRouteDeclaration] {
         Array(routesByType.values)
@@ -51,8 +50,7 @@ struct ScopeDeclarations {
     }
 
     var hookAttachments: [AnyHookDeclaration] {
-        Array(actionInterceptorsByType.values)
-        + Array(unwindHandlersByRouteType.values)
+        hooksByIdentity.values.compactMap(\.declaration)
     }
 
     var hookIdentities: Set<HookDeclarationIdentity> {
@@ -80,26 +78,40 @@ struct ScopeDeclarations {
         routesByType[ObjectIdentifier(routeType)]
     }
 
-    mutating func appendHook(_ hook: AnyHookDeclaration) -> Bool {
-        switch hook.kind {
-        case let .actionInterceptor(actionType, _):
-            let key = ObjectIdentifier(actionType)
-            guard actionInterceptorsByType[key] == nil else {
-                return false
-            }
+    func hookBinding(for identity: HookDeclarationIdentity) -> HookDeclarationBinding? {
+        hooksByIdentity[identity]
+    }
 
-            actionInterceptorsByType[key] = hook
-            return true
-
-        case let .unwindHandler(routeType, _):
-            let key = ObjectIdentifier(routeType)
-            guard unwindHandlersByRouteType[key] == nil else {
-                return false
-            }
-
-            unwindHandlersByRouteType[key] = hook
-            return true
+    func unwindHookBinding(for routeType: any Route.Type, payload: Any?) -> HookDeclarationBinding? {
+        let identity = HookDeclarationIdentity.unwindHandler(
+            ObjectIdentifier(routeType), payload: payload.map { ObjectIdentifier(type(of: $0)) }
+        )
+        if let exact = hooksByIdentity[identity] { return exact }
+        guard let payload else { return nil }
+        let compatible = hooksByIdentity.values.filter { binding in
+            guard case let .unwindHandler(candidateRoute, handler) = binding.candidate.kind,
+                  candidateRoute == routeType, handler.payloadType != nil else { return false }
+            return handler.acceptsPayload(payload)
         }
+        guard let first = compatible.first else { return nil }
+        guard compatible.count == 1 else {
+            log.departureWarning(
+                "Ambiguous unwind handlers for `\(String(reflecting: routeType))` and payload "
+                    + "`\(String(reflecting: type(of: payload)))`; the handler is disabled."
+            )
+            return .conflict(first.candidate)
+        }
+        return first
+    }
+
+    mutating func appendHook(_ hook: AnyHookDeclaration) -> Bool {
+        let identity = hook.identity
+        guard hooksByIdentity[identity] == nil else {
+            hooksByIdentity[identity] = .conflict(hook)
+            return false
+        }
+        hooksByIdentity[identity] = .declared(hook)
+        return true
     }
 
     mutating func setHooks(_ hooks: [AnyHookDeclaration]) {
@@ -110,8 +122,7 @@ struct ScopeDeclarations {
     }
 
     mutating func removeHooks() {
-        actionInterceptorsByType.removeAll(keepingCapacity: true)
-        unwindHandlersByRouteType.removeAll(keepingCapacity: true)
+        hooksByIdentity.removeAll(keepingCapacity: true)
     }
 }
 

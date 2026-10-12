@@ -1147,7 +1147,7 @@ extension RouterEngine {
         }
 
         guard let sourceRoute = sourceScope.route,
-              let match = targetScope.firstUnwindHandlerMatch(for: type(of: sourceRoute))
+              let match = targetScope.firstUnwindHandlerMatch(for: type(of: sourceRoute), payload: payload)
         else {
             return
         }
@@ -1304,25 +1304,16 @@ private extension RouteScope {
         let scope: RouteScope
     }
 
-    func firstUnwindHandlerMatch(for routeType: any Route.Type) -> UnwindHandlerMatch? {
+    func firstUnwindHandlerMatch(for routeType: any Route.Type, payload: Any?) -> UnwindHandlerMatch? {
         var scope: RouteScope? = self
 
         while let currentScope = scope {
-            if let handler = currentScope.firstUnwindHandler(for: routeType) {
+            if let binding = currentScope.unwindHookBinding(for: routeType, payload: payload) {
+                guard let handler = binding.declaration?.unwindHandler(for: routeType) else { return nil }
                 return UnwindHandlerMatch(handler: handler, scope: currentScope)
             }
 
             scope = currentScope.previousScopeInTree
-        }
-
-        return nil
-    }
-
-    func firstUnwindHandler(for routeType: any Route.Type) -> AnyUnwindHandler? {
-        for attachment in hookAttachments {
-            if let handler = attachment.unwindHandler(for: routeType) {
-                return handler
-            }
         }
 
         return nil

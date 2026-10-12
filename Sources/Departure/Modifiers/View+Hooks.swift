@@ -26,6 +26,12 @@ import SwiftUI
 public extension View {
     /// Declares hooks for the current route scope.
     ///
+    /// Multiple modifiers in one scope combine their hooks. Updating or removing a
+    /// modifier changes only its own declarations. Duplicate hooks report a warning
+    /// and are disabled until only one declaration remains. Interceptors are keyed
+    /// by action type; unwind handlers by route and expected payload type, with a
+    /// separate key for payload-free handlers.
+    ///
     /// ```swift
     /// DetailView()
     ///     .hooks {

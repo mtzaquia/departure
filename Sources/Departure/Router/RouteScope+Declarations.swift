@@ -77,6 +77,20 @@ extension RouteScope {
             .hookAttachments
     }
 
+    func hookBinding(for identity: HookDeclarationIdentity) -> HookDeclarationBinding? {
+        let scopeDeclarations = branchContainer == nil
+            ? declarations.local
+            : declarations.declarations(forBranch: activeBranch)
+        return scopeDeclarations.hookBinding(for: identity)
+    }
+
+    func unwindHookBinding(for routeType: any Route.Type, payload: Any?) -> HookDeclarationBinding? {
+        let scopeDeclarations = branchContainer == nil
+            ? declarations.local
+            : declarations.declarations(forBranch: activeBranch)
+        return scopeDeclarations.unwindHookBinding(for: routeType, payload: payload)
+    }
+
     func adoptedRouteAttachments(forBranch branchID: AnyHashable) -> [AnyRouteDeclaration] {
         declarations
             .declarations(forBranch: branchID)
@@ -289,7 +303,7 @@ extension RouteScope {
 
         let didChangeDeclarations = previousIdentities != scopeDeclarations.hookIdentities
         declarations.refreshHookAttachments(
-            scopeDeclarations.hookAttachments,
+            ledger.hookDeclarations,
             activeBranch: activeBranch,
             usesBranches: branchContainer != nil
         )
@@ -459,14 +473,15 @@ private extension RouteScope {
             log.departureWarning(
                 "Duplicate action interceptor for `\(String(reflecting: actionType))` in scope "
                     + "`\(String(describing: id))` on branch `\(String(describing: branchID))`. "
-                    + "The first interceptor will be used."
+                    + "The interceptor is disabled until only one declaration remains."
             )
 
-        case let .unwindHandler(routeType, _):
+        case let .unwindHandler(routeType, handler):
             log.departureWarning(
-                "Duplicate unwind handler for `\(String(reflecting: routeType))` in scope "
+                "Duplicate unwind handler for `\(String(reflecting: routeType))` with "
+                    + "`\(handler.payloadType.map { String(reflecting: $0) } ?? "payload-free")` payload in scope "
                     + "`\(String(describing: id))` on branch `\(String(describing: branchID))`. "
-                    + "The first handler will be used."
+                    + "The handler is disabled until only one declaration remains."
             )
         }
     }
