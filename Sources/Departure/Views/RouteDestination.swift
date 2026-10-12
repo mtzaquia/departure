@@ -44,7 +44,7 @@ public struct RouteDestination<R: Route>: Sendable {
     /// - Parameters:
     ///   - route: The domain route type bound to this destination.
     ///   - destination: Builds a view from typed route data and the current rendering context.
-    public init<Content: View>(
+    nonisolated public init<Content: View>(
         _ route: R.Type,
         @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content
     ) {
@@ -102,7 +102,7 @@ public struct RouteContext {
 final class AnyRouteDestination: Sendable {
     let build: @MainActor @Sendable (any Route, RouteContext) -> AnyView
 
-    init(build: @escaping @MainActor @Sendable (any Route, RouteContext) -> AnyView) {
+    nonisolated init(build: @escaping @MainActor @Sendable (any Route, RouteContext) -> AnyView) {
         self.build = build
     }
 }
