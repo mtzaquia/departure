@@ -41,7 +41,7 @@ public protocol HookDeclaration {
 
 enum HookDeclarationIdentity: Hashable {
     case actionInterceptor(ObjectIdentifier)
-    case unwindHandler(ObjectIdentifier)
+    case unwindHandler(ObjectIdentifier, payload: ObjectIdentifier? = nil)
 }
 
 extension AnyHookDeclaration {
@@ -50,8 +50,18 @@ extension AnyHookDeclaration {
         case let .actionInterceptor(actionType, _):
             .actionInterceptor(ObjectIdentifier(actionType))
 
-        case let .unwindHandler(routeType, _):
-            .unwindHandler(ObjectIdentifier(routeType))
+        case let .unwindHandler(routeType, handler):
+            .unwindHandler(ObjectIdentifier(routeType), payload: handler.payloadType.map(ObjectIdentifier.init))
+        }
+    }
+
+    var description: String {
+        switch kind {
+        case let .actionInterceptor(actionType, _):
+            "ActionInterceptor<\(String(reflecting: actionType))>"
+        case let .unwindHandler(routeType, handler):
+            "UnwindHandler<\(String(reflecting: routeType)), "
+                + "\(handler.payloadType.map { String(reflecting: $0) } ?? "payload-free")>"
         }
     }
 

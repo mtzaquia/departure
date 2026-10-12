@@ -44,7 +44,7 @@ Attach an interceptor to a route scope when it needs to wrap, replace, or observ
 
 Calling `invocation()` runs the original action. Omitting it consumes the action—for example, after a confirmation prompt is declined. Only the scope captured by the receiving router participates in interception.
 
-Multiple `.hooks` modifiers in the same scope compose distinct action and route types. Duplicate declarations for one type disable that hook and report a diagnostic until only one declaration remains. A conflicting interceptor consumes the request; it does not run the action without interception.
+Multiple `.hooks` modifiers in the same scope compose distinct keys. An interceptor's key is its action type; an unwind handler's key includes its route and expected payload type, with a separate payload-free key. Duplicate keys warn and disable only that hook until one declaration remains. A conflicting interceptor consumes the request; it does not run the action without interception.
 
 An outgoing scope's hooks stop participating as soon as the scope leaves navigation, even while its view remains alive for dismissal. Calling a retained invocation after its intercepting scope leaves navigation or becomes covered throws `CancellationError`.
 

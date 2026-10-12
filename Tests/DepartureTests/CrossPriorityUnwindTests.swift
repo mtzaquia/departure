@@ -76,6 +76,10 @@ import Testing
         let owner = fixture()
         let probe = Probe()
         owner.engine.root.installHookDeclarations(hookDeclarations: [
+            UnwindHandler(LoginRoute.self, expecting: String.self) { value in
+                probe.events.append("unexpected:\(value)")
+            }.declaration,
+            UnwindHandler(LoginRoute.self) { probe.events.append("unexpected-payload-free") }.declaration,
             UnwindHandler(LoginRoute.self, expecting: Int.self) { value in
                 #expect(owner.engine.spaces.highSpace != nil)
                 probe.events.append("value:\(value)")

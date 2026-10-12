@@ -5,6 +5,134 @@ import Testing
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
 struct HookBindingTests {
+    @Test(arguments: [false, true])
+    func sameRouteHandlersComposeByPayloadTypeAndPayloadFreeRequests(reverse: Bool) async throws {
+        let engine = RouterEngine(routes: RootRouteMap { Sheet(LoginRoute.self) { _, _ in EmptyView() } })
+        let router = Router(engine: engine, scope: engine.root)
+        let probe = HookBindingProbe()
+        let sources: [(String, AnyHookDeclaration)] = [
+            ("string", UnwindHandler(LoginRoute.self, expecting: String.self) { probe.events.append("string:\($0)") }.declaration),
+            ("int", UnwindHandler(LoginRoute.self, expecting: Int.self) { probe.events.append("int:\($0)") }.declaration),
+            ("payload-free", UnwindHandler(LoginRoute.self) { probe.events.append("payload-free") }.declaration),
+        ]
+        for (id, hook) in reverse ? Array(sources.reversed()) : sources {
+            engine.root.installHookDeclarations(sourceID: id, hookDeclarations: [hook])
+        }
+        for payload in ["done", 42, nil, true] as [Any?] {
+            await router.present(LoginRoute())
+            let source = try #require(engine.defaultSpace.rootPath.last)
+            let scoped = Router(engine: engine, scope: source)
+            if let payload { #expect(await scoped.unwind(to: .topmostAncestor, payload: payload)) }
+            else { #expect(await scoped.unwind(to: .topmostAncestor)) }
+        }
+        #expect(probe.events == ["string:done", "int:42", "payload-free"])
+    }
+
+    @Test func anOptionalNilPayloadIsDistinctFromAPayloadFreeUnwind() async throws {
+        let engine = RouterEngine(routes: RootRouteMap { Sheet(LoginRoute.self) { _, _ in EmptyView() } })
+        let root = Router(engine: engine, scope: engine.root)
+        let probe = HookBindingProbe()
+        engine.root.installHookDeclarations(hookDeclarations: [
+            UnwindHandler(LoginRoute.self, expecting: String?.self) { value in
+                #expect(value == nil)
+                probe.events.append("optional")
+            }.declaration,
+            UnwindHandler(LoginRoute.self) { probe.events.append("payload-free") }.declaration,
+        ])
+        await root.present(LoginRoute())
+        var source = try #require(engine.defaultSpace.rootPath.last)
+        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor, payload: Optional<String>.none))
+        await root.present(LoginRoute())
+        source = try #require(engine.defaultSpace.rootPath.last)
+        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor))
+        #expect(probe.events == ["optional", "payload-free"])
+    }
+
+    @Test(arguments: [false, true])
+    func duplicatePayloadKeyDisablesOnlyThatKeyAndRecovers(reverse: Bool) async throws {
+        let engine = RouterEngine(routes: RootRouteMap { Sheet(LoginRoute.self) { _, _ in EmptyView() } })
+        let root = Router(engine: engine, scope: engine.root)
+        let probe = HookBindingProbe()
+        engine.root.installHookDeclarations(sourceID: "int", hookDeclarations: [
+            UnwindHandler(LoginRoute.self, expecting: Int.self) { probe.events.append("int:\($0)") }.declaration,
+        ])
+        for source in reverse ? ["second", "first"] : ["first", "second"] {
+            engine.root.installHookDeclarations(sourceID: source, hookDeclarations: [
+                UnwindHandler(LoginRoute.self, expecting: String.self) { probe.events.append("\(source):\($0)") }.declaration,
+            ])
+        }
+        let key = HookDeclarationIdentity.unwindHandler(ObjectIdentifier(LoginRoute.self), payload: ObjectIdentifier(String.self))
+        guard case .conflict? = engine.root.hookBinding(for: key, in: engine.spaces) else {
+            Issue.record("Only the duplicate route/payload pair should conflict")
+            return
+        }
+        for payload in ["blocked", 7] as [Any] {
+            await root.present(LoginRoute())
+            let source = try #require(engine.defaultSpace.rootPath.last)
+            #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor, payload: payload))
+        }
+        #expect(probe.events == ["int:7"])
+        engine.root.uninstallHookDeclarations(sourceID: "second")
+        await root.present(LoginRoute())
+        let source = try #require(engine.defaultSpace.rootPath.last)
+        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor, payload: "restored"))
+        #expect(probe.events == ["int:7", "first:restored"])
+    }
+
+    @Test func aDifferentPayloadKeyDoesNotShadowAnAncestorOrHideItsOwnConflict() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Sheet(LoginRoute.self) { _, _ in EmptyView() } routes: {
+                Sheet(SettingsRoute.self) { _, _ in EmptyView() }
+            }
+        })
+        let root = Router(engine: engine, scope: engine.root)
+        let probe = HookBindingProbe()
+        engine.root.installHookDeclarations(hookDeclarations: [
+            UnwindHandler(SettingsRoute.self, expecting: String.self) { probe.events.append("ancestor:\($0)") }.declaration,
+        ])
+        await root.present(LoginRoute())
+        let landing = try #require(engine.defaultSpace.rootPath.last)
+        landing.installHookDeclarations(sourceID: "int", hookDeclarations: [
+            UnwindHandler(SettingsRoute.self, expecting: Int.self) { probe.events.append("int:\($0)") }.declaration,
+        ])
+        let landingRouter = Router(engine: engine, scope: landing)
+        await landingRouter.present(SettingsRoute())
+        var source = try #require(engine.defaultSpace.rootPath.last)
+        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor, payload: "found"))
+        #expect(probe.events == ["ancestor:found"])
+        let string = UnwindHandler(SettingsRoute.self, expecting: String.self) { probe.events.append("local:\($0)") }.declaration
+        landing.installHookDeclarations(sourceID: "duplicate", hookDeclarations: [string, string])
+        await landingRouter.present(SettingsRoute())
+        source = try #require(engine.defaultSpace.rootPath.last)
+        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor, payload: "blocked"))
+        #expect(probe.events == ["ancestor:found"])
+    }
+
+    @Test func compatiblePayloadTypesHaveNoMountOrderWinnerAndExactTypesTakePrecedence() async throws {
+        let engine = RouterEngine()
+        let probe = HookBindingProbe()
+        let base = UnwindHandler(LoginRoute.self, expecting: HookPayloadBase.self) { _ in probe.events.append("base") }.declaration
+        let tagged = UnwindHandler(LoginRoute.self, expecting: (any HookPayloadTag).self) { _ in probe.events.append("tagged") }.declaration
+        let payload = HookPayloadChild()
+        engine.root.installHookDeclarations(sourceID: "base", hookDeclarations: [base])
+        let compatible = try #require(engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: payload, in: engine.spaces)?.declaration)
+        let baseHandler = try #require(compatible.unwindHandler(for: LoginRoute.self))
+        await baseHandler.invoke(LoginRoute(), payload, engine.root.id)
+        #expect(probe.events == ["base"])
+        engine.root.installHookDeclarations(sourceID: "tagged", hookDeclarations: [tagged])
+        guard case .conflict? = engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: payload, in: engine.spaces) else {
+            Issue.record("Overlapping casts must not choose a mount-order winner")
+            return
+        }
+        let exact = UnwindHandler(LoginRoute.self, expecting: HookPayloadChild.self) { _ in probe.events.append("exact") }.declaration
+        engine.root.installHookDeclarations(sourceID: "exact", hookDeclarations: [exact])
+        let selected = try #require(engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: payload, in: engine.spaces)?.declaration)
+        let exactHandler = try #require(selected.unwindHandler(for: LoginRoute.self))
+        await exactHandler.invoke(LoginRoute(), payload, engine.root.id)
+        #expect(probe.events == ["base", "exact"])
+        #expect(engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: nil, in: engine.spaces) == nil)
+    }
+
     @Test func separateSourcesHandleActionsAndUnwindsTogether() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
             Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
@@ -241,6 +369,10 @@ struct HookBindingTests {
         #expect(probe.events == ["source", "reroute", "destination", "body"])
     }
 }
+
+private protocol HookPayloadTag {}
+private class HookPayloadBase {}
+private final class HookPayloadChild: HookPayloadBase, HookPayloadTag {}
 
 @MainActor
 private final class HookBindingProbe {

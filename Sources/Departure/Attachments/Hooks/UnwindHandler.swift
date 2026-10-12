@@ -40,6 +40,13 @@
 /// waits until the active navigation has finished, then rechecks source membership
 /// and priority coverage. It is dropped if a higher space still covers its source.
 ///
+/// Handlers in one scope compose by route and expected payload type. Duplicate keys
+/// report a warning and are disabled until only one declaration remains.
+/// For a provided payload, an exact type match takes precedence; otherwise, a sole
+/// compatible typed handler can receive it. Multiple compatible keys without an
+/// exact match warn and stop lookup. Payload-free handlers receive only payload-free
+/// unwinds, including native dismissal; they never consume a provided payload.
+///
 /// ```swift
 /// .hooks {
 ///     UnwindHandler(TransactionRoute.self, expecting: TransactionResult.self) { result in
@@ -55,6 +62,7 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
     /// If this handler matches an ``UnwindRouteAction/callAsFunction(payload:)`` or
     /// ``Router/unwind(to:payload:)`` request, `handle` is scheduled when the unwind is accepted.
     /// Delivery starts before the path changes. The router does not wait for `handle` to return.
+    /// An optional `nil` passed to the payload overload is still a typed payload.
     public init<Payload>(
         _ routeType: R.Type,
         expecting payloadType: Payload.Type,
@@ -63,7 +71,7 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
         self.declaration = AnyHookDeclaration(
             kind: .unwindHandler(
                 routeType,
-                AnyUnwindHandler { route, payload, declaringScopeID in
+                AnyUnwindHandler(payloadType: payloadType, acceptsPayload: { $0 is Payload }) { route, payload, declaringScopeID in
                     guard let payload = payload as? Payload else {
                         log.departureInfo(
                             "Unwind handler for `\(String(reflecting: routeType))` in scope "
@@ -80,7 +88,7 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
         )
     }
 
-    /// Creates an unwind handler that ignores any payload sent with the unwind request.
+    /// Creates an unwind handler for payload-free unwind requests.
     ///
     /// If this handler matches an ``UnwindRouteAction/callAsFunction()`` or
     /// ``Router/unwind(to:)`` request, `handle` is scheduled when the unwind is accepted.
@@ -107,9 +115,15 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
 // MARK: - Supporting types
 
 struct AnyUnwindHandler {
+    let payloadType: Any.Type?
+    let acceptsPayload: @MainActor (Any?) -> Bool
     let invoke: @MainActor (any Route, Any?, AnyHashable) async -> Void
 
-    init(invoke: @escaping @MainActor (any Route, Any?, AnyHashable) async -> Void) {
+    init(payloadType: Any.Type? = nil,
+         acceptsPayload: @escaping @MainActor (Any?) -> Bool = { $0 == nil },
+         invoke: @escaping @MainActor (any Route, Any?, AnyHashable) async -> Void) {
+        self.payloadType = payloadType
+        self.acceptsPayload = acceptsPayload
         self.invoke = invoke
     }
 }

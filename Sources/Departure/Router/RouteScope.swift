@@ -388,14 +388,39 @@ extension RouteScope {
         for (identity, binding) in updated {
             guard case .conflict = binding else { continue }
             if case .conflict? = previous[identity] { continue }
+            let description = hookSources.values.joined().first { $0.identity == identity }?.description ?? "\(identity)"
             log.departureWarning(
-                "Conflicting hook declarations for `\(identity)` in scope `\(id)`; "
+                "Conflicting hook declarations for `\(description)` in scope `\(id)`; "
                     + "the hook is disabled until only one declaration remains."
             )
         }
     }
 
     func uninstallHookDeclarations(sourceID: AnyHashable) { hookSources[sourceID] = nil }
+
+    func unwindHandlerBinding(for routeType: any Route.Type, payload: Any?, in spaces: RouteSpaces) -> DeclarationBinding<AnyHookDeclaration>? {
+        guard spaces.routePath(containing: self) != nil else { return nil }
+        let bindings = hookBindings
+        let exact = HookDeclarationIdentity.unwindHandler(ObjectIdentifier(routeType),
+            payload: payload.map { ObjectIdentifier(type(of: $0)) })
+        if let binding = bindings[exact] { return binding }
+        guard payload != nil else { return nil }
+
+        let compatible = Set(hookSources.values.joined().compactMap { declaration -> HookDeclarationIdentity? in
+            guard let handler = declaration.unwindHandler(for: routeType),
+                  handler.payloadType != nil, handler.acceptsPayload(payload) else { return nil }
+            return declaration.identity
+        })
+        guard let identity = compatible.first else { return nil }
+        guard compatible.count == 1 else {
+            log.departureWarning(
+                "Multiple payload types accept the unwind of `\(String(reflecting: routeType))` "
+                    + "in scope `\(id)`; no handler was selected. Declare a handler for the exact payload type."
+            )
+            return .conflict
+        }
+        return bindings[identity]
+    }
 
     func ownership(of view: PlatformView) -> Ownership {
         guard let managedView = host?.view, let managedWindow = managedView.window else { return .pending }

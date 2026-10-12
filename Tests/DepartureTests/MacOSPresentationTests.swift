@@ -32,6 +32,45 @@ import Testing
 // and --filter MacOSPresentationTests.
 @Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["DEPARTURE_RUN_HOSTED_UI_TESTS"] == "1"))
 struct MacOSPresentationTests {
+    @Test func multipleHookBuildersComposePayloadKeysAndRecoverFromDuplicates() async throws {
+        let owner = RootRouter()
+        let engine = owner.engine
+        let control = MacOSHookCompositionControl()
+        let host = WithRouter(routes: RootRouteMap { Sheet(LoginRoute.self) { _, _ in Text("Login") } }, router: owner) {
+            MacOSHookCompositionRoot(control: control)
+        }
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: host)
+        window.orderFront(nil)
+        defer { window.close() }
+        let stringKey = HookDeclarationIdentity.unwindHandler(ObjectIdentifier(LoginRoute.self), payload: ObjectIdentifier(String.self))
+        let intKey = HookDeclarationIdentity.unwindHandler(ObjectIdentifier(LoginRoute.self), payload: ObjectIdentifier(Int.self))
+        try #require(await waitUntil {
+            engine.root.hookBinding(for: stringKey, in: engine.spaces)?.declaration != nil
+                && engine.root.hookBinding(for: intKey, in: engine.spaces)?.declaration != nil
+        })
+        for payload in ["first", 7] as [Any] {
+            await owner.current.present(LoginRoute())
+            #expect(await owner.current.unwind(to: .topmostAncestor, payload: payload))
+        }
+        #expect(control.events == ["string:first", "int:7"])
+        control.duplicate = true
+        try #require(await waitUntil {
+            if case .conflict? = engine.root.hookBinding(for: stringKey, in: engine.spaces) { return true }
+            return false
+        })
+        await owner.current.present(LoginRoute())
+        #expect(await owner.current.unwind(to: .topmostAncestor, payload: "blocked"))
+        #expect(control.events == ["string:first", "int:7"])
+        control.duplicate = false
+        try #require(await waitUntil { engine.root.hookBinding(for: stringKey, in: engine.spaces)?.declaration != nil })
+        await owner.current.present(LoginRoute())
+        #expect(await owner.current.unwind(to: .topmostAncestor, payload: "restored"))
+        #expect(control.events == ["string:first", "int:7", "string:restored"])
+    }
+
     @Test func modalUnwindWaitsForNativeDismissalCompletion() async throws {
         let owner = RootRouter()
         let host = WithRouter(routes: RootRouteMap {
@@ -233,6 +272,29 @@ struct MacOSPresentationTests {
             try? await Task.sleep(for: .milliseconds(20))
         }
         return condition()
+    }
+}
+
+@MainActor @Observable
+private final class MacOSHookCompositionControl {
+    var duplicate = false
+    var events: [String] = []
+}
+
+private struct MacOSHookCompositionRoot: View {
+    let control: MacOSHookCompositionControl
+    var body: some View {
+        Text("Hook composition")
+            .hooks {
+                UnwindHandler(LoginRoute.self, expecting: String.self) { control.events.append("string:\($0)") }
+            }
+            .hooks {
+                UnwindHandler(LoginRoute.self, expecting: Int.self) { control.events.append("int:\($0)") }
+                if control.duplicate {
+                    UnwindHandler(LoginRoute.self, expecting: String.self) { control.events.append("duplicate:\($0)") }
+                }
+            }
+            .routing()
     }
 }
 

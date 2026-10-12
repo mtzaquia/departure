@@ -74,6 +74,10 @@ Native and explicit unwinds enter the matching handler before committing the pat
 
 Handlers are found from the surviving landing scope toward its space root, then from each surviving lower space's current scope toward its root, nearest priority first. Only the first matching handler receives the notification and payload. Whole-space removal starts directly with lower spaces; a combined removal skips spaces being removed by that operation. Covered scopes can receive this notification without gaining navigation authority.
 
-An outgoing scope stops participating when it leaves navigation, even if its view is retained for dismissal. Distinct hook types compose across `.hooks` modifiers in the same scope; duplicate handlers for one route type disable that handler and report a diagnostic. An ambiguous handler stops lookup, including fallback to lower spaces.
+An outgoing scope stops participating when it leaves navigation, even if its view is retained for dismissal. Multiple `.hooks` modifiers compose handlers keyed by route and expected payload type. A `String` handler and an `Int` handler for the same route coexist; duplicating the `String` key warns and disables only that key until one declaration remains. A conflicting applicable key stops lookup, including fallback to ancestors and lower spaces. A different payload key does not shadow a matching ancestor handler.
+
+For a provided payload, a handler for its exact type takes precedence in the receiving scope. Otherwise, one compatible typed handler may receive it through the same cast used by the typed builder. Multiple compatible types without an exact match warn and stop lookup instead of selecting by installation order.
+
+`UnwindHandler(Route.self) { ... }` handles only payload-free requests, including native dismissal. It does not run for a provided payload, even when no typed handler matches. An optional `nil` passed through `unwind(payload:)` remains a typed optional payload; use the payload-free overload to request a payload-free unwind.
 
 Next: [Branches](branches.md)
