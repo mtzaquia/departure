@@ -312,6 +312,7 @@ struct RouterTests {
         )
         router.root.registerBranchScope(homeScope, for: AppTab.home)
         router.resumePendingRoute(for: AppTab.home, in: router.root)
+        for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
 
         #expect(router.normalTree.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
@@ -353,6 +354,7 @@ struct RouterTests {
         )
         landingScope.registerBranchScope(homeScope, for: AppTab.home)
         router.resumePendingRoute(for: AppTab.home, in: landingScope)
+        for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
 
         #expect(router.normalTree.rootPath.count == 1)
         #expect(router.normalTree.rootPath.last === landingScope)
@@ -552,6 +554,7 @@ struct RouterTests {
         )
         router.root.registerBranchScope(homeScope, for: AppTab.home)
         router.resumePendingRoute(for: AppTab.home, in: router.root)
+        for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
 
         #expect(router.normalTree.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
@@ -651,6 +654,7 @@ struct RouterTests {
         #expect(router.pendingRoute?.append?.match.branchID == AnyHashable(AppTab.home))
 
         router.resumePendingRoute(for: AppTab.home, in: landingScope)
+        for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
 
         #expect(router.normalTree.rootPath.count == 1)
         #expect(homeScope.path.count == 1)
@@ -1059,6 +1063,7 @@ struct RouterTests {
             waitsForBranchActivation: true
         )
         router.resumePendingRoute(for: AppTab.wallet, in: router.root)
+        for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
 
         #expect(router.normalTree.rootPath.isEmpty)
         #expect(walletScope.path.count == 2)
@@ -1758,6 +1763,7 @@ struct RouterTests {
             ]
         )
         router.resumePendingRoute(for: AppTab.wallet, in: router.root)
+        for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
 
         #expect(router.normalTree.rootPath.isEmpty)
         #expect(walletScope.path.count == 1)
@@ -2016,6 +2022,7 @@ struct RouterTests {
 
         await router.requestRoute(HomeDetailRoute())
         router.resumePendingRoute(for: AppTab.home, in: router.root)
+        for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
         #expect(selectedTab() == .home)
         #expect(homeScope.path.last?.route is HomeDetailRoute)
 
@@ -3031,6 +3038,7 @@ struct RouterTests {
 
         await router.requestRoute(MessageRoute())
         router.resumePendingRoute(for: AppTab.home, in: landingScope)
+        for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
 
         #expect(selectedTab() == .home)
         #expect(homeScope.path.count == 1)
@@ -3089,6 +3097,7 @@ struct RouterTests {
         if didUnwind {
             await router.requestRoute(MessageRoute())
             router.resumePendingRoute(for: AppTab.home, in: landingScope)
+            for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
         }
 
         #expect(didUnwind)
@@ -4254,6 +4263,7 @@ struct RouterTests {
         )
         router.root.registerBranchScope(homeScope, for: AppTab.home)
         router.resumePendingRoute(for: AppTab.home, in: router.root)
+        for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
 
         #expect(router.pendingRoute == nil)
         #expect(router.routeForest.highTree?.rootPath.last?.route is LoginRoute)

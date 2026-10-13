@@ -104,6 +104,7 @@ struct PresentationHostOwnershipTests {
 
         await router.requestRoute(TransactionRoute())
         router.resumePendingRoute(for: AppTab.wallet, in: router.root)
+        for _ in 0..<1000 where router.pendingRoute != nil { await Task.yield() }
         let presentedScope = try #require(walletScope.path.last)
 
         #expect(selectedTab() == .wallet)

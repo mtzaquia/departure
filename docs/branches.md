@@ -44,6 +44,12 @@ has been built. Discovery does not search arbitrary destinations inside sibling 
 An explicit `router.branch(...)` target does not fall back to another branch when
 its branch has no matching declaration.
 
+A request whose branch host has not registered remains pending while that branch
+becomes available. After the selection or host registration callback returns,
+Departure rechecks the pending request and participating branch before inserting
+the destination. Repeated registration updates insert once; an older wakeup cannot
+consume a replacement pending request.
+
 A branch router belongs to the nearest enclosing container. It remains usable after
 the requesting destination is dismissed, and can address a branch whose view has
 not been built yet. Removing its owning container makes it inactive. Chain `branch(...)`

@@ -48,6 +48,7 @@ struct ReplaceTests {
         #expect(fixture.engine.normalTree.rootPath.isEmpty)
         fixture.mountWallet()
         fixture.engine.resumePendingRoute(for: "wallet", in: fixture.engine.root)
+        for _ in 0..<1000 where fixture.engine.pendingRoute != nil { await Task.yield() }
         #expect(fixture.wallet.path.first?.route as? SelectedRoute == SelectedRoute(number: 1))
         #expect(fixture.engine.pendingRoute == nil)
         #expect(fixture.engine.routePresentation(from: fixture.wallet, matching: .replace) != nil)

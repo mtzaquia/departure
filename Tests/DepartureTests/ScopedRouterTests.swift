@@ -87,6 +87,7 @@ struct ScopedRouterTests {
         #expect(fixture.detail.path.isEmpty)
         #expect(fixture.engine.pendingRoute?.append?.match.branchID == AnyHashable("detail"))
         fixture.engine.resumePendingRoute(for: "detail", in: fixture.engine.root)
+        for _ in 0..<1000 where fixture.engine.pendingRoute != nil { await Task.yield() }
         #expect(fixture.detail.path.last?.route is MessageRoute)
         #expect(fixture.engine.pendingRoute == nil)
     }
@@ -117,6 +118,7 @@ struct ScopedRouterTests {
         await router.present(SettingsRoute())
         #expect(fixture.selection.value == "detail")
         fixture.engine.resumePendingRoute(for: "detail", in: fixture.engine.root)
+        for _ in 0..<1000 where fixture.engine.pendingRoute != nil { await Task.yield() }
         #expect(fixture.detail.path.last?.route is SettingsRoute)
         #expect(fixture.sidebar.path.isEmpty)
         #expect(fixture.engine.pendingRoute == nil)
@@ -279,6 +281,7 @@ struct ScopedRouterTests {
             fixture.engine.root.registerBranchScope(fixture.detail, for: "detail")
         }
         fixture.engine.resumePendingRoute(for: "detail", in: fixture.engine.root)
+        for _ in 0..<1000 where fixture.engine.pendingRoute != nil { await Task.yield() }
         #expect(fixture.engine.pendingRoute == nil)
         #expect(fixture.detail.path.last?.route is SettingsRoute)
     }
@@ -293,6 +296,7 @@ struct ScopedRouterTests {
         #expect(fixture.selection.value == "detail")
         #expect(fixture.detail.activeBranch == AnyHashable("nested"))
         fixture.engine.resumePendingRoute(for: "nested", in: fixture.detail)
+        for _ in 0..<1000 where fixture.engine.pendingRoute != nil { await Task.yield() }
         #expect(nested.path.last?.route is SettingsRoute)
         await fixture.root.branch("detail").branch("nested").present(SettingsRoute())
         #expect(nested.path.count == 1)

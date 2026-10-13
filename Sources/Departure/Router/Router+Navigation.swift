@@ -545,26 +545,11 @@ extension RouterEngine {
         return didActivate
     }
 
-    /// Gives an already-mounted branch host a turn to observe the selection update before resuming
-    /// the request. A missing host resumes from its registration path instead.
+    /// Branch-selection and host-registration wakeups share the deferred resume path.
     func schedulePendingRouteResume(for match: DeclarationMatch) {
-        guard
-            let branch = match.branchID,
-            let declaringScope = match.declarationLocation.scope,
-            declaringScope.branchScopes[branch] != nil
-        else {
-            return
-        }
-
-        Task { @MainActor [weak self, weak declaringScope] in
-            await Task.yield()
-
-            guard let self, let declaringScope, declaringScope.activeBranch == branch else {
-                return
-            }
-
-            resumePendingRoute(for: branch, in: declaringScope)
-        }
+        guard let branch = match.branchID, let declaringScope = match.declarationLocation.scope,
+              declaringScope.branchScopes[branch] != nil else { return }
+        resumePendingRoute(for: branch, in: declaringScope)
     }
 
     func replaceElevatedTree(
@@ -684,34 +669,30 @@ extension RouterEngine {
     }
 
     func resumePendingRoute(for branch: AnyHashable, in declaringScope: RouteScope) {
-        guard
-            let pendingRoute,
-            let append = pendingRoute.append,
-            append.match.branchID == branch,
-            append.match.declarationLocation.scope === declaringScope,
-            declaringScope.branchScopes[branch] != nil
-        else {
-            return
+        guard let pendingRoute, let append = pendingRoute.append,
+              append.match.branchID == branch,
+              append.match.declarationLocation.scope === declaringScope,
+              declaringScope.branchScopes[branch] != nil else { return }
+
+        // Registration can run inside didMoveToWindow/updateUIView. Resume after
+        // that render callback returns, while retaining the exact pending append.
+        Task { @MainActor [weak self, weak declaringScope, weak pendingRoute] in
+            await Task.yield()
+            guard let self, let declaringScope, let pendingRoute,
+                  self.pendingRoute === pendingRoute,
+                  declaringScope.participates(inBranch: branch),
+                  routeForest.routePath(containing: declaringScope) != nil,
+                  declaringScope.branchScopes[branch] != nil else { return }
+
+            replacePendingRoute(nil)
+            log.departureDebug(.pendingRouteResuming(route: pendingRoute.route))
+            let match = routeForest.refreshingPresentationLocation(for: append.match)
+            switch append.behavior {
+            case .append: prepareRouteAppendPath(after: match)
+            case .startElevatedTree: break
+            }
+            appendOrPendRoute(pendingRoute.route, after: match, behavior: append.behavior)
         }
-
-        replacePendingRoute(nil)
-        log.departureDebug(.pendingRouteResuming(route: pendingRoute.route))
-        let pendingMatch = append.match
-        let appendBehavior = append.behavior
-        let match = routeForest.refreshingPresentationLocation(for: pendingMatch)
-        switch appendBehavior {
-        case .append:
-            prepareRouteAppendPath(after: match)
-
-        case .startElevatedTree:
-            break
-        }
-
-        appendOrPendRoute(
-            pendingRoute.route,
-            after: match,
-            behavior: appendBehavior
-        )
     }
 
     func resolvePresentationHost(
