@@ -102,8 +102,12 @@ public struct Router: Equatable {
     /// Resolves and presents a route from this router's scope, or from the active
     /// routing graph when this router has no scope.
     ///
-    /// Returns after routing state updates, without waiting for SwiftUI to display
-    /// the destination. Rejected routes do not activate the targeted branch.
+    /// Requests sharing a routing container resolve and update routing state one at a time.
+    /// While a request is in progress, only the latest waiting request is retained.
+    /// Superseded waiting requests return without resolving or presenting their routes.
+    ///
+    /// Returns after the request completes or is superseded, without waiting for SwiftUI
+    /// to display the destination. Rejected routes do not activate the targeted branch.
     /// - Parameter route: The route to resolve and present.
     public func present(_ route: any Route) async {
         guard let engine else { return }

@@ -35,6 +35,12 @@ final class RouterEngine: Identifiable, Equatable {
     @ObservationIgnored
     var pendingRoute: PendingRoute?
 
+    @ObservationIgnored
+    var isPresentationRequestInProgress = false
+
+    @ObservationIgnored
+    var bufferedPresentationRequest: BufferedPresentationRequest?
+
     var unwindPresentationSnapshot: UnwindPresentationSnapshot?
 
     @ObservationIgnored
@@ -87,7 +93,8 @@ final class RouterEngine: Identifiable, Equatable {
 
     /// Requests a route presentation.
     ///
-    /// This method returns after the request has resolved and the router has updated its routing state.
+    /// Requests resolve and update routing state one at a time, retaining only the latest
+    /// waiting request. This method returns after the request completes or is superseded.
     /// It does not wait for SwiftUI to mount or display the destination view.
     func present(_ route: any Route) async {
         await requestRouteWhenReady(route)

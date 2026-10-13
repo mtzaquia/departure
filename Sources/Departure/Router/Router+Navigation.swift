@@ -1187,6 +1187,7 @@ extension RouterEngine {
 
     enum RouteRequestStage {
         case resolve
+        case resolveAdmitted
         case presentResolved
     }
 
@@ -1213,6 +1214,18 @@ extension RouterEngine {
         origin: RouteRequestOrigin? = nil
     ) async {
         guard Task.isCancelled == false, resolveRequestOrigin(origin) != nil else { return }
+
+        // Before admission, requests waiting for an unwind share the existing latest-only
+        // navigation buffer. An admitted request owns its readiness continuation; other
+        // requests must wait separately rather than replacing that continuation.
+        if case .resolve = stage,
+           isPresentationRequestInProgress || navigationTransaction.isInProgress == false {
+            guard await beginPresentationRequest(route) else { return }
+            defer { finishPresentationRequest() }
+            await requestRouteWhenReady(route, stage: .resolveAdmitted, origin: origin)
+            return
+        }
+
         guard navigationTransaction.isInProgress == false else {
             let requestID = UUID()
             await withTaskCancellationHandler {
@@ -1238,7 +1251,7 @@ extension RouterEngine {
         }
 
         switch stage {
-        case .resolve:
+        case .resolve, .resolveAdmitted:
             await requestRoute(route, origin: origin)
         case .presentResolved:
             await presentResolvedRoute(route, origin: origin)

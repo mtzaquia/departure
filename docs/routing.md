@@ -12,6 +12,15 @@ Declare each route on the scope that should present it.
 
 `router.present(...)` starts at the scope captured by that router and uses the closest matching declaration in its branch or enclosing scopes. If the current branch has no match, discovery crawls up to container `Branch(...)` declarations and automatically selects the branch owning the match, including a branch whose view has not been built yet. It does not search arbitrary destination scopes inside sibling stacks. The same route type may be declared in more than one scope; the nearest owner wins. Use `router.branch(...)` to explicitly choose a branch when needed. If no eligible scope owns the route, nothing is presented.
 
+Requests sharing a routing container resolve and update routing state one at a time, including requests sent from separate `Task` closures or different scoped routers. While a request is in progress, the router retains one waiting request; a newer waiting request replaces it. Superseded callers return without resolving or presenting their routes. Requests waiting for an unwind to finish also retain only the latest request.
+
+`await router.present(...)` returns when that request completes or is superseded. It does not wait for SwiftUI to mount the destination or finish its presentation animation. Send consecutive requests from the same task when their order matters:
+
+```swift
+await router.present(ProfileRoute(userID: "42"))
+await router.present(SettingsRoute())
+```
+
 ## Supply a view from a feature module
 
 A route can live in a top-level Domain module without depending on its feature view. Omit
