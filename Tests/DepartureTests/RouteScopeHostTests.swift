@@ -4,14 +4,14 @@ import Testing
 
 @MainActor @Suite struct RouteScopeHostTests {
     @Test func nativeTeardownDoesNotRemoveDefinitions() {
-        let engine = RouterEngine(routes: RootRouteMap { Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }) })
+        let engine = RouterEngine(routes: RootRouteMap { testPush(testDestination(HomeDetailRoute.self)) })
         engine.routeScopeDidInstallInView(engine.root)
         engine.routeScopeDidLeaveView(engine.root)
         #expect(engine.root.definitions.routeBinding(for: HomeDetailRoute.self) != nil)
         #expect(!engine.root.isInstalledInView)
     }
     @Test func environmentUpdatesDoNotReplaceDefinitions() {
-        let engine = RouterEngine(routes: RootRouteMap { Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }) })
+        let engine = RouterEngine(routes: RootRouteMap { testSheet(testDestination(SettingsRoute.self)) })
         let identity = engine.root.routeAttachments.map(\.identity)
         var environment = EnvironmentValues(); environment.locale = Locale(identifier: "nl_NL")
         engine.root.updateSourceEnvironment(environment)
@@ -34,7 +34,7 @@ import Testing
         #expect(scope.hookBinding(for: action, in: engine.spaces) == nil)
     }
     @Test func branchScopeIdentitySurvivesNativeTeardown() throws {
-        let engine = RouterEngine(routes: RootRouteMap { Branches { Branch("tab") { Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }) } } })
+        let engine = RouterEngine(routes: RootRouteMap { Branches { Branch("tab") { testPush(testDestination(HomeDetailRoute.self)) } } })
         let branch = try #require(engine.root.branchScopes["tab"])
         engine.routeScopeDidInstallInView(branch)
         engine.routeScopeDidLeaveView(branch)
@@ -55,8 +55,10 @@ import Testing
     }
 
     @Test func staleElevatedHostDetachmentCannotClearItsReplacement() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {} highPriority: {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+        let engine = RouterEngine(routes: RootRouteMap {
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self))
+            }
         })
         await engine.present(LoginRoute())
         let space = try #require(engine.spaces.highSpace)
@@ -77,20 +79,23 @@ import Testing
 
     @Test func nativeOwnerDismissalRemovesItsEntireOwnedTreeWhileCovered() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
-        } highPriority: {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
-                Branches(concurrent: true) {
-                    Branch("first") {
-                        Push(RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }) {
-                            Sheet(RouteDestination(MessageRoute.self) { _, _ in EmptyView() })
+            testPush(testDestination(HomeDetailRoute.self))
+
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self)) {
+                    Branches(concurrent: true) {
+                        Branch("first") {
+                            testPush(testDestination(NumberedRoute.self)) {
+                                testSheet(testDestination(MessageRoute.self))
+                            }
                         }
+                        Branch("second") { testPush(testDestination(SettingsRoute.self)) }
                     }
-                    Branch("second") { Push(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }) }
                 }
             }
-        } criticalPriority: {
-            Cover(RouteDestination(AlertRoute.self) { _, _ in EmptyView() })
+            CriticalPriority {
+                testCover(testDestination(AlertRoute.self))
+            }
         })
         await engine.present(HomeDetailRoute())
         let defaultDestination = try #require(engine.defaultSpace.rootPath.last)

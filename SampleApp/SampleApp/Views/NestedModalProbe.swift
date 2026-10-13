@@ -249,26 +249,35 @@ private enum NestedModalDestinations {
 
 enum NestedModalProbeMap {
     private static let nested = RouteMap {
-        Push(NestedModalDestinations.nestedModalProbeAPushRoute) {
-            Sheet(NestedModalDestinations.nestedModalProbeSheetBRoute) {
-                Push(NestedModalDestinations.nestedModalProbeBPushRoute)
+        Push(NestedModalProbeAPushRoute.self) {
+            Sheet(NestedModalProbeSheetBRoute.self) {
+                Push(NestedModalProbeBPushRoute.self)
             }
         }
+    } destinations: {
+        NestedModalDestinations.nestedModalProbeAPushRoute
+        NestedModalDestinations.nestedModalProbeSheetBRoute
+        NestedModalDestinations.nestedModalProbeBPushRoute
     }
     static var root: RootRouteMap {
         let arguments = ProcessInfo.processInfo.arguments
         return RootRouteMap {
             if !arguments.contains("--nested-modal-high") && !arguments.contains("--nested-modal-critical") {
-                Sheet(NestedModalDestinations.nestedModalProbeSheetARoute) { nested }
+                Sheet(NestedModalProbeSheetARoute.self) { nested }
             }
-        } highPriority: {
-            if arguments.contains("--nested-modal-high") {
-                Sheet(NestedModalDestinations.nestedModalProbeSheetARoute) { nested }
+
+            HighPriority {
+                if arguments.contains("--nested-modal-high") {
+                    Sheet(NestedModalProbeSheetARoute.self) { nested }
+                }
             }
-        } criticalPriority: {
-            if arguments.contains("--nested-modal-critical") {
-                Sheet(NestedModalDestinations.nestedModalProbeSheetARoute) { nested }
+            CriticalPriority {
+                if arguments.contains("--nested-modal-critical") {
+                    Sheet(NestedModalProbeSheetARoute.self) { nested }
+                }
             }
+        } destinations: {
+            NestedModalDestinations.nestedModalProbeSheetARoute
         }
     }
 }

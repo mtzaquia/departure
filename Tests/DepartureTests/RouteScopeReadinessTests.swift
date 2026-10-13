@@ -6,9 +6,11 @@ import Testing
     @Test(arguments: [false, true])
     func destinationWaitEndsWhenItsScopeLeavesTheLiveTree(elevated: Bool) async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Push(destination(SettingsRoute.self))
-        } highPriority: {
-            Sheet(destination(LoginRoute.self))
+            testPush(destination(SettingsRoute.self))
+
+            HighPriority {
+                testSheet(destination(LoginRoute.self))
+            }
         })
         if elevated { await engine.present(LoginRoute()) }
         else { await engine.present(SettingsRoute()) }
@@ -30,9 +32,11 @@ import Testing
 
     @Test func coveringADestinationEndsItsInstallationWait() async {
         let engine = RouterEngine(routes: RootRouteMap {
-            Push(destination(SettingsRoute.self))
-        } highPriority: {
-            Sheet(destination(LoginRoute.self))
+            testPush(destination(SettingsRoute.self))
+
+            HighPriority {
+                testSheet(destination(LoginRoute.self))
+            }
         })
         await engine.present(SettingsRoute())
         let scope = engine.currentRouteScope
@@ -65,7 +69,7 @@ import Testing
     }
 
     @Test func removedUninstalledDestinationReleasesItsActionRetry() async throws {
-        let engine = RouterEngine(routes: RootRouteMap { Push(destination(SettingsRoute.self)) })
+        let engine = RouterEngine(routes: RootRouteMap { testPush(destination(SettingsRoute.self)) })
         weak var retained: RetryLifetime?
         var retried = false
         func start() async {

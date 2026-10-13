@@ -20,42 +20,28 @@
 //  SOFTWARE.
 //
 
-import SwiftUI
+import Foundation
 
-/// Declares a sheet destination with optional child definitions.
+/// Declares a route presented as a sheet, with optional child definitions.
 public struct Sheet: RouteDeclaration, Sendable {
     let declaration: AnyRouteDeclaration
+
+    /// Declares a route type and its child definitions without a destination builder.
+    ///
+    /// Requests matching this declaration report a diagnostic and leave navigation
+    /// unchanged while it has no destination. Lookup does not fall back to another
+    /// declaration of the same route type.
+    ///
+    /// - Parameters:
+    ///   - route: The route type available at this map location.
+    ///   - id: An explicit unwind name for the destination's scope.
+    ///   - children: The navigation available from this destination.
     public init<R: Route>(
-        _ destination: RouteDestination<R>,
+        _ route: R.Type,
         id: AnyHashable? = nil,
         @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        declaration = AnyRouteDeclaration(destination, presentation: .init(style: .sheet, priority: .default), id: id, children: children())
-    }
-
-    /// Declares a sheet with an inline destination builder.
-    ///
-    /// `destination` receives the requested route and its destination's ``RouteContext``
-    /// when SwiftUI evaluates the view.
-    public init<R: Route, Content: View>(
-        _ route: R.Type,
-        id: AnyHashable? = nil,
-        @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content
-    ) {
-        self.init(RouteDestination(route, destination: destination), id: id)
-    }
-
-    /// Declares a sheet with an inline destination builder and nested routes.
-    ///
-    /// `destination` builds the view using its scoped ``RouteContext``; `routes`
-    /// declares the navigation available from that destination.
-    public init<R: Route, Content: View>(
-        _ route: R.Type,
-        id: AnyHashable? = nil,
-        @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content,
-        @RouteDeclarationBuilder routes: () -> [RouteScopeDeclaration]
-    ) {
-        self.init(RouteDestination(route, destination: destination), id: id, routes)
+        declaration = AnyRouteDeclaration(route, presentation: .init(style: .sheet, priority: .default), id: id, children: children())
     }
 
     public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }

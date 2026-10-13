@@ -31,6 +31,9 @@ final class RouterEngine: Identifiable, Equatable {
     @ObservationIgnored let id = UUID()
 
     @ObservationIgnored private var isConfigured = false
+#if DEBUG
+    @ObservationIgnored private(set) var hasTracedMapAdoption = false
+#endif
 
     var spaces: RouteSpaces
 
@@ -78,7 +81,7 @@ final class RouterEngine: Identifiable, Equatable {
         let root = RouteScope(id: UUID(), route: nil)
         if let routes {
             isConfigured = true
-            root.useDefinitions(RouteDefinitions(routes.declarations, id: routes.scopeID))
+            root.useDefinitions(RouteDefinitions(routes.scopeDeclarations, id: routes.scopeID))
         }
         let defaultSpace = RouteSpace(priority: .default, root: root)
         self.spaces = RouteSpaces(defaultSpace: defaultSpace)
@@ -87,8 +90,19 @@ final class RouterEngine: Identifiable, Equatable {
     func configureMap(_ map: RootRouteMap) {
         guard !isConfigured else { return }
         isConfigured = true
-        root.useDefinitions(RouteDefinitions(map.declarations, id: map.scopeID))
+        root.useDefinitions(RouteDefinitions(map.scopeDeclarations, id: map.scopeID))
     }
+
+#if DEBUG
+    /// Logs the compiled map once after its WithRouter host actually appears.
+    @discardableResult
+    func traceMapAdoption() -> Bool {
+        guard !hasTracedMapAdoption, Departure.debug == .trace else { return false }
+        hasTracedMapAdoption = true
+        log.departureDebug(.mapAdopted(definitions: root.definitions, ownerID: id))
+        return true
+    }
+#endif
 
     /// Requests a route presentation.
     ///

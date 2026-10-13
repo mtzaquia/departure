@@ -9,10 +9,13 @@ struct WindowPresentationLifetimeUIKitTests {
     @Test(arguments: [RoutePriority.high, .critical])
     func windowAppearsImmediatelyAndSurvivesUntilNativeDismissalCompletes(priority: RoutePriority) async throws {
         let owner = RootRouter()
-        _ = WithRouter(routes: RootRouteMap {} highPriority: {
-            if priority == .high { Sheet(destination) }
-        } criticalPriority: {
-            if priority == .critical { Sheet(destination) }
+        _ = WithRouter(routes: RootRouteMap {
+            HighPriority {
+                if priority == .high { testSheet(destination) }
+            }
+            CriticalPriority {
+                if priority == .critical { testSheet(destination) }
+            }
         }, router: owner) { EmptyView() }
         await owner.current.present(WindowLifetimeRoute())
         let engine = owner.engine
@@ -70,7 +73,7 @@ struct WindowPresentationLifetimeUIKitTests {
     }
 
     private var destination: RouteDestination<WindowLifetimeRoute> {
-        RouteDestination(WindowLifetimeRoute.self) { _, _ in EmptyView() }
+        testDestination(WindowLifetimeRoute.self)
     }
     private func waitUntil(_ condition: () -> Bool) async -> Bool {
         let deadline = ContinuousClock.now + .seconds(5)

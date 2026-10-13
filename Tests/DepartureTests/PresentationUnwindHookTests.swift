@@ -104,13 +104,13 @@ import Testing
 
     private func localFixture(_ style: Style) -> RootRouter {
         let owner = RootRouter()
-        let children = RouteMap { Push(destination(Child.self)) }
+        let children = RouteMap { testPush(destination(Child.self)) }
         _ = WithRouter(routes: RootRouteMap {
             switch style {
-            case .push: Push(destination(Parent.self)) { children }
-            case .replace: Replace(destination(Parent.self)) { children }
-            case .sheet: Sheet(destination(Parent.self)) { children }
-            case .cover: Cover(destination(Parent.self)) { children }
+            case .push: testPush(destination(Parent.self)) { children }
+            case .replace: testReplace(destination(Parent.self)) { children }
+            case .sheet: testSheet(destination(Parent.self)) { children }
+            case .cover: testCover(destination(Parent.self)) { children }
             }
         }, router: owner) { EmptyView() }
         return owner
@@ -119,12 +119,15 @@ import Testing
     private func elevatedFixture(_ priority: RoutePriority) -> RootRouter {
         let owner = RootRouter()
         let entries = ModalRouteMap {
-            Sheet(destination(Parent.self)) { Push(destination(Child.self)) }
+            testSheet(destination(Parent.self)) { testPush(destination(Child.self)) }
         }
-        _ = WithRouter(routes: RootRouteMap {} highPriority: {
-            if priority == .high { entries }
-        } criticalPriority: {
-            if priority == .critical { entries }
+        _ = WithRouter(routes: RootRouteMap {
+            HighPriority {
+                if priority == .high { entries }
+            }
+            CriticalPriority {
+                if priority == .critical { entries }
+            }
         }, router: owner) { EmptyView() }
         return owner
     }

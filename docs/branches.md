@@ -12,11 +12,15 @@ A scope accepts exactly one `Branches` group, including through composed `RouteM
 enum AppTab: Hashable, Sendable { case home, wallet }
 
 let routes = RootRouteMap {
-  Cover(LoginFeature.destination)
+  Cover(LoginRoute.self)
   Branches {
-    Branch(AppTab.home) { Push(HomeFeature.detailDestination) }
-    Branch(AppTab.wallet) { Sheet(WalletFeature.transactionDestination) }
+    Branch(AppTab.home) { Push(HomeDetailRoute.self) }
+    Branch(AppTab.wallet) { Sheet(TransactionRoute.self) }
   }
+} destinations: {
+  LoginFeature.destination
+  HomeFeature.detailDestination
+  WalletFeature.transactionDestination
 }
 
 struct RootView: View {
@@ -57,15 +61,20 @@ A branch router belongs to its enclosing container, so it survives dismissal of 
 ```swift
 let columns = RouteMap {
   Branches(concurrent: true) {
-    Branch(NavigationSplitViewColumn.sidebar) { Push(LibraryFeature.settingsDestination) }
-    Branch(NavigationSplitViewColumn.content) { Push(CollectionFeature.destination) }
+    Branch(NavigationSplitViewColumn.sidebar) { Push(LibrarySettingsRoute.self) }
+    Branch(NavigationSplitViewColumn.content) { Push(CollectionRoute.self) }
     Branch(NavigationSplitViewColumn.detail) {
-      Replace(MessageFeature.destination) {
-        Push(MessageFeature.attachmentDestination)
+      Replace(MessageRoute.self) {
+        Push(AttachmentRoute.self)
       }
-      Cover(PreviewFeature.destination)
+      Cover(PreviewRoute.self)
     }
   }
+} destinations: {
+  LibraryFeature.settingsDestination
+  CollectionFeature.destination
+  MessageFeature.destinations
+  PreviewFeature.destination
 }
 
 NavigationSplitView(preferredCompactColumn: $column) {

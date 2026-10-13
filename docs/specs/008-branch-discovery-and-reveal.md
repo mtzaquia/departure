@@ -38,7 +38,7 @@ Keep contextual nearest-match behavior and automatic branch reveal. Replace only
 
 Uniqueness would apply to that fallback, not to the whole map. Repeated route types in separate contexts remain valid. This proposal does not require a global route registry, public declaration-occurrence keys, or a configurable lookup policy.
 
-Investigate following nested **branch-root edges** during fallback. Those scopes already exist from the map and can be revealed by selecting their ancestors, without inventing route values. Preserve the boundary against searching arbitrary sibling destination history or descending through unpresented destination declarations. A declaration under `Push(Parent.destination)` requires a concrete parent route instance; knowing the child's type does not supply one.
+Investigate following nested **branch-root edges** during fallback. Those scopes already exist from the map and can be revealed by selecting their ancestors, without inventing route values. Preserve the boundary against searching arbitrary sibling destination history or descending through unpresented destination declarations. A declaration under `Push(ParentRoute.self)` requires a concrete parent route instance; knowing the child's type does not supply one.
 
 The existing matching and activation split remains the foundation. The consolidation below derives branch association from the live tree while preserving distinct presentation and container anchors. Proposed changes to candidate discovery must not silently change unwind planning or snapshot policy.
 

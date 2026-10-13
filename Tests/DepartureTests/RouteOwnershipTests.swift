@@ -79,9 +79,9 @@ struct RouteOwnershipTests {
 @MainActor
 private func modalSubtree() async throws -> (RouterEngine, RouteScope, RouteScope) {
     let engine = RouterEngine(routes: RootRouteMap {
-        Push(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
+        testPush(testDestination(LoginRoute.self)) {
             Branches {
-                Branch("modal") { Sheet(RouteDestination(MessageRoute.self) { _, _ in EmptyView() }) }
+                Branch("modal") { testSheet(testDestination(MessageRoute.self)) }
             }
         }
     })

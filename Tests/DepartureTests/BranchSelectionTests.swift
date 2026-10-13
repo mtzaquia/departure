@@ -90,7 +90,7 @@ import Testing
 
     @Test func outgoingSelectionOwnersCannotWriteBindingsAfterTheirScopeLeavesTheTree() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
+            testSheet(testDestination(LoginRoute.self)) {
                 Branches { Branch("first") {}; Branch("second") {} }
             }
         })
@@ -114,8 +114,8 @@ import Testing
     private func fixture() -> RouterEngine {
         RouterEngine(routes: RootRouteMap {
             Branches(concurrent: true) {
-                Branch("first") { Push(RouteDestination(First.self) { _, _ in EmptyView() }) }
-                Branch("second") { Push(RouteDestination(Second.self) { _, _ in EmptyView() }) }
+                Branch("first") { testPush(testDestination(First.self)) }
+                Branch("second") { testPush(testDestination(Second.self)) }
             }
         })
     }

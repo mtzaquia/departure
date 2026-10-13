@@ -18,11 +18,14 @@ Name a mapped scope to target it explicitly:
 
 ```swift
 RootRouteMap(id: "app-root") {
-  Sheet(SettingsFeature.destination) {
+  Sheet(SettingsRoute.self) {
     RouteMap(id: "settings-flow") {
-      Push(SettingsFeature.advancedDestination)
+      Push(AdvancedSettingsRoute.self)
     }
   }
+} destinations: {
+  SettingsFeature.destination
+  SettingsFeature.advancedDestination
 }
 ```
 

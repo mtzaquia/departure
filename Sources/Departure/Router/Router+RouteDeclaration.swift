@@ -67,6 +67,10 @@ extension RouterEngine {
             log.departureWarning("Route `\(routeType)` was ignored because its declarations conflict.")
             return nil
         }
+        guard match.declaration.destination != nil else {
+            log.departureWarning("Route `\(routeType)` was ignored because its matched declaration has no destination builder.")
+            return nil
+        }
 
         let priority = match.declaration.priority
         if priority == .default, let currentRoute = source.route, currentRoute._isEqual(to: resolvedRoute),

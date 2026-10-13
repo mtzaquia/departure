@@ -157,7 +157,7 @@ Follow-up logs: `/tmp/departure-unwind-executor-regressions.log`, `/tmp/departur
 
 ## Main reconciliation, 2026-10-11
 
-The integration of `main` through `ddcbe48c` reconciles its contextual destination backport and `9276ee9` sheet fix with the v3 implementation. The shared native presentation lifetime, predefined maps, independent priority spaces, and inline destination builders remain intact. Legacy provider fallbacks, dynamic `.routes` registration, and automatic navigation-stack wrapping are not restored.
+The integration of `main` through `ddcbe48c` reconciled its contextual destination backport and `9276ee9` sheet fix with the v3 implementation. At that integration, the shared native presentation lifetime, predefined maps, independent priority spaces, and inline destination builders remained intact. The subsequent map decoupling moves builders into `destinations:` closures; specifications 1 and 2 describe the current API. Legacy provider fallbacks, dynamic `.routes` registration, and automatic navigation-stack wrapping are not restored.
 
 The backport's destination documentation, typed-data and nearest-builder regressions, mounted environment/context checks, and sample context sheet are adapted to `RootRouteMap`, `RootRouter`, explicit `.routing()`, and `.default` priority. Mounted checks verify replacement environment updates, captured actions remaining bound to removed scopes, each local presentation style, and high/critical children inheriting effective priority. The sample's About sheet displays its actual style and priority and closes through its scoped context action.
 

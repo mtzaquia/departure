@@ -4,17 +4,23 @@ High and critical presentations are declared at the routing root. They appear ab
 
 ```swift
 let routes = RootRouteMap {
-  Sheet(ProfileFeature.destination)
-} highPriority: {
-  Cover(LoginFeature.destination) {
-    Push(LoginFeature.challengeDestination)
+  Sheet(ProfileRoute.self)
+  HighPriority {
+    Cover(LoginRoute.self) {
+      Push(ChallengeRoute.self)
+    }
   }
-} criticalPriority: {
-  Cover(SystemOutageFeature.destination, transition: .fade)
+  CriticalPriority {
+    Cover(SystemOutageRoute.self, transition: .fade)
+  }
+} destinations: {
+  ProfileFeature.destination
+  LoginFeature.destinations
+  SystemOutageFeature.destination
 }
 ```
 
-Either additional builder may be omitted independently. Elevated base builders accept `Sheet`, `Cover`, and restricted `ModalRouteMap` compositions; unsupported expressions fail at compile time. Compose ordinary `RouteMap` values inside their nested builders. Child declarations use default local styles within that elevated flow; they inherit its effective priority. Priorities belong to the root builders, so `Push`, `Replace`, `Sheet`, and `Cover` have no priority argument.
+`HighPriority` and `CriticalPriority` are optional groups accepted only in `RootRouteMap`'s root builder. They cannot be nested inside feature maps, route children, or other priority groups. Their builders accept `Sheet`, `Cover`, and restricted `ModalRouteMap` compositions; unsupported expressions fail at compile time. Compose ordinary `RouteMap` values inside an entry's child builder. Child declarations use local presentation styles and inherit the elevated flow's effective priority. The four presentation declarations have no priority argument.
 
 Only `RootRouteMap` declares high and critical entries. A high destination cannot declare or host a critical space inside its child map. It may request a critical entry from the owner's root catalog while high is top; the owner presents that independent critical space. A nested sheet inside high is local navigation within high and keeps the existing high root.
 

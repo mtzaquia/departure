@@ -8,7 +8,7 @@ struct NavigationOperationTests {
     @Test(arguments: [false, true])
     func branchContinuationKeepsItsCallerUntilInsertionOrSupersession(insert: Bool) async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Branches { Branch("host") { Push(destination(SettingsRoute.self)) } }
+            Branches { Branch("host") { testPush(destination(SettingsRoute.self)) } }
         })
         let branch = try #require(engine.root.branchScopes["host"])
         let match = try #require(engine.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
@@ -38,17 +38,20 @@ struct NavigationOperationTests {
     func overlappingOwnerRemovalsKeepEachOutgoingStackUntilItsOwnCompletion(firstToFinish: RoutePriority) async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(destination(SettingsRoute.self))
-        } highPriority: {
-            Sheet(destination(LoginRoute.self)) {
-                Push(destination(HomeDetailRoute.self)) {
-                    Push(destination(TransactionRoute.self))
+            testSheet(destination(SettingsRoute.self))
+
+            HighPriority {
+                testSheet(destination(LoginRoute.self)) {
+                    testPush(destination(HomeDetailRoute.self)) {
+                        testPush(destination(TransactionRoute.self))
+                    }
                 }
             }
-        } criticalPriority: {
-            Sheet(destination(AlertRoute.self)) {
-                Push(destination(HomeDetailRoute.self)) {
-                    Push(destination(TransactionRoute.self))
+            CriticalPriority {
+                testSheet(destination(AlertRoute.self)) {
+                    testPush(destination(HomeDetailRoute.self)) {
+                        testPush(destination(TransactionRoute.self))
+                    }
                 }
             }
         }, router: owner) { EmptyView() }
@@ -107,8 +110,8 @@ struct NavigationOperationTests {
     @Test func cancelledReplacementCompletesTeardownWithoutPresentingItsContinuation() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(destination(SettingsRoute.self))
-            Sheet(destination(LoginRoute.self))
+            testSheet(destination(SettingsRoute.self))
+            testSheet(destination(LoginRoute.self))
         }, router: owner) { EmptyView() }
         await owner.current.present(SettingsRoute())
         let old = try #require(owner.engine.defaultSpace.rootPath.last)

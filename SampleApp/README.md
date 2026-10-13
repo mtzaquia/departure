@@ -89,5 +89,5 @@ rather than relying on a globally current routing scope.
 
 The start screen's **About this sample** sheet binds a domain-only route using
 `RouteDestination`. It displays `context.presentation` and dismisses using the supplied
-scoped unwind action. All flows use predefined maps and typed destinations; app-local
-views may also use inline builders on `Push`, `Replace`, `Sheet`, and `Cover`.
+scoped unwind action. All flows use type-only map declarations and typed builders in
+`destinations:` closures. High and critical entries use root-only priority groups.

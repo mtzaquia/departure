@@ -117,8 +117,8 @@ struct IOS17NavigationStackPushWorkaroundTests {
         let owner = RootRouter()
         owner.engine.ios17NavigationStackPushWorkaround = IOS17NavigationStackPushWorkaround()
         _ = WithRouter(routes: RootRouteMap {
-            Replace(RouteDestination(CompatSelection.self) { _, _ in EmptyView() }) {
-                Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
+            testReplace(testDestination(CompatSelection.self)) {
+                testPush(testDestination(HomeDetailRoute.self))
             }
         }, router: owner) { EmptyView() }
         await owner.current.present(CompatSelection(number: 1))
@@ -220,12 +220,12 @@ struct IOS17NavigationStackPushWorkaroundTests {
             definitions: RouteDeclarationBuilder.buildBlock(
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.home) {
-                        AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
+                        testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push, priority: .default))
                     }
                 ),
                 BranchDeclarationBuilder.buildExpression(
                     Branch(AppTab.wallet) {
-                        AnyRouteDeclaration(RouteDestination(TransactionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))
+                        testDeclaration(testDestination(TransactionRoute.self), presentation: .init(style: .push, priority: .default))
                     }
                 )
             )
@@ -236,7 +236,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
             id: AnyHashable(AppTab.home),
             selection: nil,
             definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations),
+                RouteScopeDeclaration(routes: testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations),
             ]
         )
         router.root.attachTestBranch(homeScope, for: AppTab.home)
@@ -327,7 +327,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
         if let presentationHostID {
             router.root.bindRoutingHost(presentationHostID, automatic: false, environment: router.root.sourceEnvironment)
         }
-        let declarations = AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
+        let declarations = testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations
         router.root.defineTestMap(
             id: nil,
             selection: nil,

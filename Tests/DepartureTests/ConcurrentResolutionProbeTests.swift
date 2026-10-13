@@ -8,8 +8,8 @@ struct ConcurrentResolutionProbeTests {
     @Test
     func olderResolutionCannotOvertakeANewerPresentation() async {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(SlowProbeRoute.self) { _, _ in EmptyView() })
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(SlowProbeRoute.self))
+            testSheet(testDestination(SettingsRoute.self))
         })
         let router = Router(engine: engine, scope: engine.root)
         let gate = ProbeResolutionGate()
@@ -203,11 +203,14 @@ struct ConcurrentResolutionProbeTests {
     }
 
     @Test func waitingRequestRechecksCoverageAfterAnElevatedPresentation() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {} highPriority: {
-            Sheet(LoginRoute.self) { _, _ in EmptyView() } routes: {
-                Sheet(CountingProbeRoute.self) { _, _ in EmptyView() }
+        let engine = RouterEngine(routes: RootRouteMap {
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self)) {
+                    testSheet(testDestination(CountingProbeRoute.self))
+                }
             }
-        } criticalPriority: { Sheet(SlowProbeRoute.self) { _, _ in EmptyView() } })
+            CriticalPriority { testSheet(testDestination(SlowProbeRoute.self)) }
+        })
         await engine.present(LoginRoute())
         let high = try #require(engine.spaces.highSpace?.root)
         let gate = ProbeResolutionGate()
@@ -224,10 +227,13 @@ struct ConcurrentResolutionProbeTests {
     }
 
     @Test func coveredCallerCannotReplaceAnEligibleAdmissionWaiter() async throws {
-        let engine = RouterEngine(routes: RootRouteMap { Sheet(SettingsRoute.self) { _, _ in EmptyView() } } highPriority: {
-            Sheet(LoginRoute.self) { _, _ in EmptyView() } routes: {
-                Sheet(SlowProbeRoute.self) { _, _ in EmptyView() }
-                Sheet(CountingProbeRoute.self) { _, _ in EmptyView() }
+        let engine = RouterEngine(routes: RootRouteMap {
+ testSheet(testDestination(SettingsRoute.self))
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self)) {
+                    testSheet(testDestination(SlowProbeRoute.self))
+                    testSheet(testDestination(CountingProbeRoute.self))
+                }
             }
         })
         await engine.present(LoginRoute())
@@ -251,11 +257,14 @@ struct ConcurrentResolutionProbeTests {
     @Test(arguments: [RoutePriority.high, .critical])
     func higherPriorityAttemptAlsoWaitsForTheActiveResolver(priority: RoutePriority) async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(SlowProbeRoute.self) { _, _ in EmptyView() }
-        } highPriority: {
-            Sheet(LoginRoute.self) { _, _ in EmptyView() }
-        } criticalPriority: {
-            Cover(LockRoute.self) { _, _ in EmptyView() }
+            testSheet(testDestination(SlowProbeRoute.self))
+
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self))
+            }
+            CriticalPriority {
+                testCover(testDestination(LockRoute.self))
+            }
         })
         let router = Router(engine: engine, scope: engine.root)
         let gate = ProbeResolutionGate()
@@ -312,10 +321,10 @@ struct ConcurrentResolutionProbeTests {
     @Test(arguments: [false, true])
     func deferredHostInsertionKeepsItsExactResultOrIsSuperseded(supersede: Bool) async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(SettingsRoute.self) { _, _ in EmptyView() }
+            testSheet(testDestination(SettingsRoute.self))
             Branches {
                 Branch("first") {}
-                Branch("second") { Sheet(CountingProbeRoute.self) { _, _ in EmptyView() } }
+                Branch("second") { testSheet(testDestination(CountingProbeRoute.self)) }
             }
         })
         engine.routeScopeDidInstallInView(engine.root)
@@ -343,10 +352,10 @@ struct ConcurrentResolutionProbeTests {
 
     private func fixture() -> RouterEngine {
         RouterEngine(routes: RootRouteMap {
-            Sheet(SlowProbeRoute.self) { _, _ in EmptyView() }
-            Sheet(SettingsRoute.self) { _, _ in EmptyView() }
-            Sheet(CountingProbeRoute.self) { _, _ in EmptyView() }
-            Push(HomeDetailRoute.self) { _, _ in EmptyView() }
+            testSheet(testDestination(SlowProbeRoute.self))
+            testSheet(testDestination(SettingsRoute.self))
+            testSheet(testDestination(CountingProbeRoute.self))
+            testPush(testDestination(HomeDetailRoute.self))
         })
     }
 

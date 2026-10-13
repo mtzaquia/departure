@@ -41,8 +41,8 @@ private struct DestinationContent: View {
     @RouterEnvironment private var router
     @Environment(\.self) private var environment
     var body: some View {
-        if let route = scope.route, let declaration = scope.presentationDeclaration, let presentation = scope.routePresentation {
-            declaration.build(route, RouteContext(
+        if let route = scope.route, let destination = scope.presentation?.destination, let presentation = scope.routePresentation {
+            destination.build(route, RouteContext(
                 router: Router(engine: router, scope: scope),
                 unwindRoute: UnwindRouteAction(router: router, routeScope: scope),
                 presentation: presentation,

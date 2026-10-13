@@ -29,11 +29,11 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct ReplaceTests {
     @Test func declarationIsInlineAndDefaultPriority() {
-        let declaration = AnyRouteDeclaration(RouteDestination(SelectedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .replace, priority: .default))._routeDeclarations[0]
+        let declaration = testDeclaration(testDestination(SelectedRoute.self), presentation: .init(style: .replace, priority: .default))._routeDeclarations[0]
         #expect(declaration.presentationKind == .replace)
         #expect(!declaration.presentationKind.isModal)
         #expect(declaration.priority == .default)
-        #expect(Branch("wallet") { AnyRouteDeclaration(RouteDestination(SelectedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .replace, priority: .default)) }
+        #expect(Branch("wallet") { testDeclaration(testDestination(SelectedRoute.self), presentation: .init(style: .replace, priority: .default)) }
             .declarations[0].routes[0].presentationKind == .replace)
     }
 
@@ -89,7 +89,7 @@ struct ReplaceTests {
         let fixture = ReplaceFixture()
         let pushed = RouteScope(id: "pushed-equal", route: SelectedRoute(number: 1))
         pushed.attachPresentation(to: fixture.wallet,
-            declaration: AnyRouteDeclaration(RouteDestination(SelectedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations[0])
+            declaration: testDeclaration(testDestination(SelectedRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations[0])
         fixture.engine.mutateRouteGraph { fixture.wallet.path.append(pushed) }
         await fixture.router.branch("wallet").present(SelectedRoute(number: 1))
         let selected = try #require(fixture.wallet.path.first)
@@ -249,7 +249,7 @@ struct ReplaceTests {
         let fixture = ReplaceFixture()
         fixture.engine.root.defineTestMap(sourceID: "elevated", id: nil,
             selection: nil, definitions: [
-                RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(ElevatedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
+                RouteScopeDeclaration(routes: testDeclaration(testDestination(ElevatedRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
             ])
         await fixture.local(fixture.sidebar).present(ElevatedRoute())
         let elevated = try #require(fixture.engine.spaces.space(for: .high)?.root)
@@ -257,7 +257,7 @@ struct ReplaceTests {
         #expect(fixture.wallet.path.isEmpty)
         #expect(fixture.selection.value == "sidebar")
         elevated.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SelectedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .replace, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SelectedRoute.self), presentation: .init(style: .replace, priority: .default))._routeDeclarations),
         ])
         await fixture.local(elevated).present(SelectedRoute(number: 1))
         #expect(fixture.engine.spaces.space(for: .high)?.rootPath.count == 1)
@@ -271,7 +271,7 @@ struct ReplaceTests {
         let container = try #require(fixture.sidebar.path.first)
         let hostID = RoutePresentationHostID()
         container.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SelectedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .replace, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SelectedRoute.self), presentation: .init(style: .replace, priority: .default))._routeDeclarations),
         ])
         container.bindRoutingHost(hostID, automatic: false, environment: container.sourceEnvironment)
         await fixture.local(container).present(SelectedRoute(number: 1))
@@ -290,8 +290,8 @@ struct ReplaceTests {
         await fixture.router.branch("wallet").present(SelectedRoute(number: 1))
         let selected = try #require(fixture.wallet.path.first)
         selected.defineTestMap(id: nil, selection: nil, definitions:
-            Branch("nested") { AnyRouteDeclaration(RouteDestination(ChildRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations
-            + [RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(ElevatedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations)])
+            Branch("nested") { testDeclaration(testDestination(ChildRoute.self), presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations
+            + [RouteScopeDeclaration(routes: testDeclaration(testDestination(ElevatedRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations)])
         let nested = RouteScope(id: "nested", route: nil)
         fixture.engine.mutateRouteGraph { selected.attachTestBranch(nested, for: "nested") }
         await fixture.local(nested).present(ChildRoute())
@@ -325,8 +325,8 @@ private struct ReplaceFixture {
         @Bindable var selection = selection
         engine.root.defineTestMap(id: nil,
             selection: AnyRouteBranchSelection($selection.value), concurrent: concurrent,
-            definitions: Branch("sidebar") { AnyRouteDeclaration(RouteDestination(SiblingRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations
-                + Branch("wallet") { AnyRouteDeclaration(RouteDestination(SelectedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .replace, priority: .default)) }.routeScopeDeclarations)
+            definitions: Branch("sidebar") { testDeclaration(testDestination(SiblingRoute.self), presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations
+                + Branch("wallet") { testDeclaration(testDestination(SelectedRoute.self), presentation: .init(style: .replace, priority: .default)) }.routeScopeDeclarations)
         sidebar = engine.root.branchScopes["sidebar"]!
         wallet = engine.root.branchScopes["wallet"]!
 
@@ -336,8 +336,8 @@ private struct ReplaceFixture {
     func mountWallet() { engine.resumePendingRoute(for: "wallet", in: engine.root) }
     func installChildren(on selected: RouteScope) {
         selected.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(ChildRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations
-                + AnyRouteDeclaration(RouteDestination(OverlayRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(ChildRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations
+                + testDeclaration(testDestination(OverlayRoute.self), presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
         ])
     }
 }

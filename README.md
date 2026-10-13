@@ -19,19 +19,22 @@ Declare the navigation tree once. Feature modules supply typed destination build
 
 ```swift
 let routes = RootRouteMap {
-  Sheet(SettingsFeature.destination) {
-    Push(SettingsFeature.advancedDestination)
+  Sheet(SettingsRoute.self) {
+    Push(AdvancedSettingsRoute.self)
   }
+} destinations: {
+  SettingsFeature.destination
+  SettingsFeature.advancedDestination
 }
 ```
 
 ## Install
 
-Departure requires Swift 6.3+, iOS 17+, or macOS 14+. The map API described here is available in the `v3.0.0-beta.1` prerelease.
+Departure requires Swift 6.3+, iOS 17+, or macOS 14+. These examples target the development branch after `v3.0.0-beta.1`.
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/mtzaquia/departure.git", exact: "3.0.0-beta.1"),
+  .package(url: "https://github.com/mtzaquia/departure.git", branch: "zaquia/predefined-route-maps"),
 ]
 ```
 
@@ -57,7 +60,9 @@ enum SettingsFeature {
 @main
 struct ExampleApp: App {
   private let routes = RootRouteMap {
-    Sheet(SettingsFeature.destination)
+    Sheet(SettingsRoute.self)
+  } destinations: {
+    SettingsFeature.destination
   }
 
   var body: some Scene {
@@ -80,7 +85,7 @@ struct HomeView: View {
 
 The map owns definitions independently of mounted views. `WithRouter` and destinations bind their scopes automatically. When a scope declares pushes, explicitly supply `NavigationStack { content.routing() }`, placing `.routing()` on the root content inside the stack. Destinations choose their containers explicitly.
 
-For app-local views, the development branch also supports [inline destination builders](docs/routing.md#build-a-destination-in-the-map), added after `v3.0.0-beta.1`.
+The development branch separates type-only declarations from [composable destination bindings](docs/routing.md#compose-destination-bindings) and uses root-only `HighPriority` and `CriticalPriority` groups. This surface is newer than `v3.0.0-beta.1`.
 
 ## Documentation
 
@@ -90,6 +95,7 @@ For app-local views, the development branch also supports [inline destination bu
 - [Unwinding](docs/unwinding.md) — dismissing flows and returning values.
 - [Branches](docs/branches.md) — tabs, concurrent columns, and replacement selections.
 - [Priority](docs/priority.md) — high and critical root presentations.
+- [Diagnostics](docs/diagnostics.md) — trace the adopted map and routing decisions.
 - [Rewrite specifications](docs/specs/README.md) — agreed contracts and implementation inventory.
 
 ## Sample app

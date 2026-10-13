@@ -172,15 +172,18 @@ struct IndependentPriorityTests {
 
     @Test func branchedEntryResetKeepsOnlyRootOwnedInactiveHistoryAndCoveredSelectionIsRejected() async throws {
         let owner = RootRouter()
-        _ = WithRouter(routes: RootRouteMap {} highPriority: {
-            Sheet(RouteDestination(HighEntry.self) { _, _ in EmptyView() }) {
-                Branches {
-                    Branch("main") { Push(RouteDestination(HighPush.self) { _, _ in EmptyView() }) }
-                    Branch("other") { Push(RouteDestination(HighModal.self) { _, _ in EmptyView() }) }
+        _ = WithRouter(routes: RootRouteMap {
+            HighPriority {
+                testSheet(testDestination(HighEntry.self)) {
+                    Branches {
+                        Branch("main") { testPush(testDestination(HighPush.self)) }
+                        Branch("other") { testPush(testDestination(HighModal.self)) }
+                    }
                 }
             }
-        } criticalPriority: {
-            Cover(RouteDestination(CriticalEntry.self) { _, _ in EmptyView() })
+            CriticalPriority {
+                testCover(testDestination(CriticalEntry.self))
+            }
         }, router: owner) { EmptyView() }
         await owner.current.present(HighEntry(value: 1))
         let high = try #require(owner.engine.spaces.highSpace)
@@ -213,17 +216,20 @@ struct IndependentPriorityTests {
     private func fixture() -> RootRouter {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap(id: "default-root") {
-            Push(RouteDestination(SuspendedDefault.self) { _, _ in EmptyView() })
-            Push(RouteDestination(DefaultPush.self) { _, _ in EmptyView() }) {
-                Sheet(RouteDestination(DefaultOnlyModal.self) { _, _ in EmptyView() })
+            testPush(testDestination(SuspendedDefault.self))
+            testPush(testDestination(DefaultPush.self)) {
+                testSheet(testDestination(DefaultOnlyModal.self))
             }
-        } highPriority: {
-            Sheet(RouteDestination(HighEntry.self) { _, _ in EmptyView() }) {
-                Push(RouteDestination(HighPush.self) { _, _ in EmptyView() })
-                Sheet(RouteDestination(HighModal.self) { _, _ in EmptyView() })
+
+            HighPriority {
+                testSheet(testDestination(HighEntry.self)) {
+                    testPush(testDestination(HighPush.self))
+                    testSheet(testDestination(HighModal.self))
+                }
             }
-        } criticalPriority: {
-            Cover(RouteDestination(CriticalEntry.self) { _, _ in EmptyView() })
+            CriticalPriority {
+                testCover(testDestination(CriticalEntry.self))
+            }
         }, router: owner) { EmptyView() }
         return owner
     }

@@ -44,13 +44,17 @@ struct SheetFocusProbeRoot: View {
             NavigationStack { SheetFocusProbeForm(number: route.number).routing() }
         }
         if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root") {
-            return RootRouteMap { Sheet(destination) }
+            return RootRouteMap { Sheet(SheetFocusProbeRoute.self) } destinations: {
+                destination
+            }
         }
         return RootRouteMap {
             Branches {
-                Branch(SheetFocusTab.home) { Sheet(destination) }
-                Branch(SheetFocusTab.other) { Sheet(destination) }
+                Branch(SheetFocusTab.home) { Sheet(SheetFocusProbeRoute.self) }
+                Branch(SheetFocusTab.other) { Sheet(SheetFocusProbeRoute.self) }
             }
+        } destinations: {
+            destination
         }
     }
 

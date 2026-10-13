@@ -20,45 +20,30 @@
 //  SOFTWARE.
 //
 
-import SwiftUI
+import Foundation
 
-/// Declares a cover destination with optional child definitions.
+/// Declares a route presented as a cover, with optional child definitions.
 public struct Cover: RouteDeclaration, Sendable {
     let declaration: AnyRouteDeclaration
+
+    /// Declares a route type and its child definitions without a destination builder.
+    ///
+    /// Requests matching this declaration report a diagnostic and leave navigation
+    /// unchanged while it has no destination. Lookup does not fall back to another
+    /// declaration of the same route type.
+    ///
+    /// - Parameters:
+    ///   - route: The route type available at this map location.
+    ///   - transition: The cover transition, defaulting to `.slide`.
+    ///   - id: An explicit unwind name for the destination's scope.
+    ///   - children: The navigation available from this destination.
     public init<R: Route>(
-        _ destination: RouteDestination<R>, transition: Transition = .slide,
+        _ route: R.Type,
+        transition: Transition = .slide,
         id: AnyHashable? = nil,
         @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        declaration = AnyRouteDeclaration(destination, presentation: .init(style: .cover(transition), priority: .default), id: id, children: children())
-    }
-
-    /// Declares a cover with an inline destination builder.
-    ///
-    /// `destination` receives the requested route and its destination's ``RouteContext``
-    /// when SwiftUI evaluates the view. The transition defaults to `.slide`.
-    public init<R: Route, Content: View>(
-        _ route: R.Type,
-        transition: Transition = .slide,
-        id: AnyHashable? = nil,
-        @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content
-    ) {
-        self.init(RouteDestination(route, destination: destination), transition: transition, id: id)
-    }
-
-    /// Declares a cover with an inline destination builder and nested routes.
-    ///
-    /// `destination` builds the view using its scoped ``RouteContext``; `routes`
-    /// declares the navigation available from that destination.
-    /// The transition defaults to `.slide`.
-    public init<R: Route, Content: View>(
-        _ route: R.Type,
-        transition: Transition = .slide,
-        id: AnyHashable? = nil,
-        @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content,
-        @RouteDeclarationBuilder routes: () -> [RouteScopeDeclaration]
-    ) {
-        self.init(RouteDestination(route, destination: destination), transition: transition, id: id, routes)
+        declaration = AnyRouteDeclaration(route, presentation: .init(style: .cover(transition), priority: .default), id: id, children: children())
     }
 
     public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }

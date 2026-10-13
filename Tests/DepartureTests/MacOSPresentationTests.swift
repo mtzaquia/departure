@@ -24,6 +24,7 @@
 import AppKit
 import SwiftUI
 import Testing
+import RouteDomainFixtures
 @testable import Departure
 
 @MainActor
@@ -32,11 +33,43 @@ import Testing
 // and --filter MacOSPresentationTests.
 @Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["DEPARTURE_RUN_HOSTED_UI_TESTS"] == "1"))
 struct MacOSPresentationTests {
+#if DEBUG
+    @Test func withRouterTracesItsAdoptedMapOnFirstAppearanceWithoutBuildingDestinations() async throws {
+        let previous = Departure.debug
+        defer { Departure.debug = previous }
+        Departure.debug = .trace
+        let owner = RootRouter()
+        var builds = 0
+        let routes = RootRouteMap {
+            Sheet(DomainOnlyRoute.self)
+        } destinations: {
+            RouteDestination(DomainOnlyRoute.self) { _, _ in
+                builds += 1
+                return EmptyView()
+            }
+        }
+        let host = WithRouter(routes: routes, router: owner) { Text("Trace adoption") }
+        #expect(!owner.engine.hasTracedMapAdoption)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: host)
+        window.orderFront(nil)
+        defer { window.close() }
+        try #require(await waitUntil { owner.engine.hasTracedMapAdoption })
+        #expect(builds == 0)
+        #expect(!owner.engine.traceMapAdoption())
+        window.contentView = NSHostingView(rootView: WithRouter(routes: routes, router: owner) { Text("Rebuilt") })
+        #expect(!owner.engine.traceMapAdoption())
+        #expect(builds == 0)
+    }
+#endif
+
     @Test func multipleHookBuildersComposePayloadKeysAndRecoverFromDuplicates() async throws {
         let owner = RootRouter()
         let engine = owner.engine
         let control = MacOSHookCompositionControl()
-        let host = WithRouter(routes: RootRouteMap { Sheet(LoginRoute.self) { _, _ in Text("Login") } }, router: owner) {
+        let host = WithRouter(routes: RootRouteMap { testSheet(RouteDestination(LoginRoute.self) { _, _ in Text("Login") }) }, router: owner) {
             MacOSHookCompositionRoot(control: control)
         }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
@@ -74,7 +107,7 @@ struct MacOSPresentationTests {
     @Test func modalUnwindWaitsForNativeDismissalCompletion() async throws {
         let owner = RootRouter()
         let host = WithRouter(routes: RootRouteMap {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in Text("Native modal") })
+            testSheet(RouteDestination(SettingsRoute.self) { _, _ in Text("Native modal") })
         }, router: owner) { Text("Root") }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -94,7 +127,7 @@ struct MacOSPresentationTests {
 
     @Test func branchLocalDeclarationsRemainAttachedToTheirBranch() async throws {
         let router = RootRouter()
-        let host = WithRouter(routes: RootRouteMap { Branches { Branch("detail") { Push(RouteDestination(MacOSPresentingRoute.self) { route, _ in route.destination() }) } } }, router: router) {
+        let host = WithRouter(routes: RootRouteMap { Branches { Branch("detail") { testPush(RouteDestination(MacOSPresentingRoute.self) { route, _ in route.destination() }) } } }, router: router) {
             Text("Branch content")
                 .routing()
                 .routing("detail")
@@ -118,7 +151,7 @@ struct MacOSPresentationTests {
     @Test func nonDeparturePresentationCannotReplacePresentingBranchDeclarations() async throws {
         let router = RootRouter()
         let control = MacOSLegacyPresentationControl()
-        let host = WithRouter(routes: RootRouteMap { Push(RouteDestination(MacOSPresentingRoute.self) { route, _ in route.destination() }) }, router: router) {
+        let host = WithRouter(routes: RootRouteMap { testPush(RouteDestination(MacOSPresentingRoute.self) { route, _ in route.destination() }) }, router: router) {
             MacOSLegacyPresentationHost(control: control)
         }
         let window = NSWindow(
@@ -155,11 +188,11 @@ struct MacOSPresentationTests {
         let recorder = MacOSScopeRecorder()
         let destinationRecorder = MacOSScopeRecorder()
         let host = WithRouter(routes: RootRouteMap { Branches(concurrent: true) { Branch("detail") {
-            Replace(MacOSScopedReplacementRoute.self) { route, context in
+            testReplace(RouteDestination(MacOSScopedReplacementRoute.self) { route, context in
                 let _ = #expect(context.router == context.environment.router)
                 let _ = #expect(context.presentation.style == .replace)
                 route.destination()
-            }
+            })
         } } }, router: router) {
             MacOSScopeReader(recorder: recorder)
                 .routing("detail")
@@ -196,7 +229,7 @@ struct MacOSPresentationTests {
         let router = RootRouter()
         let recorder = MacOSInlineRecorder()
         let control = MacOSInlineControl()
-        let host = WithRouter(routes: RootRouteMap { Replace(RouteDestination(MacOSInlineRoute.self) { route, _ in route.destination() }) }, router: router) {
+        let host = WithRouter(routes: RootRouteMap { testReplace(RouteDestination(MacOSInlineRoute.self) { route, _ in route.destination() }) }, router: router) {
             MacOSInlinePlaceholder(control: control)
         }
         let window = NSWindow(
@@ -238,7 +271,10 @@ struct MacOSPresentationTests {
     func elevatedFadeCoverPresentsAndDismissesAsSheet(priority: RoutePriority) async throws {
         let router = RouterEngine()
         let recorder = MacOSDismissRecorder()
-        let host = WithRouter(routes: RootRouteMap {} highPriority: { if priority == .high { Cover(RouteDestination(MacOSFadeRoute.self) { route, _ in route.destination() }, transition: .fade) } } criticalPriority: { if priority == .critical { Cover(RouteDestination(MacOSFadeRoute.self) { route, _ in route.destination() }, transition: .fade) } }, router: RootRouter(engine: router)) {
+        let host = WithRouter(routes: RootRouteMap {
+            HighPriority { if priority == .high { testCover(RouteDestination(MacOSFadeRoute.self) { route, _ in route.destination() }, transition: .fade) } }
+            CriticalPriority { if priority == .critical { testCover(RouteDestination(MacOSFadeRoute.self) { route, _ in route.destination() }, transition: .fade) } }
+        }, router: RootRouter(engine: router)) {
             Color.clear.frame(width: 320, height: 240)
                 .routing()
         } windowDestination: { destination, _ in

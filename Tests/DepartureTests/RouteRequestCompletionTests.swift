@@ -10,7 +10,7 @@ struct RouteRequestCompletionTests {
         let engine = RouterEngine(routes: RootRouteMap {
             Branches {
                 Branch("first") {}
-                Branch("second") { Sheet(destination(SettingsRoute.self)) }
+                Branch("second") { testSheet(destination(SettingsRoute.self)) }
             }
         })
         engine.routeScopeDidInstallInView(engine.root)
@@ -46,7 +46,7 @@ struct RouteRequestCompletionTests {
         let engine = RouterEngine(routes: RootRouteMap {
             Branches(concurrent: concurrent) {
                 Branch("first") {}
-                Branch("second") { Sheet(destination(SettingsRoute.self)) }
+                Branch("second") { testSheet(destination(SettingsRoute.self)) }
             }
         })
         let branch = try #require(engine.root.branchScopes["second"])
@@ -62,7 +62,7 @@ struct RouteRequestCompletionTests {
 
     @Test func equivalentRouteReturnsTheReusedScopeAfterTeardown() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Push(destination(HomeDetailRoute.self)) { Sheet(destination(SettingsRoute.self)) }
+            testPush(destination(HomeDetailRoute.self)) { testSheet(destination(SettingsRoute.self)) }
         })
         await engine.present(HomeDetailRoute())
         let reused = try #require(engine.defaultSpace.rootPath.last)
@@ -79,10 +79,13 @@ struct RouteRequestCompletionTests {
 
     @Test(arguments: [RoutePriority.high, .critical])
     func elevatedPresentationAndReuseReturnTheSpaceRoot(priority: RoutePriority) async throws {
-        let engine = RouterEngine(routes: RootRouteMap {} highPriority: {
-            Sheet(destination(LoginRoute.self)) { Push(destination(HomeDetailRoute.self)) }
-        } criticalPriority: {
-            Sheet(destination(CriticalEntry.self)) { Push(destination(HomeDetailRoute.self)) }
+        let engine = RouterEngine(routes: RootRouteMap {
+            HighPriority {
+                testSheet(destination(LoginRoute.self)) { testPush(destination(HomeDetailRoute.self)) }
+            }
+            CriticalPriority {
+                testSheet(destination(CriticalEntry.self)) { testPush(destination(HomeDetailRoute.self)) }
+            }
         })
         let route: any Route = priority == .high ? LoginRoute() : CriticalEntry()
         let result = await engine.requestRouteWhenReady(route)
@@ -101,7 +104,7 @@ struct RouteRequestCompletionTests {
                 Branch("second") {
                     Branches {
                         Branch("inner-first") {}
-                        Branch("inner-second") { Push(destination(SettingsRoute.self)) }
+                        Branch("inner-second") { testPush(destination(SettingsRoute.self)) }
                     }
                 }
             }
@@ -131,7 +134,7 @@ struct RouteRequestCompletionTests {
                     Branches {
                         Branch("inner-first") {}
                         Branch("inner-second") {
-                            Push(destination(RootRoute.self)) { Push(destination(SettingsRoute.self)) }
+                            testPush(destination(RootRoute.self)) { testPush(destination(SettingsRoute.self)) }
                         }
                     }
                 }
@@ -158,9 +161,9 @@ struct RouteRequestCompletionTests {
     @Test func actionRerouteFromABranchRetriesAtItsCommonAncestorDestination() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(destination(SettingsRoute.self))
+            testSheet(destination(SettingsRoute.self))
             Branches(concurrent: true) {
-                Branch("first") { Push(destination(HomeDetailRoute.self)) }
+                Branch("first") { testPush(destination(HomeDetailRoute.self)) }
                 Branch("second") {}
             }
         }, router: owner) { EmptyView() }
@@ -188,9 +191,9 @@ struct RouteRequestCompletionTests {
     @Test func supersededBufferedRequestReturnsNilAndLatestReturnsItsDestination() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(destination(SettingsRoute.self))
-            Sheet(destination(LoginRoute.self))
-            Sheet(destination(HomeDetailRoute.self))
+            testSheet(destination(SettingsRoute.self))
+            testSheet(destination(LoginRoute.self))
+            testSheet(destination(HomeDetailRoute.self))
         }, router: owner) { EmptyView() }
         let origin = RouteRequestOrigin(scope: owner.engine.root)
         await owner.current.present(SettingsRoute())

@@ -177,11 +177,14 @@ struct NativePresentationLifetimeTests {
 
     private func makeEngine() -> RouterEngine {
         RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-        } highPriority: {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
-        } criticalPriority: {
-            Cover(RouteDestination(AlertRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(SettingsRoute.self))
+
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self))
+            }
+            CriticalPriority {
+                testCover(testDestination(AlertRoute.self))
+            }
         })
     }
     private func waitUntil(_ condition: () -> Bool) async {

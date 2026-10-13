@@ -31,8 +31,8 @@ public enum Departure {
         case off
         /// Shows requests, routing decisions, outcomes, and resulting route paths.
         case normal
-        /// Includes declaration lookup strategy, lifecycle, and waiting details in addition to
-        /// normal logs.
+        /// Includes the adopted map tree and destination bindings, declaration lookup
+        /// strategy, lifecycle, and waiting details in addition to normal logs.
         case trace
     }
 
@@ -77,6 +77,9 @@ enum DepartureWarningEvent {
 }
 
 enum DepartureLogEvent {
+#if DEBUG
+    case mapAdopted(definitions: RouteDefinitions, ownerID: UUID)
+#endif
     case actionCompleted(action: any Action)
     case actionDirectInvocationEnded(action: any Action, error: any Error)
     case actionFailed(action: any Action, error: any Error)
@@ -179,6 +182,7 @@ extension DepartureLogEvent {
         switch self {
         case .actionRunning,
              .actionNoInterceptor,
+             .mapAdopted,
 
              .pathCleared,
              .pathTrimmed,
@@ -209,6 +213,8 @@ extension DepartureLogEvent {
 
     private var category: String {
         switch self {
+        case .mapAdopted:
+            "map"
         case .actionCompleted,
              .actionDirectInvocationEnded,
              .actionFailed,
@@ -259,6 +265,7 @@ extension DepartureLogEvent {
             "⇢"
 
         case .actionCompleted,
+             .mapAdopted,
              .actionInterceptorFinished,
              .branchActivated,
              .elevatedSpaceStarted,
@@ -304,6 +311,8 @@ extension DepartureLogEvent {
 
     var message: String {
         switch self {
+        case let .mapAdopted(definitions, ownerID):
+            "adopted routing map owner=\(ownerID.uuidString.prefix(8))\n\(definitions.departureMapTrace)"
         case let .actionCompleted(action):
             "completed \(action.departureDebugDescription)"
         case let .actionDirectInvocationEnded(action, error):

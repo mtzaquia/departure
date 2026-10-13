@@ -227,15 +227,18 @@ import Testing
     private func fixture() -> RootRouter {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
-            Push(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-        } highPriority: {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
-                Push(RouteDestination(HigherChild.self) { _, _ in EmptyView() })
+            testPush(testDestination(HomeDetailRoute.self))
+            testPush(testDestination(SettingsRoute.self))
+
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self)) {
+                    testPush(testDestination(HigherChild.self))
+                }
+                testCover(testDestination(OtherHighRoot.self))
             }
-            Cover(RouteDestination(OtherHighRoot.self) { _, _ in EmptyView() })
-        } criticalPriority: {
-            Cover(RouteDestination(LockRoute.self) { _, _ in EmptyView() })
+            CriticalPriority {
+                testCover(testDestination(LockRoute.self))
+            }
         }, router: owner) { EmptyView() }
         return owner
     }

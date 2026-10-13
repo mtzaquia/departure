@@ -24,22 +24,33 @@ import SwiftUI
 
 /// Binds a domain route to a feature view without extending the route type.
 ///
-/// Pass this value to ``Push``, ``Replace``, ``Sheet``, or ``Cover`` in a route map.
+/// Supply this value in a map's `destinations:` builder, independently of the
+/// route's ``Push``, ``Replace``, ``Sheet``, or ``Cover`` declaration.
 /// Its builder runs on the main actor with the requested route and the destination's
-/// own routing context. The same route type can use different builders at different
-/// map locations.
+/// own routing context. Each composed ``RootRouteMap`` accepts one destination value
+/// per route type. Reusing that value in multiple maps is allowed; distinct values
+/// for the same type conflict throughout the tree. Compose destination values
+/// independently of route declarations with ``RouteDestinations``.
 ///
 /// ```swift
 /// let profile = RouteDestination(ProfileRoute.self) { route, context in
 ///     ProfileView(userID: route.userID)
 /// }
 ///
-/// let routes = RootRouteMap { Push(profile) }
+/// let routes = RootRouteMap {
+///     Push(ProfileRoute.self)
+/// } destinations: {
+///     profile
+/// }
 /// ```
 public struct RouteDestination<R: Route>: Sendable {
+    let identity = UUID()
     let build: @MainActor @Sendable (R, RouteContext) -> AnyView
 
-    /// Creates a reusable destination builder for a route type.
+    /// Creates a reusable destination builder with its own identity for a route type.
+    ///
+    /// Copies retain that identity, including when added to destination collections.
+    /// Creating another destination value for the same type creates a distinct binding.
     ///
     /// - Parameters:
     ///   - route: The domain route type bound to this destination.
@@ -47,6 +58,33 @@ public struct RouteDestination<R: Route>: Sendable {
     public init<Content: View>(_ route: R.Type, @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content) {
         build = { AnyView(destination($0, $1)) }
     }
+}
+
+/// A destination builder whose route type is retained without a generic parameter.
+///
+/// ``RouteDestinationBuilder`` uses these values to compose builders for different
+/// route types. Erasing a destination does not declare a navigation position or
+/// evaluate its builder.
+public struct AnyRouteDestination: Sendable, Hashable {
+    private let identity: UUID
+    let routeType: any Route.Type
+    let build: @MainActor @Sendable (any Route, RouteContext) -> AnyView
+
+    /// Stores a typed destination for composition with other destination builders.
+    /// - Parameter destination: The builder and route type to retain.
+    public init<R: Route>(_ destination: RouteDestination<R>) {
+        identity = destination.identity
+        routeType = R.self
+        build = { route, context in
+            // A declaration is matched by concrete route type before rendering.
+            destination.build(route as! R, context)
+        }
+    }
+
+    /// Compares the original destination values by identity, independently of route equality.
+    public static func == (lhs: Self, rhs: Self) -> Bool { lhs.identity == rhs.identity }
+    /// Hashes this destination's identity.
+    public nonisolated func hash(into hasher: inout Hasher) { hasher.combine(identity) }
 }
 
 /// Presentation metadata for the particular destination being rendered.

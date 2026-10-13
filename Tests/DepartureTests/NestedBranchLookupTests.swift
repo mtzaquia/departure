@@ -30,14 +30,14 @@ struct NestedBranchLookupTests {
     @Test(arguments: [false, true])
     func publicBranchPushBehindModalKeepsItsExactAnchor(declaredAtBranchRoot: Bool) async throws {
         let owner = RootRouter()
-        let settings = RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }
+        let settings = testDestination(SettingsRoute.self)
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(RouteDestination(MessageRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(MessageRoute.self))
             Branches {
                 Branch("wallet") {
-                    if declaredAtBranchRoot { Push(settings) }
-                    Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }) {
-                        if !declaredAtBranchRoot { Push(settings) }
+                    if declaredAtBranchRoot { testPush(settings) }
+                    testPush(testDestination(HomeDetailRoute.self)) {
+                        if !declaredAtBranchRoot { testPush(settings) }
                     }
                 }
             }
@@ -65,13 +65,13 @@ struct NestedBranchLookupTests {
     @Test func publicSelectedNestedDestinationKeepsItsOuterContainerAnchor() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(RouteDestination(MessageRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(MessageRoute.self))
             Branches {
                 Branch("outer") {
                     Branches {
                         Branch("inner") {
-                            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }) {
-                                Push(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+                            testPush(testDestination(HomeDetailRoute.self)) {
+                                testPush(testDestination(SettingsRoute.self))
                             }
                         }
                     }
@@ -99,7 +99,7 @@ struct NestedBranchLookupTests {
     func enclosingLocalDeclarationWinsOverLazyContainer(hasLazyDeclaration: Bool) async throws {
         let (router, outer, _) = makeNestedBranches(hasLazyDeclaration: hasLazyDeclaration)
         outer.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
         ])
         outer.setActiveBranch("inner")
 
@@ -121,11 +121,11 @@ struct NestedBranchLookupTests {
     @Test func innermostLocalDeclarationStillWins() async throws {
         let (router, outer, inner) = makeNestedBranches(hasLazyDeclaration: true)
         outer.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
         ])
         outer.setActiveBranch("inner")
         inner.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
         ])
 
         let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
@@ -151,7 +151,7 @@ struct NestedBranchLookupTests {
         outer.detachTestBranch(inner, for: "inner")
         let container = RouteScope(id: "container", route: HomeDetailRoute())
         container.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
         ])
         router.mutateRouteGraph {
             outer.path.append(container)
@@ -174,7 +174,7 @@ struct NestedBranchLookupTests {
         let inner = RouteScope(id: "inner", route: nil)
         if hasLazyDeclaration {
             router.root.defineTestMap(id: nil, selection: nil, definitions:
-                Branch("outer") { AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations
+                Branch("outer") { testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations
             )
         }
         router.mutateRouteGraph {

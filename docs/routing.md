@@ -24,36 +24,66 @@ public enum SettingsFeature {
 }
 ```
 
-Declare `Sheet(SettingsFeature.destination)` in the application map. Each declaration has a destination builder; no fallback view or retroactive conformance is needed. Different occurrences of the same route type may use different builders.
-
-## Build a destination in the map
-
-For views defined alongside their routes, pass the route type and build the destination directly. These overloads are available on the development branch after `v3.0.0-beta.1`.
+Declare the route type in the map, then supply the feature builder through `destinations:`:
 
 ```swift
 RootRouteMap {
-  Push(ProfileRoute.self) { route, context in
-    ProfileView(userID: route.userID, close: context.unwindRoute)
-  } routes: {
-    Sheet(EditProfileRoute.self) { route, context in
-      EditProfileView(userID: route.userID, close: context.unwindRoute)
-    }
-  }
+  Sheet(SettingsRoute.self)
+} destinations: {
+  SettingsFeature.destination
 }
 ```
 
-`Push`, `Replace`, `Sheet`, and `Cover` all accept this form. The first closure builds the view with typed route data and the same `RouteContext` as a `RouteDestination` builder. Add the labelled `routes:` closure for nested declarations; omit it for a leaf. Nested builders can compose `RouteMap` values and mix inline declarations with reusable destinations. IDs and cover transitions use the same parameters as destination-value declarations.
+No fallback view or retroactive conformance is needed. Builders are bound when the root is installed; their views are built later in the destination's own context.
+
+## Compose destination bindings
+
+A feature map can describe routes implemented by other modules and supply only its own builders. The enclosing map completes the missing bindings:
+
+```swift
+let settings = RouteMap {
+  Sheet(SettingsRoute.self) {
+    Push(ProfileRoute.self)
+  }
+} destinations: {
+  SettingsFeature.destination
+}
+
+let routes = RootRouteMap {
+  settings
+} destinations: {
+  ProfileFeature.destinations
+}
+```
+
+`RouteDestinations` composes individual typed builders and other destination collections, including conditionals and loops:
+
+```swift
+let destinations = RouteDestinations {
+  ProfileFeature.destination
+  SettingsFeature.destinations
+}
+```
+
+All destination contributions from the composed tree form one catalog when the root is installed, including contributions from inactive branches and unpresented destination children. Each route type accepts one destination value. Reusing that value, its copies, or a collection containing it is allowed. Distinct values for the same type report a diagnostic and disable that binding throughout the tree, regardless of composition order. There is no map-specific override precedence. Collections retain entries without evaluating view builders.
+
+A registered builder does not declare a route or expand route discoverability. Missing builders are diagnosed during root installation. Requests matching an unbound declaration leave navigation unchanged and do not fall back to another declaration of that type.
 
 ## Choose a style and children
 
 ```swift
 RootRouteMap {
-  Push(ProfileFeature.destination)
-  Replace(MessageFeature.destination) {
-    Push(MessageFeature.attachmentDestination)
+  Push(ProfileRoute.self)
+  Replace(MessageRoute.self) {
+    Push(AttachmentRoute.self)
   }
-  Sheet(SettingsFeature.destination)
-  Cover(OnboardingFeature.destination, transition: .fade)
+  Sheet(SettingsRoute.self)
+  Cover(OnboardingRoute.self, transition: .fade)
+} destinations: {
+  ProfileFeature.destination
+  MessageFeature.destinations
+  SettingsFeature.destination
+  OnboardingFeature.destination
 }
 ```
 
@@ -64,9 +94,9 @@ RootRouteMap {
 | `Sheet` | Presents a sheet. |
 | `Cover` | Presents a cover, using `.slide` by default or `.fade`. |
 
-Destinations explicitly construct stacks when needed. A replacement clears its descendants and keeps other branch paths. Fade covers use detached hosts; forward custom environment values through `WithRouter`'s `windowDestination` as described in [Priority](priority.md).
+All four declarations accept route types and optional child declarations. View builders belong in `destinations:`. Destinations explicitly construct stacks when needed. A replacement clears its descendants and keeps other branch paths. Fade covers use detached hosts; forward custom environment values through `WithRouter`'s `windowDestination` as described in [Priority](priority.md).
 
-Reusable `RouteMap` values compose in ordinary builders. Use `ModalRouteMap` to compose high/critical entries: only sheets, covers, and other modal maps can appear in its base builder. Their children still support pushes, replacements, branches, and ordinary maps.
+Reusable `RouteMap` values compose in ordinary builders. `ModalRouteMap` composes sheets and covers and can supply destination builders. Root-only `HighPriority` and `CriticalPriority` groups accept modal declarations and modal maps; their entries' children accept ordinary declarations and maps.
 
 ## Use destination context
 

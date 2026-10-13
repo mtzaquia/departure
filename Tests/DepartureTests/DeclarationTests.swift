@@ -25,35 +25,43 @@ import Testing
 @testable import Departure
 
 @MainActor @Suite struct DeclarationTests {
-    let detail = RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }
-    let settings = RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }
-    let login = RouteDestination(LoginRoute.self) { _, _ in EmptyView() }
-    let alert = RouteDestination(AlertRoute.self) { _, _ in EmptyView() }
+    let detail = testDestination(HomeDetailRoute.self)
+    let settings = testDestination(SettingsRoute.self)
+    let login = testDestination(LoginRoute.self)
+    let alert = testDestination(AlertRoute.self)
 
     @Test func rootPrioritiesApplyOnlyToTopLevelModals() {
-        let map = RootRouteMap { Push(detail) } highPriority: {
-            Cover(login) { Push(detail); Sheet(settings) }
-        } criticalPriority: { Sheet(alert) }
+        let map = RootRouteMap {
+ testPush(detail)
+            HighPriority {
+                testCover(login) { testPush(detail); testSheet(settings) }
+            }
+            CriticalPriority { testSheet(alert) }
+        }
         let definitions = map.declarations.flatMap(\.routes)
         #expect(definitions.map(\.priority) == [.default, .high, .critical])
         #expect(definitions[1].children.flatMap(\.routes).allSatisfy { $0.priority == .default })
     }
-    @Test func independentlyOptionalPriorityBuilders() {
-        let map = RootRouteMap {} criticalPriority: { Cover(alert) }
+    @Test func rootPriorityGroupsCanBeDeclaredIndependently() {
+        let map = RootRouteMap {
+            CriticalPriority { testCover(alert) }
+        }
         #expect(map.declarations.flatMap(\.routes).map(\.priority) == [.critical])
     }
     @Test func composedMapsDoNotIntroduceScopes() {
-        let feature = RouteMap { Push(detail); Sheet(settings) }
+        let feature = RouteMap { testPush(detail); testSheet(settings) }
         let engine = RouterEngine(routes: RootRouteMap { feature })
         #expect(engine.root.routeAttachments.count == 2)
         #expect(engine.root.branchScopes.keys.isEmpty)
         #expect(engine.root.path.isEmpty)
     }
     @Test func modalMapsComposeAndKeepChildrenLocal() {
-        let nested = ModalRouteMap { Cover(login) { Push(detail) } }
-        let entries = ModalRouteMap { nested; Sheet(settings) }
-        let engine = RouterEngine(routes: RootRouteMap {} highPriority: { entries }
-            criticalPriority: { ModalRouteMap { Sheet(alert) } })
+        let nested = ModalRouteMap { testCover(login) { testPush(detail) } }
+        let entries = ModalRouteMap { nested; testSheet(settings) }
+        let engine = RouterEngine(routes: RootRouteMap {
+            HighPriority { entries }
+            CriticalPriority { ModalRouteMap { testSheet(alert) } }
+        })
         #expect(engine.root.routeAttachments.map(\.priority) == [.high, .high, .critical])
         #expect(engine.root.definitions.presentationStyles == [.cover(.slide), .sheet])
         let children = engine.root.definitions.routeBinding(for: LoginRoute.self)?.declaration?.childScope
@@ -63,12 +71,12 @@ import Testing
     }
 
     @Test func mapIDsDistinguishRepeatedRouteTypesInOnePath() async throws {
-        let numbered = RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }
+        let numbered = testDestination(NumberedRoute.self)
         let engine = RouterEngine(routes: RootRouteMap(id: "app") {
-            Push(numbered) {
+            testPush(numbered) {
                 RouteMap(id: "outer-detail") {
-                    Push(numbered) {
-                        RouteMap(id: "inner-detail") { Push(settings) }
+                    testPush(numbered) {
+                        RouteMap(id: "inner-detail") { testPush(settings) }
                     }
                 }
             }
@@ -93,10 +101,10 @@ import Testing
             RouteMap(id: "app") {
                 Branches {
                     Branch(AppTab.home) {
-                        RouteMap(id: "home-flow") { Push(detail) }
+                        RouteMap(id: "home-flow") { testPush(detail) }
                     }
                 }
-                Sheet(settings)
+                testSheet(settings)
             }
         })
         #expect(engine.root.id == AnyHashable("app"))
@@ -111,8 +119,10 @@ import Testing
     }
 
     @Test func mapIDsNameElevatedRoots() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {} highPriority: {
-            ModalRouteMap { Sheet(login) { RouteMap(id: "authentication") { Push(detail) } } }
+        let engine = RouterEngine(routes: RootRouteMap {
+            HighPriority {
+                ModalRouteMap { testSheet(login) { RouteMap(id: "authentication") { testPush(detail) } } }
+            }
         })
         await engine.present(LoginRoute())
         let space = try #require(engine.spaces.highSpace)
@@ -126,8 +136,8 @@ import Testing
     @Test(arguments: [false, true])
     func conflictingMapIDsDisableTheIDTargetButKeepDefinitions(sameID: Bool) async {
         let engine = RouterEngine(routes: RootRouteMap {
-            Push(detail) {
-                RouteMap(id: "first") { Push(settings) }
+            testPush(detail) {
+                RouteMap(id: "first") { testPush(settings) }
                 RouteMap(id: sameID ? "first" : "second") {}
             }
         })
@@ -148,7 +158,7 @@ import Testing
             Issue.record("A root and an inlined map cannot both name one scope")
             return
         }
-        let destination = RouteDefinitions([.init(routes: Push(detail, id: "route") {
+        let destination = RouteDefinitions([.init(routes: testPush(detail, id: "route") {
             RouteMap(id: "map") {}
         }._routeDeclarations)]).routeBinding(for: HomeDetailRoute.self)?.declaration?.childScope
         guard case .conflict? = destination?.scopeID else {
@@ -160,9 +170,9 @@ import Testing
     @Test func branchBuilderSupportsControlFlowAndSiblingRoutes() {
         let branches = [AppTab.home, .wallet]
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(settings)
+            testSheet(settings)
             Branches(concurrent: true) {
-                for branch in branches { Branch(branch) { Push(detail) } }
+                for branch in branches { Branch(branch) { testPush(detail) } }
                 if false { Branch("unused") {} }
             }
         })
@@ -172,7 +182,7 @@ import Testing
     }
     @Test func branchDefinitionsExistBeforeAnyHostIsMounted() throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Branches { Branch(AppTab.home) { Push(detail) }; Branch(AppTab.wallet) { Sheet(settings) } }
+            Branches { Branch(AppTab.home) { testPush(detail) }; Branch(AppTab.wallet) { testSheet(settings) } }
         })
         let wallet = try #require(engine.root.branchScopes[AppTab.wallet])
         #expect(engine.root.definitions.presentationStyles.isEmpty)
@@ -183,7 +193,7 @@ import Testing
     }
     @Test func concurrentBranchesShareContainerParticipation() {
         let engine = RouterEngine(routes: RootRouteMap { Branches(concurrent: true) {
-            Branch(AppTab.home) { Push(detail) }; Branch(AppTab.wallet) { Sheet(settings) }
+            Branch(AppTab.home) { testPush(detail) }; Branch(AppTab.wallet) { testSheet(settings) }
         } })
         #expect(engine.root.participates(inBranch: AppTab.home))
         #expect(engine.root.participates(inBranch: AppTab.wallet))
@@ -192,13 +202,13 @@ import Testing
     @Test(arguments: [false, true], [false, true])
     func aScopeRejectsMultipleBranchGroupsEvenWhenTheirConcurrencyAgrees(concurrent: Bool, composed: Bool) async {
         let feature = RouteMap {
-            Branches(concurrent: concurrent) { Branch("second") { Sheet(settings) } }
+            Branches(concurrent: concurrent) { Branch("second") { testSheet(settings) } }
         }
         let engine = RouterEngine(routes: RootRouteMap {
-            Branches(concurrent: concurrent) { Branch("first") { Push(detail) } }
+            Branches(concurrent: concurrent) { Branch("first") { testPush(detail) } }
             if composed { feature }
-            else { Branches(concurrent: !concurrent) { Branch("second") { Sheet(settings) } } }
-            Sheet(login)
+            else { Branches(concurrent: !concurrent) { Branch("second") { testSheet(settings) } } }
+            testSheet(login)
         })
         guard case .conflict? = engine.root.definitions.branchContainer else {
             Issue.record("A receiving scope must accept exactly one Branches group")
@@ -214,8 +224,8 @@ import Testing
     @Test func composedMapContributesOneContainerWithItsOwnConcurrency() async throws {
         let feature = RouteMap {
             Branches(concurrent: true) {
-                Branch("first") { Push(detail) }
-                Branch("second") { Push(settings) }
+                Branch("first") { testPush(detail) }
+                Branch("second") { testPush(settings) }
             }
         }
         let engine = RouterEngine(routes: RootRouteMap { feature })
@@ -229,11 +239,11 @@ import Testing
     }
     @Test(arguments: [false, true])
     func duplicateTypeDisablesOnlyConflictingKey(reverse: Bool) async {
-        let conflicting = RouteMap { Sheet(settings); Push(settings) }
-        let reversed = RouteMap { Push(settings); Sheet(settings) }
+        let conflicting = RouteMap { testSheet(settings); testPush(settings) }
+        let reversed = RouteMap { testPush(settings); testSheet(settings) }
         let engine = RouterEngine(routes: RootRouteMap {
             if reverse { reversed } else { conflicting }
-            Push(detail)
+            testPush(detail)
         })
         let router = Router(engine: engine, scope: engine.root)
         #expect(engine.root.routeAttachments.count == 1)
@@ -250,11 +260,11 @@ import Testing
 
     @Test func conflictingRouteDoesNotFallBackToAncestorOrSibling() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(settings)
-            Push(detail) {
+            testSheet(settings)
+            testPush(detail) {
                 Branches {
-                    Branch("conflicting") { Push(settings); Sheet(settings) }
-                    Branch("valid") { Sheet(settings) }
+                    Branch("conflicting") { testPush(settings); testSheet(settings) }
+                    Branch("valid") { testSheet(settings) }
                 }
             }
         })
@@ -270,9 +280,9 @@ import Testing
     @Test func conflictingBranchHasNoRuntimeScopeOrMountOrderWinner() async {
         let engine = RouterEngine(routes: RootRouteMap {
             Branches {
-                Branch("duplicate") { Sheet(settings) }
-                Branch("duplicate") { Push(detail) }
-                Branch("valid") { Push(detail) }
+                Branch("duplicate") { testSheet(settings) }
+                Branch("duplicate") { testPush(detail) }
+                Branch("valid") { testPush(detail) }
             }
         })
         #expect(engine.root.branchScopes["duplicate"] == nil)
@@ -282,7 +292,10 @@ import Testing
     }
 
     @Test func duplicateTypeAcrossPriorityCatalogsIsAlsoAConflict() async {
-        let engine = RouterEngine(routes: RootRouteMap { Sheet(settings) } highPriority: { Sheet(settings) })
+        let engine = RouterEngine(routes: RootRouteMap {
+ testSheet(settings)
+            HighPriority { testSheet(settings) }
+        })
         await Router(engine: engine, scope: engine.root).present(SettingsRoute())
         #expect(engine.root.routeAttachments.isEmpty)
         #expect(engine.defaultSpace.rootPath.isEmpty)
@@ -290,7 +303,7 @@ import Testing
     }
 
     @Test func duplicateTypeIsRecordedAsConflictWithinScope() {
-        let engine = RouterEngine(routes: RootRouteMap { Sheet(settings); Push(settings) })
+        let engine = RouterEngine(routes: RootRouteMap { testSheet(settings); testPush(settings) })
         #expect(engine.root.routeAttachments.isEmpty)
         guard case .conflict? = engine.spaces.firstDeclaration(including: SettingsRoute.self) else {
             Issue.record("Expected a conflicting declaration")
@@ -299,8 +312,8 @@ import Testing
     }
     @Test func routeInstancesShareDefinitionsAndKeepIndependentBranchState() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }) {
-                Branches { Branch("content") { Push(detail) } }
+            testSheet(testDestination(NumberedRoute.self)) {
+                Branches { Branch("content") { testPush(detail) } }
             }
         })
         await engine.present(NumberedRoute(number: 1))
@@ -314,7 +327,7 @@ import Testing
     }
 
     @Test func repeatedFeatureMapHasDistinctDeclarationOccurrences() throws {
-        let feature = RouteMap { Push(detail) { Sheet(settings) } }
+        let feature = RouteMap { testPush(detail) { testSheet(settings) } }
         let engine = RouterEngine(routes: RootRouteMap {
             Branches { Branch("first") { feature }; Branch("second") { feature } }
         })

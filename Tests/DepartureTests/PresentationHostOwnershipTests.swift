@@ -27,7 +27,7 @@ import Testing
 @MainActor @Suite struct PresentationHostOwnershipTests {
     @Test(arguments: [false, true])
     func duplicateExplicitHostsDisablePresentationUntilOneRemains(removeFirst: Bool) async {
-        let engine = RouterEngine(routes: RootRouteMap { Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }) })
+        let engine = RouterEngine(routes: RootRouteMap { testSheet(testDestination(SettingsRoute.self)) })
         let first = RoutePresentationHostID(), second = RoutePresentationHostID(), automatic = RoutePresentationHostID()
         let scope = engine.root
         scope.bindRoutingHost(automatic, automatic: true, environment: scope.sourceEnvironment)
@@ -78,9 +78,9 @@ import Testing
 
     @Test(arguments: [RoutePresentation.Style.push, .sheet, .cover(.slide), .cover(.fade), .replace])
     func bindingWriteBackIsAcceptedOnlyFromOwningHost(style: RoutePresentation.Style) async throws {
-        let destination = RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }
+        let destination = testDestination(NumberedRoute.self)
         let engine = RouterEngine(routes: RootRouteMap {
-            AnyRouteDeclaration(destination, presentation: .init(style: style, priority: .default))
+            testDeclaration(destination, presentation: .init(style: style, priority: .default))
         })
         let owner = RoutePresentationHostID(), stranger = RoutePresentationHostID()
         engine.root.bindRoutingHost(owner, automatic: false, environment: engine.root.sourceEnvironment)
@@ -100,7 +100,7 @@ import Testing
         #expect(engine.defaultSpace.rootPath.isEmpty)
     }
     @Test func staleDefaultDismissalCannotClearReplacement() async throws {
-        let engine = RouterEngine(routes: RootRouteMap { Sheet(RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }) })
+        let engine = RouterEngine(routes: RootRouteMap { testSheet(testDestination(NumberedRoute.self)) })
         await engine.present(NumberedRoute(number: 1))
         let oldBinding = engine.routePresentationBinding(from: engine.root, matching: .sheet)
         await engine.present(NumberedRoute(number: 2))
@@ -110,11 +110,14 @@ import Testing
     }
     @Test(arguments: [RoutePriority.high, .critical])
     func staleElevatedDismissalCannotClearReplacement(priority: RoutePriority) async throws {
-        let destination = RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }
-        let engine = RouterEngine(routes: RootRouteMap {} highPriority: {
-            if priority == .high { Sheet(destination) }
-        } criticalPriority: {
-            if priority == .critical { Sheet(destination) }
+        let destination = testDestination(NumberedRoute.self)
+        let engine = RouterEngine(routes: RootRouteMap {
+            HighPriority {
+                if priority == .high { testSheet(destination) }
+            }
+            CriticalPriority {
+                if priority == .critical { testSheet(destination) }
+            }
         })
         await engine.present(NumberedRoute(number: 1))
         let old = engine.elevatedRoutePresentationBinding(priority: priority, matching: .sheet)
@@ -125,7 +128,7 @@ import Testing
     }
     @Test func branchDeclarationsUseTheBranchBindingHost() async throws {
         let engine = RouterEngine(routes: RootRouteMap { Branches { Branch(AppTab.home) {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(SettingsRoute.self))
         } } })
         let branch = try #require(engine.root.branchScopes[AppTab.home])
         let host = RoutePresentationHostID()

@@ -12,14 +12,24 @@ struct IndependentSpaceProbeRoot: View {
 enum IndependentSpaceProbeMap {
     static func root(owner: RootRouter) -> RootRouteMap {
         RootRouteMap {
-            Sheet(RouteDestination(SpaceProbeDefault.self) { _, context in
+            Sheet(SpaceProbeDefault.self)
+
+            HighPriority {
+                Sheet(SpaceProbeHigh.self) {
+                    Push(SpaceProbeDetail.self)
+                }
+            }
+            CriticalPriority {
+                Cover(SpaceProbeCritical.self)
+            }
+        } destinations: {
+            RouteDestination(SpaceProbeDefault.self) { _, context in
                 VStack {
                     Text("Default after high removal").accessibilityIdentifier("sample.spaces.default")
                     Button("Done") { Task { await context.unwindRoute() } }
                 }
-            })
-        } highPriority: {
-            Sheet(RouteDestination(SpaceProbeHigh.self) { _, context in
+            }
+            RouteDestination(SpaceProbeHigh.self) { _, context in
                 NavigationStack {
                     VStack(spacing: 20) {
                         Text("High space root").accessibilityIdentifier("sample.spaces.high-root")
@@ -39,14 +49,12 @@ enum IndependentSpaceProbeMap {
                     }
                     .routing()
                 }
-            }) {
-                Push(RouteDestination(SpaceProbeDetail.self) { _, context in
-                    Button("Reset high to its root") { Task { await context.router.unwind(to: .root) } }
-                        .accessibilityIdentifier("sample.spaces.reset")
-                })
             }
-        } criticalPriority: {
-            Cover(RouteDestination(SpaceProbeCritical.self) { _, context in
+            RouteDestination(SpaceProbeDetail.self) { _, context in
+                Button("Reset high to its root") { Task { await context.router.unwind(to: .root) } }
+                    .accessibilityIdentifier("sample.spaces.reset")
+            }
+            RouteDestination(SpaceProbeCritical.self) { _, context in
                 VStack(spacing: 20) {
                     Text("Critical space root").accessibilityIdentifier("sample.spaces.critical-root")
                     Button("Remove covered high") { Task { await owner.dismissSpace(.high) } }
@@ -54,7 +62,7 @@ enum IndependentSpaceProbeMap {
                     Button("Close critical") { Task { await context.unwindRoute() } }
                         .accessibilityIdentifier("sample.spaces.close-critical")
                 }
-            })
+            }
         }
     }
 }

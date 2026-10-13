@@ -26,18 +26,25 @@ enum ProfileFeature {
 
 ```swift
 let profileRoutes = RouteMap {
-  Push(ProfileFeature.destination)
+  Push(ProfileRoute.self)
+} destinations: {
+  ProfileFeature.destination
 }
 
 let appRoutes = RootRouteMap {
   profileRoutes
-  Sheet(SettingsFeature.destination) {
-    Push(SettingsFeature.advancedDestination)
+  Sheet(SettingsRoute.self) {
+    Push(AdvancedSettingsRoute.self)
   }
+} destinations: {
+  SettingsFeature.destination
+  SettingsFeature.advancedDestination
 }
 ```
 
 A nested builder declares routes available in that destination's scope. Inserting a `RouteMap` contributes its definitions without introducing another scope. Definitions are fixed for the routing owner's lifetime; view rebuilds do not add or remove them.
+
+Feature maps can supply some or all of their destination builders. All contributions form one catalog for the complete root tree, and the root can supply missing destinations. Reusing the same destination value across maps is allowed. Distinct values for one route type conflict throughout the tree; no map overrides another. Binding runs when the root is installed, before views mount. Missing builders report diagnostics and block presentation through their declarations without changing navigation.
 
 ## Bind views and request routes
 

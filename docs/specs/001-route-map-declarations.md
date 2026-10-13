@@ -2,105 +2,81 @@
 
 Status: Implemented on `zaquia/predefined-route-maps`; validation is recorded in specification 4.
 
-Departure knows its route definitions independently of mounted views. Applications declare the navigation structure ahead of time using `RootRouteMap`, and features compose reusable declarations using `RouteMap`. Views connect to that structure without defining which routes exist through their lifecycle.
+Departure knows its route definitions independently of mounted views. Applications declare navigation with `RootRouteMap`, and features compose reusable declarations with `RouteMap`. Views connect to that structure without defining which routes exist through their lifecycle.
 
-This specification records the map declaration API and the view bindings that connect it to presentation. The Swift examples use the implemented surface.
-
-Presentation declarations accept typed `RouteDestination` values, as defined in [Route destinations and context](002-route-destinations.md). In the examples below, `Destinations` represents feature-owned destination values; the map infers each value's domain route type.
+Presentation declarations name domain route types. Feature-owned destination builders are supplied separately through each map's optional final `destinations:` closure, as described in [Route destinations and context](002-route-destinations.md).
 
 ## Map types
 
-`RootRouteMap` describes the complete navigation definition for one routing container. Its initializer accepts a primary route declaration builder and up to two additional trailing builders, labeled `highPriority` and `criticalPriority`. Both additional builders default to empty.
+`RootRouteMap` describes one routing owner's complete navigation definition. Its primary builder accepts ordinary declarations and root-only `HighPriority` and `CriticalPriority` groups. Its optional `destinations:` builder contributes additional builders to the assembled tree.
 
-`RouteMap` describes reusable declarations that can be inserted into a map builder or a route's child builder. Composition contributes those declarations to the receiving scope; it does not introduce a new scope by itself.
+`RouteMap` contributes declarations to its receiving scope without adding a navigation scope. Its destinations join one catalog for the complete composed tree. Repeated contributions of the same value are allowed; different destination values for one type conflict throughout the tree. The root can supply missing values, with no override precedence.
 
-`RouteMap(id:)` optionally names that receiving scope for `.unwind(to: .id(...))`. A scope accepts one explicit ID across its root/presentation declaration and composed maps. Unnamed fragments compose freely. Multiple explicit IDs report a diagnostic and disable the explicit target while leaving the route definitions available.
+`RouteMap(id:)` optionally names that receiving scope for `.unwind(to: .id(...))`. A scope accepts one explicit ID across its root/presentation declaration and composed maps. Multiple explicit IDs report a diagnostic and disable the explicit target while retaining definitions.
 
-`ModalRouteMap` is the restricted composition type for elevated entries. Its builder accepts sheets, covers, and other modal maps. Ordinary `RouteMap` values belong in the main builder or inside an entry modal.
+`ModalRouteMap` composes sheets, covers, and other modal maps, with an optional `destinations:` builder. It can be used inside an elevated priority group. Ordinary `RouteMap` values belong in the main builder or inside an entry modal.
 
-Only `RootRouteMap` exposes the priority builders. A `RouteMap` cannot define high- or critical-priority root presentations, and a `RootRouteMap` cannot be embedded as a feature subtree.
+Priority groups are accepted only by the root builder. Neither `RouteMap` nor route children nor other priority groups accept them. A `RootRouteMap` cannot be embedded as a feature subtree.
 
 ## Root declaration
 
 ```swift
 enum AppRoutes {
-    static let root = RootRouteMap {
-        Push(Destinations.profile) {
-            Sheet(Destinations.editProfile)
-        }
-
-        settings
-    } highPriority: {
-        Cover(Destinations.login) {
-            Push(Destinations.resetPassword)
-        }
-
-        Sheet(Destinations.maintenance)
-    } criticalPriority: {
-        Cover(Destinations.sessionExpired)
-    }
-
     static let settings = RouteMap {
-        Push(Destinations.appearance)
-
-        Push(Destinations.account) {
-            Sheet(Destinations.changePassword)
+        Push(AppearanceRoute.self)
+        Push(AccountRoute.self) {
+            Sheet(ChangePasswordRoute.self)
         }
+    } destinations: {
+        SettingsFeature.destinations
+    }
+
+    static let root = RootRouteMap {
+        Push(ProfileRoute.self) {
+            Sheet(EditProfileRoute.self)
+        }
+        settings
+        HighPriority {
+            Cover(LoginRoute.self) {
+                Push(ResetPasswordRoute.self)
+            }
+            Sheet(MaintenanceRoute.self)
+        }
+        CriticalPriority {
+            Cover(SessionExpiredRoute.self)
+        }
+    } destinations: {
+        ProfileFeature.destinations
+        LoginFeature.destinations
+        MaintenanceFeature.destination
+        SessionFeature.destination
     }
 }
 ```
 
-The priority builders are optional independently. A root map can supply neither, either one, or both. When both are supplied, `highPriority` precedes `criticalPriority`.
-
-```swift
-let ordinaryRoutes = RootRouteMap {
-    Push(Destinations.profile)
-}
-
-let routesWithHighPriority = RootRouteMap {
-    Push(Destinations.profile)
-} highPriority: {
-    Cover(Destinations.login)
-}
-
-let routesWithCriticalPriority = RootRouteMap {
-    Push(Destinations.profile)
-} criticalPriority: {
-    Cover(Destinations.sessionExpired)
-}
-```
+The root can contain neither priority group, either group, or both. Multiple disjoint groups compose at the root; repeated route types still conflict at their receiving scope.
 
 ## Nested declarations
 
-Retain the presentation DSL: `Push`, `Sheet`, `Cover`, and `Replace`. Each accepts an optional trailing builder for declarations belonging to its destination scope. A leaf keeps its concise spelling.
-
-Route declarations do not accept `priority:` or `providesNavigation:`. Root map builders determine priority, and destination views explicitly provide any navigation containers they need.
+`Push`, `Sheet`, `Cover`, and `Replace` accept a route type, an optional scope ID, and an optional child declaration builder. `Cover` also accepts its transition. They do not accept destination values, inline view builders, `priority:`, or `providesNavigation:`.
 
 ```swift
-Push(Destinations.profile)
-
-Push(Destinations.profile) {
-    Sheet(Destinations.editProfile) {
-        Push(Destinations.avatarPicker)
+Push(ProfileRoute.self) {
+    Sheet(EditProfileRoute.self) {
+        Push(AvatarPickerRoute.self)
     }
 }
 ```
 
-Sibling declarations belong to the same scope. A child builder describes navigation available within each presented instance of its parent route; it does not require that child to be presented or create a separate navigation stack by itself.
+Sibling declarations belong to the same scope. A child builder describes navigation available within each presented instance of its parent route. It does not present the child or create a navigation stack.
 
-The same route type may be declared in different scopes with different presentation styles and children. Definitions describe route types and their placement in the map; route instances carry the data for a particular presentation.
-
-Each placement requires a distinct internal declaration identity, even when it reuses a destination or composed map. Route discoverability stays exactly as it is today, including nearest eligible declaration lookup from the originating scope. [Route lookup and navigation semantics](003-route-addressing.md) is a reference for that retained behavior.
+The same route type may occur in different scopes with different presentation styles and children, sharing one destination binding throughout their routing owner. Each placement has a distinct declaration identity. Reusing a map retains separate placements and runtime state while preserving nearest eligible declaration lookup.
 
 ## Root presentation priorities
 
-Top-level declarations in `highPriority` and `criticalPriority` describe presentations from the routing container's root, above ordinary navigation. The root map builders determine presentation priority. Individual `Sheet` and `Cover` declarations do not expose a `priority:` parameter.
+`HighPriority` and `CriticalPriority` accept only sheets, covers, and modal maps at their base. Entries present from the routing root above ordinary navigation. Their children describe local navigation within that priority space; a nested push or sheet inherits the entry's effective priority without becoming another root entry.
 
-A root presentation's nested declarations describe local navigation within that presentation. For example, `ResetPasswordRoute` pushes inside the presented Login destination; it does not become a separate root presentation because its definition is nested under `highPriority`.
-
-Only the owner's `RootRouteMap` can declare elevated catalogs. Its type cannot be embedded inside a route's child builder or a feature map. High-space sources can still request root-declared critical entries while eligible; the owner presents an independent space rather than nesting critical ownership inside high. Nested sheets and covers remain local to their existing space.
-
-The exact rules for replacing, dismissing, and resolving competing root presentations belong to the runtime routing specification.
+A high-space source can request a root-declared critical entry while eligible. The owner presents an independent critical space. Nested priority groups are rejected at compile time. Replacing, dismissing, and resolving competing root presentations follow the runtime routing specification.
 
 ## Router installation
 
@@ -173,7 +149,7 @@ Branches split the X path into independent sub-paths while sharing the Y modal l
 
 ```swift
 static let root = RootRouteMap {
-    Sheet(Destinations.help)
+    Sheet(HelpRoute.self)
 
     Branches {
         Branch(AppTab.home) {
@@ -230,6 +206,6 @@ Knowing a nested definition does not by itself construct missing ancestor route 
 - Builders support conditionals, optional groups, and arrays. Elevated root builders accept modal declarations and reject top-level branches, pushes, and replacements.
 - Additional physical presentation hosts or replacement slots in one mapped scope, runtime map replacement, and recursive definition references remain outside this API.
 
-### Elevated entry builder constraint (2026-10-08)
+### Elevated entry builder constraint (2026-10-13)
 
-The base `highPriority` and `criticalPriority` closures use `ModalRouteDeclarationBuilder`: `Sheet`, `Cover`, and restricted `ModalRouteMap` compositions are accepted. `Push`, `Replace`, and branch containers belong inside an entry modal's ordinary nested route builder. The entry modal is the origin and logical root of that priority space. Composable `RouteMap` values remain available inside those nested builders; an ID on such a map names the entry's scope. Unsupported entry expressions fail at compile time.
+`RootRouteDeclarationBuilder` accepts root-only `HighPriority` and `CriticalPriority` groups. Their `ModalRouteDeclarationBuilder` accepts sheets, covers, and modal maps. Pushes, replacements, branches, and ordinary maps belong inside an entry's child builder. Unsupported or nested priority groups fail at compile time. The entry modal is the logical root of its priority space.

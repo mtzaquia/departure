@@ -201,13 +201,18 @@ enum SplitBranchMap {
     static let destination = RouteDestination(SplitBranchesRoute.self) { _, _ in SplitBranchesView() }
     static let routes = RouteMap {
         Branches(concurrent: true) {
-            Branch(NavigationSplitViewColumn.sidebar) { Push(SplitDestinations.splitPaneRoute) }
-            Branch(NavigationSplitViewColumn.content) { Push(SplitDestinations.splitPaneRoute) }
+            Branch(NavigationSplitViewColumn.sidebar) { Push(SplitPaneRoute.self) }
+            Branch(NavigationSplitViewColumn.content) { Push(SplitPaneRoute.self) }
             Branch(NavigationSplitViewColumn.detail) {
-                Push(SplitDestinations.splitPaneRoute)
-                Replace(SplitDestinations.splitSelectionRoute) { Push(SplitDestinations.splitSelectionChildRoute) }
-                Cover(SplitDestinations.splitPreviewRoute)
+                Push(SplitPaneRoute.self)
+                Replace(SplitSelectionRoute.self) { Push(SplitSelectionChildRoute.self) }
+                Cover(SplitPreviewRoute.self)
             }
         }
+    } destinations: {
+        SplitDestinations.splitPaneRoute
+        SplitDestinations.splitSelectionRoute
+        SplitDestinations.splitSelectionChildRoute
+        SplitDestinations.splitPreviewRoute
     }
 }

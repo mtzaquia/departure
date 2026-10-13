@@ -615,47 +615,81 @@ enum Destinations {
 
 enum AppRouteMaps {
     static let authentication = RouteMap {
-        Sheet(Destinations.topLevelSheetRoute)
+        Sheet(TopLevelSheetRoute.self)
+    } destinations: {
+        Destinations.topLevelSheetRoute
     }
     static let landing = RouteMap {
-        Sheet(Destinations.topLevelSheetRoute)
-        Cover(Destinations.topLevelCoverRoute)
-        Cover(Destinations.topLevelReplacementCoverRoute)
+        Sheet(TopLevelSheetRoute.self)
+        Cover(TopLevelCoverRoute.self)
+        Cover(TopLevelReplacementCoverRoute.self)
         Branches {
             Branch(LandingView.TabItem.home) {
-                Push(Destinations.lifecycleTeardownRoute) { LifecycleTeardownMap.routes }
-                Sheet(Destinations.profileRoute)
-                Sheet(Destinations.dismissProbeRoute) { Sheet(Destinations.nestedModalRoute) }
-                Cover(Destinations.messageRoute, transition: .fade)
-                Cover(Destinations.navigationBarFadeOcclusionRoute, transition: .fade)
+                Push(LifecycleTeardownRoute.self) { LifecycleTeardownMap.routes }
+                Sheet(ProfileRoute.self)
+                Sheet(DismissProbeRoute.self) { Sheet(NestedModalRoute.self) }
+                Cover(MessageRoute.self, transition: .fade)
+                Cover(NavigationBarFadeOcclusionRoute.self, transition: .fade)
             }
             Branch(LandingView.TabItem.settings) {
-                Push(Destinations.localDetailRoute)
-                Push(Destinations.appearanceSettingsRoute) {
-                    Push(Destinations.authenticationSettingsRoute) { authentication }
+                Push(LocalDetailRoute.self)
+                Push(AppearanceSettingsRoute.self) {
+                    Push(AuthenticationSettingsRoute.self) { authentication }
                 }
-                Push(Destinations.authenticationSettingsRoute) { authentication }
-                Sheet(Destinations.settingsModalRoute)
-                Sheet(Destinations.rerouteChainFinalRoute)
+                Push(AuthenticationSettingsRoute.self) { authentication }
+                Sheet(SettingsModalRoute.self)
+                Sheet(RerouteChainFinalRoute.self)
             }
         }
+    } destinations: {
+        Destinations.topLevelSheetRoute
+        Destinations.topLevelCoverRoute
+        Destinations.topLevelReplacementCoverRoute
+        Destinations.lifecycleTeardownRoute
+        Destinations.profileRoute
+        Destinations.dismissProbeRoute
+        Destinations.nestedModalRoute
+        Destinations.messageRoute
+        Destinations.navigationBarFadeOcclusionRoute
+        Destinations.localDetailRoute
+        Destinations.appearanceSettingsRoute
+        Destinations.authenticationSettingsRoute
+        Destinations.settingsModalRoute
+        Destinations.rerouteChainFinalRoute
     }
     static let root = RootRouteMap(id: SampleAppAccessibility.startScopeID) {
-        Cover(Destinations.landingRoute) { landing }
-        Cover(SplitBranchMap.destination) { SplitBranchMap.routes }
-        Sheet(Destinations.startInfoRoute)
-    } highPriority: {
-        Cover(Destinations.loginRoute) {
-            Push(Destinations.loginDetailRoute)
-            Sheet(Destinations.loginNoticeRoute)
+        Cover(LandingRoute.self) { landing }
+        Cover(SplitBranchesRoute.self) { SplitBranchMap.routes }
+        Sheet(StartInfoRoute.self)
+
+        HighPriority {
+            Cover(LoginRoute.self) {
+                Push(LoginDetailRoute.self)
+                Sheet(LoginNoticeRoute.self)
+            }
+            Cover(LoginReplacementRoute.self)
+            Cover(AlertRoute.self, transition: .fade)
+            Sheet(HighPriorityPassthroughSheetRoute.self)
+            Sheet(HighPriorityBlockingSheetRoute.self)
+            Cover(PendingPriorityRoute.self)
         }
-        Cover(Destinations.loginReplacementRoute)
-        Cover(Destinations.alertRoute, transition: .fade)
-        Sheet(Destinations.highPriorityPassthroughSheetRoute)
-        Sheet(Destinations.highPriorityBlockingSheetRoute)
-        Cover(Destinations.pendingPriorityRoute)
-    } criticalPriority: {
-        Cover(Destinations.criticalRoute, transition: .fade)
-        Cover(Destinations.criticalReplacementRoute, transition: .fade)
+        CriticalPriority {
+            Cover(CriticalRoute.self, transition: .fade)
+            Cover(CriticalReplacementRoute.self, transition: .fade)
+        }
+    } destinations: {
+        Destinations.landingRoute
+        SplitBranchMap.destination
+        Destinations.startInfoRoute
+        Destinations.loginRoute
+        Destinations.loginDetailRoute
+        Destinations.loginNoticeRoute
+        Destinations.loginReplacementRoute
+        Destinations.alertRoute
+        Destinations.highPriorityPassthroughSheetRoute
+        Destinations.highPriorityBlockingSheetRoute
+        Destinations.pendingPriorityRoute
+        Destinations.criticalRoute
+        Destinations.criticalReplacementRoute
     }
 }

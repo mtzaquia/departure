@@ -124,13 +124,13 @@ struct RouteSpaceTests {
 
     @Test func forwardPathsAndNestedModalLanesHaveOneStructuralLocation() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Push(RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }) {
-                Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
-                    Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }) {
-                        Cover(RouteDestination(AlertRoute.self) { _, _ in EmptyView() })
+            testPush(testDestination(NumberedRoute.self)) {
+                testSheet(testDestination(LoginRoute.self)) {
+                    testPush(testDestination(HomeDetailRoute.self)) {
+                        testCover(testDestination(AlertRoute.self))
                     }
                     Branches {
-                        Branch("inner") { Push(RouteDestination(MessageRoute.self) { _, _ in EmptyView() }) }
+                        Branch("inner") { testPush(testDestination(MessageRoute.self)) }
                     }
                 }
             }
@@ -177,17 +177,17 @@ struct RouteSpaceTests {
         let engine = RouterEngine(routes: RootRouteMap {
             Branches(concurrent: true) {
                 Branch("home") {
-                    Push(RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }) {
-                        Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
-                            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }) {
-                                Sheet(RouteDestination(AlertRoute.self) { _, _ in EmptyView() })
+                    testPush(testDestination(NumberedRoute.self)) {
+                        testSheet(testDestination(LoginRoute.self)) {
+                            testPush(testDestination(HomeDetailRoute.self)) {
+                                testSheet(testDestination(AlertRoute.self))
                             }
                         }
                     }
                 }
                 Branch("wallet") {
-                    Push(RouteDestination(TransactionRoute.self) { _, _ in EmptyView() }) {
-                        Sheet(RouteDestination(MessageRoute.self) { _, _ in EmptyView() })
+                    testPush(testDestination(TransactionRoute.self)) {
+                        testSheet(testDestination(MessageRoute.self))
                     }
                 }
             }
@@ -230,16 +230,19 @@ struct RouteSpaceTests {
 
     @Test func prioritiesOwnIndependentSpacesAndLocalRoutesKeepTheirPriority() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }) {
-                Push(RouteDestination(NumberedRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(SettingsRoute.self)) {
+                testPush(testDestination(NumberedRoute.self))
             }
-        } highPriority: {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
-                Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
+
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self)) {
+                    testPush(testDestination(HomeDetailRoute.self))
+                }
             }
-        } criticalPriority: {
-            Cover(RouteDestination(AlertRoute.self) { _, _ in EmptyView() }) {
-                Sheet(RouteDestination(MessageRoute.self) { _, _ in EmptyView() })
+            CriticalPriority {
+                testCover(testDestination(AlertRoute.self)) {
+                    testSheet(testDestination(MessageRoute.self))
+                }
             }
         })
         await engine.present(SettingsRoute())
@@ -279,10 +282,10 @@ struct RouteSpaceTests {
 @MainActor
 private func nestedBranchFixture(rootIsBranched: Bool) async throws -> (RouterEngine, RoutePath, RouteScope) {
     let feature = RouteMap {
-        Push(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
+        testPush(testDestination(LoginRoute.self)) {
             Branches {
-                Branch("active") { Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }) }
-                Branch("inactive") { Push(RouteDestination(MessageRoute.self) { _, _ in EmptyView() }) }
+                Branch("active") { testPush(testDestination(HomeDetailRoute.self)) }
+                Branch("inactive") { testPush(testDestination(MessageRoute.self)) }
             }
         }
     }
@@ -290,7 +293,7 @@ private func nestedBranchFixture(rootIsBranched: Bool) async throws -> (RouterEn
         if rootIsBranched {
             Branches {
                 Branch("main") { feature }
-                Branch("other") { Push(RouteDestination(TransactionRoute.self) { _, _ in EmptyView() }) }
+                Branch("other") { testPush(testDestination(TransactionRoute.self)) }
             }
         } else {
             feature

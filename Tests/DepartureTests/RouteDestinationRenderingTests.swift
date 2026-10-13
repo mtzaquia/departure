@@ -46,7 +46,7 @@ struct RouteDestinationRenderingTests {
             recorder.values.append(context.environment.destinationTestValue)
             return DestinationEnvironmentReader(recorder: recorder)
         }
-        let host = WithRouter(routes: RootRouteMap { Replace(destination) }, router: router) {
+        let host = WithRouter(routes: RootRouteMap { testReplace(destination) }, router: router) {
             DestinationEnvironmentHost(control: control)
         }
         let window = mount(host)
@@ -92,9 +92,9 @@ struct RouteDestinationRenderingTests {
             return DestinationEnvironmentReader(recorder: recorder)
         }
         let routes = RootRouteMap {
-            if style == .push { Push(destination) }
-            if style == .sheet { Sheet(destination) }
-            if case .cover(let transition) = style { Cover(destination, transition: transition) }
+            if style == .push { testPush(destination) }
+            if style == .sheet { testSheet(destination) }
+            if case .cover(let transition) = style { testCover(destination, transition: transition) }
         }
         let host = WithRouter(routes: routes, router: router) {
             NavigationStack {
@@ -142,10 +142,13 @@ struct RouteDestinationRenderingTests {
             parentRecorder.context = context
             return NavigationStack { DestinationEnvironmentReader(recorder: parentRecorder).routing() }
         }
-        let routes = RootRouteMap {} highPriority: {
-            if priority == .high { Cover(parent, transition: .fade) { Push(child) } }
-        } criticalPriority: {
-            if priority == .critical { Cover(parent, transition: .fade) { Push(child) } }
+        let routes = RootRouteMap {
+            HighPriority {
+                if priority == .high { testCover(parent, transition: .fade) { testPush(child) } }
+            }
+            CriticalPriority {
+                if priority == .critical { testCover(parent, transition: .fade) { testPush(child) } }
+            }
         }
         let host = WithRouter(routes: routes, router: router) {
             Text("Root")

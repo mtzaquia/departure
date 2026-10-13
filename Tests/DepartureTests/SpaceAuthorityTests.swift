@@ -102,13 +102,16 @@ struct SpaceAuthorityTests {
     private func fixture() -> RootRouter {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Push(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
-            Push(RouteDestination(AuthorityDestination.self) { _, _ in EmptyView() })
-        } highPriority: {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
-        } criticalPriority: {
-            Cover(RouteDestination(LockRoute.self) { _, _ in EmptyView() })
+            testPush(testDestination(SettingsRoute.self))
+            testPush(testDestination(HomeDetailRoute.self))
+            testPush(testDestination(AuthorityDestination.self))
+
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self))
+            }
+            CriticalPriority {
+                testCover(testDestination(LockRoute.self))
+            }
         }, router: owner) { EmptyView() }
         return owner
     }

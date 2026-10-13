@@ -63,11 +63,14 @@ import Testing
     }
     private func makeChain() async throws -> (RouterEngine, RouteScope, RouteScope, RouteScope) {
         let engine = RouterEngine(routes: RootRouteMap {
-            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
-        } highPriority: {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
-        } criticalPriority: {
-            Sheet(RouteDestination(AlertRoute.self) { _, _ in EmptyView() })
+            testPush(testDestination(HomeDetailRoute.self))
+
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self))
+            }
+            CriticalPriority {
+                testSheet(testDestination(AlertRoute.self))
+            }
         })
         await engine.present(HomeDetailRoute())
         let defaultScope = try #require(engine.defaultSpace.rootPath.last)

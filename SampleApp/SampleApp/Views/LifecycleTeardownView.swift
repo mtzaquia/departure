@@ -103,7 +103,9 @@ private struct RoutedScrollStatus: View {
 
 enum LifecycleTeardownMap {
     static let routes = RouteMap {
-        Branches { Branch(ProbeBranch.content) { Sheet(Destinations.topLevelSheetRoute) } }
+        Branches { Branch(ProbeBranch.content) { Sheet(TopLevelSheetRoute.self) } }
+    } destinations: {
+        Destinations.topLevelSheetRoute
     }
 }
 

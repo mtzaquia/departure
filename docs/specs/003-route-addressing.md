@@ -68,11 +68,14 @@ For example:
 
 ```swift
 RootRouteMap {
-    Sheet(Destinations.profile)
+    Sheet(ProfileRoute.self)
 
-    Push(Destinations.account) {
-        Push(Destinations.profile)
+    Push(AccountRoute.self) {
+        Push(ProfileRoute.self)
     }
+} destinations: {
+    Destinations.profile
+    Destinations.account
 }
 ```
 
@@ -95,7 +98,7 @@ The branch handle selects the lookup context without changing selection merely b
 
 Within the same declaration scope, duplicate route types report a diagnostic and disable that key. A conflict stops lookup rather than falling back to another owner. This uniform route/hook policy was accepted in specification 7 and supersedes the original first-declaration-wins rule. Repeating a route type at separate scope occurrences remains valid.
 
-Different scopes can declare the same type with different presentation styles, destination builders, or children. Their requesting scope determines precedence. Independent branches remain distinct declaration scopes.
+Different scopes can declare the same type with different presentation styles or children, sharing one destination binding throughout their routing owner. Their requesting scope determines precedence. Independent branches remain distinct declaration scopes.
 
 ## Internal declaration identity
 

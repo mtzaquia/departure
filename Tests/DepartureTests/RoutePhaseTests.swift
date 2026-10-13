@@ -3,16 +3,16 @@ import Testing
 @testable import Departure
 
 @MainActor @Suite struct RoutePhaseTests {
-    let detail = RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }
-    let settings = RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }
-    let login = RouteDestination(LoginRoute.self) { _, _ in EmptyView() }
+    let detail = testDestination(HomeDetailRoute.self)
+    let settings = testDestination(SettingsRoute.self)
+    let login = testDestination(LoginRoute.self)
 
     @Test func inactiveLiveAncestorsAndBranchesRetainCommandAuthority() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
             Branches {
-                Branch(AppTab.home) { Push(detail) }
-                Branch(AppTab.wallet) { Push(settings) }
+                Branch(AppTab.home) { testPush(detail) }
+                Branch(AppTab.wallet) { testPush(settings) }
             }
         }, router: owner) { EmptyView() }
         let engine = owner.engine
@@ -44,10 +44,12 @@ import Testing
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
             Branches(concurrent: true) {
-                Branch(AppTab.home) { Push(detail) }
-                Branch(AppTab.wallet) { Push(settings) }
+                Branch(AppTab.home) { testPush(detail) }
+                Branch(AppTab.wallet) { testPush(settings) }
             }
-        } highPriority: { Sheet(login) }, router: owner) { EmptyView() }
+
+            HighPriority { testSheet(login) }
+        }, router: owner) { EmptyView() }
         let engine = owner.engine
         await owner.default.branch(AppTab.home).present(HomeDetailRoute())
         await owner.default.branch(AppTab.wallet).present(SettingsRoute())
@@ -76,8 +78,8 @@ import Testing
         _ = WithRouter(routes: RootRouteMap {
             Branches(concurrent: true) {
                 Branch(AppTab.home) {
-                    Push(detail) {
-                        Sheet(login) {
+                    testPush(detail) {
+                        testSheet(login) {
                             Branches(concurrent: true) {
                                 Branch("leading") {}
                                 Branch("trailing") {}
@@ -85,7 +87,7 @@ import Testing
                         }
                     }
                 }
-                Branch(AppTab.wallet) { Push(settings) }
+                Branch(AppTab.wallet) { testPush(settings) }
             }
         }, router: owner) { EmptyView() }
         let engine = owner.engine

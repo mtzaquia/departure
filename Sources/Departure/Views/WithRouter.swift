@@ -47,6 +47,11 @@ public struct WithRouter<Content: View>: View {
                 ElevatedPriorityHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
             }
             .environment(\.routerEngine, router)
+#if DEBUG
+            .onAppear {
+                router.traceMapAdoption()
+            }
+#endif
     }
 
     /// Creates a router host.

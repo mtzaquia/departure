@@ -8,11 +8,14 @@ struct UnwindPresentationPolicyTests {
     @Test(arguments: [RoutePriority.default, .high, .critical])
     func oldNativeBindingCannotDismissANewInstanceWithTheSameRouteID(priority: RoutePriority) async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
-        } highPriority: {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-        } criticalPriority: {
-            Sheet(RouteDestination(AlertRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(LoginRoute.self))
+
+            HighPriority {
+                testSheet(testDestination(SettingsRoute.self))
+            }
+            CriticalPriority {
+                testSheet(testDestination(AlertRoute.self))
+            }
         })
         let owner = RootRouter(engine: engine)
         let route: any Route = switch priority {
@@ -39,11 +42,11 @@ struct UnwindPresentationPolicyTests {
 
     @Test func outgoingBranchBindingsKeepTheirCapturedEnvironmentWithoutRoutingAuthority() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Push(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
+            testPush(testDestination(LoginRoute.self)) {
                 Branches(concurrent: true) {
                     Branch("modal") {
-                        Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() }) {
-                            Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
+                        testSheet(testDestination(SettingsRoute.self)) {
+                            testPush(testDestination(HomeDetailRoute.self))
                         }
                     }
                 }
@@ -101,7 +104,7 @@ struct UnwindPresentationPolicyTests {
             host.defineTestMap(
                 id: nil,
                 selection: nil,
-                definitions: [RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(NumberedRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations)]
+                definitions: [RouteScopeDeclaration(routes: testDeclaration(testDestination(NumberedRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations)]
             )
             scope.attachPresentation(to: host, declaration: try #require(host.routeAttachments.first))
             engine.routeScopeDidInstallInView(scope)
@@ -140,7 +143,7 @@ struct UnwindPresentationPolicyTests {
         engine.root.defineTestMap(
             id: nil,
             selection: nil,
-            definitions: [RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(LoginRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: priority))._routeDeclarations)]
+            definitions: [RouteScopeDeclaration(routes: testDeclaration(testDestination(LoginRoute.self), presentation: .init(style: .sheet, priority: priority))._routeDeclarations)]
         )
         await Router(engine: engine, scope: engine.root).present(LoginRoute())
         let space = try #require(engine.spaces.space(for: priority))
@@ -152,14 +155,14 @@ struct UnwindPresentationPolicyTests {
         retained.defineTestMap(
             id: nil,
             selection: nil,
-            definitions: [RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations)]
+            definitions: [RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations)]
         )
         await Router(engine: engine, scope: retained).present(SettingsRoute())
         let sheet = try #require(space.rootPath.last)
         sheet.defineTestMap(
             id: nil,
             selection: nil,
-            definitions: [RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(HomeDetailRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .push, priority: .default))._routeDeclarations)]
+            definitions: [RouteScopeDeclaration(routes: testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations)]
         )
         await Router(engine: engine, scope: sheet).present(HomeDetailRoute())
         let push = try #require(space.rootPath.last)

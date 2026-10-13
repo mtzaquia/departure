@@ -7,7 +7,7 @@ import Testing
 struct HookBindingTests {
     @Test(arguments: [false, true])
     func sameRouteHandlersComposeByPayloadTypeAndPayloadFreeRequests(reverse: Bool) async throws {
-        let engine = RouterEngine(routes: RootRouteMap { Sheet(LoginRoute.self) { _, _ in EmptyView() } })
+        let engine = RouterEngine(routes: RootRouteMap { testSheet(testDestination(LoginRoute.self)) })
         let router = Router(engine: engine, scope: engine.root)
         let probe = HookBindingProbe()
         let sources: [(String, AnyHookDeclaration)] = [
@@ -29,7 +29,7 @@ struct HookBindingTests {
     }
 
     @Test func anOptionalNilPayloadIsDistinctFromAPayloadFreeUnwind() async throws {
-        let engine = RouterEngine(routes: RootRouteMap { Sheet(LoginRoute.self) { _, _ in EmptyView() } })
+        let engine = RouterEngine(routes: RootRouteMap { testSheet(testDestination(LoginRoute.self)) })
         let root = Router(engine: engine, scope: engine.root)
         let probe = HookBindingProbe()
         engine.root.installHookDeclarations(hookDeclarations: [
@@ -50,7 +50,7 @@ struct HookBindingTests {
 
     @Test(arguments: [false, true])
     func duplicatePayloadKeyDisablesOnlyThatKeyAndRecovers(reverse: Bool) async throws {
-        let engine = RouterEngine(routes: RootRouteMap { Sheet(LoginRoute.self) { _, _ in EmptyView() } })
+        let engine = RouterEngine(routes: RootRouteMap { testSheet(testDestination(LoginRoute.self)) })
         let root = Router(engine: engine, scope: engine.root)
         let probe = HookBindingProbe()
         engine.root.installHookDeclarations(sourceID: "int", hookDeclarations: [
@@ -81,8 +81,8 @@ struct HookBindingTests {
 
     @Test func aDifferentPayloadKeyDoesNotShadowAnAncestorOrHideItsOwnConflict() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(LoginRoute.self) { _, _ in EmptyView() } routes: {
-                Sheet(SettingsRoute.self) { _, _ in EmptyView() }
+            testSheet(testDestination(LoginRoute.self)) {
+                testSheet(testDestination(SettingsRoute.self))
             }
         })
         let root = Router(engine: engine, scope: engine.root)
@@ -135,7 +135,7 @@ struct HookBindingTests {
 
     @Test func separateSourcesHandleActionsAndUnwindsTogether() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(LoginRoute.self))
         })
         let router = Router(engine: engine, scope: engine.root)
         let probe = HookBindingProbe()
@@ -218,8 +218,8 @@ struct HookBindingTests {
 
     @Test func conflictingUnwindHandlersDoNotFallBackToAnAncestor() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
-                Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(LoginRoute.self)) {
+                testSheet(testDestination(SettingsRoute.self))
             }
         })
         let root = Router(engine: engine, scope: engine.root)
@@ -249,7 +249,7 @@ struct HookBindingTests {
 
     @Test func outgoingViewsLoseHooksAtCommitBeforeNativeTeardown() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
+            testSheet(testDestination(LoginRoute.self)) {
                 Branches { Branch("tab") {} }
             }
         })
@@ -287,8 +287,10 @@ struct HookBindingTests {
     }
 
     @Test func removingAnElevatedSpaceInvalidatesHooksWhileItsObjectsRemainAlive() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {} highPriority: {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+        let engine = RouterEngine(routes: RootRouteMap {
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self))
+            }
         })
         await Router(engine: engine, scope: engine.root).present(LoginRoute())
         let space = try #require(engine.spaces.highSpace)
@@ -315,7 +317,7 @@ struct HookBindingTests {
     @Test func deferredInvocationCannotRetargetASurvivingBranch() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
             Branches {
-                Branch("tab") { Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) }
+                Branch("tab") { testSheet(testDestination(LoginRoute.self)) }
             }
         })
         let branch = try #require(engine.root.branchScopes["tab"])
@@ -343,7 +345,7 @@ struct HookBindingTests {
 
     @Test func interceptedRerouteStillWaitsForDestinationAndInterceptsTheRetry() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(LoginRoute.self))
         })
         let probe = HookBindingProbe()
         engine.root.installHookDeclarations(hookDeclarations: [

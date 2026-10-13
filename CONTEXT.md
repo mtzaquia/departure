@@ -41,6 +41,15 @@ A particular routing position with its own definition context and enclosing navi
 **Map ID**:
 An explicit name for the scope receiving a map, used to target that scope during unwinding. Composition contributes definitions to a scope; it does not create another routing position.
 
+**Route declaration**:
+One placement of a route type in a map, describing its presentation and the navigation available from that destination. Its identity is distinct from a route instance and route equality.
+
+**Destination builder**:
+The feature-owned construction of a view from typed route data and the destination's routing context. It is independent of where the route is declared.
+
+**Destination binding**:
+The association between a route declaration and the one destination value for its route type in the composed root tree. Multiple maps may contribute the same value; distinct values for one type conflict.
+
 **Live scope**:
 A scope still belonging to its space's navigation tree. Being live is independent of being current or having a presentation host.
 

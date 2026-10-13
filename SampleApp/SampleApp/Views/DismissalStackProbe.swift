@@ -208,10 +208,14 @@ private enum DismissalStackDestinations {
 
 enum DismissalStackProbeMap {
     static let root = RootRouteMap {
-        Sheet(DismissalStackDestinations.dismissalStackProbeSheetRoute) {
-            Push(DismissalStackDestinations.dismissalStackProbeFirstRoute) {
-                Push(DismissalStackDestinations.dismissalStackProbeSecondRoute)
+        Sheet(DismissalStackProbeSheetRoute.self) {
+            Push(DismissalStackProbeFirstRoute.self) {
+                Push(DismissalStackProbeSecondRoute.self)
             }
         }
+    } destinations: {
+        DismissalStackDestinations.dismissalStackProbeSheetRoute
+        DismissalStackDestinations.dismissalStackProbeFirstRoute
+        DismissalStackDestinations.dismissalStackProbeSecondRoute
     }
 }

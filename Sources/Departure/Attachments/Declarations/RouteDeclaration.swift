@@ -20,13 +20,15 @@
 //  SOFTWARE.
 //
 
-import SwiftUI
+import Foundation
 
 struct RoutePresentationHostID: Hashable, Sendable {
     private let value = UUID()
 }
 
-/// One occurrence in a map, with its destination and child definitions.
+/// One route occurrence in a map, with presentation metadata and child definitions.
+///
+/// A declaration can describe a route type without supplying a destination builder.
 public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
     let identity: UUID
     let routeType: any Route.Type
@@ -34,41 +36,39 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
     let scopeID: AnyHashable?
     let children: [RouteScopeDeclaration]
     let childScope: RouteDefinitions?
-    let build: @MainActor @Sendable (any Route, RouteContext) -> AnyView
+    let destination: AnyRouteDestination?
 
-    init<R: Route>(_ destination: RouteDestination<R>, presentation: RoutePresentation, id: AnyHashable? = nil, children: [RouteScopeDeclaration] = []) {
+    init(_ route: any Route.Type, presentation: RoutePresentation, id: AnyHashable? = nil, children: [RouteScopeDeclaration] = []) {
         precondition(presentation.style.isModal || presentation.priority == .default,
                      "Only modal declarations can start a priority space.")
         identity = UUID()
-        routeType = R.self
+        routeType = route
         self.presentation = presentation
         scopeID = id
         self.children = children
         childScope = nil
-        build = { route, context in
-            // Lookup checks the domain type before choosing this occurrence.
-            destination.build(route as! R, context)
-        }
+        destination = nil
     }
 
-    private init(copy: Self, presentation: RoutePresentation? = nil, identity: UUID? = nil, childScope: RouteDefinitions? = nil) {
+    private init(copy: Self, destination: AnyRouteDestination?, presentation: RoutePresentation? = nil, identity: UUID? = nil, childScope: RouteDefinitions? = nil) {
         self.identity = identity ?? copy.identity
         routeType = copy.routeType
         self.presentation = presentation ?? copy.presentation
         scopeID = copy.scopeID
-        children = childScope == nil ? copy.children : []
+        children = copy.children
         self.childScope = childScope ?? copy.childScope
-        build = copy.build
+        self.destination = destination
     }
 
-    func compiled() -> Self {
-        Self(copy: self, identity: UUID(), childScope: childScope ?? RouteDefinitions(children, id: scopeID))
+    func compiled(destinations: RouteDestinationBindings) -> Self {
+        Self(copy: self, destination: destinations.binding(for: routeType)?.declaration,
+             identity: UUID(), childScope: RouteDefinitions(children, id: scopeID, destinations: destinations))
     }
 
     func withPriority(_ priority: RoutePriority) -> Self {
         precondition(presentation.style.isModal || priority == .default,
                      "Root priority builders accept only modal presentations.")
-        return Self(copy: self, presentation: .init(style: presentation.style, priority: priority))
+        return Self(copy: self, destination: destination, presentation: .init(style: presentation.style, priority: priority))
     }
 
     public var _routeDeclarations: [AnyRouteDeclaration] { [self] }
@@ -97,6 +97,7 @@ public struct RouteScopeDeclaration: Sendable, Hashable {
     enum Content: Sendable, Hashable {
         case scopeID(AnyHashable)
         case routes([AnyRouteDeclaration])
+        case destinations([AnyRouteDestination])
         case branch(AnyHashable, children: [RouteScopeDeclaration])
         case branches(concurrent: Bool, children: [RouteScopeDeclaration])
     }
@@ -112,6 +113,9 @@ public struct RouteScopeDeclaration: Sendable, Hashable {
     init(routes: [AnyRouteDeclaration]) {
         content = .routes(routes)
     }
+    init(destinations: [AnyRouteDestination]) {
+        content = .destinations(destinations)
+    }
     init<Selection: Hashable>(branch: Selection, children: [RouteScopeDeclaration]) {
         content = .branch(AnyHashable(branch), children: children)
     }
@@ -122,10 +126,14 @@ public struct RouteScopeDeclaration: Sendable, Hashable {
         content = .scopeID(scopeID)
     }
     func withPriority(_ priority: RoutePriority) -> Self {
-        guard case let .routes(routes) = content else {
-            preconditionFailure("Root priority builders accept only modal route declarations.")
+        switch content {
+        case .routes(let routes):
+            return Self(routes: routes.map { $0.withPriority(priority) })
+        case .destinations:
+            return self
+        default:
+            preconditionFailure("Root priority groups accept only modal route declarations.")
         }
-        return Self(routes: routes.map { $0.withPriority(priority) })
     }
 }
 

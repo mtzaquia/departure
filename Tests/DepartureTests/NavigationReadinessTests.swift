@@ -80,10 +80,12 @@ struct NavigationReadinessTests {
     @Test func coveredAttemptCannotSupersedeAnAwakenedTopSpaceRequest() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-        } highPriority: {
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() }) {
-                Push(RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(SettingsRoute.self))
+
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self)) {
+                    testPush(testDestination(HomeDetailRoute.self))
+                }
             }
         }, router: owner) { EmptyView() }
         await owner.current.present(LoginRoute())
@@ -103,8 +105,8 @@ struct NavigationReadinessTests {
     @Test func unwindCompletesWhileItsFollowupIsStillResolving() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-            Sheet(RouteDestination(DelayedResolutionRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(SettingsRoute.self))
+            testSheet(testDestination(DelayedResolutionRoute.self))
         }, router: owner) { EmptyView() }
         let root = owner.default
         await root.present(SettingsRoute())
@@ -141,8 +143,8 @@ struct NavigationReadinessTests {
     @Test func bufferedResolutionRunsInItsOriginalCallersTaskContext() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-            Sheet(RouteDestination(CallerContextRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(SettingsRoute.self))
+            testSheet(testDestination(CallerContextRoute.self))
         }, router: owner) { EmptyView() }
         let root = owner.default
         await root.present(SettingsRoute())
@@ -169,8 +171,8 @@ struct NavigationReadinessTests {
     @Test func cancellingCommittedUnwindDoesNotCancelAnUnrelatedQueuedPresentation() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(SettingsRoute.self))
+            testSheet(testDestination(LoginRoute.self))
         }, router: owner) { EmptyView() }
         let root = owner.current
         await root.present(SettingsRoute())
@@ -193,8 +195,8 @@ struct NavigationReadinessTests {
     @Test func cancellingResumedRequestCancelsItsOwnResolution() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-            Sheet(RouteDestination(DelayedResolutionRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(SettingsRoute.self))
+            testSheet(testDestination(DelayedResolutionRoute.self))
         }, router: owner) { EmptyView() }
         let root = owner.current
         await root.present(SettingsRoute())
@@ -224,8 +226,8 @@ struct NavigationReadinessTests {
     func resolutionFinishingDuringUnwindWaitsWithoutResolvingAgain(cancel: Bool) async throws {
         let router = RouterEngine()
         router.root.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(SettingsRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
-            RouteScopeDeclaration(routes: AnyRouteDeclaration(RouteDestination(DelayedResolutionRoute.self) { route, _ in EmptyView() }, presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(DelayedResolutionRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
         ])
         await router.present(SettingsRoute())
         let old = try #require(router.defaultSpace.rootPath.last)
@@ -264,8 +266,8 @@ struct NavigationReadinessTests {
 
     private func queuedRequestFixture() -> RouterEngine {
         RouterEngine(routes: RootRouteMap {
-            Sheet(RouteDestination(SettingsRoute.self) { _, _ in EmptyView() })
-            Sheet(RouteDestination(LoginRoute.self) { _, _ in EmptyView() })
+            testSheet(testDestination(SettingsRoute.self))
+            testSheet(testDestination(LoginRoute.self))
         })
     }
 }
