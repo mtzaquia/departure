@@ -209,3 +209,5 @@ Result bundles in the Departure XcodeBuildMCP workspace:
 - iOS 17.5 cases: `test_sim_2026-10-13T09-06-40-362Z_pid25920_680c1314.xcresult`.
 
 Hosted macOS evidence: `swift_package_test_2026-10-13T08-34-23-854Z_pid13781_2112265b.log`.
+
+The subsequent [tab-host reconciliation fix](009-view-lifecycle-reconciliation.md#tab-host-arrival-and-deferred-insertion-2026-10-13) identified synchronous insertion inside the native tab-attachment callback as the Profile failure's cause. Host arrival now uses the existing deferred resume. The original UI journey passed ten uninstrumented repetitions, and the fresh full iPhone/iOS 26.5 suite passed all 45 applicable cases with only the two expected iPad skips. Presentation-request admission, latest-only buffering, and exact destination completion remain intact.

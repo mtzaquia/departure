@@ -162,3 +162,31 @@ The integration of `main` through `ddcbe48c` reconciles its contextual destinati
 The backport's destination documentation, typed-data and nearest-builder regressions, mounted environment/context checks, and sample context sheet are adapted to `RootRouteMap`, `RootRouter`, explicit `.routing()`, and `.default` priority. Mounted checks verify replacement environment updates, captured actions remaining bound to removed scopes, each local presentation style, and high/critical children inheriting effective priority. The sample's About sheet displays its actual style and priority and closes through its scoped context action.
 
 Focused validation passed 49 package tests and seven mounted rendering cases across three test functions. All three iOS 26.5 UI checks passed: the sample context sheet and root/branch first-responder retention and reopening. The full UI matrix is not repeated for this reconciliation.
+
+## Tab-host arrival and deferred insertion, 2026-10-13
+
+`testDirectCoverTopmostAncestorAndProtectedSettingsRoute` intermittently selected Home without showing its Profile sheet. The same assertion failed twice in three repetitions against unchanged `cbda2bf`, establishing that this failure predates presentation-request admission.
+
+Temporary test-only traces reproduced the failure and distinguished logical insertion from native admission. Profile was inserted once into Home's live path and its request returned the exact destination. Home was selected and physically available; declaration ownership, presentation-host identity, and live membership were valid. Nevertheless, the rendered sheet input remained empty, Profile never acquired a native presentation owner, and its view never installed. The request was not dropped or left in a navigation wait.
+
+The insertion stack ran synchronously inside `ViewLifecycleBridge.LifecycleView.didMoveToWindow`, reached while UIKit was attaching the selected tab. `hostDidAttach` resumed the pending presentation inline, mutating the route graph during the native attachment/render pass. Waiting for an anchor's arrival is necessary, but that callback is a readiness signal rather than a safe place to insert the destination.
+
+Host arrival now calls the existing `schedulePendingRouteResume`, shared with branch-selection refresh. The deferred resume validates the exact pending operation, selection, current host availability, live membership, declarations, and priority coverage before insertion. Repeated host updates cannot insert twice; a detached host keeps the request pending until it becomes available again. There is no timer, new lifecycle flag, additional request queue, or change to caller completion. Native teardown and the latest-request buffer retain their existing semantics.
+
+The new model regression failed before the fix because insertion happened inside the lifecycle callback. It now covers repeated arrival signals and arrival followed by detachment before resumption. The replacement regression still requires insertion while outgoing scopes finish, but awaits the deferred insertion rather than requiring it inline. All temporary instrumentation was removed; the original UI journey and its assertions are unchanged.
+
+Validation on the final implementation:
+
+| Check | Result |
+| --- | --- |
+| Original Profile journey, uninstrumented repetitions | All ten passed. |
+| Full iPhone/iOS 26.5 UI suite | 45 passed, zero failures, two expected iPad-only skips. |
+| iPad/iOS 27 skipped cases | Both passed, completing all 47 UI cases across the two devices. |
+| iPhone/iOS 17.5 focused regressions | All nine passed: Profile, branch crawl, native Back/re-push, replacement, and all five native focus cases. |
+| Full package suite | Passed with 421 tests in 33 suites, including ten expected separately hosted skips. |
+| Hosted macOS rendering and lifetime suites | All 20 tests in three suites passed. |
+| Release build | Passed. |
+
+The new regression's before-fix failure is recorded in `swift_package_test_2026-10-13T09-39-12-756Z_pid31396_35a11c84.log`. Diagnostic reproduction is `test_sim_2026-10-13T09-52-25-939Z_pid33323_9942b31e.xcresult`; its temporary model/projection trace is `/private/tmp/departure-tab-profile-projection.log`.
+
+Final UI bundles in the Departure XcodeBuildMCP workspace are `test_sim_2026-10-13T09-57-20-335Z_pid35253_40ac3785.xcresult` (ten repetitions), `test_sim_2026-10-13T10-09-03-598Z_pid38992_05715387.xcresult` (full iPhone), `test_sim_2026-10-13T10-32-40-803Z_pid43744_2bae1c94.xcresult` (iPad), and `test_sim_2026-10-13T10-35-26-900Z_pid44333_4b31dbb6.xcresult` (iOS 17.5). Package, hosted macOS, and Release evidence is `swift_package_test_2026-10-13T09-59-26-815Z_pid36012_0f3b80dc.log`, `swift_package_test_2026-10-13T09-59-59-149Z_pid36220_933d073a.log`, and `build_spm_2026-10-13T10-01-03-540Z_pid36383_216d86e7.log` respectively.

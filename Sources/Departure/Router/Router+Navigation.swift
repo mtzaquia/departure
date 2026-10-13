@@ -287,8 +287,7 @@ extension RouterEngine {
             && (scope.activeBranch == branchID || scope.branchSelection?.acceptsValue(branchID) != false)
     }
 
-    /// Gives an already-mounted branch host a turn to observe the selection update before resuming
-    /// the request. A missing host resumes from its registration path instead.
+    /// Resumes after branch selection or native host arrival has left the current render pass.
     func schedulePendingRouteResume(_ operation: NavigationOperation) {
         guard
             let match = operation.presentation?.match,
@@ -442,10 +441,12 @@ extension RouterEngine {
             log.departureDebug(.scopeInstalledInView(scope: scope))
             ios17NavigationStackPushWorkaround?.routeScopeDidInstall(scope)
         }
-        if let match = pendingRoute?.operation?.presentation?.match,
+        if let operation = pendingRoute?.operation, let match = operation.presentation?.match,
            let branch = match.branchID,
            scope === match.presentingScope || scope === match.declaringScope.branchScopes[branch] {
-            resumePendingRoute(for: branch, in: match.declaringScope)
+            // Native arrival can be delivered inline by didMoveToWindow/updateUIView.
+            // Inserting here can leave SwiftUI's presentation binding at its pre-arrival value.
+            schedulePendingRouteResume(operation)
         }
     }
 

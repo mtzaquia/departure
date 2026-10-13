@@ -6,6 +6,42 @@ import Testing
 @Suite(.timeLimit(.minutes(1)))
 struct RouteRequestCompletionTests {
     @Test(arguments: [false, true])
+    func nativeHostArrivalResumesAfterItsLifecycleCallback(detachBeforeResume: Bool) async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Branches {
+                Branch("first") {}
+                Branch("second") { Sheet(destination(SettingsRoute.self)) }
+            }
+        })
+        engine.routeScopeDidInstallInView(engine.root)
+        let branch = try #require(engine.root.branchScopes["second"])
+        let origin = RouteRequestOrigin(scope: engine.root)
+        let request = Task { await engine.requestRouteWhenReady(SettingsRoute(), origin: origin) }
+        for _ in 0..<1000 where engine.pendingRoute?.operation == nil { await Task.yield() }
+        let operation = try #require(engine.pendingRoute?.operation)
+
+        // didMoveToWindow/updateUIView are part of SwiftUI's current render pass.
+        // Arrival must wake staging, without modifying the rendered path inline.
+        let hostID = UUID()
+        engine.hostDidAttach(branch, view: nil, id: hostID)
+        engine.hostDidAttach(branch, view: nil, id: hostID)
+        #expect(branch.path.isEmpty)
+        #expect(engine.pendingRoute?.operation === operation)
+
+        if detachBeforeResume {
+            engine.hostDidDetach(branch, id: hostID)
+            for _ in 0..<20 { await Task.yield() }
+            #expect(branch.path.isEmpty)
+            #expect(engine.pendingRoute?.operation === operation)
+            engine.hostDidAttach(branch, view: nil, id: hostID)
+        }
+
+        #expect(await request.value === branch.path.last)
+        #expect(branch.path.count == 1)
+        #expect(engine.pendingRoute == nil)
+    }
+
+    @Test(arguments: [false, true])
     func branchPresentationReturnsItsExactDestinationAfterReveal(concurrent: Bool) async throws {
         let engine = RouterEngine(routes: RootRouteMap {
             Branches(concurrent: concurrent) {

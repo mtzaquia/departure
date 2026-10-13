@@ -175,7 +175,10 @@ struct ReplaceTests {
         // SwiftUI refreshes the surviving branch host when its inline content changes.
         fixture.engine.hostDidAttach(fixture.wallet, view: nil, id: hostID)
         if cancel { #expect(fixture.wallet.path.isEmpty) }
-        else { #expect(fixture.wallet.path.first?.route as? SelectedRoute == SelectedRoute(number: 2)) }
+        else {
+            for _ in 0..<1000 where fixture.wallet.path.isEmpty { await Task.yield() }
+            #expect(fixture.wallet.path.first?.route as? SelectedRoute == SelectedRoute(number: 2))
+        }
         #expect(fixture.engine.isNavigating)
         fixture.engine.routeScopeDidLeaveView(selected)
         fixture.engine.routeScopeDidLeaveView(child)
