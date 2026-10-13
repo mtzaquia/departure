@@ -96,6 +96,11 @@ public struct Router: Equatable {
     /// request is dropped, superseded or cancelled. Any required parent-host staging completes
     /// first; this does not wait for SwiftUI to display the destination.
     /// Rejected routes do not activate the targeted branch.
+    ///
+    /// One presentation resolves and updates routing state at a time, including
+    /// its reroute chain. While it is suspended, only the latest waiting attempt
+    /// is retained; callers superseded before admission return without resolving.
+    /// Resolution continues in each caller's own task.
     /// During an unfinished navigation operation, the latest presentation attempt
     /// from a live scope waits for completion. Coverage is checked when it resumes;
     /// a surviving higher-priority space causes the request to be dropped.

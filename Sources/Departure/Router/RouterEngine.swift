@@ -37,6 +37,9 @@ final class RouterEngine: Identifiable, Equatable {
     @ObservationIgnored
     var pendingRoute: PendingNavigation?
 
+    @ObservationIgnored var isPresentationRequestInProgress = false
+    @ObservationIgnored var bufferedPresentationRequest: PendingNavigation.Request?
+
     /// Operations retain their outgoing projections until native teardown completes.
     var navigationOperations: [NavigationOperation] = []
 

@@ -666,6 +666,7 @@ extension RouterEngine {
 
     enum RouteRequestStage {
         case resolve
+        case resolveAdmitted
         case presentResolved
     }
 
@@ -702,7 +703,18 @@ extension RouterEngine {
         // A live lower-space handler can request its follow-up before unwind commits.
         // Coverage is evaluated after the global operation completes.
         guard Task.isCancelled == false, resolveRequestOrigin(origin) != nil else { return nil }
+        if case .resolve = stage, isPresentationRequestInProgress || !isNavigating {
+            // Covered callers may wait through an unwind, but cannot replace an
+            // eligible caller merely because another route is resolving.
+            guard isNavigating || navigationSource(origin) != nil else { return nil }
+            guard await beginPresentationRequest(route) else { return nil }
+            defer { finishPresentationRequest() }
+            return await requestRouteWhenReady(route, stage: .resolveAdmitted, origin: origin)
+        }
         if isNavigating {
+            // An admitted caller that has not committed its presentation still
+            // yields to the latest attempt while navigation is suspended.
+            guard bufferedPresentationRequest == nil else { return nil }
             let request = PendingNavigation.Request(route: route)
             let ready = await withTaskCancellationHandler {
                 defer {
@@ -739,7 +751,11 @@ extension RouterEngine {
         if pendingRoute?.request != nil { replacePendingRoute(nil) }
         switch stage {
         case .resolve:
-            return await requestRoute(route, origin: origin)
+            // A caller waking from the navigation buffer must acquire admission
+            // before resolving, in its original task and with its captured origin.
+            return await requestRouteWhenReady(route, origin: origin)
+        case .resolveAdmitted:
+            return await requestAdmittedRoute(route, origin: origin)
         case .presentResolved:
             return await presentResolvedRoute(route, origin: origin)
         }

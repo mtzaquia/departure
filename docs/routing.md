@@ -105,6 +105,10 @@ struct ProtectedSettingsRoute: Route {
 
 Resolution may `.allow`, `.reroute`, or `.drop`. Every rerouted value is resolved too. Make the chain finite.
 
+Presentations are admitted one at a time through resolution, rerouting, and insertion or reuse in routing state. If a resolver suspends, a newer attempt waits instead of overtaking it. Only the latest waiting attempt is retained; an attempt superseded before admission returns without resolving. Each admitted request continues in its original caller's task, preserving cancellation and task-local values.
+
+A presentation also waits for ongoing unwind teardown and any required parent host. Superseding a presentation waiting for teardown or its parent host prevents its pending insertion; committed teardown still completes. Unwind returns after its own teardown independently of the next resolver. `await router.present(...)` completes after insertion, reuse, or rejection, without waiting for SwiftUI to display the destination.
+
 Make a route `Equatable` when its value identifies a destination. An equal current route stops; an eligible equal ancestor is retained and its descendants unwind. Replacement equality is limited to the selected slot, so an equal push elsewhere does not become that replacement.
 
 Removal performed to present a route does not invoke unwind handlers. This includes ancestor crawlback, equality reuse, and replacement. The retained equal destination keeps its existing route value and view instance.

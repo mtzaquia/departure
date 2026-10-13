@@ -3461,7 +3461,7 @@ struct RouterTests {
 
         for _ in 0..<10 {
             if router.hasOutgoingPresentations == false,
-               router.pendingRoute?.route is AlertRoute {
+               (router.bufferedPresentationRequest?.route ?? router.pendingRoute?.route) is AlertRoute {
                 break
             }
             await Task.yield()
@@ -3469,7 +3469,7 @@ struct RouterTests {
 
         #expect(router.hasOutgoingPresentations == false)
         #expect(router.routePresentationBinding(from: appearanceScope, matching: .push).wrappedValue == nil)
-        #expect(router.pendingRoute?.route is AlertRoute)
+        #expect((router.bufferedPresentationRequest?.route ?? router.pendingRoute?.route) is AlertRoute)
 
         router.routeScopeDidLeaveView(authenticationScope)
         _ = await requestTask.value
@@ -4013,8 +4013,8 @@ struct RouterTests {
         #expect(engine.spaces.highSpace?.root.route as? NumberedRoute == NumberedRoute(number: 2))
         #expect(engine.isNavigating)
         let lowerRequest = Task { await Router(engine: engine, scope: engine.root).present(SettingsRoute()) }
-        for _ in 0..<1000 where engine.pendingRoute == nil { await Task.yield() }
-        #expect(engine.pendingRoute != nil)
+        for _ in 0..<1000 where engine.bufferedPresentationRequest == nil { await Task.yield() }
+        #expect(engine.bufferedPresentationRequest != nil)
         #expect(engine.defaultSpace.rootPath.isEmpty)
         #expect(engine.spaces.highSpace?.root.route as? NumberedRoute == NumberedRoute(number: 2))
         engine.routeScopeDidLeaveView(old)

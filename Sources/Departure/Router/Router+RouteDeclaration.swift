@@ -27,15 +27,19 @@ extension RouterEngine {
     // and queued work. Action retries must not infer it from the foreground path.
     @discardableResult
     func requestRoute(_ route: some Route, origin: RouteRequestOrigin? = nil) async -> RouteScope? {
+        await requestRouteWhenReady(route, origin: origin)
+    }
+
+    @discardableResult
+    func requestAdmittedRoute(_ route: some Route, origin: RouteRequestOrigin) async -> RouteScope? {
         #if DEBUG
         guard DepartureLogTrace.id != nil else {
             return await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "r")) {
-                await requestRoute(route, origin: origin)
+                await requestAdmittedRoute(route, origin: origin)
             }
         }
         #endif
 
-        let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         log.departureDebug(.routeRequested(route: route))
 
         let resolvedRoute = await resolveRouteChain(startingWith: route)
@@ -100,7 +104,7 @@ extension RouterEngine {
     private func resolveRouteChain(startingWith route: any Route) async -> (any Route)? {
         var candidate = route
 
-        while true {
+        while !Task.isCancelled {
             let resolution: RouteResolution = await candidate.resolveRoute()
             switch resolution {
             case .allow:
@@ -115,6 +119,7 @@ extension RouterEngine {
                 return nil
             }
         }
+        return nil
     }
 }
 

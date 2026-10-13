@@ -1,10 +1,12 @@
 # Navigation operations
 
-Status: implemented and validated on `zaquia/predefined-route-maps` (2026-10-08).
+Status: implemented on `zaquia/predefined-route-maps`; latest admission correction on 2026-10-13.
 
 ## Behavioral contract
 
 Each accepted transition owns its unwind plan, outgoing presentation projections, and any presentation that continues after removal. The routing owner retains all unfinished operations and one latest pending request. Coordination remains global across independent priority spaces.
+
+Presentation admission begins before asynchronous route resolution and lasts through the reroute chain and routing-state completion. One request is admitted and at most one newer attempt waits. A newer waiting attempt supersedes the previous waiter without resolving it. Resolver lifetime is independent of native operations: it does not make `isNavigating` true or delay an unwind's completion. The admission correction below closes the gap before the first operation is created.
 
 Logical removal cuts the live tree's ownership edges immediately. Native teardown may finish later. Outgoing objects remain ineligible for routing and hooks throughout that interval. A live source may request a presentation, but its request waits until every active operation completes and rechecks its captured source before continuing. Superseding a pending request resumes its caller exactly once.
 
@@ -175,3 +177,35 @@ The callback still enters before commit. Overlapping unwinds await the same entr
 Production Swift decreases from 7,759 lines at `81ba05a` to 7,742 lines: **17 fewer lines**. The regression that injected a stale global-history key is replaced with public routing that presents and unwinds two instances of the same route while retaining the first outgoing instance. A new lifetime regression verifies deallocation while a handler is suspended in default, high, and critical spaces. Existing overlap and timing assertions remain unchanged.
 
 Validation: **75 package tests in 8 affected suites passed** on the final code, covering unwind hooks, cross-priority notification and follow-ups, presentation-crawlback exclusions, hook composition and eligibility, action hooks, operation overlap, request completion, and outgoing snapshot policy. The final run has no compiler warnings. The full UI matrix was not repeated for this bookkeeping-only pass. Evidence: `/tmp/departure-scope-unwind-focused-final.log`.
+
+## Admission before resolution (2026-10-13)
+
+The previous barrier started only when a navigation operation existed. A controlled public `Router.present` regression failed at `cbda2bf`: a newer Settings request returned and inserted a destination while the first resolver was suspended, then the older resolver replaced Settings when released. All three assertions failed before the production change.
+
+Admission now covers asynchronous resolution, every reroute, and the existing routing-state completion boundary. One active request retains its turn; a single latest waiter replaces earlier waiters without resolving them. Releasing admission grants the waiter in its own task and keeps the reservation until it resumes, so a third request cannot overtake a granted caller. Cancellation, task-local values, and the captured origin stay with each caller. Superseded, cancelled, or dropped callers return `nil`; successful requests return the exact destination inserted or reused.
+
+Native coordination remains separate. Unwinds can start during resolution, and a resolved route rechecks native readiness without resolving again. A newer attempt supersedes an active caller's pending teardown or parent-host insertion, while committed teardown and that operation's completion remain intact. The native latest slot is retained; admission adds only a busy flag and one waiter using the existing resumable request type. There is no new resolver task, teardown operation, FIFO queue, or public completion API. An unwind returns after its own teardown even when the following resolver is suspended.
+
+Regression coverage includes latest-only admission, active/waiting/granted cancellation, grant ordering, dropping, task-local context, reroute chains, removed origins, coverage, elevated requests, native waits, and exact deferred-insertion results. Existing replacement tests now inspect the admission waiter as well as the native continuation; their destination and teardown assertions are preserved. Two older coverage tests depended on an elevated presentation overtaking a resolver. They now install independent coverage directly into the model to retain their post-resolution authority assertions, while a new public-router test verifies elevated presentations wait for admission too.
+
+The final package run succeeded with **420 tests in 33 suites**, including ten expected skips for separately hosted macOS rendering tests. The Release build also passed. Package evidence is `swift_package_test_2026-10-13T08-30-56-949Z_pid12855_84e2b01c.log`; Release evidence is `build_spm_2026-10-13T08-31-33-628Z_pid13022_2b5534f6.log` in the Departure XcodeBuildMCP workspace.
+
+### UI verification
+
+The separately hosted macOS run passed all **22 tests in three suites**, including every rendering test skipped by the ordinary package run.
+
+The complete iPhone/iOS 26.5 UI suite executed all **47 cases: 44 passed, one failed, and two iPad-only cases skipped**. Both skipped cases then passed on iPad/iOS 27. All five native focus tests passed, including first-responder retention through view updates, dismissal/reopening, replacement, and immediate presentation/unwind. These probes use native responder and editing signals rather than assuming a visible software keyboard.
+
+The UI checkpoint is not wholly green. `testDirectCoverTopmostAncestorAndProtectedSettingsRoute` intermittently fails to show the Profile sheet after revealing Home from Settings. The failure's hierarchy confirms Home was selected without a visible Profile sheet. Three isolated repetitions using the same race-fix binaries passed twice and failed once. An archived, unchanged `cbda2bf` checkout failed the identical assertion twice in three repetitions. This establishes that the remaining UI failure predates admission protection; it does not establish the mechanism of that tab-to-sheet failure. No production or UI-test changes were made to conceal it.
+
+All **14 selected iOS 17.5 cases passed**, with no failures or skips: branch crawl and concurrent split targeting, native Back/re-push, inline replacement, outgoing sheet-stack retention, elevated-root removal/default continuation, covered-space owner removal, window replacement/continuation, pending-priority protection, and all five native focus checks. This is older-system regression coverage, not a second full suite.
+
+Result bundles in the Departure XcodeBuildMCP workspace:
+
+- Full iPhone: `test_sim_2026-10-13T08-33-09-015Z_pid13192_8f7d8100.xcresult`.
+- Same-binary repetitions: `test_sim_2026-10-13T08-56-32-105Z_pid21200_2739da74.xcresult`.
+- Unchanged baseline repetitions: `test_sim_2026-10-13T09-02-44-749Z_pid23568_1e280ac9.xcresult`.
+- iPad-only cases: `test_sim_2026-10-13T09-00-28-252Z_pid22845_bd202e93.xcresult`.
+- iOS 17.5 cases: `test_sim_2026-10-13T09-06-40-362Z_pid25920_680c1314.xcresult`.
+
+Hosted macOS evidence: `swift_package_test_2026-10-13T08-34-23-854Z_pid13781_2112265b.log`.

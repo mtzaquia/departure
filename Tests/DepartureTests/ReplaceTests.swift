@@ -139,7 +139,7 @@ struct ReplaceTests {
         while fixture.engine.pendingRoute == nil { await Task.yield() }
         #expect(fixture.wallet.path.isEmpty)
         let latest = Task { await fixture.router.branch("wallet").present(SelectedRoute(number: 3)) }
-        while fixture.engine.pendingRoute?.route as? SelectedRoute != SelectedRoute(number: 3) {
+        while (fixture.engine.bufferedPresentationRequest?.route ?? fixture.engine.pendingRoute?.route) as? SelectedRoute != SelectedRoute(number: 3) {
             await Task.yield()
         }
         fixture.engine.routeScopeDidLeaveView(old)
@@ -219,7 +219,7 @@ struct ReplaceTests {
         let first = Task { await fixture.router.branch("wallet").present(SelectedRoute(number: 2)) }
         while fixture.wallet.path.count != 1 { await Task.yield() }
         let latest = Task { await fixture.router.branch("wallet").present(SelectedRoute(number: 3)) }
-        while fixture.engine.pendingRoute?.route as? SelectedRoute != SelectedRoute(number: 3) {
+        while (fixture.engine.bufferedPresentationRequest?.route ?? fixture.engine.pendingRoute?.route) as? SelectedRoute != SelectedRoute(number: 3) {
             await Task.yield()
         }
 

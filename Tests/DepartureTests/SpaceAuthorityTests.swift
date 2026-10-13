@@ -64,8 +64,12 @@ struct SpaceAuthorityTests {
         let gate = AuthorityGate()
         await owner.default.perform(AuthorityRerouteAction(probe: probe, gate: gate))
         await gate.waitUntilEntered()
-        await owner.current.present(LockRoute())
-        let lock = try #require(owner.engine.spaces.criticalSpace?.root)
+        // Install independent coverage to test the action retry's authority check.
+        // An ordinary presentation cannot overtake the suspended resolver.
+        let entry = LockRoute()
+        let lock = RouteScope(id: entry.id, route: entry)
+        let critical = RouteSpace(priority: .critical, root: lock)
+        owner.engine.mutateRouteGraph { owner.engine.spaces.setElevatedSpace(critical, for: .critical) }
         lock.installHookDeclarations(hookDeclarations: [
             ActionInterceptor(AuthorityRerouteAction.self) { _ in probe.events.append("lock-interceptor") }.declaration,
         ])

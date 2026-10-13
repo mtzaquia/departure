@@ -134,7 +134,11 @@ struct IndependentPriorityTests {
         let gate = SpaceResolutionGate()
         let request = Task { await source.present(SuspendedDefault(gate: gate)) }
         await gate.waitForStart()
-        await source.present(HighEntry(value: 1))
+        // Change coverage independently of admission: another presentation now
+        // waits for this resolver rather than overtaking it.
+        let entry = HighEntry(value: 1)
+        let high = RouteSpace(priority: .high, root: RouteScope(id: entry.id, route: entry))
+        owner.engine.mutateRouteGraph { owner.engine.spaces.setElevatedSpace(high, for: .high) }
         gate.release()
         await request.value
         #expect(owner.engine.defaultSpace.rootPath.isEmpty)
