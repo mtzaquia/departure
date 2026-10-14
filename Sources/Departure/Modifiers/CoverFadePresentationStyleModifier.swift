@@ -85,15 +85,8 @@ private struct CoverFadeModalPresenter: View {
                         .opacity(isContentVisible ? 1 : 0)
                         .presentationBackground(.clear)
                         .onLifecycleEvent { _, _, event in
-                            switch event {
-                            case .created: lifetime.didCreateDestination(of: rendered.id)
-                            case .installedInWindow: lifetime.didAdmitPresentation(of: rendered.id)
-                            case .updated(let installed):
-                                lifetime.didUpdateDestination(of: rendered.id, isInstalledInWindow: installed)
-                            case .dismantled, .deinitialized:
-                                lifetime.didDismantleDestination(of: rendered.id)
-                                synchronize()
-                            }
+                            lifetime.handleDestinationEvent(event, of: rendered.id)
+                            if case .ended = event { synchronize() }
                             if case .installedInWindow(isInitial: true) = event {
                                 Task { @MainActor in
                                     guard lifetime.presentation?.id == rendered.id, lifetime.isPresented else { return }
@@ -117,7 +110,7 @@ private struct CoverFadeModalPresenter: View {
             .onLifecycleEvent { _, _, event in
                 switch event {
                 case .installedInWindow: synchronize()
-                case .dismantled, .deinitialized:
+                case .ended:
                     if let id = lifetime.presentation?.id { lifetime.completeDismissal(of: id, in: router) }
                 case .created, .updated: break
                 }

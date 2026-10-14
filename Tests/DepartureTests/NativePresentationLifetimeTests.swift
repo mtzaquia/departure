@@ -27,7 +27,7 @@ struct NativePresentationLifetimeTests {
         lifetime.synchronize(.init(scope: first)) { .init(route: $0) }
         lifetime.didCreateDestination(of: ObjectIdentifier(first))
         // updateUIView reports this event before the destination enters a window.
-        lifetime.didUpdateDestination(of: ObjectIdentifier(first), isInstalledInWindow: false)
+        lifetime.handleDestinationEvent(.updated(isInstalledInWindow: false), of: ObjectIdentifier(first))
         let replacement = Task { await engine.requestRouteWhenReady(NumberedRoute(number: 2), origin: origin) }
         await waitUntil { engine.isNavigating && engine.defaultSpace.rootPath.isEmpty }
         lifetime.synchronize(nil) { .init(route: $0) }

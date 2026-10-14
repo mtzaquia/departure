@@ -446,7 +446,7 @@ extension RouterEngine {
             guard let view else { return }
             hostDidAttach(scope, view: view, id: id)
         case .updated(isInstalledInWindow: false): scope.hostAvailabilityDidChange(id: id)
-        case .dismantled, .deinitialized: hostDidDetach(scope, id: id)
+        case .ended: hostDidDetach(scope, id: id)
         }
     }
 
@@ -468,7 +468,7 @@ extension RouterEngine {
     func hostDidDetach(_ scope: RouteScope, id: UUID) {
         guard scope.detachHost(id: id) else { return }
         log.departureDebug(.scopeUninstalledFromView(scope: scope))
-        if ios17NavigationStackPushWorkaround?.routeScopeDidLeave(scope, in: self) == true { return }
+        ios17NavigationStackPushWorkaround?.routeScopeDidLeave(scope, in: self)
     }
 
     func waitForPresentationsToEnd(_ routeScopes: [RouteScope]) async {

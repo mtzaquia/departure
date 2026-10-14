@@ -30,23 +30,23 @@ final class NativePresentationLifetime {
     private struct CompletedOccurrence { weak var scope: RouteScope? }
     private enum Phase {
         case idle(CompletedOccurrence)
-        case preparing(RouteDestinationSnapshot)
-        case showing(RouteDestinationSnapshot)
+        case presenting(RouteDestinationSnapshot)
         case dismissing(RouteDestinationSnapshot)
     }
+    private enum Admission { case uncreated, created, admitted }
     private var phase: Phase = .idle(CompletedOccurrence())
-    @ObservationIgnored private var hasCreatedDestination = false
-    @ObservationIgnored private var hasAdmittedPresentation = false
+    // Native preparation changes completion requirements, but does not change rendered content.
+    @ObservationIgnored private var admission: Admission = .uncreated
 
     var presentation: RouteDestinationSnapshot? {
         switch phase {
         case .idle: nil
-        case .preparing(let presentation), .showing(let presentation), .dismissing(let presentation): presentation
+        case .presenting(let presentation), .dismissing(let presentation): presentation
         }
     }
     var isPresented: Bool {
         switch phase {
-        case .preparing, .showing: true
+        case .presenting: true
         case .idle, .dismissing: false
         }
     }
@@ -58,63 +58,59 @@ final class NativePresentationLifetime {
         switch phase {
         case .idle(let completed):
             guard let route, route.scope !== completed.scope else { return }
-            hasCreatedDestination = false
-            hasAdmittedPresentation = false
-            phase = .preparing(build(route))
+            admission = .uncreated
+            phase = .presenting(build(route))
             route.scope.trackNativePresentation(self)
-        case .preparing(let presentation):
+        case .presenting(let presentation):
             guard route?.id != presentation.id else { return }
             beginDismissal(of: presentation.id)
             // Content that never reached native creation has no completion callback.
             // Reconcile its successor immediately; created content finishes dismantling first.
             synchronize(route, build: build)
-        case .showing(let presentation):
-            if route?.id != presentation.id { beginDismissal(of: presentation.id) }
         case .dismissing: break
         }
     }
 
     func didCreateDestination(of id: PresentedRoute.ID) {
-        guard presentation?.id == id else { return }
-        hasCreatedDestination = true
+        guard presentation?.id == id, admission == .uncreated else { return }
+        admission = .created
     }
 
     /// The destination entered a window, or UIKit installed its native owner.
     func didAdmitPresentation(of id: PresentedRoute.ID) {
-        guard let presentation, presentation.id == id else { return }
-        hasAdmittedPresentation = true
-        if case .preparing = phase { phase = .showing(presentation) }
+        guard presentation?.id == id else { return }
+        // A cancelled destination can still enter its window before SwiftUI tears it down.
+        admission = .admitted
     }
 
-    func didUpdateDestination(of id: PresentedRoute.ID, isInstalledInWindow: Bool) {
-        guard isInstalledInWindow else { return }
-        didAdmitPresentation(of: id)
+    func handleDestinationEvent(_ event: ViewLifecycleBridge.Event, of id: PresentedRoute.ID) {
+        switch event {
+        case .created: didCreateDestination(of: id)
+        case .installedInWindow, .updated(isInstalledInWindow: true): didAdmitPresentation(of: id)
+        case .updated(isInstalledInWindow: false): break
+        case .ended: didDismantleDestination(of: id)
+        }
     }
 
     /// A cancelled preparation needs no native dismissal once its uninstalled content is gone.
     func didDismantleDestination(of id: PresentedRoute.ID) {
-        guard !hasAdmittedPresentation, case .dismissing(let presentation) = phase,
+        guard admission != .admitted, case .dismissing(let presentation) = phase,
               presentation.id == id else { return }
-        phase = .idle(CompletedOccurrence(scope: presentation.route.scope))
-        presentation.route.scope.nativePresentationDidEnd()
+        finish(presentation)
     }
 
     @discardableResult
     func beginDismissal(of id: PresentedRoute.ID) -> Bool {
         guard let presentation, presentation.id == id else { return false }
         switch phase {
-        case .preparing:
-            if hasCreatedDestination {
+        case .presenting:
+            if admission != .uncreated {
                 phase = .dismissing(presentation)
                 return true
             }
             // SwiftUI may coalesce a request and its cancellation without presenting anything.
             // There will be no native onDismiss to wait for in that case.
-            phase = .idle(CompletedOccurrence(scope: presentation.route.scope))
-            presentation.route.scope.nativePresentationDidEnd()
-            return true
-        case .showing:
-            phase = .dismissing(presentation)
+            finish(presentation)
             return true
         case .idle, .dismissing: return false
         }
@@ -134,6 +130,10 @@ final class NativePresentationLifetime {
         if isPresented, presentation.route.scope.isNativePresentationOwned(by: self) {
             router.nativePresentationDidDismiss(presentation.route.scope)
         }
+        finish(presentation)
+    }
+
+    private func finish(_ presentation: RouteDestinationSnapshot) {
         phase = .idle(CompletedOccurrence(scope: presentation.route.scope))
         presentation.route.scope.nativePresentationDidEnd()
     }

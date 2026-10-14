@@ -47,11 +47,6 @@ public struct WithRouter<Content: View>: View {
                 ElevatedPriorityHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
             }
             .environment(\.routerEngine, router)
-#if DEBUG
-            .onAppear {
-                router.traceMapAdoption()
-            }
-#endif
     }
 
     /// Creates a router host.
@@ -99,6 +94,9 @@ private struct WindowDestinationBuilderRegistration: View {
             .onLifecycleEvent { lifecycleView, lifecycleID, event in
                 router.windowDestinationBuilder = windowDestinationBuilder
                 router.handleHostEvent(event, scope: router.root, view: lifecycleView, id: lifecycleID)
+#if DEBUG
+                if case .installedInWindow = event { router.traceMapAdoption() }
+#endif
             }
     }
 }

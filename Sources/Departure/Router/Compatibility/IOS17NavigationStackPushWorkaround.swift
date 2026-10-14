@@ -35,7 +35,7 @@ protocol IOS17NavigationStackPushWorkaroundHandling: AnyObject {
     ) -> Bool
     func routeGraphDidMutate(in router: RouterEngine)
     func routeScopeDidInstall(_ routeScope: RouteScope)
-    func routeScopeDidLeave(_ routeScope: RouteScope, in router: RouterEngine) -> Bool
+    func routeScopeDidLeave(_ routeScope: RouteScope, in router: RouterEngine)
     func startViewExitWatchdogs(for routeScopes: [RouteScope], in router: RouterEngine)
 }
 
@@ -124,13 +124,13 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         invalidate(dismissal)
     }
 
-    func routeScopeDidLeave(_ routeScope: RouteScope, in router: RouterEngine) -> Bool {
+    func routeScopeDidLeave(_ routeScope: RouteScope, in router: RouterEngine) {
         cancelViewExitWatchdog(for: routeScope)
         reconcilePendingDismissals(in: router)
 
         let scopeID = ObjectIdentifier(routeScope)
         guard let dismissal = pendingDismissals[scopeID] else {
-            return false
+            return
         }
 
         Task { @MainActor [weak self, weak router, weak routeScope] in
@@ -157,7 +157,6 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
             log.departureDebug(.ios17PushDismissalResumed(scope: routeScope))
             complete(dismissal, in: router)
         }
-        return true
     }
 
     func startViewExitWatchdogs(for routeScopes: [RouteScope], in router: RouterEngine) {

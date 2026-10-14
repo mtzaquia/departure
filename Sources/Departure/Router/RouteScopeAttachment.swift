@@ -79,7 +79,7 @@ final class RouteScopeAttachment {
             guard lifecycleID == id else { return }
             update(target: target, view: view, apply: apply, remove: remove)
             lifecycleID = id
-        case .dismantled, .deinitialized:
+        case .ended:
             guard lifecycleID == id else { return }
             detach()
         }

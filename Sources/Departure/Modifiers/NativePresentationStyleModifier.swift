@@ -86,7 +86,7 @@ struct SystemModalPresentationModifier: ViewModifier {
             .onLifecycleEvent { _, _, event in
                 switch event {
                 case .installedInWindow: synchronize()
-                case .dismantled, .deinitialized:
+                case .ended:
                     if let id = lifetime.presentation?.id { lifetime.completeDismissal(of: id, in: router) }
                 case .created, .updated: break
                 }
@@ -115,15 +115,8 @@ struct SystemModalPresentationModifier: ViewModifier {
     private func destination(_ rendered: RouteDestinationSnapshot) -> some View {
         rendered.destination.id(rendered.id)
             .onLifecycleEvent { _, _, event in
-                switch event {
-                case .created: lifetime.didCreateDestination(of: rendered.id)
-                case .installedInWindow: lifetime.didAdmitPresentation(of: rendered.id)
-                case .updated(let installed):
-                    lifetime.didUpdateDestination(of: rendered.id, isInstalledInWindow: installed)
-                case .dismantled, .deinitialized:
-                    lifetime.didDismantleDestination(of: rendered.id)
-                    synchronize()
-                }
+                lifetime.handleDestinationEvent(event, of: rendered.id)
+                if case .ended = event { synchronize() }
             }
     }
 
