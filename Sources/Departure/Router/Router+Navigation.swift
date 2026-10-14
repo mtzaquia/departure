@@ -677,7 +677,6 @@ extension RouterEngine {
         // Registration can run inside didMoveToWindow/updateUIView. Resume after
         // that render callback returns, while retaining the exact pending append.
         Task { @MainActor [weak self, weak declaringScope, weak pendingRoute] in
-            await Task.yield()
             guard let self, let declaringScope, let pendingRoute,
                   self.pendingRoute === pendingRoute,
                   declaringScope.participates(inBranch: branch),

@@ -62,27 +62,11 @@ private struct HooksModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onLifecycleEvent { lifecycleView, _, event in
-                switch event {
-                case .installedInWindow, .updated(isInstalledInWindow: true):
-                    guard let lifecycleView else { return }
-                    let sourceID = attachment.id
-                    let declarations = declarations
-                    attachment.update(
-                        target: routeScope,
-                        view: lifecycleView,
-                        apply: { $0.installHookDeclarations(
-                            sourceID: sourceID, hookDeclarations: declarations
-                        ) },
-                        remove: { $0.uninstallHookDeclarations(sourceID: sourceID) }
-                    )
-
-                case .updated(isInstalledInWindow: false):
-                    break
-
-                case .dismantled, .deinitialized:
-                    attachment.detach()
-                }
+            .onLifecycleEvent { lifecycleView, lifecycleID, event in
+                let sourceID = attachment.id
+                attachment.handle(event, id: lifecycleID, target: routeScope, view: lifecycleView,
+                    apply: { $0.installHookDeclarations(sourceID: sourceID, hookDeclarations: declarations) },
+                    remove: { $0.uninstallHookDeclarations(sourceID: sourceID) })
             }
     }
 }

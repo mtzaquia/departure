@@ -93,6 +93,7 @@ private struct WindowDestinationBuilderRegistration: View {
             .frame(width: 0, height: 0)
             .onLifecycleEvent { lifecycleView, lifecycleID, event in
                 switch event {
+                case .created: break
                 case .installedInWindow, .updated(isInstalledInWindow: true):
                     router.windowDestinationBuilder = windowDestinationBuilder
                     guard let lifecycleView else { return }

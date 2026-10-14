@@ -176,6 +176,7 @@ private struct CoverFadeModalPresenter: View {
             }
             .onLifecycleEvent { _, _, event in
                 switch event {
+                case .created: break
                 case .installedInWindow, .updated(isInstalledInWindow: true):
                     scheduleStateMutation {
                         syncPresentation()

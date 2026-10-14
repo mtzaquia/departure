@@ -108,18 +108,8 @@ private struct RoutesModifier: ViewModifier {
             .modifier(ReplacePresentationStyleModifier(presentationHostID: presentationHostID,
                 isEnabled: hostedDeclarations.containsPresentationKind(.replace)))
             .environment(\.branchRouteDeclarations, accumulatedBranchRouteDeclarations)
-            .onLifecycleEvent { lifecycleView, _, event in
-                switch event {
-                case .installedInWindow, .updated(isInstalledInWindow: true):
-                    guard let lifecycleView else { return }
-                    configureAttachment(view: lifecycleView)
-
-                case .updated(isInstalledInWindow: false):
-                    break
-
-                case .dismantled, .deinitialized:
-                    attachment.detach()
-                }
+            .onLifecycleEvent { lifecycleView, lifecycleID, event in
+                configureAttachment(view: lifecycleView, event: event, lifecycleID: lifecycleID)
             }
             .onChange(of: activeBranch) { _, _ in
                 configureAttachment()
@@ -147,7 +137,7 @@ private struct RoutesModifier: ViewModifier {
             }
     }
 
-    private func configureAttachment(view: PlatformView? = nil) {
+    private func configureAttachment(view: PlatformView? = nil, event: ViewLifecycleBridge.Event? = nil, lifecycleID: UUID? = nil) {
         let router = router
         let sourceID = attachment.id
         let explicitScopeID = explicitScopeID
@@ -172,7 +162,11 @@ private struct RoutesModifier: ViewModifier {
             router.mutateRouteGraph { scope.uninstallRouteDeclarations(sourceID: sourceID) }
         }
 
-        attachment.update(target: routeScope, view: view, apply: apply, remove: remove)
+        if let event, let lifecycleID {
+            attachment.handle(event, id: lifecycleID, target: routeScope, view: view, apply: apply, remove: remove)
+        } else {
+            attachment.update(target: routeScope, view: view, apply: apply, remove: remove)
+        }
     }
 
     private var accumulatedBranchRouteDeclarations: [RouteScopeDeclaration] {

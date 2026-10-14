@@ -69,6 +69,17 @@ bring Departure back to the foreground between replacements. The generation must
 nested route phase must return to `active`, the background-transition counter must advance, and
 the app must remain running without a Swift exclusivity trap.
 
+## Sheet focus and replacement probe
+
+Launch with `--sheet-focus-probe` to exercise branch-owned sheets. Add
+`--sheet-focus-root` for a root-owned sheet, or `--sheet-focus-pushed` for a sheet
+owned by a pushed screen. `--sheet-focus-root --sheet-focus-fade` exercises a fade cover.
+The controls replace a destination immediately, across an update, or during its
+presentation. The successor must remain visible and dismiss cleanly.
+
+The focus tests use typed text, focus state, and destination identity to check retention;
+they do not depend on the simulator displaying a software keyboard.
+
 ## Concurrent split-view branches
 
 Choose **Split-view lab** on the start screen. The three-column layout uses ordinary

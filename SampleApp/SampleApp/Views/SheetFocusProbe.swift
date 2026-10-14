@@ -44,7 +44,13 @@ struct SheetFocusProbeRoot: View {
                 }
             } else if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root") {
                 NavigationStack { SheetFocusProbeControls() }
-                    .routes { Sheet(SheetFocusProbeRoute.self) }
+                    .routes {
+                        if ProcessInfo.processInfo.arguments.contains("--sheet-focus-fade") {
+                            Cover(SheetFocusProbeRoute.self, transition: .fade)
+                        } else {
+                            Sheet(SheetFocusProbeRoute.self)
+                        }
+                    }
             } else {
                 TabView(selection: $selection) {
                     NavigationStack { SheetFocusProbeControls().routeBranch(SheetFocusTab.home) }
@@ -79,6 +85,14 @@ private struct SheetFocusProbeControls: View {
                 }
             }
             .accessibilityIdentifier("sample.sheet-focus.present-then-replace")
+            Button("Present then replace across an update") {
+                Task {
+                    await router.present(SheetFocusProbeRoute(number: 1))
+                    await Task.yield()
+                    await router.present(SheetFocusProbeRoute(number: 2))
+                }
+            }
+            .accessibilityIdentifier("sample.sheet-focus.present-then-replace-update")
             // Lets the first sheet reach the host in its own update, as a fast network reply would.
             Button("Present then replace after a beat") {
                 Task {

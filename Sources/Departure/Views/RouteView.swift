@@ -25,12 +25,15 @@ import SwiftUI
 public struct RouteView: View {
     let scope: RouteScope
     let providesNavigation: Bool
+    private let lifecycleHandler: (@MainActor (ViewLifecycleBridge.Event) -> Void)?
 
     @Environment(RouterEngine.self) private var router
 
-    init(scope: RouteScope, providesNavigation: Bool = false) {
+    init(scope: RouteScope, providesNavigation: Bool = false,
+        lifecycleHandler: (@MainActor (ViewLifecycleBridge.Event) -> Void)? = nil) {
         self.scope = scope
         self.providesNavigation = providesNavigation
+        self.lifecycleHandler = lifecycleHandler
     }
 
     public var body: some View {
@@ -38,6 +41,7 @@ public struct RouteView: View {
             .routeScopeEnvironment(scope, router: router)
             .onLifecycleEvent { lifecycleView, lifecycleID, event in
                 switch event {
+                case .created: break
                 case .updated(isInstalledInWindow: true), .installedInWindow:
                     guard let lifecycleView else { return }
                     scope.ledger.installManagedView(lifecycleView, id: lifecycleID)
@@ -52,6 +56,7 @@ public struct RouteView: View {
                     scope.ledger.uninstallManagedView(id: lifecycleID)
                     router.routeScopeDidLeaveView(scope)
                 }
+                lifecycleHandler?(event)
             }
     }
 

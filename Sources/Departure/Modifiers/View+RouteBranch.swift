@@ -73,16 +73,18 @@ private struct RouteBranchModifier: ViewModifier {
             .routeScopeEnvironment(branchScope, router: router)
             .onLifecycleEvent { lifecycleView, lifecycleID, event in
                 switch event {
+                case .created:
+                    configureAttachment(view: lifecycleView, event: event, lifecycleID: lifecycleID)
                 case .installedInWindow, .updated(isInstalledInWindow: true):
                     guard let lifecycleView else { return }
                     branchScope.ledger.installManagedView(lifecycleView, id: lifecycleID)
-                    configureAttachment(view: lifecycleView)
+                    configureAttachment(view: lifecycleView, event: event, lifecycleID: lifecycleID)
 
                 case .updated(isInstalledInWindow: false):
-                    break
+                    configureAttachment(view: lifecycleView, event: event, lifecycleID: lifecycleID)
 
                 case .dismantled, .deinitialized:
-                    attachment.detach()
+                    configureAttachment(event: event, lifecycleID: lifecycleID)
                     branchScope.ledger.uninstallManagedView(id: lifecycleID)
                 }
             }
@@ -108,34 +110,35 @@ private struct RouteBranchModifier: ViewModifier {
             }
     }
 
-    private func configureAttachment(view: PlatformView? = nil) {
+    private func configureAttachment(view: PlatformView? = nil, event: ViewLifecycleBridge.Event? = nil, lifecycleID: UUID? = nil) {
         let router = router
         let branchScope = branchScope
         let branch = branch
         let sourceEnvironment = sourceEnvironment
         let presentationHostID = presentationHostID
-        attachment.update(
-            target: parentScope,
-            key: branch,
-            view: view,
-            apply: { parent in
-                branchScope.ledger.updateInitialID(branch)
-                router.mutateRouteGraph {
-                    parent.registerBranchScope(
-                        branchScope,
-                        for: branch,
-                        sourceEnvironment: sourceEnvironment,
-                        presentationHostID: presentationHostID
-                    )
-                }
-                router.resumePendingRoute(for: branch, in: parent)
-            },
-            remove: { parent in
-                router.mutateRouteGraph {
-                    parent.unregisterBranchScope(branchScope, for: branch)
-                }
+        let apply: (RouteScope) -> Void = { parent in
+            branchScope.ledger.updateInitialID(branch)
+            router.mutateRouteGraph {
+                parent.registerBranchScope(
+                    branchScope,
+                    for: branch,
+                    sourceEnvironment: sourceEnvironment,
+                    presentationHostID: presentationHostID
+                )
             }
-        )
+            router.resumePendingRoute(for: branch, in: parent)
+        }
+        let remove: (RouteScope) -> Void = { parent in
+            router.mutateRouteGraph {
+                parent.unregisterBranchScope(branchScope, for: branch)
+            }
+        }
+        if let event, let lifecycleID {
+            attachment.handle(event, id: lifecycleID, target: parentScope, key: branch,
+                view: view, apply: apply, remove: remove)
+        } else {
+            attachment.update(target: parentScope, key: branch, view: view, apply: apply, remove: remove)
+        }
     }
 
     private var adoptedDeclarations: [RouteScopeDeclaration] {

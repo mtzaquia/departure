@@ -125,7 +125,7 @@ struct RouterTests {
 
         #expect(router.routePhase(for: homeScope) == .active)
         #expect(router.root.firstRouteAttachment(for: HomeDetailRoute.self) != nil)
-        await teardownTask.value
+        await teardownTask?.value
 
         #expect(router.routePhase(for: router.root) == .active)
         #expect(router.routePhase(for: homeScope) == .inactive)

@@ -23,6 +23,31 @@
 import XCTest
 
 final class SheetFocusTests: XCTestCase {
+    func testPushedHostReplacementAcrossAnUpdateShowsSuccessor() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--sheet-focus-probe", "--sheet-focus-pushed"]
+        continueAfterFailure = false
+        app.launch()
+        defer { app.terminate() }
+        tap("sample.sheet-focus.open-host", in: app)
+        verifyImmediateReplacement(in: app, trigger: "sample.sheet-focus.present-then-replace-update")
+    }
+
+    func testRootReplacementAcrossAnUpdateShowsSuccessor() {
+        let app = launch(root: true)
+        defer { app.terminate() }
+        verifyImmediateReplacement(in: app, trigger: "sample.sheet-focus.present-then-replace-update")
+    }
+
+    func testFadeCoverReplacementAcrossAnUpdateShowsSuccessor() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--sheet-focus-probe", "--sheet-focus-root", "--sheet-focus-fade"]
+        continueAfterFailure = false
+        app.launch()
+        defer { app.terminate() }
+        verifyImmediateReplacement(in: app, trigger: "sample.sheet-focus.present-then-replace-update")
+    }
+
     func testBranchSheetRetainsFocusAndReopensAfterNativeDismissal() {
         verifyFocusAndReopening(root: false)
     }

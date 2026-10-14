@@ -20,6 +20,7 @@
 //  SOFTWARE.
 //
 
+import Observation
 import SwiftUI
 
 struct SheetPresentationStyleModifier: ViewModifier {
@@ -60,7 +61,21 @@ struct SheetPresentationStyleModifier: ViewModifier {
                 presentationState.synchronize(presentation.wrappedValue)
             }) {
                 if let route {
-                    RouteView(scope: route.scope, providesNavigation: route.providesNavigation)
+                    RouteView(scope: route.scope, providesNavigation: route.providesNavigation,
+                        lifecycleHandler: { event in
+                            switch event {
+                            case .created:
+                                presentationState.didCreateDestination(id: route.id)
+                            case .installedInWindow, .updated(isInstalledInWindow: true):
+                                presentationState.didAdmitDestination(id: route.id)
+                            case .updated(isInstalledInWindow: false): break
+                            case .dismantled, .deinitialized:
+                                if presentationState.didDismantleDestination(id: route.id) {
+                                    // Read the live slot, rather than a route captured by an earlier update.
+                                    presentationState.synchronize(presentation.wrappedValue)
+                                }
+                            }
+                        })
                         .id(route.id)
                 }
             }
@@ -73,23 +88,24 @@ struct SheetPresentationStyleModifier: ViewModifier {
 }
 
 /// Retains the exiting destination until native dismissal finishes, before admitting a successor.
-struct SheetPresentationState {
+@Observable
+final class SheetPresentationState {
     private(set) var route: PresentedRoute?
     private(set) var isPresented = false
+    @ObservationIgnored private var hasCreatedDestination = false
+    @ObservationIgnored private var hasAdmittedPresentation = false
 
-    mutating func synchronize(_ incoming: PresentedRoute?) {
+    func synchronize(_ incoming: PresentedRoute?) {
         guard let route else {
-            self.route = incoming
-            isPresented = incoming != nil
+            replaceUnadmittedDestination(with: incoming)
             return
         }
         guard isPresented else { return }
         guard incoming?.id == route.id else {
-            // SwiftUI never reports dismissal of a sheet that is withdrawn before it appears,
-            // so a destination that has not appeared is replaced instead of awaiting onDismiss.
-            guard route.scope.isInstalledInView else {
-                self.route = incoming
-                isPresented = incoming != nil
+            // A created off-window destination must dismantle before its successor is admitted.
+            // Content never created has no native completion callback to wait for.
+            guard hasCreatedDestination || hasAdmittedPresentation || route.scope.isInstalledInView else {
+                replaceUnadmittedDestination(with: incoming)
                 return
             }
             isPresented = false
@@ -98,13 +114,37 @@ struct SheetPresentationState {
         self.route = incoming
     }
 
-    mutating func beginDismissal(id: AnyHashable?) -> Bool {
+    func didCreateDestination(id: AnyHashable) {
+        guard route?.id == id else { return }
+        hasCreatedDestination = true
+    }
+
+    func didAdmitDestination(id: AnyHashable) {
+        guard route?.id == id else { return }
+        hasAdmittedPresentation = true
+    }
+
+    @discardableResult
+    func didDismantleDestination(id: AnyHashable) -> Bool {
+        guard let route, route.id == id, !isPresented,
+              !hasAdmittedPresentation, !route.scope.isInstalledInView else { return false }
+        return completeDismissal(id: id)
+    }
+
+    private func replaceUnadmittedDestination(with incoming: PresentedRoute?) {
+        hasCreatedDestination = false
+        hasAdmittedPresentation = false
+        route = incoming
+        isPresented = incoming != nil
+    }
+
+    func beginDismissal(id: AnyHashable?) -> Bool {
         guard let route, route.id == id, isPresented else { return false }
         isPresented = false
         return true
     }
 
-    mutating func completeDismissal(id: AnyHashable?) -> Bool {
+    func completeDismissal(id: AnyHashable?) -> Bool {
         guard let route, route.id == id else { return false }
         self.route = nil
         isPresented = false

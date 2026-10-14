@@ -161,10 +161,8 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         }
 
         Task { @MainActor [weak self, weak router, weak routeScope] in
-            // SwiftUI delivers dismantle callbacks while holding observation accesses. Defer route
-            // mutations out of that stack, and let same-update-cycle reinstallations cancel a
-            // spurious push dismissal before changing the path.
-            await Task.yield()
+            // Leave the representable callback before mutating observed routing state.
+            // Identity and native exit checks invalidate a dismissal after reinstallation.
             guard let self, let router, let routeScope else {
                 return
             }

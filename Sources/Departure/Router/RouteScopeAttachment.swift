@@ -36,6 +36,7 @@ final class RouteScopeAttachment {
     let id = AnyHashable(UUID())
     private let kind: Kind
     private weak var view: PlatformView?
+    private var lifecycleID: UUID?
     private var target: RouteScope?
     private var key: AnyHashable?
     private var installed: RouteScope?
@@ -68,7 +69,29 @@ final class RouteScopeAttachment {
         reconcile()
     }
 
+    func handle(_ event: ViewLifecycleBridge.Event, id: UUID, target: RouteScope?,
+                key: AnyHashable? = nil, view: PlatformView?,
+                apply: @escaping (RouteScope) -> Void, remove: @escaping (RouteScope) -> Void) {
+        switch event {
+        case .created:
+            // An off-window replacement inherits the modifier's registration, without
+            // admitting a new presentation host. Its predecessor cannot detach it.
+            lifecycleID = id
+        case .installedInWindow:
+            update(target: target, key: key, view: view, apply: apply, remove: remove)
+            lifecycleID = id
+        case .updated:
+            guard lifecycleID == id else { return }
+            update(target: target, key: key, view: view, apply: apply, remove: remove)
+            lifecycleID = id
+        case .dismantled, .deinitialized:
+            guard lifecycleID == id else { return }
+            detach()
+        }
+    }
+
     func detach() {
+        lifecycleID = nil
         if let installed {
             remove?(installed)
         }

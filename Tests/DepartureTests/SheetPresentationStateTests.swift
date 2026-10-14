@@ -28,7 +28,7 @@ import Testing
 struct SheetPresentationStateTests {
     @Test func firstPresentationHasItsDestinationBeforeShowing() {
         let route = presentation()
-        var state = SheetPresentationState()
+        let state = SheetPresentationState()
         state.synchronize(route)
         #expect(state.route?.id == route.id)
         #expect(state.isPresented)
@@ -36,7 +36,7 @@ struct SheetPresentationStateTests {
 
     @Test func programmaticDismissalRetainsDestinationUntilCompletion() {
         let route = presentation()
-        var state = SheetPresentationState()
+        let state = SheetPresentationState()
         state.synchronize(route)
         route.scope.ledger.install()
         state.synchronize(nil)
@@ -52,7 +52,7 @@ struct SheetPresentationStateTests {
     @Test func successorWaitsForTheExitingDestination() {
         let first = presentation()
         let second = presentation()
-        var state = SheetPresentationState()
+        let state = SheetPresentationState()
         state.synchronize(first)
         first.scope.ledger.install()
         state.synchronize(second)
@@ -76,7 +76,7 @@ struct SheetPresentationStateTests {
     @Test func successorReplacesADestinationThatNeverAppeared() {
         let first = presentation()
         let second = presentation()
-        var state = SheetPresentationState()
+        let state = SheetPresentationState()
         state.synchronize(first)
         state.synchronize(second)
         #expect(state.isPresented)
@@ -89,7 +89,7 @@ struct SheetPresentationStateTests {
     @Test func dismissalOfADestinationThatNeverAppearedAdmitsTheNextPresentation() {
         let first = presentation()
         let second = presentation()
-        var state = SheetPresentationState()
+        let state = SheetPresentationState()
         state.synchronize(first)
         state.synchronize(nil)
         #expect(!state.isPresented)
@@ -101,7 +101,7 @@ struct SheetPresentationStateTests {
 
     @Test func nativeDismissalIsAcknowledgedOnce() {
         let route = presentation()
-        var state = SheetPresentationState()
+        let state = SheetPresentationState()
         state.synchronize(route)
         let nativeWrite = state.beginDismissal(id: route.id)
         #expect(nativeWrite)
@@ -112,6 +112,53 @@ struct SheetPresentationStateTests {
         #expect(completion)
         let duplicateCompletion = state.completeDismissal(id: route.id)
         #expect(!duplicateCompletion)
+    }
+
+    @Test func createdOffWindowDestinationWaitsForDismantlingInsteadOfOnDismiss() {
+        let first = presentation()
+        let second = presentation()
+        let state = SheetPresentationState()
+        state.synchronize(first)
+        state.didCreateDestination(id: first.id)
+        state.synchronize(second)
+        #expect(!state.isPresented)
+        #expect(state.route?.id == first.id)
+        #expect(state.didDismantleDestination(id: first.id))
+        state.synchronize(second)
+        #expect(state.isPresented)
+        #expect(state.route?.id == second.id)
+        #expect(!state.didDismantleDestination(id: first.id))
+    }
+
+    @Test func lateWindowAdmissionRequiresNativeCompletion() {
+        let first = presentation()
+        let second = presentation()
+        let state = SheetPresentationState()
+        state.synchronize(first)
+        state.didCreateDestination(id: first.id)
+        state.synchronize(second)
+        state.didAdmitDestination(id: first.id)
+        #expect(!state.didDismantleDestination(id: first.id))
+        #expect(state.route?.id == first.id)
+        #expect(state.completeDismissal(id: first.id))
+        state.synchronize(second)
+        #expect(state.route?.id == second.id)
+    }
+
+    @Test func admittedDestinationStillWaitsAfterLeavingItsWindow() {
+        let first = presentation()
+        let second = presentation()
+        let state = SheetPresentationState()
+        state.synchronize(first)
+        state.didAdmitDestination(id: first.id)
+        #expect(!first.scope.isInstalledInView)
+        state.synchronize(second)
+        #expect(!state.isPresented)
+        #expect(state.route?.id == first.id)
+        #expect(!state.didDismantleDestination(id: first.id))
+        #expect(state.completeDismissal(id: first.id))
+        state.synchronize(second)
+        #expect(state.route?.id == second.id)
     }
 
     private func presentation() -> PresentedRoute {
