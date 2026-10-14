@@ -36,6 +36,86 @@ private let nativeDestinationTestsEnabled = ProcessInfo.processInfo.environment[
 // Native windows run separately from the unhosted package suite. UIKit needs a scene-backed host.
 @Suite(.serialized, .enabled(if: nativeDestinationTestsEnabled))
 struct RouteDestinationRenderingTests {
+    #if canImport(AppKit)
+    @Test func unadmittedRouteTeardownCompletesWhileItsCustomWrapperIsRetained() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Replace(DomainOnlyRoute.self)
+        } destinations: {
+            RouteDestination(DomainOnlyRoute.self) { _, _ in Text("Pending route") }
+        })
+        engine.routeScopeDidInstallInView(engine.root)
+        await engine.present(DomainOnlyRoute())
+        let scope = try #require(engine.defaultSpace.rootPath.last)
+        let lifetime = NativePresentationLifetime()
+        let control = CustomizedDestinationControl()
+        let builder = WindowDestinationBuilder { view, _ in
+            ConditionalCustomizedDestination(control: control, destination: view)
+        }
+        lifetime.synchronize(.init(scope: scope)) { .init(route: $0, destinationBuilder: builder, nativePresentation: lifetime) }
+        let snapshot = try #require(lifetime.presentation)
+        let host = NSHostingView(rootView: snapshot.destination.environment(\.routerEngine, engine))
+        host.frame = NSRect(x: 0, y: 0, width: 390, height: 500)
+        host.layoutSubtreeIfNeeded()
+        try #require(await waitUntil { lifecycleBridgeCount(in: host) == 2 })
+        #expect(!lifetime.isAdmitted)
+        lifetime.synchronize(nil) { .init(route: $0) }
+        #expect(scope.isAwaitingPresentationEnd)
+        control.showsRoute = false
+        host.layoutSubtreeIfNeeded()
+        try #require(await waitUntil { lifetime.presentation == nil })
+        #expect(lifecycleBridgeCount(in: host) == 1)
+        #expect(!scope.isAwaitingPresentationEnd)
+        withExtendedLifetime(host) {}
+    }
+    #endif
+
+    @Test func customizedContentAdmitsItsModalEvenWhenItTemporarilyOmitsRouteView() async throws {
+        let engine = RouterEngine()
+        let route = PresentedRoute(scope: RouteScope(id: "custom wrapper", route: nil))
+        let lifetime = NativePresentationLifetime()
+        let builder = WindowDestinationBuilder { _, _ in Text("Preparing customized content") }
+        lifetime.synchronize(route) { .init(route: $0, destinationBuilder: builder, nativePresentation: lifetime) }
+        let snapshot = try #require(lifetime.presentation)
+        let window = mount(snapshot.destination.environment(\.routerEngine, engine))
+        defer { close(window) }
+        try #require(await waitUntil { lifetime.isAdmitted })
+        #expect(!route.scope.isInstalledInView)
+        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.didDismantleDestination(of: snapshot.id)
+        #expect(route.scope.isAwaitingPresentationEnd)
+        lifetime.completeDismissal(of: snapshot.id, in: engine)
+        #expect(!route.scope.isAwaitingPresentationEnd)
+    }
+
+    @Test func destinationUsesOneBridgeForHostRegistrationAndNativeAdmission() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Replace(DomainOnlyRoute.self)
+        } destinations: {
+            RouteDestination(DomainOnlyRoute.self) { _, _ in Text("Single lifecycle source") }
+        })
+        engine.routeScopeDidInstallInView(engine.root)
+        await engine.present(DomainOnlyRoute())
+        let scope = try #require(engine.defaultSpace.rootPath.last)
+        let lifetime = NativePresentationLifetime()
+        lifetime.synchronize(.init(scope: scope)) { .init(route: $0, nativePresentation: lifetime) }
+        let snapshot = try #require(lifetime.presentation)
+        let window = mount(snapshot.destination.environment(\.routerEngine, engine))
+        defer { close(window) }
+        try #require(await waitUntil { scope.isAvailableForPresentation && scope.presentationHostID != nil })
+        #expect(lifecycleBridgeCount(in: try #require(window.contentViewForLifecycleTest)) == 1)
+        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.didDismantleDestination(of: snapshot.id)
+        // Window admission must have reached the native owner through that same bridge.
+        #expect(scope.isAwaitingPresentationEnd)
+        lifetime.completeDismissal(of: snapshot.id, in: engine)
+        #expect(!scope.isAwaitingPresentationEnd)
+    }
+
+    private func lifecycleBridgeCount(in view: PlatformView) -> Int {
+        (view is ViewLifecycleBridge.LifecycleView ? 1 : 0)
+            + view.subviews.reduce(0) { $0 + lifecycleBridgeCount(in: $1) }
+    }
+
     @Test func replacementContextTracksEnvironmentAndKeepsCapturedActionsScoped() async throws {
         let router = RootRouter()
         let engine = router.engine
@@ -215,6 +295,28 @@ struct RouteDestinationRenderingTests {
     private func close(_ window: NSWindow) { window.close() }
     #endif
 }
+
+@MainActor @Observable
+private final class CustomizedDestinationControl { var showsRoute = true }
+
+private struct ConditionalCustomizedDestination: View {
+    @Bindable var control: CustomizedDestinationControl
+    let destination: RouteView
+    var body: some View {
+        if control.showsRoute { destination }
+        else { Text("Preparing customized content") }
+    }
+}
+
+#if canImport(UIKit)
+private extension UIWindow {
+    var contentViewForLifecycleTest: UIView? { rootViewController?.view }
+}
+#else
+private extension NSWindow {
+    var contentViewForLifecycleTest: NSView? { contentView }
+}
+#endif
 
 @MainActor
 @Observable

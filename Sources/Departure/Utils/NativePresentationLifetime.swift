@@ -35,7 +35,8 @@ final class NativePresentationLifetime {
     }
     private enum Admission { case uncreated, created, admitted }
     private var phase: Phase = .idle(CompletedOccurrence())
-    // Native preparation changes completion requirements, but does not change rendered content.
+    // Creation changes completion requirements without invalidating content. Admission
+    // publishes only its computed signal, used by the native fade animation.
     @ObservationIgnored private var admission: Admission = .uncreated
 
     var presentation: RouteDestinationSnapshot? {
@@ -51,6 +52,10 @@ final class NativePresentationLifetime {
         }
     }
     var dismissalID: PresentedRoute.ID? { isPresented ? nil : presentation?.id }
+    var isAdmitted: Bool {
+        access(keyPath: \.isAdmitted)
+        return presentation != nil && admission == .admitted
+    }
 
     /// Retains an admitted occurrence until native completion; unadmitted content can be replaced.
     /// The coordinator owns pending navigation, so no pending route is stored here.
@@ -58,7 +63,7 @@ final class NativePresentationLifetime {
         switch phase {
         case .idle(let completed):
             guard let route, route.scope !== completed.scope else { return }
-            admission = .uncreated
+            withMutation(keyPath: \.isAdmitted) { admission = .uncreated }
             phase = .presenting(build(route))
             route.scope.trackNativePresentation(self)
         case .presenting(let presentation):
@@ -78,9 +83,9 @@ final class NativePresentationLifetime {
 
     /// The destination entered a window, or UIKit installed its native owner.
     func didAdmitPresentation(of id: PresentedRoute.ID) {
-        guard presentation?.id == id else { return }
+        guard presentation?.id == id, admission != .admitted else { return }
         // A cancelled destination can still enter its window before SwiftUI tears it down.
-        admission = .admitted
+        withMutation(keyPath: \.isAdmitted) { admission = .admitted }
     }
 
     func handleDestinationEvent(_ event: ViewLifecycleBridge.Event, of id: PresentedRoute.ID) {

@@ -25,14 +25,15 @@ import SwiftUI
 public struct RouteView: View {
     let scope: RouteScope
     @RouterEnvironment private var router
-    init(scope: RouteScope) { self.scope = scope }
+    private weak var nativePresentation: NativePresentationLifetime?
+    init(scope: RouteScope, nativePresentation: NativePresentationLifetime? = nil) {
+        self.scope = scope
+        self.nativePresentation = nativePresentation
+    }
     public var body: some View {
         DestinationContent(scope: scope)
-            .routingAutomatically()
+            .routingAutomatically(nativePresentation: nativePresentation)
             .routeScopeEnvironment(scope, router: router)
-            .onLifecycleEvent { view, id, event in
-                router.handleHostEvent(event, scope: scope, view: view, id: id)
-            }
     }
 }
 

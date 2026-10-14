@@ -25,13 +25,13 @@ import SwiftUI
 /// Each native style stays fixed within its independent presentation host slot.
 struct NativePresentationStyleModifier: ViewModifier {
     enum Style {
-        case push, sheet, cover
+        case push, sheet, cover(Cover.Transition)
 
         var presentationKind: RoutePresentationKind {
             switch self {
             case .push: .push
             case .sheet: .sheet
-            case .cover: .cover(.slide)
+            case .cover(let transition): .cover(transition)
             }
         }
     }
@@ -58,8 +58,13 @@ struct NativePresentationStyleModifier: ViewModifier {
                 }
         case .sheet:
             content.modifier(SystemModalPresentationModifier(style: .sheet, route: presentation))
-        case .cover:
-            content.modifier(SystemModalPresentationModifier(style: .cover(.slide), route: presentation))
+        case .cover(let transition):
+            #if canImport(UIKit)
+            let builder = transition == .fade ? router.windowDestinationBuilder : nil
+            #else
+            let builder: WindowDestinationBuilder? = nil
+            #endif
+            content.modifier(SystemModalPresentationModifier(style: .cover(transition), route: presentation, destinationBuilder: builder))
         }
     }
 }
@@ -70,11 +75,29 @@ struct SystemModalPresentationModifier: ViewModifier {
     @Binding var route: PresentedRoute?
     var destinationBuilder: WindowDestinationBuilder?
     @RouterEnvironment private var router
+    @Environment(\.scenePhase) private var scenePhase
     @State private var lifetime = NativePresentationLifetime()
+    @State private var fade: Fade = .hidden
+
+    private enum Fade: Equatable {
+        case hidden, visible, dismissed(PresentedRoute.ID)
+        var opacity: Double { self == .visible ? 1 : 0 }
+    }
+
+    private var fades: Bool {
+        #if canImport(UIKit)
+        style == .cover(.fade)
+        #else
+        false
+        #endif
+    }
 
     func body(content: Content) -> some View {
         let rendered = lifetime.presentation
-        let presented = Binding(get: { lifetime.isPresented }, set: { value in
+        let presented = Binding(get: {
+            if fades { return rendered.map { fade != .dismissed($0.id) } ?? false }
+            return lifetime.isPresented
+        }, set: { value in
             guard !value, let rendered else { return }
             // Native write-back can arrive inside SwiftUI's update transaction.
             Task { @MainActor in
@@ -83,6 +106,22 @@ struct SystemModalPresentationModifier: ViewModifier {
         })
         return systemPresentation(content, presented: presented, rendered: rendered)
             .onChange(of: route?.id, initial: true) { _, _ in synchronize() }
+            .onChange(of: lifetime.presentation?.id) { _, id in
+                if id == nil { synchronize() }
+            }
+            .onChange(of: admittedFadeID, initial: true) { _, id in
+                guard let id, lifetime.presentation?.id == id, lifetime.isPresented else { return }
+                withAnimation(.easeInOut(duration: 0.35)) { fade = .visible }
+            }
+            .task(id: fades ? lifetime.dismissalID : nil) {
+                guard fades, let id = lifetime.dismissalID else { return }
+                withAnimation(.easeInOut(duration: 0.25), completionCriteria: .removed) {
+                    fade = .hidden
+                } completion: {
+                    guard lifetime.dismissalID == id else { return }
+                    fade = .dismissed(id)
+                }
+            }
             .onLifecycleEvent { _, _, event in
                 switch event {
                 case .installedInWindow: synchronize()
@@ -96,7 +135,12 @@ struct SystemModalPresentationModifier: ViewModifier {
     @ViewBuilder
     private func systemPresentation(_ content: Content, presented: Binding<Bool>, rendered: RouteDestinationSnapshot?) -> some View {
         #if canImport(UIKit)
-        if style != .sheet {
+        if fades {
+            content.fullScreenCover(isPresented: presented, onDismiss: { complete(rendered) }) {
+                if let rendered { destination(rendered).presentationBackground(.clear) }
+            }
+            .transaction { $0.disablesAnimations = true }
+        } else if style != .sheet {
             content.fullScreenCover(isPresented: presented, onDismiss: { complete(rendered) }) {
                 if let rendered { destination(rendered) }
             }
@@ -112,19 +156,30 @@ struct SystemModalPresentationModifier: ViewModifier {
         #endif
     }
 
+    @ViewBuilder
     private func destination(_ rendered: RouteDestinationSnapshot) -> some View {
-        rendered.destination.id(rendered.id)
-            .onLifecycleEvent { _, _, event in
-                lifetime.handleDestinationEvent(event, of: rendered.id)
-                if case .ended = event { synchronize() }
-            }
+        if fades {
+            rendered.destination.id(rendered.id)
+                .environment(\.routerEngine, router)
+                .environment(\.scenePhase, scenePhase)
+                .opacity(fade.opacity)
+        } else {
+            rendered.destination.id(rendered.id)
+        }
+    }
+
+    private var admittedFadeID: PresentedRoute.ID? {
+        guard fades, let rendered = lifetime.presentation, lifetime.isAdmitted else { return nil }
+        return rendered.id
     }
 
     private func synchronize() {
+        let previousID = lifetime.presentation?.id
         lifetime.synchronize(route) {
-            if let destinationBuilder { RouteDestinationSnapshot(route: $0, destinationBuilder: destinationBuilder) }
-            else { RouteDestinationSnapshot(route: $0) }
+            if let destinationBuilder { RouteDestinationSnapshot(route: $0, destinationBuilder: destinationBuilder, nativePresentation: lifetime) }
+            else { RouteDestinationSnapshot(route: $0, nativePresentation: lifetime) }
         }
+        if previousID != lifetime.presentation?.id { fade = .hidden }
     }
     private func complete(_ rendered: RouteDestinationSnapshot?) {
         guard let rendered else { return }

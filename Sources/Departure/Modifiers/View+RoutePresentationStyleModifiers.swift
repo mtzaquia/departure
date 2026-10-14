@@ -53,13 +53,13 @@ extension View {
             .background {
                 if styles.contains(.cover(.slide)) {
                     presentationHost
-                        .modifier(NativePresentationStyleModifier(style: .cover, presentationHostID: presentationHostID))
+                        .modifier(NativePresentationStyleModifier(style: .cover(.slide), presentationHostID: presentationHostID))
                 }
             }
             .background {
                 if styles.contains(.cover(.fade)) {
                     presentationHost
-                        .modifier(CoverFadePresentationStyleModifier(presentationHostID: presentationHostID))
+                        .modifier(NativePresentationStyleModifier(style: .cover(.fade), presentationHostID: presentationHostID))
                 }
             }
     }

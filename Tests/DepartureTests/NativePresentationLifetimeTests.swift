@@ -4,6 +4,25 @@ import Testing
 
 @MainActor @Suite(.timeLimit(.minutes(1)))
 struct NativePresentationLifetimeTests {
+    @Test(arguments: [false, true])
+    func retainedDestinationSnapshotDoesNotRetainItsNativeOwner(customized: Bool) throws {
+        let route = PresentedRoute(scope: RouteScope(id: "snapshot", route: nil))
+        var lifetime: NativePresentationLifetime? = NativePresentationLifetime()
+        weak let owner = lifetime
+        lifetime?.synchronize(route) {
+            if customized {
+                .init(route: $0, destinationBuilder: WindowDestinationBuilder { view, _ in view }, nativePresentation: lifetime)
+            } else {
+                .init(route: $0, nativePresentation: lifetime)
+            }
+        }
+        let snapshot = try #require(lifetime?.presentation)
+        lifetime = nil
+        #expect(owner == nil)
+        #expect(!route.scope.isAwaitingPresentationEnd)
+        withExtendedLifetime(snapshot) {}
+    }
+
     @Test func unadmittedSuccessorIsPreparedInTheSameSynchronization() {
         let first = PresentedRoute(scope: RouteScope(id: "first", route: nil))
         let next = PresentedRoute(scope: RouteScope(id: "next", route: nil))

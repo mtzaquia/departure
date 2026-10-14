@@ -36,13 +36,9 @@ public struct WithRouter<Content: View>: View {
 
     public var body: some View {
         content
-            .routingAutomatically()
+            .routingAutomatically(windowDestinationBuilder: windowDestinationBuilder)
             .routeScopeEnvironment(router.root, router: router)
             .background {
-                WindowDestinationBuilderRegistration(
-                    router: router,
-                    windowDestinationBuilder: windowDestinationBuilder
-                )
                 ElevatedPriorityHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
                 ElevatedPriorityHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
             }
@@ -81,22 +77,5 @@ public struct WithRouter<Content: View>: View {
         self._router = State(wrappedValue: router)
         self.content = content()
         self.windowDestinationBuilder = windowDestinationBuilder
-    }
-}
-
-private struct WindowDestinationBuilderRegistration: View {
-    let router: RouterEngine
-    let windowDestinationBuilder: WindowDestinationBuilder
-
-    var body: some View {
-        Color.clear
-            .frame(width: 0, height: 0)
-            .onLifecycleEvent { lifecycleView, lifecycleID, event in
-                router.windowDestinationBuilder = windowDestinationBuilder
-                router.handleHostEvent(event, scope: router.root, view: lifecycleView, id: lifecycleID)
-#if DEBUG
-                if case .installedInWindow = event { router.traceMapAdoption() }
-#endif
-            }
     }
 }

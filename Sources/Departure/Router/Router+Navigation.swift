@@ -445,6 +445,9 @@ extension RouterEngine {
         case .installedInWindow, .updated(isInstalledInWindow: true):
             guard let view else { return }
             hostDidAttach(scope, view: view, id: id)
+            #if DEBUG
+            if scope === root, case .installedInWindow = event { traceMapAdoption() }
+            #endif
         case .updated(isInstalledInWindow: false): scope.hostAvailabilityDidChange(id: id)
         case .ended: hostDidDetach(scope, id: id)
         }
