@@ -81,20 +81,31 @@ private struct RoutingModifier: ViewModifier {
                 attachment.handle(event, id: id, target: scope, view: view,
                     apply: { scope in
                         scope.bindRoutingHost(hostID, automatic: automatic, environment: environment, selection: selection)
-                        if selection != nil {
-                            Task { @MainActor in router.synchronizeBranchSelection(ownedBy: hostID, in: scope) }
-                        }
+                        reconcileSelection(in: scope)
                     }, remove: { scope in
                         scope.unbindRoutingHost(hostID)
-                        if selection != nil {
-                            Task { @MainActor in router.restoreBranchSelection(in: scope) }
-                        }
+                        reconcileSelection(in: scope, restoring: true)
                     })
             }
             .onChange(of: selection?.value(), initial: true) { _, _ in
                 guard let scope else { return }
-                router.synchronizeBranchSelection(ownedBy: hostID, in: scope)
+                reconcileSelection(in: scope, deferred: false)
             }
+    }
+
+    private func reconcileSelection(in scope: RouteScope, restoring: Bool = false, deferred: Bool = true) {
+        guard selection != nil, scope.needsBranchSelectionSynchronization else { return }
+        let router = router, owner = hostID
+        if !deferred {
+            router.synchronizeBranchSelection(ownedBy: owner, in: scope, restoring: restoring)
+            return
+        }
+        // Native updates can be inside SwiftUI's transaction; reconcile the live
+        // registration after leaving that callback, without retaining a departed host.
+        Task { @MainActor [weak router, weak scope] in
+            guard let router, let scope, scope.needsBranchSelectionSynchronization else { return }
+            router.synchronizeBranchSelection(ownedBy: owner, in: scope, restoring: restoring)
+        }
     }
 }
 

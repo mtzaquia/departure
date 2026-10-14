@@ -159,6 +159,7 @@ struct SystemModalPresentationModifier: ViewModifier {
     @ViewBuilder
     private func destination(_ rendered: RouteDestinationSnapshot) -> some View {
         if fades {
+            let _ = prepareFadeDestination(rendered.id)
             rendered.destination.id(rendered.id)
                 .environment(\.routerEngine, router)
                 .environment(\.scenePhase, scenePhase)
@@ -166,6 +167,18 @@ struct SystemModalPresentationModifier: ViewModifier {
         } else {
             rendered.destination.id(rendered.id)
         }
+    }
+
+    private func prepareFadeDestination(_ id: PresentedRoute.ID) {
+        #if canImport(UIKit)
+        if #unavailable(iOS 18) {
+            // iOS 17 commits an unanimated cover before creating its lifecycle
+            // bridge. Retain it until native completion so its late dismissal
+            // callback cannot be rebound to a successor. Newer SwiftUI can cancel
+            // prepared content without creating native views or calling onDismiss.
+            lifetime.didCreateDestination(of: id)
+        }
+        #endif
     }
 
     private var admittedFadeID: PresentedRoute.ID? {

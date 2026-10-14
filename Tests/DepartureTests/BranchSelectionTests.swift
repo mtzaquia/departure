@@ -104,7 +104,7 @@ import Testing
         selection.value = "second"
         duplicate.value = "second"
         engine.synchronizeBranchSelection(ownedBy: owner, in: outgoing)
-        engine.restoreBranchSelection(in: outgoing)
+        engine.synchronizeBranchSelection(ownedBy: owner, in: outgoing, restoring: true)
         #expect(selection.value == "second")
         #expect(duplicate.value == "second")
         #expect(outgoing.activeBranch == AnyHashable("first"))

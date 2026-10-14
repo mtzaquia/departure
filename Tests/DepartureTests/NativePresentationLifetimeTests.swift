@@ -36,6 +36,30 @@ struct NativePresentationLifetimeTests {
         #expect(next.scope.isAwaitingPresentationEnd)
     }
 
+    @Test func preparedContentWithoutALifecycleBridgeWaitsForNativeCompletion() throws {
+        let engine = RouterEngine()
+        let first = PresentedRoute(scope: RouteScope(id: "first", route: nil))
+        let next = PresentedRoute(scope: RouteScope(id: "next", route: nil))
+        let lifetime = NativePresentationLifetime()
+        lifetime.synchronize(first) { .init(route: $0) }
+        // SwiftUI evaluates the modal content builder before making its native views.
+        lifetime.didCreateDestination(of: first.id)
+        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.synchronize(next) { .init(route: $0) }
+        #expect(lifetime.presentation?.id == first.id)
+        #expect(first.scope.isAwaitingPresentationEnd)
+        #expect(!lifetime.isPresented)
+        #expect(!lifetime.isAdmitted)
+
+        lifetime.completeDismissal(of: first.id, in: engine)
+        #expect(!first.scope.isAwaitingPresentationEnd)
+        lifetime.synchronize(next) { .init(route: $0) }
+        #expect(try #require(lifetime.presentation).id == next.id)
+        lifetime.completeDismissal(of: first.id, in: engine)
+        #expect(lifetime.presentation?.id == next.id)
+        #expect(lifetime.isPresented)
+    }
+
     @Test func offWindowDestinationUpdateCannotHoldAReplacementWaitingForDismissal() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
             Sheet(NumberedRoute.self)

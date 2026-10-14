@@ -36,6 +36,36 @@ private let nativeDestinationTestsEnabled = ProcessInfo.processInfo.environment[
 // Native windows run separately from the unhosted package suite. UIKit needs a scene-backed host.
 @Suite(.serialized, .enabled(if: nativeDestinationTestsEnabled))
 struct RouteDestinationRenderingTests {
+    @Test func branchSelectionReconcilesInitialValueAndOwnerChanges() async throws {
+        let router = RootRouter()
+        let control = SelectionReconciliationControl()
+        let host = WithRouter(routes: RootRouteMap {
+            Branches { Branch("first") {}; Branch("second") {} }
+        }, router: router) {
+            SelectionReconciliationSources(control: control)
+        }
+        let window = mount(host)
+        defer { close(window) }
+        let scope = router.engine.root
+        try #require(await waitUntil { scope.branchSelection != nil && scope.activeBranch == AnyHashable("second") })
+
+        control.showsDuplicate = true
+        try #require(await waitUntil { scope.hasConflictingBranchSelection && control.duplicate == "second" })
+        // Resolve ownership in the same update as a conflicting native selection write.
+        // The remaining owner must first restore the model, then accept later user changes.
+        control.duplicate = "first"
+        control.showsPrimary = false
+        try #require(await waitUntil { scope.branchSelection != nil && control.duplicate == "second" })
+        #expect(scope.activeBranch == AnyHashable("second"))
+        control.duplicate = "first"
+        try #require(await waitUntil { scope.activeBranch == AnyHashable("first") })
+
+        control.showsDuplicate = false
+        try #require(await waitUntil { scope.branchSelection == nil })
+        control.showsPrimary = true
+        try #require(await waitUntil { scope.branchSelection != nil && scope.activeBranch == AnyHashable("second") })
+    }
+
     #if canImport(AppKit)
     @Test func unadmittedRouteTeardownCompletesWhileItsCustomWrapperIsRetained() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
@@ -298,6 +328,24 @@ struct RouteDestinationRenderingTests {
 
 @MainActor @Observable
 private final class CustomizedDestinationControl { var showsRoute = true }
+
+@MainActor @Observable
+private final class SelectionReconciliationControl {
+    var showsPrimary = true
+    var showsDuplicate = false
+    var primary = "second"
+    var duplicate = "first"
+}
+
+private struct SelectionReconciliationSources: View {
+    @Bindable var control: SelectionReconciliationControl
+    var body: some View {
+        VStack {
+            if control.showsPrimary { Text("Primary").routing(branch: $control.primary) }
+            if control.showsDuplicate { Text("Duplicate").routing(branch: $control.duplicate) }
+        }
+    }
+}
 
 private struct ConditionalCustomizedDestination: View {
     @Bindable var control: CustomizedDestinationControl

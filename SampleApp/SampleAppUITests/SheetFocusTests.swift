@@ -46,7 +46,9 @@ final class SheetFocusTests: XCTestCase {
     func testFadeCoverReplacementAcrossAnUpdateShowsSuccessor() {
         let app = launch(root: true, fade: true)
         defer { app.terminate() }
-        verifyImmediateReplacement(in: app, trigger: "sample.sheet-focus.present-then-replace-update")
+        for _ in 0..<5 {
+            verifyImmediateReplacement(in: app, trigger: "sample.sheet-focus.present-then-replace-update")
+        }
     }
 
     private func verifyPushedHostReplacement(acrossUpdate: Bool) {
@@ -161,7 +163,15 @@ final class SheetFocusTests: XCTestCase {
     }
 
     func testImmediatePresentationAndUnwindCanBeRepeated() {
-        let app = launch(root: true)
+        verifyImmediatePresentationAndUnwind(fade: false)
+    }
+
+    func testImmediateFadePresentationAndUnwindCanBeRepeated() {
+        verifyImmediatePresentationAndUnwind(fade: true)
+    }
+
+    private func verifyImmediatePresentationAndUnwind(fade: Bool) {
+        let app = launch(root: true, fade: fade)
         defer { app.terminate() }
         tap("sample.sheet-focus.cycle", in: app)
         let cycles = app.staticTexts["sample.sheet-focus.cycles"]

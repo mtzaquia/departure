@@ -166,9 +166,9 @@ extension RouterEngine {
         scope.belongs(to: spaces.activeSpace)
     }
 
-    func synchronizeBranchSelection(ownedBy owner: RoutePresentationHostID, in scope: RouteScope) {
+    func synchronizeBranchSelection(ownedBy owner: RoutePresentationHostID, in scope: RouteScope, restoring: Bool = false) {
         guard spaces.routePath(containing: scope) != nil else { return }
-        guard let selection = scope.branchSelection(ownedBy: owner) else {
+        guard !restoring, let selection = scope.branchSelection(ownedBy: owner) else {
             scope.restoreBranchSelection()
             return
         }
@@ -177,11 +177,6 @@ extension RouterEngine {
             return
         }
         scope.bindBranchSelection(selection)
-    }
-
-    func restoreBranchSelection(in scope: RouteScope) {
-        guard spaces.routePath(containing: scope) != nil else { return }
-        scope.restoreBranchSelection()
     }
 
     func navigationSource(_ origin: RouteRequestOrigin?) -> RouteScope? {

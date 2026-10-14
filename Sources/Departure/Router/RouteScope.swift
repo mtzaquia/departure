@@ -342,6 +342,11 @@ extension RouteScope {
     }
 
     // Selection ownership is a projection of routing attachments, not another registry.
+    var needsBranchSelectionSynchronization: Bool {
+        guard branchContainer != nil else { return false }
+        return routingHosts.values.lazy.compactMap(\.selection).contains { $0.value() != activeBranch }
+    }
+
     var hasConflictingBranchSelection: Bool {
         routingHosts.values.lazy.compactMap(\.selection).count > 1
     }
