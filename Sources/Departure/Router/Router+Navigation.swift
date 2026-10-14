@@ -304,7 +304,7 @@ extension RouterEngine {
             return
         }
 
-        if await ios17NavigationStackPushWorkaround?.prepareAppend(after: match, in: self) == true {
+        if await prepareReplacement(after: match) {
             return
         }
 
@@ -335,6 +335,32 @@ extension RouterEngine {
 
         clearUnwindPresentationSnapshot(id: snapshotID)
         appendPreparedRoute(route, after: match)
+    }
+
+    private func prepareReplacement(after match: DeclarationMatch) async -> Bool {
+        guard match.declaration.presentationKind == .replace,
+              let host = match.presentationHost,
+              let replacing = routePresentation(
+                from: host, matching: .replace, hostedBy: match.presentationHostID
+              )?.scope,
+              let path = routeForest.routePath(containing: replacing),
+              let position = path.position(of: replacing),
+              path.scopesRemovedAfter(position).contains(where: {
+                $0.presentationDeclaration?.presentationKind == .push
+              })
+        else { return false }
+
+        // Keep the selection and its native stack until pushed children finish leaving.
+        // This applies to every OS; replacing both in one render pass can cancel the pop.
+        let transaction = beginNavigationTransaction()
+        let plan = routeForest.unwindPlan(for: .scoped(routePath: path, after: position))
+        let removed = prepareRouteAppendPath(plan)
+        await waitForRouteScopesToLeaveView(removed)
+        let wasSuperseded = pendingRoute != nil || bufferedPresentationRequest != nil || Task.isCancelled
+            || routeForest.routePath(containing: host) == nil
+        await finishNavigationTransaction(transaction)
+        if case .drop = priorityDecision(for: match) { return true }
+        return wasSuperseded
     }
 
     func appendPreparedRoute(

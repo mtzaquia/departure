@@ -145,6 +145,9 @@ inside a `NavigationStack`. A sheet or cover overlays the selected root as usual
 
 Unwinding the selected root reveals the original branch content. Presenting an equivalent
 selected route keeps its scope identity and unwinds its descendants back to that root.
+If the selected root has pushed children, Departure waits for them to leave before
+replacing the root. Cancelling the request during that pop leaves the selected root
+in place; a newer waiting request takes precedence.
 An equal route pushed elsewhere is not reused as the selected root. A `Replace` declared
 locally with `.routes` replaces that declaring view's slot rather than the entire branch.
 

@@ -28,8 +28,6 @@ protocol IOS17NavigationStackPushWorkaroundHandling: AnyObject {
         in parentScope: RouteScope?,
         router: RouterEngine
     ) -> Bool
-    /// Returns true when a newer route request superseded the append during preparation.
-    func prepareAppend(after match: RouterEngine.DeclarationMatch, in router: RouterEngine) async -> Bool
     func interceptDismissal(
         of presentation: PresentedRoute,
         matching presentationKind: RoutePresentationKind,
@@ -83,30 +81,6 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         _ = router.activeRouteScopeID
         guard parentScope?.branchContainer?.isConcurrent == true else { return true }
         return parentScope?.activeBranch == branch
-    }
-
-    func prepareAppend(after match: RouterEngine.DeclarationMatch, in router: RouterEngine) async -> Bool {
-        guard match.declaration.presentationKind == .replace,
-              let host = match.presentationHost,
-              let replacing = router.routePresentation(
-                from: host, matching: .replace, hostedBy: match.presentationHostID
-              )?.scope,
-              let path = router.routeForest.routePath(containing: replacing),
-              let position = path.position(of: replacing),
-              path.scopesRemovedAfter(position).contains(where: {
-                $0.presentationDeclaration?.presentationKind == .push
-              })
-        else { return false }
-
-        // iOS 17 cannot reliably remove a pushed child and replace its enclosing selection
-        // in the same graph update. Pop the child first and preserve latest-request semantics.
-        let transaction = router.beginNavigationTransaction()
-        let plan = router.routeForest.unwindPlan(for: .scoped(routePath: path, after: position))
-        let removed = router.prepareRouteAppendPath(plan)
-        await router.waitForRouteScopesToLeaveView(removed)
-        let wasSuperseded = router.pendingRoute != nil
-        await router.finishNavigationTransaction(transaction)
-        return wasSuperseded
     }
 
     func interceptDismissal(
