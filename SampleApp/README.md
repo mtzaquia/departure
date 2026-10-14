@@ -91,3 +91,17 @@ The start screen's **About this sample** sheet binds a domain-only route using
 `RouteDestination`. It displays `context.presentation` and dismisses using the supplied
 scoped unwind action. All flows use type-only map declarations and typed builders in
 `destinations:` closures. High and critical entries use root-only priority groups.
+
+## Presentation replacement regressions
+
+Launch with `--sheet-focus-probe` for a branch-owned sheet, add `--sheet-focus-root`
+for a root-owned sheet, or add `--sheet-focus-pushed` for a pushed screen owning the sheet.
+Add `--sheet-focus-fade` to the root probe to exercise the same lifecycle with a fading cover.
+**Present then replace** sends two sequential public routing requests before the first
+sheet appears. The update variant yields once between requests. Both must display **Sheet 2**
+and allow it to unwind normally. `SheetFocusTests` covers these cases alongside native
+focus retention, swipe dismissal, replacement of a visible sheet, and repeated reopening.
+
+The **Split-view lab** covers replacing selected content from a pushed child. Select a detail
+root, open its child, and choose **Replace from child**. The child must pop before the next
+selection appears, without adding a Back entry or clearing another column's navigation.

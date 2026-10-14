@@ -61,13 +61,16 @@ private struct ViewLifecycleEventModifier: ViewModifier {
 /// Moves teardown out of SwiftUI's representable dismantle stack.
 /// A later installation invalidates pending work so transient bridge replacement cannot
 /// uninstall a live registration.
+/// Pending callbacks retain delivery until the router receives its final teardown.
 final class ViewLifecycleTeardownDelivery {
-    private var installedLifecycleID: UUID?
-    private var generation = 0
+    // An installed bridge and its off-window replacement can coexist.
+    private var installed: Occurrence?
+    private var created: Occurrence?
 
     func install(_ lifecycleID: UUID) {
-        installedLifecycleID = lifecycleID
-        generation &+= 1
+        if installed?.id != lifecycleID { installed = Occurrence(id: lifecycleID) }
+        else { installed?.cancelTeardown() }
+        if created?.id == lifecycleID { created?.cancelTeardown() }
     }
 
     @discardableResult
@@ -79,6 +82,11 @@ final class ViewLifecycleTeardownDelivery {
         let lifecycleID = view.id
 
         switch event {
+        case .created:
+            created = Occurrence(id: lifecycleID)
+            handler(view, lifecycleID, event)
+            return nil
+
         case .installedInWindow, .updated(isInstalledInWindow: true):
             install(lifecycleID)
             handler(view, lifecycleID, event)
@@ -89,7 +97,12 @@ final class ViewLifecycleTeardownDelivery {
             return nil
 
         case .dismantled, .deinitialized:
-            return schedule(for: lifecycleID) {
+            if installed?.id == lifecycleID {
+                return schedule(for: lifecycleID) { handler(nil, lifecycleID, event) }
+            }
+            guard let created, created.id == lifecycleID else { return nil }
+            return created.scheduleTeardown { [self] in
+                self.created = nil
                 handler(nil, lifecycleID, event)
             }
         }
@@ -99,28 +112,47 @@ final class ViewLifecycleTeardownDelivery {
     func schedule(
         for lifecycleID: UUID,
         _ action: @escaping @MainActor () -> Void
-    ) -> Task<Void, Never> {
-        generation &+= 1
-        let scheduledGeneration = generation
-
-        return Task { @MainActor [self] in
-            await Task.yield()
-
-            guard
-                generation == scheduledGeneration,
-                installedLifecycleID == lifecycleID
-            else {
-                return
-            }
-
-            installedLifecycleID = nil
+    ) -> Task<Void, Never>? {
+        guard let installed, installed.id == lifecycleID else { return nil }
+        return installed.scheduleTeardown { [self] in
+            self.installed = nil
+            if created?.id == lifecycleID { created = nil }
             action()
         }
+    }
+
+    /// Keeps a bridge identity and its cancellable callback together.
+    private final class Occurrence {
+        let id: UUID
+        private var teardown: Task<Void, Never>?
+
+        init(id: UUID) { self.id = id }
+
+        func cancelTeardown() {
+            teardown?.cancel()
+            teardown = nil
+        }
+
+        func scheduleTeardown(_ action: @escaping @MainActor () -> Void) -> Task<Void, Never> {
+            cancelTeardown()
+            // Leave the synchronous representable callback before mutating observed routing state.
+            // A discarded occurrence cancels its work without being retained by the task.
+            let task = Task { @MainActor [weak self] in
+                guard let self, !Task.isCancelled else { return }
+                teardown = nil
+                action()
+            }
+            teardown = task
+            return task
+        }
+
+        isolated deinit { teardown?.cancel() }
     }
 }
 
 struct ViewLifecycleBridge {
     enum Event {
+        case created
         case updated(isInstalledInWindow: Bool)
         case installedInWindow(isInitial: Bool)
         case dismantled
@@ -134,7 +166,9 @@ struct ViewLifecycleBridge {
     }
 
     fileprivate func makeView() -> LifecycleView {
-        LifecycleView(onIdentifiedEvent: onEvent)
+        let view = LifecycleView(onIdentifiedEvent: onEvent)
+        onEvent(view, .created)
+        return view
     }
 
     fileprivate func updateView(_ view: LifecycleView) {
@@ -149,6 +183,7 @@ extension ViewLifecycleBridge: UIViewRepresentable {
     func updateUIView(_ uiView: LifecycleView, context: Context) { updateView(uiView) }
     static func dismantleUIView(_ uiView: LifecycleView, coordinator: ()) { uiView.notifyDismantled() }
 }
+
 #else
 extension ViewLifecycleBridge: NSViewRepresentable {
     func makeNSView(context: Context) -> LifecycleView { makeView() }

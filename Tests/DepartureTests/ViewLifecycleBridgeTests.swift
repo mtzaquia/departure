@@ -28,6 +28,155 @@ import Testing
 @MainActor
 @Suite
 struct ViewLifecycleBridgeTests {
+    @Test func finalTeardownRetainsDeliveryUntilCompletionAndThenReleasesIt() async {
+        var delivery: ViewLifecycleTeardownDelivery? = ViewLifecycleTeardownDelivery()
+        weak let retainedDelivery = delivery
+        let lifecycleID = UUID()
+        var completed = false
+        delivery?.install(lifecycleID)
+        let teardown = delivery?.schedule(for: lifecycleID) { completed = true }
+        delivery = nil
+        #expect(retainedDelivery != nil)
+        #expect(!completed)
+        await teardown?.value
+        #expect(completed)
+        #expect(retainedDelivery == nil)
+    }
+
+    @Test func installedAndCreatedTeardownsRemainIndependent() async {
+        let delivery = ViewLifecycleTeardownDelivery()
+        let old = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        let next = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        var teardownIDs: [UUID] = []
+        let handler: @MainActor (ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event) -> Void = { _, id, event in
+            if case .dismantled = event { teardownIDs.append(id) }
+        }
+        delivery.deliver(.created, for: old, handler: handler)
+        delivery.deliver(.installedInWindow(isInitial: true), for: old, handler: handler)
+        let installed = delivery.deliver(.dismantled, for: old, handler: handler)
+        delivery.deliver(.created, for: next, handler: handler)
+        let created = delivery.deliver(.dismantled, for: next, handler: handler)
+        await installed?.value
+        await created?.value
+        #expect(Set(teardownIDs) == [old.id, next.id])
+        #expect(teardownIDs.count == 2)
+    }
+
+    @Test(arguments: [false, true])
+    func installationCancelsCreatedTeardownOnlyForTheSameBridge(sameBridge: Bool) async {
+        let delivery = ViewLifecycleTeardownDelivery()
+        let created = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        let other = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        var teardownIDs: [UUID] = []
+        let handler: @MainActor (ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event) -> Void = { _, id, event in
+            if case .dismantled = event { teardownIDs.append(id) }
+        }
+        delivery.deliver(.created, for: created, handler: handler)
+        let teardown = delivery.deliver(.dismantled, for: created, handler: handler)
+        delivery.deliver(.installedInWindow(isInitial: true), for: sameBridge ? created : other, handler: handler)
+        await teardown?.value
+        #expect(teardownIDs == (sameBridge ? [] : [created.id]))
+    }
+
+    @Test func recreatedOffWindowBridgeKeepsItsRoutingRegistrationUntilItsOwnTeardown() async {
+        let engine = RouterEngine()
+        let attachment = RouteScopeAttachment(kind: .routing)
+        let delivery = ViewLifecycleTeardownDelivery()
+        let hostID = RoutePresentationHostID()
+        let old = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        let next = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: [], backing: .buffered, defer: false)
+        window.contentView = old
+        engine.hostDidAttach(engine.root, view: old, id: old.id)
+        let handler: @MainActor (ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event) -> Void = { view, id, event in
+            attachment.handle(event, id: id, target: engine.root, view: view,
+                apply: { $0.bindRoutingHost(hostID, automatic: false, environment: $0.sourceEnvironment) },
+                remove: { $0.unbindRoutingHost(hostID) })
+        }
+        delivery.deliver(.installedInWindow(isInitial: true), for: old, handler: handler)
+        #expect(engine.root.presentationHostID == hostID)
+        let stale = delivery.deliver(.dismantled, for: old, handler: handler)
+        delivery.deliver(.created, for: next, handler: handler)
+        engine.hostDidDetach(engine.root, id: old.id)
+        delivery.deliver(.updated(isInstalledInWindow: false), for: next, handler: handler)
+        await stale?.value
+        #expect(!engine.root.isInstalledInView)
+        #expect(engine.root.presentationHostID == hostID)
+        let teardown = delivery.deliver(.dismantled, for: next, handler: handler)
+        await teardown?.value
+        #expect(engine.root.presentationHostID == nil)
+    }
+
+    @Test func creationOfAnUninstalledReplacementDoesNotSuppressTheInstalledHostsTeardown() async {
+        let delivery = ViewLifecycleTeardownDelivery()
+        let engine = RouterEngine()
+        let old = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        let next = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        let handler: @MainActor (ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event) -> Void = { view, id, event in
+            engine.handleHostEvent(event, scope: engine.root, view: view, id: id)
+        }
+        delivery.deliver(.installedInWindow(isInitial: true), for: old, handler: handler)
+        #expect(engine.root.isInstalledInView)
+        let teardown = delivery.deliver(.dismantled, for: old, handler: handler)
+        delivery.deliver(.created, for: next, handler: handler)
+        await teardown?.value
+        #expect(!engine.root.isInstalledInView)
+    }
+
+    @Test func creationOfANewerPreparationCoalescesUninstalledTeardown() async {
+        let delivery = ViewLifecycleTeardownDelivery()
+        let old = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        let next = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        var teardowns: [UUID] = []
+        let handler: @MainActor (ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event) -> Void = { _, id, event in
+            if case .dismantled = event { teardowns.append(id) }
+        }
+        delivery.deliver(.created, for: old, handler: handler)
+        let stale = delivery.deliver(.dismantled, for: old, handler: handler)
+        delivery.deliver(.created, for: next, handler: handler)
+        #expect(stale?.isCancelled == true)
+        await stale?.value
+        #expect(teardowns.isEmpty)
+        let final = delivery.deliver(.dismantled, for: next, handler: handler)
+        await final?.value
+        #expect(teardowns == [next.id])
+    }
+
+    @Test func staleTeardownCannotCancelTheCurrentHostsTeardown() async {
+        let delivery = ViewLifecycleTeardownDelivery()
+        let old = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        let current = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        var teardownIDs: [UUID] = []
+        let handler: @MainActor (ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event) -> Void = { _, id, event in
+            if case .dismantled = event { teardownIDs.append(id) }
+        }
+        delivery.deliver(.installedInWindow(isInitial: true), for: old, handler: handler)
+        delivery.deliver(.installedInWindow(isInitial: true), for: current, handler: handler)
+        let teardown = delivery.deliver(.dismantled, for: current, handler: handler)
+        delivery.deliver(.dismantled, for: old, handler: handler)
+        await teardown?.value
+        #expect(teardownIDs == [current.id])
+    }
+
+    @Test func creationDeliversTeardownBeforeWindowInstallationWithoutMakingTheHostReady() async {
+        let delivery = ViewLifecycleTeardownDelivery()
+        let engine = RouterEngine()
+        let view = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, _ in })
+        var teardowns = 0
+        let handler: @MainActor (ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event) -> Void = { view, id, event in
+            engine.handleHostEvent(event, scope: engine.root, view: view, id: id)
+            if case .dismantled = event { teardowns += 1 }
+        }
+        delivery.deliver(.created, for: view, handler: handler)
+        #expect(!engine.root.isInstalledInView)
+        #expect(view.window == nil)
+        let teardown = delivery.deliver(.dismantled, for: view, handler: handler)
+        await teardown?.value
+        #expect(teardowns == 1)
+        #expect(!engine.root.isInstalledInView)
+    }
+
     @Test func transientWindowRemovalDoesNotEmitLifecycleEvents() {
         var events: [ViewLifecycleBridge.Event] = []
         let view = ViewLifecycleBridge.LifecycleView(onIdentifiedEvent: { _, event in
@@ -97,7 +246,7 @@ struct ViewLifecycleBridgeTests {
         }
 
         #expect(didRun == false)
-        await task.value
+        await task?.value
         #expect(didRun)
     }
 
@@ -113,16 +262,16 @@ struct ViewLifecycleBridgeTests {
         let secondTask = delivery.schedule(for: lifecycleID) {
             deliveredValues.append(2)
         }
-        await firstTask.value
-        await secondTask.value
+        await firstTask?.value
+        await secondTask?.value
 
         #expect(deliveredValues == [2])
     }
 
-    @Test func installationCancelsDeferredTeardown() async {
+    @Test(arguments: [false, true]) func installationCancelsDeferredTeardown(reinstallSameView: Bool) async {
         let delivery = ViewLifecycleTeardownDelivery()
         let removedLifecycleID = UUID()
-        let installedLifecycleID = UUID()
+        let installedLifecycleID = reinstallSameView ? removedLifecycleID : UUID()
         var didRun = false
         delivery.install(removedLifecycleID)
 
@@ -131,13 +280,14 @@ struct ViewLifecycleBridgeTests {
         }
         delivery.install(installedLifecycleID)
 
-        await task.value
+        #expect(task?.isCancelled == true)
+        await task?.value
         #expect(didRun == false)
 
-        let staleTask = delivery.schedule(for: removedLifecycleID) {
+        let staleTask = delivery.schedule(for: UUID()) {
             didRun = true
         }
-        await staleTask.value
+        await staleTask?.value
         #expect(didRun == false)
     }
 

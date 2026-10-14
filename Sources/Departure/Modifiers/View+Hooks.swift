@@ -63,9 +63,9 @@ private struct HooksModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onLifecycleEvent { lifecycleView, _, event in
+            .onLifecycleEvent { lifecycleView, id, event in
                 let sourceID = attachment.id
-                attachment.handle(event, target: routeScope, view: lifecycleView,
+                attachment.handle(event, id: id, target: routeScope, view: lifecycleView,
                     apply: { $0.installHookDeclarations(sourceID: sourceID, hookDeclarations: declarations) },
                     remove: { $0.uninstallHookDeclarations(sourceID: sourceID) })
             }

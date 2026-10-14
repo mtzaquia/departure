@@ -63,8 +63,8 @@ private struct RoutingModifier: ViewModifier {
             .background {
                 Color.clear.frame(width: 0, height: 0)
                     .routePresentationStyleModifiers(for: styles, hostedBy: hostID, pushHostIdentity: pushHostIdentity)
-                    .onLifecycleEvent { view, _, event in
-                        attachment.handle(event, target: scope, view: view,
+                    .onLifecycleEvent { view, id, event in
+                        attachment.handle(event, id: id, target: scope, view: view,
                             apply: { scope in
                                 scope.bindRoutingHost(hostID, automatic: automatic, environment: environment, selection: selection)
                                 if selection != nil {

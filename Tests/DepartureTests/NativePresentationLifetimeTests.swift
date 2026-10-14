@@ -4,6 +4,98 @@ import Testing
 
 @MainActor @Suite(.timeLimit(.minutes(1)))
 struct NativePresentationLifetimeTests {
+    @Test func unadmittedSuccessorIsPreparedInTheSameSynchronization() {
+        let first = PresentedRoute(scope: RouteScope(id: "first", route: nil))
+        let next = PresentedRoute(scope: RouteScope(id: "next", route: nil))
+        let lifetime = NativePresentationLifetime()
+        lifetime.synchronize(first) { .init(route: $0) }
+        lifetime.synchronize(next) { .init(route: $0) }
+
+        #expect(lifetime.isPresented)
+        #expect(lifetime.presentation?.id == next.id)
+        #expect(!first.scope.isAwaitingPresentationEnd)
+        #expect(next.scope.isAwaitingPresentationEnd)
+    }
+
+    @Test func offWindowDestinationUpdateCannotHoldAReplacementWaitingForDismissal() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Sheet(NumberedRoute.self)
+        } destinations: { RouteDestination(NumberedRoute.self) { _, _ in EmptyView() } })
+        let origin = RouteRequestOrigin(scope: engine.root)
+        let first = try #require(await engine.requestRouteWhenReady(NumberedRoute(number: 1), origin: origin))
+        let lifetime = NativePresentationLifetime()
+        lifetime.synchronize(.init(scope: first)) { .init(route: $0) }
+        lifetime.didCreateDestination(of: ObjectIdentifier(first))
+        // updateUIView reports this event before the destination enters a window.
+        lifetime.didUpdateDestination(of: ObjectIdentifier(first), isInstalledInWindow: false)
+        let replacement = Task { await engine.requestRouteWhenReady(NumberedRoute(number: 2), origin: origin) }
+        await waitUntil { engine.isNavigating && engine.defaultSpace.rootPath.isEmpty }
+        lifetime.synchronize(nil) { .init(route: $0) }
+
+        #expect(first.isAwaitingPresentationEnd)
+        #expect(lifetime.presentation?.route.scope === first)
+        lifetime.didDismantleDestination(of: ObjectIdentifier(first))
+        #expect(!first.isAwaitingPresentationEnd)
+        #expect(lifetime.presentation == nil)
+        // Cleanup also proves a stale native event cannot invalidate the eventual successor.
+        lifetime.completeDismissal(of: ObjectIdentifier(first), in: engine)
+        let next = try #require(await replacement.value)
+        #expect(next === engine.defaultSpace.rootPath.last)
+        #expect((next.route as? NumberedRoute)?.number == 2)
+        #expect(!engine.isNavigating)
+        lifetime.synchronize(.init(scope: next)) { .init(route: $0) }
+        lifetime.completeDismissal(of: ObjectIdentifier(first), in: engine)
+        #expect(lifetime.presentation?.route.scope === next)
+    }
+
+    @Test func windowArrivalDuringCancelledPreparationStillWaitsForNativeDismissal() async throws {
+        let engine = RouterEngine(routes: RootRouteMap {
+            Sheet(NumberedRoute.self)
+        } destinations: { RouteDestination(NumberedRoute.self) { _, _ in EmptyView() } })
+        let origin = RouteRequestOrigin(scope: engine.root)
+        let first = try #require(await engine.requestRouteWhenReady(NumberedRoute(number: 1), origin: origin))
+        let lifetime = NativePresentationLifetime()
+        lifetime.synchronize(.init(scope: first)) { .init(route: $0) }
+        lifetime.didCreateDestination(of: ObjectIdentifier(first))
+        var returned = false
+        let replacement = Task {
+            let destination = await engine.requestRouteWhenReady(NumberedRoute(number: 2), origin: origin)
+            returned = true
+            return destination
+        }
+        await waitUntil { engine.isNavigating && engine.defaultSpace.rootPath.isEmpty }
+        lifetime.synchronize(nil) { .init(route: $0) }
+        // UIKit may finish installing content after the request to dismiss it.
+        lifetime.didAdmitPresentation(of: ObjectIdentifier(first))
+        lifetime.didDismantleDestination(of: ObjectIdentifier(first))
+        #expect(first.isAwaitingPresentationEnd)
+        #expect(!returned)
+        lifetime.completeDismissal(of: ObjectIdentifier(first), in: engine)
+        let next = try #require(await replacement.value)
+        #expect((next.route as? NumberedRoute)?.number == 2)
+        #expect(!engine.isNavigating)
+    }
+
+    @Test func multipleUnadmittedReplacementsKeepOnlyTheLatestAndIgnoreStaleEvents() {
+        let engine = RouterEngine()
+        let routes = (1...3).map { PresentedRoute(scope: RouteScope(id: $0, route: nil)) }
+        let lifetime = NativePresentationLifetime()
+        var builds = 0
+        for route in routes {
+            lifetime.synchronize(route) { builds += 1; return .init(route: $0) }
+        }
+        #expect(builds == 3)
+        #expect(lifetime.presentation?.id == routes[2].id)
+        for old in routes.prefix(2) {
+            #expect(!old.scope.isAwaitingPresentationEnd)
+            lifetime.didAdmitPresentation(of: old.id)
+            #expect(!lifetime.beginDismissal(of: old.id))
+            lifetime.completeDismissal(of: old.id, in: engine)
+        }
+        #expect(lifetime.isPresented)
+        #expect(lifetime.presentation?.id == routes[2].id)
+    }
+
     @Test func retainsOutgoingContentAndRejectsSuccessorsUntilCompletion() {
         let engine = RouterEngine()
         let first = PresentedRoute(scope: RouteScope(id: "first", route: nil))
@@ -41,6 +133,7 @@ struct NativePresentationLifetimeTests {
         let lifetime = NativePresentationLifetime()
         lifetime.synchronize(.init(scope: scope)) { .init(route: $0) }
         engine.routeScopeDidInstallInView(scope)
+        lifetime.didAdmitPresentation(of: ObjectIdentifier(scope))
         var returned = false
         let unwind = Task { let result = await engine.unwindPrevious(from: scope); returned = true; return result }
         await waitUntil { engine.defaultSpace.rootPath.isEmpty }
@@ -49,6 +142,8 @@ struct NativePresentationLifetimeTests {
         #expect(!returned)
         #expect(engine.isNavigating)
         lifetime.synchronize(nil) { .init(route: $0) }
+        #expect(scope.isAwaitingPresentationEnd)
+        #expect(!returned)
         lifetime.completeDismissal(of: ObjectIdentifier(scope), in: engine)
         #expect(await unwind.value)
         #expect(!engine.isNavigating)
@@ -61,6 +156,7 @@ struct NativePresentationLifetimeTests {
         let lifetime = NativePresentationLifetime()
         lifetime.synchronize(.init(scope: scope)) { .init(route: $0) }
         engine.routeScopeDidInstallInView(scope)
+        lifetime.didAdmitPresentation(of: ObjectIdentifier(scope))
         let unwind = Task { await engine.unwindPrevious(from: scope) }
         await waitUntil { engine.defaultSpace.rootPath.isEmpty }
         lifetime.completeDismissal(of: ObjectIdentifier(scope), in: engine)

@@ -99,7 +99,7 @@ struct RouterTests {
         let lifecycleID = UUID()
         teardownDelivery.install(lifecycleID)
         let teardownTask = teardownDelivery.schedule(for: lifecycleID) { engine.routeScopeDidLeaveView(home) }
-        await teardownTask.value
+        await teardownTask?.value
         #expect(engine.root.branchScopes[AppTab.home] === home)
         #expect(home.definitions.routeBinding(for: HomeDetailRoute.self) != nil)
         #expect(engine.routePhase(for: home) == .active)

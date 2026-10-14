@@ -44,7 +44,7 @@ struct CoverFadePresentationStyleModifier: ViewModifier {
                 )
             }
 #else
-            .modifier(SystemModalPresentationModifier(style: .sheet, route: presentation.wrappedValue))
+            .modifier(SystemModalPresentationModifier(style: .sheet, route: presentation))
 #endif
     }
 }
@@ -86,8 +86,13 @@ private struct CoverFadeModalPresenter: View {
                         .presentationBackground(.clear)
                         .onLifecycleEvent { _, _, event in
                             switch event {
-                            case .installedInWindow, .updated: lifetime.didAdmitPresentation(of: rendered.id)
-                            case .dismantled, .deinitialized: break
+                            case .created: lifetime.didCreateDestination(of: rendered.id)
+                            case .installedInWindow: lifetime.didAdmitPresentation(of: rendered.id)
+                            case .updated(let installed):
+                                lifetime.didUpdateDestination(of: rendered.id, isInstalledInWindow: installed)
+                            case .dismantled, .deinitialized:
+                                lifetime.didDismantleDestination(of: rendered.id)
+                                synchronize()
                             }
                             if case .installedInWindow(isInitial: true) = event {
                                 Task { @MainActor in
@@ -114,7 +119,7 @@ private struct CoverFadeModalPresenter: View {
                 case .installedInWindow: synchronize()
                 case .dismantled, .deinitialized:
                     if let id = lifetime.presentation?.id { lifetime.completeDismissal(of: id, in: router) }
-                case .updated: break
+                case .created, .updated: break
                 }
             }
     }

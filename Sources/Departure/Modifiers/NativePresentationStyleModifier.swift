@@ -57,9 +57,9 @@ struct NativePresentationStyleModifier: ViewModifier {
                     if disablesDismissalAnimations { transaction.disablesAnimations = true }
                 }
         case .sheet:
-            content.modifier(SystemModalPresentationModifier(style: .sheet, route: presentation.wrappedValue))
+            content.modifier(SystemModalPresentationModifier(style: .sheet, route: presentation))
         case .cover:
-            content.modifier(SystemModalPresentationModifier(style: .cover(.slide), route: presentation.wrappedValue))
+            content.modifier(SystemModalPresentationModifier(style: .cover(.slide), route: presentation))
         }
     }
 }
@@ -67,7 +67,7 @@ struct NativePresentationStyleModifier: ViewModifier {
 /// A stable rendered destination survives logical removal until native `onDismiss`.
 struct SystemModalPresentationModifier: ViewModifier {
     let style: RoutePresentationKind
-    let route: PresentedRoute?
+    @Binding var route: PresentedRoute?
     var destinationBuilder: WindowDestinationBuilder?
     @RouterEnvironment private var router
     @State private var lifetime = NativePresentationLifetime()
@@ -88,7 +88,7 @@ struct SystemModalPresentationModifier: ViewModifier {
                 case .installedInWindow: synchronize()
                 case .dismantled, .deinitialized:
                     if let id = lifetime.presentation?.id { lifetime.completeDismissal(of: id, in: router) }
-                case .updated: break
+                case .created, .updated: break
                 }
             }
     }
@@ -116,8 +116,13 @@ struct SystemModalPresentationModifier: ViewModifier {
         rendered.destination.id(rendered.id)
             .onLifecycleEvent { _, _, event in
                 switch event {
-                case .installedInWindow, .updated: lifetime.didAdmitPresentation(of: rendered.id)
-                case .dismantled, .deinitialized: break
+                case .created: lifetime.didCreateDestination(of: rendered.id)
+                case .installedInWindow: lifetime.didAdmitPresentation(of: rendered.id)
+                case .updated(let installed):
+                    lifetime.didUpdateDestination(of: rendered.id, isInstalledInWindow: installed)
+                case .dismantled, .deinitialized:
+                    lifetime.didDismantleDestination(of: rendered.id)
+                    synchronize()
                 }
             }
     }

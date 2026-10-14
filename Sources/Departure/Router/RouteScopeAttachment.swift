@@ -35,6 +35,7 @@ final class RouteScopeAttachment {
     let id = AnyHashable(UUID())
     private let kind: Kind
     private weak var view: PlatformView?
+    private var lifecycleID: UUID?
     private var target: RouteScope?
     private var installed: RouteScope?
     private var apply: ((RouteScope) -> Void)?
@@ -64,16 +65,28 @@ final class RouteScopeAttachment {
         reconcile()
     }
 
-    func handle(_ event: ViewLifecycleBridge.Event, target: RouteScope?, view: PlatformView?,
+    func handle(_ event: ViewLifecycleBridge.Event, id: UUID, target: RouteScope?, view: PlatformView?,
                 apply: @escaping (RouteScope) -> Void, remove: @escaping (RouteScope) -> Void) {
         switch event {
-        case .installedInWindow, .updated:
+        case .created:
+            // The modifier still owns its registration when SwiftUI recreates an off-window
+            // bridge. Creation replaces its identity without admitting a new native host.
+            lifecycleID = id
+        case .installedInWindow:
             update(target: target, view: view, apply: apply, remove: remove)
-        case .dismantled, .deinitialized: detach()
+            lifecycleID = id
+        case .updated:
+            guard lifecycleID == id else { return }
+            update(target: target, view: view, apply: apply, remove: remove)
+            lifecycleID = id
+        case .dismantled, .deinitialized:
+            guard lifecycleID == id else { return }
+            detach()
         }
     }
 
     func detach() {
+        lifecycleID = nil
         if let installed {
             remove?(installed)
         }

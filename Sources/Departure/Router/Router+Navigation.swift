@@ -128,9 +128,7 @@ extension RouterEngine {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         guard navigationSource(origin) != nil, !match.presentingScope.hasConflictingPresentationHosts,
               !Task.isCancelled else { return nil }
-        if await ios17NavigationStackPushWorkaround?.prepareAppend(after: match, in: self) == true {
-            return nil
-        }
+        if await prepareReplacement(after: match) { return nil }
 
         // Preparation may remove the requesting child. Its captured presentation anchor
         // must remain in the live top space for the accepted navigation to continue.
@@ -143,6 +141,24 @@ extension RouterEngine {
 
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
         return await commitPresentation(route, after: match, unwinding: spaces.presentationUnwindPlan(after: match))
+    }
+
+    /// Keep an inline selection's native stack until its pushed children finish popping.
+    private func prepareReplacement(after match: ResolvedRouteTarget) async -> Bool {
+        guard match.declaration.presentationKind == .replace,
+              let replacing = routePresentation(from: match.presentingScope, matching: .replace,
+                  hostedBy: match.presentationHostID)?.scope,
+              let path = spaces.routePath(containing: replacing),
+              path.scopesRemoved(after: replacing).contains(where: {
+                  $0.presentationDeclaration?.presentationKind == .push
+              }) else { return false }
+
+        let operation = beginNavigationOperation(plan: RouteSpaces.UnwindPlan(retaining: [replacing]))
+        commitNavigationOperation(operation, preservesModalPresentationBindings: false)
+        await waitForNavigationOperation(operation)
+        let wasSuperseded = pendingRoute != nil || bufferedPresentationRequest != nil
+        finishNavigationOperation(operation)
+        return wasSuperseded
     }
 
     private func commitPresentation(
@@ -287,7 +303,7 @@ extension RouterEngine {
             && (scope.activeBranch == branchID || scope.branchSelection?.acceptsValue(branchID) != false)
     }
 
-    /// Resumes after branch selection or native host arrival has left the current render pass.
+    /// Moves insertion out of the selection or native host callback; host readiness gates resumption.
     func schedulePendingRouteResume(_ operation: NavigationOperation) {
         guard
             let match = operation.presentation?.match,
@@ -299,8 +315,6 @@ extension RouterEngine {
 
         let declaringScope = match.declaringScope
         Task { @MainActor [weak self, weak declaringScope] in
-            await Task.yield()
-
             guard let self, isPendingPresentation(operation) else { return }
             guard let declaringScope, declaringScope.activeBranch == branch,
                   declaringScope.branchScopes[branch] != nil else {
@@ -427,6 +441,7 @@ extension RouterEngine {
 
     func handleHostEvent(_ event: ViewLifecycleBridge.Event, scope: RouteScope, view: PlatformView?, id: UUID) {
         switch event {
+        case .created: break
         case .installedInWindow, .updated(isInstalledInWindow: true):
             guard let view else { return }
             hostDidAttach(scope, view: view, id: id)

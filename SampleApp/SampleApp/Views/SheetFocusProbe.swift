@@ -43,7 +43,20 @@ struct SheetFocusProbeRoot: View {
         let destination = RouteDestination(SheetFocusProbeRoute.self) { route, _ in
             NavigationStack { SheetFocusProbeForm(number: route.number).routing() }
         }
+        if ProcessInfo.processInfo.arguments.contains("--sheet-focus-pushed") {
+            return RootRouteMap {
+                Push(SheetFocusProbeHostRoute.self) { Sheet(SheetFocusProbeRoute.self) }
+            } destinations: {
+                RouteDestination(SheetFocusProbeHostRoute.self) { _, _ in SheetFocusProbeControls().routing() }
+                destination
+            }
+        }
         if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root") {
+            if ProcessInfo.processInfo.arguments.contains("--sheet-focus-fade") {
+                return RootRouteMap { Cover(SheetFocusProbeRoute.self, transition: .fade) } destinations: {
+                    destination
+                }
+            }
             return RootRouteMap { Sheet(SheetFocusProbeRoute.self) } destinations: {
                 destination
             }
@@ -60,7 +73,9 @@ struct SheetFocusProbeRoot: View {
 
     var body: some View {
         Group {
-            if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root") {
+            if ProcessInfo.processInfo.arguments.contains("--sheet-focus-pushed") {
+                NavigationStack { SheetFocusProbeOpener().routing() }
+            } else if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root") {
                 NavigationStack { SheetFocusProbeControls().routing() }
             } else {
                 TabView(selection: $selection) {
@@ -101,9 +116,35 @@ private struct SheetFocusProbeControls: View {
                 Task { await router.present(SheetFocusProbeRoute(number: 1)) }
             }
             .accessibilityIdentifier("sample.sheet-focus.present")
+            Button("Present then replace") {
+                Task {
+                    await router.present(SheetFocusProbeRoute(number: 1))
+                    await router.present(SheetFocusProbeRoute(number: 2))
+                }
+            }
+            .accessibilityIdentifier("sample.sheet-focus.present-then-replace")
+            Button("Present then replace across an update") {
+                Task {
+                    await router.present(SheetFocusProbeRoute(number: 1))
+                    await Task.yield()
+                    await router.present(SheetFocusProbeRoute(number: 2))
+                }
+            }
+            .accessibilityIdentifier("sample.sheet-focus.present-then-replace-update")
         }
     }
 }
+
+private struct SheetFocusProbeOpener: View {
+    @Environment(\.router) private var router
+
+    var body: some View {
+        Button("Open host") { Task { await router.present(SheetFocusProbeHostRoute()) } }
+            .accessibilityIdentifier("sample.sheet-focus.open-host")
+    }
+}
+
+private struct SheetFocusProbeHostRoute: Route, Equatable {}
 
 private struct SheetFocusProbeRoute: Route, Equatable {
     let number: Int

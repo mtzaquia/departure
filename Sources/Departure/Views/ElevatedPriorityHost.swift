@@ -40,7 +40,7 @@ struct ElevatedPriorityHost: View {
         #else
         Color.clear.frame(width: 0, height: 0)
             .modifier(SystemModalPresentationModifier(style: .sheet,
-                route: router.presentationBinding(for: .priority(priority)).wrappedValue,
+                route: router.presentationBinding(for: .priority(priority)),
                 destinationBuilder: windowDestinationBuilder))
         #endif
     }

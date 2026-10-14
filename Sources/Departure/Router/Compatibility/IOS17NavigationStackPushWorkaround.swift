@@ -28,8 +28,6 @@ protocol IOS17NavigationStackPushWorkaroundHandling: AnyObject {
         in parentScope: RouteScope?,
         router: RouterEngine
     ) -> Bool
-    /// Returns true when a newer route request superseded the append during preparation.
-    func prepareAppend(after match: RouterEngine.ResolvedRouteTarget, in router: RouterEngine) async -> Bool
     func interceptDismissal(
         of presentation: PresentedRoute,
         matching presentationKind: RoutePresentationKind,
@@ -84,29 +82,6 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         return parentScope?.activeBranch == branch
     }
 
-    func prepareAppend(after match: RouterEngine.ResolvedRouteTarget, in router: RouterEngine) async -> Bool {
-        guard match.declaration.presentationKind == .replace,
-              let replacing = router.routePresentation(
-                from: match.presentingScope, matching: .replace, hostedBy: match.presentationHostID
-              )?.scope,
-              let path = router.spaces.routePath(containing: replacing),
-              path.contains(replacing),
-              path.scopesRemoved(after: replacing).contains(where: {
-                $0.presentationDeclaration?.presentationKind == .push
-              })
-        else { return false }
-
-        // iOS 17 cannot reliably remove a pushed child and replace its enclosing selection
-        // in the same graph update. Pop the child first and preserve latest-request semantics.
-        let plan = RouteSpaces.UnwindPlan(retaining: [replacing])
-        let operation = router.beginNavigationOperation(plan: plan)
-        router.commitNavigationOperation(operation, preservesModalPresentationBindings: false)
-        await router.waitForNavigationOperation(operation)
-        let wasSuperseded = router.pendingRoute != nil
-        router.finishNavigationOperation(operation)
-        return wasSuperseded
-    }
-
     func interceptDismissal(
         of presentation: PresentedRoute,
         matching presentationKind: RoutePresentationKind,
@@ -159,10 +134,8 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         }
 
         Task { @MainActor [weak self, weak router, weak routeScope] in
-            // SwiftUI delivers dismantle callbacks while holding observation accesses. Defer route
-            // mutations out of that stack, and let same-update-cycle reinstallations cancel a
-            // spurious push dismissal before changing the path.
-            await Task.yield()
+            // A reinstall or graph mutation invalidates the captured dismissal before this
+            // main-actor handoff commits it. Native exit, rather than a yield, authorizes the pop.
             guard let self, let router, let routeScope else {
                 return
             }
