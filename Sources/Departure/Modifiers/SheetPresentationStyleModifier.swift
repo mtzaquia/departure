@@ -85,6 +85,13 @@ struct SheetPresentationState {
         }
         guard isPresented else { return }
         guard incoming?.id == route.id else {
+            // SwiftUI never reports dismissal of a sheet that is withdrawn before it appears,
+            // so a destination that has not appeared is replaced instead of awaiting onDismiss.
+            guard route.scope.isInstalledInView else {
+                self.route = incoming
+                isPresented = incoming != nil
+                return
+            }
             isPresented = false
             return
         }

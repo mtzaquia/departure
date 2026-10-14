@@ -425,7 +425,7 @@ extension RouteForest {
             ))
 
         case .append:
-            guard let presentationOrigin = match.presentationLocation.scope else {
+            guard let presentationOrigin = match.presentationHost else {
                 break
             }
 

@@ -38,6 +38,7 @@ struct SheetPresentationStateTests {
         let route = presentation()
         var state = SheetPresentationState()
         state.synchronize(route)
+        route.scope.ledger.install()
         state.synchronize(nil)
         #expect(!state.isPresented)
         #expect(state.route?.id == route.id)
@@ -53,6 +54,7 @@ struct SheetPresentationStateTests {
         let second = presentation()
         var state = SheetPresentationState()
         state.synchronize(first)
+        first.scope.ledger.install()
         state.synchronize(second)
         #expect(!state.isPresented)
         #expect(state.route?.id == first.id)
@@ -67,6 +69,32 @@ struct SheetPresentationStateTests {
         #expect(!staleCompletion)
         let staleNativeWrite = state.beginDismissal(id: first.id)
         #expect(!staleNativeWrite)
+        #expect(state.isPresented)
+        #expect(state.route?.id == second.id)
+    }
+
+    @Test func successorReplacesADestinationThatNeverAppeared() {
+        let first = presentation()
+        let second = presentation()
+        var state = SheetPresentationState()
+        state.synchronize(first)
+        state.synchronize(second)
+        #expect(state.isPresented)
+        #expect(state.route?.id == second.id)
+        let staleCompletion = state.completeDismissal(id: first.id)
+        #expect(!staleCompletion)
+        #expect(state.route?.id == second.id)
+    }
+
+    @Test func dismissalOfADestinationThatNeverAppearedAdmitsTheNextPresentation() {
+        let first = presentation()
+        let second = presentation()
+        var state = SheetPresentationState()
+        state.synchronize(first)
+        state.synchronize(nil)
+        #expect(!state.isPresented)
+        #expect(state.route == nil)
+        state.synchronize(second)
         #expect(state.isPresented)
         #expect(state.route?.id == second.id)
     }

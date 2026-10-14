@@ -37,7 +37,12 @@ struct SheetFocusProbeRoot: View {
 
     var body: some View {
         Group {
-            if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root") {
+            if ProcessInfo.processInfo.arguments.contains("--sheet-focus-pushed") {
+                NavigationStack {
+                    SheetFocusProbeOpener()
+                        .routes { Push(SheetFocusProbeHostRoute.self) }
+                }
+            } else if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root") {
                 NavigationStack { SheetFocusProbeControls() }
                     .routes { Sheet(SheetFocusProbeRoute.self) }
             } else {
@@ -63,8 +68,44 @@ private struct SheetFocusProbeControls: View {
     @Environment(\.router) private var router
 
     var body: some View {
-        Button("Present sheet") { Task { await router.present(SheetFocusProbeRoute(number: 1)) } }
-            .accessibilityIdentifier("sample.sheet-focus.present")
+        VStack {
+            Button("Present sheet") { Task { await router.present(SheetFocusProbeRoute(number: 1)) } }
+                .accessibilityIdentifier("sample.sheet-focus.present")
+            // Replaces the first sheet as soon as its request returns, before SwiftUI shows it.
+            Button("Present then replace") {
+                Task {
+                    await router.present(SheetFocusProbeRoute(number: 1))
+                    await router.present(SheetFocusProbeRoute(number: 2))
+                }
+            }
+            .accessibilityIdentifier("sample.sheet-focus.present-then-replace")
+            // Lets the first sheet reach the host in its own update, as a fast network reply would.
+            Button("Present then replace after a beat") {
+                Task {
+                    await router.present(SheetFocusProbeRoute(number: 1))
+                    try? await Task.sleep(for: .milliseconds(10))
+                    await router.present(SheetFocusProbeRoute(number: 2))
+                }
+            }
+            .accessibilityIdentifier("sample.sheet-focus.present-then-replace-delayed")
+        }
+    }
+}
+
+/// Opens a pushed screen that owns the sheet declaration, as a pushed review screen would.
+private struct SheetFocusProbeOpener: View {
+    @Environment(\.router) private var router
+
+    var body: some View {
+        Button("Open host") { Task { await router.present(SheetFocusProbeHostRoute()) } }
+            .accessibilityIdentifier("sample.sheet-focus.open-host")
+    }
+}
+
+private struct SheetFocusProbeHostRoute: Route, Equatable {
+    func destination() -> some View {
+        SheetFocusProbeControls()
+            .routes { Sheet(SheetFocusProbeRoute.self) }
     }
 }
 
