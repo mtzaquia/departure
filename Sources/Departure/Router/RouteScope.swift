@@ -96,13 +96,32 @@ final class RouteScope: Identifiable {
         return host.isAvailable
     }
 
-    /// Modal completion belongs to its native adapter; pushes use managed-host teardown.
+    /// AppKit dismissal also ends descendants whose managed hosts remain cached.
     var isAwaitingPresentationEnd: Bool {
+        isAwaitingOwnPresentationEnd
+            && !nativePresentationAncestors.contains { !$0.isAwaitingOwnPresentationEnd }
+    }
+
+    private var isAwaitingOwnPresentationEnd: Bool {
         switch presentationCompletion {
         case .host: isInstalledInView
         case .native(let owner): owner.value?.presentation?.route.scope === self
         }
     }
+
+    private var nativePresentationAncestors: [RouteScope] {
+        #if canImport(AppKit)
+        // AppKit can cache a sheet's managed hosts after native dismissal.
+        return ancestry.dropFirst().filter {
+            if case .native = $0.presentationCompletion { return true }
+            return false
+        }
+        #else
+        // UIKit needs each managed controller's teardown before reusing its stack.
+        return []
+        #endif
+    }
+
     func trackNativePresentation(_ owner: NativePresentationLifetime) {
         presentationCompletion = .native(WeakNativePresentation(value: owner))
     }
@@ -489,7 +508,12 @@ extension RouteScope {
 
     @discardableResult
     func waitUntilPresentationEnded() async -> Bool {
-        await RouteScopeReadiness.wait(in: self, cancellable: false) { !self.isAwaitingPresentationEnd }
+        // A child pop can already be waiting when an enclosing native modal is dismissed.
+        // Keep those completion sources observable after the outgoing graph is detached.
+        let ancestors = nativePresentationAncestors
+        return await RouteScopeReadiness.wait(in: self, observing: ancestors, cancellable: false) {
+            !self.isAwaitingOwnPresentationEnd || ancestors.contains { !$0.isAwaitingOwnPresentationEnd }
+        }
     }
 
     @discardableResult

@@ -22,15 +22,15 @@
 
 import Observation
 
-/// Host completion comes from the scope's canonical event; command eligibility is
-/// observed in the live model. Neither wait stores another copy of membership.
+/// Completion comes from the scope and its enclosing native presentations; command
+/// eligibility is observed in the live model. Neither wait copies membership.
 final class RouteScopeReadiness {
     private var eligibility: (() -> Bool)?
     private var ready: (() -> Bool)?
     private var continuation: CheckedContinuation<Bool, Never>?
     var isPending: Bool { continuation != nil }
 
-    static func wait(in scope: RouteScope, cancellable: Bool = true,
+    static func wait(in scope: RouteScope, observing relatedScopes: [RouteScope] = [], cancellable: Bool = true,
                      while eligible: (() -> Bool)? = nil, until ready: @escaping () -> Bool) async -> Bool {
         let readiness = RouteScopeReadiness()
         defer { withExtendedLifetime(readiness) {} }
@@ -44,6 +44,7 @@ final class RouteScopeReadiness {
                 readiness.ready = ready
                 readiness.continuation = continuation
                 scope.observeReadiness(readiness)
+                for relatedScope in relatedScopes { relatedScope.observeReadiness(readiness) }
                 readiness.observeEligibility()
             }
         } onCancel: {

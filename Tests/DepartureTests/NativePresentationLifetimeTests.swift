@@ -209,6 +209,80 @@ struct NativePresentationLifetimeTests {
         engine.routeScopeDidLeaveView(scope)
     }
 
+    #if canImport(AppKit)
+    @Test(arguments: [RoutePriority.default, .high, .critical])
+    func enclosingNativeCompletionReleasesRetainedPushedHosts(priority: RoutePriority) async throws {
+        let (engine, modal, child, lifetime) = try await pushedFlow(priority: priority)
+        defer {
+            engine.routeScopeDidLeaveView(child)
+            engine.routeScopeDidLeaveView(modal)
+        }
+        var completed: Bool?
+        let unwind = Task { completed = await UnwindRouteAction(router: engine, routeScope: modal)() }
+        defer { unwind.cancel() }
+        await waitUntil { !engine.isNavigationEligible(modal) }
+        engine.routeScopeDidLeaveView(modal)
+        await Task.yield()
+        #expect(completed == nil)
+        #expect(child.isAwaitingPresentationEnd)
+        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.completeDismissal(of: ObjectIdentifier(modal), in: engine)
+        await waitUntil { completed != nil }
+        #expect(completed == true)
+        #expect(child.isInstalledInView)
+        #expect(!child.isAwaitingPresentationEnd)
+        #expect(!engine.isNavigating)
+    }
+
+    #endif
+
+    @Test func childOnlyPopStillWaitsForItsOwnHost() async throws {
+        let (engine, modal, child, lifetime) = try await pushedFlow()
+        defer { engine.routeScopeDidLeaveView(modal) }
+        var completed: Bool?
+        let unwind = Task { completed = await UnwindRouteAction(router: engine, routeScope: child)() }
+        defer { unwind.cancel() }
+        await waitUntil { !engine.isNavigationEligible(child) }
+        #expect(completed == nil)
+        #expect(child.isAwaitingPresentationEnd)
+        #expect(lifetime.isPresented)
+        engine.routeScopeDidLeaveView(child)
+        await waitUntil { completed != nil }
+        #expect(completed == true)
+        #expect(engine.isNavigationEligible(modal))
+        #expect(modal.isAwaitingPresentationEnd)
+        lifetime.completeDismissal(of: ObjectIdentifier(modal), in: engine)
+        await waitUntil { !engine.isNavigating }
+    }
+
+    #if canImport(AppKit)
+    @Test func enclosingDismissalAlsoCompletesAnAlreadyWaitingChildPop() async throws {
+        let (engine, modal, child, lifetime) = try await pushedFlow()
+        defer {
+            engine.routeScopeDidLeaveView(child)
+            engine.routeScopeDidLeaveView(modal)
+        }
+        var childCompleted: Bool?, modalCompleted: Bool?
+        let pop = Task { childCompleted = await UnwindRouteAction(router: engine, routeScope: child)() }
+        defer { pop.cancel() }
+        await waitUntil { !engine.isNavigationEligible(child) }
+        #expect(childCompleted == nil)
+        let dismiss = Task { modalCompleted = await UnwindRouteAction(router: engine, routeScope: modal)() }
+        defer { dismiss.cancel() }
+        await waitUntil { !engine.isNavigationEligible(modal) }
+        #expect(childCompleted == nil)
+        #expect(modalCompleted == nil)
+        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.completeDismissal(of: ObjectIdentifier(modal), in: engine)
+        await waitUntil { childCompleted != nil && modalCompleted != nil }
+        #expect(childCompleted == true)
+        #expect(modalCompleted == true)
+        #expect(child.isInstalledInView)
+        #expect(!engine.isNavigating)
+    }
+
+    #endif
+
     @Test func ordinaryBridgeTeardownHasNoAuthorityOverAnElevatedSpace() async throws {
         let engine = makeEngine()
         await engine.present(LoginRoute())
@@ -312,6 +386,29 @@ struct NativePresentationLifetimeTests {
         #expect(lifetime.presentation == nil)
         lifetime.didAdmitPresentation(of: ObjectIdentifier(scope))
         #expect(lifetime.presentation == nil)
+    }
+
+    private func pushedFlow(priority: RoutePriority = .default) async throws
+        -> (RouterEngine, RouteScope, RouteScope, NativePresentationLifetime) {
+        let engine = RouterEngine(routes: RootRouteMap {
+            if priority == .default { Sheet(SettingsRoute.self) { Push(HomeDetailRoute.self) } }
+            if priority == .high { HighPriority { Cover(SettingsRoute.self) { Push(HomeDetailRoute.self) } } }
+            if priority == .critical { CriticalPriority { Cover(SettingsRoute.self) { Push(HomeDetailRoute.self) } } }
+        } destinations: {
+            testDestination(SettingsRoute.self)
+            testDestination(HomeDetailRoute.self)
+        })
+        await engine.present(SettingsRoute())
+        let space = try #require(engine.spaces.space(for: priority))
+        let modal = try #require(priority == .default ? space.rootPath.last : space.root)
+        let lifetime = NativePresentationLifetime()
+        lifetime.synchronize(.init(scope: modal)) { .init(route: $0) }
+        lifetime.didAdmitPresentation(of: ObjectIdentifier(modal))
+        engine.routeScopeDidInstallInView(modal)
+        await Router(engine: engine, scope: modal).present(HomeDetailRoute())
+        let child = try #require(space.rootPath.last)
+        engine.routeScopeDidInstallInView(child)
+        return (engine, modal, child, lifetime)
     }
 
     private func makeEngine() -> RouterEngine {

@@ -288,8 +288,8 @@ struct RouteDestinationRenderingTests {
         try #require(await waitUntil { engine.spaces.space(for: priority) == nil })
     }
 
-    @Test(arguments: [RoutePresentation.Style.sheet, .cover(.fade)])
-    func ancestorReaderKeepsItsCapturedFlowAfterItsChildUnwinds(style: RoutePresentation.Style) async throws {
+    @Test(arguments: [RoutePresentation.Style.sheet, .cover(.fade)], [false, true])
+    func ancestorReaderDismissesItsFlow(style: RoutePresentation.Style, childUnwindsFirst: Bool) async throws {
         let router = RootRouter()
         let recorder = RenderedDestinationRecorder()
         let parent = RouteDestination(DomainOnlyRoute.self) { _, _ in
@@ -311,9 +311,11 @@ struct RouteDestinationRenderingTests {
         try #require(await waitUntil { recorder.unwindRoute != nil })
         let action = try #require(recorder.unwindRoute)
         #expect(action == UnwindRouteAction(router: router.engine, routeScope: parentScope))
-        let childScope = try #require(router.engine.defaultSpace.rootPath.last)
-        #expect(await UnwindRouteAction(router: router.engine, routeScope: childScope)())
-        #expect(router.engine.defaultSpace.rootPath.last === parentScope)
+        if childUnwindsFirst {
+            let childScope = try #require(router.engine.defaultSpace.rootPath.last)
+            #expect(await UnwindRouteAction(router: router.engine, routeScope: childScope)())
+            #expect(router.engine.defaultSpace.rootPath.last === parentScope)
+        }
         var completed: Bool?
         let unwind = Task { completed = await action() }
         defer { unwind.cancel() }
