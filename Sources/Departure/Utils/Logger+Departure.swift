@@ -144,7 +144,11 @@ extension Logger {
         let event = event()
         guard logLevel.includes(event.logLevel) else { return }
 
-        for message in event.renderedMessages {
+        if let dump = event.standardOutputDump {
+            // Unified logging truncates large dynamic strings, including multiline trees.
+            Swift.print(dump)
+        } else {
+            let message = event.renderedMessage
             debug("\(message, privacy: .public)")
         }
 #endif
@@ -212,16 +216,9 @@ extension DepartureLogEvent {
         return "[\(category)]\(trace) \(marker) \(message)"
     }
 
-    var renderedMessages: [String] {
-        let rendered = renderedMessage
-        guard case .mapAdopted = self else { return [rendered] }
-
-        // Keep multiline trees below the console's per-record line limit.
-        let lines = rendered.split(separator: "\n", omittingEmptySubsequences: false)
-        let lineLimit = 400
-        return stride(from: 0, to: lines.count, by: lineLimit).map { start in
-            lines[start..<min(start + lineLimit, lines.count)].joined(separator: "\n")
-        }
+    var standardOutputDump: String? {
+        guard case .mapAdopted = self else { return nil }
+        return renderedMessage
     }
 
     private func appendedMessage(route: any Route, path: String, match: RouterEngine.ResolvedRouteTarget) -> String {

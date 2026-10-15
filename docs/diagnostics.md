@@ -33,7 +33,7 @@ root
    └─ cover.slide LoginRoute → destination #2
 ```
 
-Large dumps use consecutive multiline log entries of at most 400 lines, split between tree rows with indentation preserved. Smaller trees remain one entry.
+The complete tree is printed as one standard-output block, preserving its indentation. Unified logging truncates large interpolated strings by encoded size, so the tree uses standard output rather than multiple log records. It remains limited to `.trace` in Debug builds and is emitted once per routing owner.
 
 Destination numbers identify the resolved builder values within this tree, in first-declaration order. Copies and repeated contributions of the same value retain the same number. They identify builders, not the views those builders eventually produce; rendering the trace does not evaluate a destination.
 
@@ -65,7 +65,7 @@ The hint describes the registered host and suggests a placement to check; it doe
 
 ## Logging and privacy
 
-Events use unified logging with subsystem `eu.lelfe.departure` and category `Departure`. The bracketed domain, such as `[map]` or `[route]`, distinguishes event kinds. Route, action, and unwind operations retain their existing task-local correlation IDs; the adoption event identifies its routing owner.
+Engine events use unified logging with subsystem `eu.lelfe.departure` and category `Departure`; the adoption tree is the standard-output exception described above. The bracketed domain, such as `[map]` or `[route]`, distinguishes event kinds. Route, action, and unwind operations retain their existing task-local correlation IDs; the adoption event identifies its routing owner.
 
 The adoption tree prints presentation metadata, route type names, and branch type names with ordinals. It omits branch values, explicit map IDs, route instances, payloads, captured dependencies, and destination view contents. Existing navigation events use compact application-supplied route and path identifiers.
 

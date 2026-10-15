@@ -75,12 +75,12 @@ import Testing
             let event = DepartureLogEvent.mapAdopted(definitions: engine.root.definitions, ownerID: engine.id)
             #expect(event.logLevel == .trace)
             #expect(event.renderedMessage == "[map] ✓ adopted routing map owner=\(engine.id.uuidString.prefix(8))\n\(expected)")
-            #expect(event.renderedMessages == [event.renderedMessage])
+            #expect(event.standardOutputDump == event.renderedMessage)
             #expect(engine.root.definitions.departureMapTrace == expected)
             #expect(builds == 0)
         }
 
-        @Test func largeAdoptedTreeEmitsCompleteMultilineChunksWithoutBuildingViews() {
+        @Test func largeAdoptedTreeUsesOneCompleteStandardOutputDumpWithoutBuildingViews() {
             var builds = 0
             let engine = RouterEngine(
                 routes: RootRouteMap {
@@ -97,20 +97,19 @@ import Testing
                 })
             let event = DepartureLogEvent.mapAdopted(definitions: engine.root.definitions, ownerID: engine.id)
             let lines = event.renderedMessage.components(separatedBy: "\n")
-            let messages = event.renderedMessages
+            let dump = event.standardOutputDump
 
             #expect(lines.count == 1_204)
-            #expect(messages.count == 4)
-            #expect(messages.map { $0.components(separatedBy: "\n").count } == [400, 400, 400, 4])
-            #expect(messages.joined(separator: "\n") == event.renderedMessage)
-            #expect(messages.last?.hasSuffix("      └─ branch #600 (Int)\n         └─ push NumberedRoute → destination #1") == true)
+            #expect(event.renderedMessage.utf8.count > 32_768)
+            #expect(dump == event.renderedMessage)
+            #expect(dump?.hasSuffix("      └─ branch #600 (Int)\n         └─ push NumberedRoute → destination #1") == true)
             #expect(builds == 0)
         }
 
-        @Test func otherEventsKeepMultilineContextInOneRecord() {
+        @Test func otherEventsKeepMultilineContextInUnifiedLogging() {
             let event = DepartureLogEvent.routeLookupStarted(routeType: NumberedRoute.self, activePath: "root")
             #expect(event.renderedMessage.contains("\n"))
-            #expect(event.renderedMessages == [event.renderedMessage])
+            #expect(event.standardOutputDump == nil)
         }
 
         @Test func treeIdentifiesMissingAndConflictingBindingsWithoutPrintingConfiguredIDs() {
