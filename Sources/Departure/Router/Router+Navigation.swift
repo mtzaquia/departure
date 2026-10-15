@@ -385,7 +385,7 @@ extension RouterEngine {
             scope.attachPresentation(to: match.presentingScope, declaration: declaration, priority: space.priority)
             appendedPath.append(scope)
         }
-        log.departureDebug(.routeAppended(route: route, path: appendedPath.departureDebugPathDescription))
+        log.departureDebug(.routeAppended(route: route, path: appendedPath.departureDebugPathDescription, match: match))
         operation.completePresentation(at: scope)
     }
 

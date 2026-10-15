@@ -284,6 +284,23 @@ extension RouteScope {
         return selectedHost(in: routingHosts)
     }
 
+#if DEBUG
+    enum PresentationHostKind: String {
+        case automatic, explicit, missing, conflict
+    }
+
+    var presentationHostKind: PresentationHostKind {
+        switch presentationHostBinding(in: routingHosts) {
+        case .declared(let id)?:
+            routingHosts[id]?.automatic == true ? .automatic : .explicit
+        case .conflict?:
+            .conflict
+        case nil:
+            .missing
+        }
+    }
+#endif
+
     private func selectedHost(in hosts: OrderedStorage<RoutePresentationHostID, RoutingHost>) -> RoutePresentationHostID? {
         presentationHostBinding(in: hosts)?.declaration
     }

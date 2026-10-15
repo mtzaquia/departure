@@ -107,7 +107,7 @@ enum DepartureLogEvent {
     case routeAcceptedReplaceElevatedPriority(route: any Route)
     case routeAppendSuperseded(route: any Route)
     case routeAppendPreparing(route: any Route, match: RouterEngine.ResolvedRouteTarget)
-    case routeAppended(route: any Route, path: String)
+    case routeAppended(route: any Route, path: String, match: RouterEngine.ResolvedRouteTarget)
     case routeBlockedByElevatedPriority(route: any Route)
     case routeDroppedBranchActivationFailed(branch: AnyHashable)
     case routeDroppedResolution
@@ -222,6 +222,29 @@ extension DepartureLogEvent {
         return stride(from: 0, to: lines.count, by: lineLimit).map { start in
             lines[start..<min(start + lineLimit, lines.count)].joined(separator: "\n")
         }
+    }
+
+    private func appendedMessage(route: any Route, path: String, match: RouterEngine.ResolvedRouteTarget) -> String {
+        let owner = match.presentingScope
+        let ownerName = owner.route.map { departureDebugName(for: type(of: $0)) }
+            ?? (owner.branchID == nil ? "root" : "branch")
+        let host = owner.presentationHostKind
+        let style = if case .cover(let transition) = match.declaration.presentationKind {
+            "cover.\(transition)"
+        } else {
+            String(describing: match.declaration.presentationKind)
+        }
+        var message = "appended \(route.departureDebugDescription) to path"
+            + " | style=\(style) owner=\(ownerName) host=\(host.rawValue)"
+            + "\n  path: \(path)"
+        if match.declaration.presentationKind == .push,
+           owner.routePresentation?.style.isModal == true,
+           host == .automatic {
+            message += "\n  hint: \(ownerName) has no explicit routing host."
+                + " If its RouteDestination creates a NavigationStack, add `.routing()`"
+                + " to the root content inside that stack."
+        }
+        return message
     }
 
     private var category: String {
@@ -380,8 +403,8 @@ extension DepartureLogEvent {
             "dropped \(route.departureDebugDescription) — superseded while waiting for replaced scopes"
         case let .routeAppendPreparing(route, _):
             "preparing append for \(route.departureDebugDescription)"
-        case let .routeAppended(route, path):
-            "presented \(route.departureDebugDescription)\n  path: \(path)"
+        case let .routeAppended(route, path, match):
+            appendedMessage(route: route, path: path, match: match)
         case let .routeBlockedByElevatedPriority(route):
             "blocked \(route.departureDebugDescription) — a higher-priority route is active or pending"
         case let .routeDroppedBranchActivationFailed(branch):
