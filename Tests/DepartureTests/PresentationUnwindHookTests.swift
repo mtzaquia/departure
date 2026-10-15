@@ -33,7 +33,7 @@ import Testing
         #expect(events.values.isEmpty)
 
         await owner.current.present(Child())
-        #expect(await owner.current.unwind(to: .topmostAncestor))
+        #expect(await owner.current.unwind(.current))
         #expect(events.values == ["child"])
     }
 
@@ -54,7 +54,7 @@ import Testing
         #expect(engine.defaultSpace.rootPath.last !== old)
         #expect((engine.defaultSpace.rootPath.last?.route as? Parent)?.value == 2)
         #expect(events.values.isEmpty)
-        #expect(await owner.current.unwind(to: .topmostAncestor))
+        #expect(await owner.current.unwind(.current))
         #expect(events.values == ["parent"])
     }
 
@@ -79,7 +79,7 @@ import Testing
         #expect(space.rootPath.isEmpty)
         #expect(events.values.isEmpty)
         await owner.current.present(Child())
-        #expect(await owner.current.unwind(to: .root))
+        #expect(await owner.current.unwind(.root))
         #expect(events.values == [local ? "local" : "lower"])
     }
 

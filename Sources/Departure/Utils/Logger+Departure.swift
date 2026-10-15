@@ -61,7 +61,7 @@ enum DepartureLogTrace {
 
 enum DepartureWarningEvent {
     case routeDroppedNoDeclaration(routeType: any Route.Type)
-    case unwindRouteTargetMissing(routeType: any Route.Type)
+    case unwindRouteTargetMissing(target: RouterEngine.UnwindSelection)
 
     var renderedMessage: String {
         let trace = DepartureLogTrace.id.map { "[\($0)]" } ?? ""
@@ -79,9 +79,15 @@ enum DepartureWarningEvent {
     private var message: String {
         switch self {
         case let .routeDroppedNoDeclaration(routeType):
-            "dropped \(String(reflecting: routeType)) — no declaration found"
-        case let .unwindRouteTargetMissing(routeType):
-            "could not find a live \(departureDebugName(for: routeType)) in the unwind reader's scope ancestry"
+            return "dropped \(String(reflecting: routeType)) — no declaration found"
+        case let .unwindRouteTargetMissing(target):
+            let description = switch target {
+            case .policy(.current): "a live destination"
+            case .policy(.nearestModal): "an enclosing modal"
+            case .policy(.root): "a live priority-space root"
+            case let .routeType(type): "a live \(departureDebugName(for: type))"
+            }
+            return "could not find \(description) from the source scope"
         }
     }
 }
@@ -134,13 +140,10 @@ enum DepartureLogEvent {
     case viewExitWaitStarted(installed: Int)
     case ios17ViewExitWaitTimedOut(scope: RouteScope)
     case unwindAccepted(keepThrough: RouteScope, removing: Int)
-    case unwindAcceptedAncestorTarget(keepThrough: RouteScope, removing: Int)
     case unwindCompleted(path: String)
-    case unwindDroppedTargetNotFound(target: RouterEngine.UnwindTarget?)
     case unwindPreviousRequested
-    case unwindRequested(target: RouterEngine.UnwindTarget?)
+    case unwindRequested(target: RouterEngine.UnwindSelection)
     case unwindSkippedNoRoute
-    case unwindSkippedNotInsideBranch
 }
 
 extension Logger {
@@ -281,13 +284,10 @@ extension DepartureLogEvent {
             "path"
 
         case .unwindAccepted,
-             .unwindAcceptedAncestorTarget,
              .unwindCompleted,
-             .unwindDroppedTargetNotFound,
              .unwindPreviousRequested,
              .unwindRequested,
              .unwindSkippedNoRoute,
-             .unwindSkippedNotInsideBranch,
              .ios17PushDismissalDeferred,
              .ios17PushDismissalDropped,
              .ios17PushDismissalResumed:
@@ -341,9 +341,7 @@ extension DepartureLogEvent {
              .routeDroppedResolution,
              .routeNoOpEquivalent,
              .ios17PushDismissalDropped,
-             .unwindDroppedTargetNotFound,
              .unwindSkippedNoRoute,
-             .unwindSkippedNotInsideBranch,
              .ios17ViewExitWaitTimedOut:
             "⊘"
 
@@ -446,20 +444,14 @@ extension DepartureLogEvent {
             "iOS 17 view exit wait timed out — forcing reconciliation | scope=\(scope.departureDebugDescription)"
         case let .unwindAccepted(keepThrough, removing):
             "removing \(removing) route scope\(removing == 1 ? "" : "s") through \(keepThrough.unwindDebugDescription)"
-        case let .unwindAcceptedAncestorTarget(keepThrough, removing):
-            "removing \(removing) route scope\(removing == 1 ? "" : "s") to ancestor target \(keepThrough.unwindDebugDescription)"
         case let .unwindCompleted(path):
             "completed\n  path: \(path)"
-        case let .unwindDroppedTargetNotFound(target):
-            "could not find unwind target \(String(describing: target))"
         case .unwindPreviousRequested:
             "requested to previous route (scope-anchored)"
         case let .unwindRequested(target):
-            "requested to \(target.map { String(describing: $0) } ?? "previous route")"
+            "requested \(target.departureDebugDescription)"
         case .unwindSkippedNoRoute:
             "skipped — no route to remove"
-        case .unwindSkippedNotInsideBranch:
-            "skipped — not inside a branch"
         }
     }
 }
@@ -500,3 +492,12 @@ private extension RouterEngine.ResolvedRouteTarget.LookupStrategy {
     }
 }
 #endif
+
+extension RouterEngine.UnwindSelection {
+    var departureDebugDescription: String {
+        switch self {
+        case let .policy(policy): String(describing: policy)
+        case let .routeType(type): "from \(departureDebugName(for: type))"
+        }
+    }
+}

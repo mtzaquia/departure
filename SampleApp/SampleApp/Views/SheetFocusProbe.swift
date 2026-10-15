@@ -107,7 +107,7 @@ private struct SheetFocusProbeControls: View {
                     for number in 1...10 {
                         await router.present(SheetFocusProbeRoute(number: number))
                         await Task.yield()
-                        await router.unwind(to: .topmostAncestor)
+                        await router.unwind(.current)
                         completedCycles = number
                     }
                 }
@@ -187,7 +187,7 @@ private struct SheetFocusProbeForm: View {
                 Button("Replace sheet") { Task { await router.present(SheetFocusProbeRoute(number: number + 1)) } }
                     .accessibilityIdentifier("sample.sheet-focus.replace")
                 Button("Unwind sheet") { Task {
-                    await router.unwind(to: .topmostAncestor)
+                    await router.unwind(.current)
                 } }
                     .accessibilityIdentifier("sample.sheet-focus.unwind")
                 ForEach(0..<10, id: \.self) { Text("Item \($0)") }

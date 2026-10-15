@@ -29,26 +29,18 @@ import SwiftUI
 /// Live scopes in that space may issue commands even when their ``RoutePhase`` is
 /// inactive. Covered or removed scopes cannot issue commands.
 public struct Router: Equatable {
-    /// A destination for ``Router/unwind(to:)``.
-    public enum UnwindTarget {
+    /// A policy shared by ``Router/unwind(_:)`` and ``UnwindRoute``.
+    public enum UnwindTarget: Equatable {
+        /// Dismisses the captured destination and its descendants.
+        /// An elevated root removes its space; the permanent default root returns `false`.
+        case current
+
+        /// Dismisses the nearest enclosing sheet or cover, including its pushed descendants.
+        /// Includes the current destination and stays within its priority space.
+        case nearestModal
+
         /// Resets navigation in the receiving space, keeping its root and outer presentation.
         case root
-
-        /// Unwinds to the first scope of the nearest enclosing branch.
-        ///
-        /// Brings the user to the branch's root regardless of how deep the receiving scope is. If the
-        /// user is already at the branch root, this is a no-op. If the user is not inside a branch,
-        /// the unwind request returns `false`.
-        case nearestBranch
-
-        /// Dismisses the receiving scope. An elevated root removes its whole space.
-        ///
-        /// Dismisses the receiving scope and its descendants, matching a local
-        /// ``UnwindRouteAction`` captured from that scope.
-        case topmostAncestor
-
-        /// Unwinds to a scope named by a map or presentation declaration ID.
-        case id(AnyHashable)
     }
 
     private weak var referencedEngine: RouterEngine?
@@ -110,25 +102,46 @@ public struct Router: Equatable {
         await engine.requestRouteWhenReady(route, origin: origin)
     }
 
-    /// Unwinds from this router's scope, to an explicit target in its priority space.
+    /// Applies an unwind policy from this router's captured scope within its priority space.
     ///
     /// `.root` retains this space's root. Use `dismissSpace()` for whole-space removal.
     /// Waits for this unwind's native teardown. A buffered presentation waits for all
     /// ongoing unwinds, then continues in its own caller without delaying this return.
-    /// - Returns: Whether an unwind target was found for a live scope in the top space.
+    /// - Returns: Whether the request was accepted for a live scope in the top space.
     @discardableResult
-    public func unwind(to target: UnwindTarget) async -> Bool {
+    public func unwind(_ target: UnwindTarget) async -> Bool {
         guard let engine else { return false }
-        return await engine.unwindAndWait(to: target, origin: origin)
+        return await engine.unwindAndWait(target, origin: origin)
     }
 
     /// Unwinds from this router's scope, and delivers a payload to a matching handler.
     /// Waits for this unwind's native teardown, independently of any buffered presentation.
-    /// - Returns: Whether an unwind target was found for a live scope in the top space.
+    /// - Returns: Whether the request was accepted for a live scope in the top space.
     @discardableResult
-    public func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {
+    public func unwind<Payload>(_ target: UnwindTarget, payload: Payload) async -> Bool {
         guard let engine else { return false }
-        return await engine.unwindAndWait(to: target, payload: payload, origin: origin)
+        return await engine.unwindAndWait(target, payload: payload, origin: origin)
+    }
+
+    /// Dismisses the nearest live occurrence of an exact route type and its descendants.
+    /// Lookup includes the current destination and stays within its priority space.
+    /// - Parameter route: The exact route type whose nearest occurrence should be dismissed.
+    /// - Returns: Whether a matching scope was found and dismissed, after native teardown.
+    @discardableResult
+    public func unwind<R: Route>(from route: R.Type) async -> Bool {
+        guard let engine else { return false }
+        return await engine.unwindAndWait(.routeType(route), origin: origin)
+    }
+
+    /// Dismisses the nearest matching route and delivers a payload using the same policy.
+    /// - Parameters:
+    ///   - route: The exact route type whose nearest occurrence should be dismissed.
+    ///   - payload: The value delivered to a matching ``UnwindHandler``.
+    /// - Returns: Whether a matching scope was found and dismissed, after native teardown.
+    @discardableResult
+    public func unwind<R: Route, Payload>(from route: R.Type, payload: Payload) async -> Bool {
+        guard let engine else { return false }
+        return await engine.unwindAndWait(.routeType(route), payload: payload, origin: origin)
     }
 
     /// Performs an action from this router's scope, within its priority space.

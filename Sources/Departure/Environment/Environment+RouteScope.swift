@@ -35,51 +35,51 @@ import SwiftUI
 /// }
 /// ```
 public struct UnwindRouteAction: Equatable {
-    private let router: Router
-    private let missingRouteType: (any Route.Type)?
+    private weak var engine: RouterEngine?
+    private let resolved: RouterEngine.ResolvedUnwind?
+    private let missingTarget: RouterEngine.UnwindSelection?
 
     /// Creates an inactive unwind action.
-    public init() { router = .inactive; missingRouteType = nil }
+    public init() { engine = nil; resolved = nil; missingTarget = nil }
 
     init(router: RouterEngine, routeScope: RouteScope) {
-        self.router = Router(engine: router, scope: routeScope)
-        missingRouteType = nil
+        self.init(router: router, resolved: .init(.policy(.current), source: routeScope, target: routeScope))
     }
 
-    init(missing routeType: any Route.Type) {
-        router = .inactive
-        missingRouteType = routeType
+    init(router: RouterEngine, resolved: RouterEngine.ResolvedUnwind) {
+        engine = router
+        self.resolved = resolved
+        missingTarget = nil
     }
 
-    /// Unwinds the captured route scope.
-    ///
-    /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed installed route scopes have left the view hierarchy.
+    init(missing target: RouterEngine.UnwindSelection) {
+        engine = nil
+        resolved = nil
+        missingTarget = target
+    }
+
+    /// Applies the captured unwind policy and awaits its native teardown.
+    /// - Returns: Whether the captured request was accepted. Removed or covered scopes return `false`.
     @discardableResult
-    public func callAsFunction() async -> Bool {
-        if let missingRouteType {
-            log.departureWarning(.unwindRouteTargetMissing(routeType: missingRouteType))
+    public func callAsFunction() async -> Bool { await invoke() }
+
+    /// Applies the captured unwind policy and delivers a payload to a matching ``UnwindHandler``.
+    /// - Parameter payload: The value delivered using the policy's handler rules.
+    /// - Returns: Whether the captured request was accepted, after native teardown completes.
+    @discardableResult
+    public func callAsFunction<Payload>(payload: Payload) async -> Bool { await invoke(payload: payload) }
+
+    private func invoke(payload: Any? = nil) async -> Bool {
+        if let missingTarget {
+            log.departureWarning(.unwindRouteTargetMissing(target: missingTarget))
             return false
         }
-        return await router.unwind(to: .topmostAncestor)
-    }
-
-    /// Unwinds the captured route scope and delivers a payload to a matching ``UnwindHandler``.
-    ///
-    /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed installed route scopes have left the view hierarchy.
-    @discardableResult
-    public func callAsFunction<Payload>(payload: Payload) async -> Bool {
-        if let missingRouteType {
-            log.departureWarning(.unwindRouteTargetMissing(routeType: missingRouteType))
-            return false
-        }
-        return await router.unwind(to: .topmostAncestor, payload: payload)
+        guard let engine, let resolved else { return false }
+        return await engine.unwindAndWait(resolved, payload: payload)
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.router == rhs.router
-            && lhs.missingRouteType.map(ObjectIdentifier.init) == rhs.missingRouteType.map(ObjectIdentifier.init)
+        lhs.engine === rhs.engine && lhs.resolved == rhs.resolved && lhs.missingTarget == rhs.missingTarget
     }
 }
 

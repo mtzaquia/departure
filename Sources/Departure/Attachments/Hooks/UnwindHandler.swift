@@ -23,8 +23,8 @@
 /// Handles a matching route when it unwinds.
 ///
 /// Unwinds can be requested with ``UnwindRouteAction`` from ``UnwindRoute`` for
-/// captured route-scope dismissal, or with ``Router/unwind(to:)`` and
-/// ``Router/unwind(to:payload:)`` for explicit router-level targets.
+/// captured route-scope dismissal, or with ``Router/unwind(_:)`` and
+/// ``Router/unwind(_:payload:)`` for explicit router-level targets.
 /// Explicit whole-space removal and native Back or dismissal also notify handlers.
 /// Presenting a route never notifies them: ancestor crawlback, equality reuse,
 /// and replacement can remove destinations without being an unwind request.
@@ -60,7 +60,7 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
     /// Creates an unwind handler.
     ///
     /// If this handler matches an ``UnwindRouteAction/callAsFunction(payload:)`` or
-    /// ``Router/unwind(to:payload:)`` request, `handle` is scheduled when the unwind is accepted.
+    /// ``Router/unwind(_:payload:)`` request, `handle` is scheduled when the unwind is accepted.
     /// Delivery starts before the path changes. The router does not wait for `handle` to return.
     /// An optional `nil` passed to the payload overload is still a typed payload.
     public init<Payload>(
@@ -91,7 +91,7 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
     /// Creates an unwind handler for payload-free unwind requests.
     ///
     /// If this handler matches an ``UnwindRouteAction/callAsFunction()`` or
-    /// ``Router/unwind(to:)`` request, `handle` is scheduled when the unwind is accepted.
+    /// ``Router/unwind(_:)`` request, `handle` is scheduled when the unwind is accepted.
     /// Native dismissal uses the same before-commit timing.
     public init(
         _ routeType: R.Type,

@@ -65,7 +65,7 @@ struct RouterTests {
         #expect(router.defaultSpace.rootPath.count == 1)
         #expect(router.defaultSpace.rootPath.last?.route is HomeDetailRoute)
 
-        await owner.current.unwind(to: .topmostAncestor)
+        await owner.current.unwind(.current)
 
         #expect(router.defaultSpace.rootPath.isEmpty)
 
@@ -218,7 +218,7 @@ struct RouterTests {
             ]
         )
 
-        let didUnwind = await router.unwind(to: .id("missing"))
+        let didUnwind = await Router(engine: router).unwind(from: LoginRoute.self)
         if didUnwind {
             await router.present(SettingsRoute())
         }
@@ -230,15 +230,15 @@ struct RouterTests {
     @Test func publicUnwindReportsNoRouteAtRoot() async {
         let router = RouterEngine()
 
-        #expect(await router.unwind(to: .root) == false)
-        #expect(await router.unwind(to: .topmostAncestor) == false)
+        #expect(await router.unwind(.root) == false)
+        #expect(await router.unwind(.current) == false)
         #expect(router.defaultSpace.rootPath.isEmpty)
     }
 
-    @Test func publicUnwindReportsMissingNearestBranch() async {
+    @Test func publicUnwindReportsMissingNearestModal() async {
         let router = RouterEngine()
 
-        #expect(await router.unwind(to: .nearestBranch) == false)
+        #expect(await router.unwind(.nearestModal) == false)
         #expect(router.defaultSpace.rootPath.isEmpty)
     }
 
@@ -372,7 +372,7 @@ struct RouterTests {
         #expect(homeScope.path.count == 1)
         #expect(homeScope.path.last?.route is HomeDetailRoute)
 
-        await router.unwind(to: .nearestBranch)
+        await router.unwind(.current)
         await router.requestRoute(SettingsRoute())
 
         #expect(router.defaultSpace.rootPath.isEmpty)
@@ -1903,7 +1903,7 @@ struct RouterTests {
 
         await root.current.present(HomeDetailRoute())
         let pushedScope = try #require(root.engine.defaultSpace.rootPath.last)
-        #expect(await root.current.unwind(to: .topmostAncestor))
+        #expect(await root.current.unwind(.current))
 
         #expect(root.engine.spaces.routePath(containing: pushedScope) == nil)
         #expect(root.engine.defaultSpace.rootPath.isEmpty)
@@ -2004,7 +2004,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(pushedScope)
 
         let unwindTask = Task {
-            await router.unwind(to: .id(RootRoute().id))
+            await router.unwind(.nearestModal)
         }
         for _ in 0..<10 where router.hasOutgoingPresentations == false {
             await Task.yield()
@@ -2061,14 +2061,14 @@ struct RouterTests {
         router.defaultSpace.rootPath.replaceTestPath([firstScope])
         router.installElevatedSpace(priority: .high, scopes: [secondScope])
 
-        await router.unwindAndWait(to: nil)
+        await router.unwindAndWait(.current)
 
         #expect(router.defaultSpace.rootPath.count == 1)
         #expect(router.defaultSpace.rootPath.last === firstScope)
         #expect(router.spaces.highSpace == nil)
     }
 
-    @Test func unwindToIDKeepsMatchingRouteScope() async {
+    @Test func routeTypeUnwindNeverSearchesCoveredSpaces() async {
         let router = RouterEngine()
         let firstScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let secondScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -2076,7 +2076,7 @@ struct RouterTests {
         router.defaultSpace.rootPath.replaceTestPath([firstScope])
         router.installElevatedSpace(priority: .high, scopes: [secondScope])
 
-        #expect(!((await router.unwindAndWait(to: .id(RootRoute().id)))))
+        #expect(!((await Router(engine: router).unwind(from: RootRoute.self))))
         #expect(router.defaultSpace.rootPath.last === firstScope)
         #expect(router.spaces.highSpace?.root === secondScope)
     }
@@ -2105,7 +2105,7 @@ struct RouterTests {
         router.defaultSpace.rootPath.replaceTestPath([firstScope])
         router.installElevatedSpace(priority: .high, scopes: [secondScope])
 
-        await router.unwindAndWait(to: .root)
+        await router.unwindAndWait(.root)
 
         #expect(router.defaultSpace.rootPath.last === firstScope)
         #expect(router.spaces.highSpace?.root === secondScope)
@@ -2145,7 +2145,7 @@ struct RouterTests {
         #expect(router.defaultSpace.rootPath.count == 1)
 
         // `.root` reaches past the current branch path to the app root.
-        await router.unwind(to: .root)
+        await router.unwind(.root)
         #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: walletScope) == nil)
     }
@@ -2190,7 +2190,7 @@ struct RouterTests {
         #expect(homeScope.path.first?.route is SettingsRoute)
         #expect(homeScope.path.last?.route is MessageRoute)
 
-        await router.unwind(to: .root)
+        await router.unwind(.root)
 
         #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: homeScope) == nil)
@@ -2252,7 +2252,7 @@ struct RouterTests {
         #expect(homeScope.path.count == 2)
         #expect(walletScope.path.count == 1)
 
-        await router.unwind(to: .root)
+        await router.unwind(.root)
 
         #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: homeScope) == nil)
@@ -2319,7 +2319,7 @@ struct RouterTests {
         #expect(homeScope.path.last?.route is HomeDetailRoute)
         #expect(walletScope.path.count == 2)
 
-        await router.unwind(to: .root)
+        await router.unwind(.root)
 
         #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
@@ -2329,7 +2329,7 @@ struct RouterTests {
         #expect(walletScope.path.isEmpty)
     }
 
-    @Test func unwindToNearestBranchClearsThatBranchPathButKeepsTheAppRoot() async throws {
+    @Test func unwindFromBranchDestinationKeepsTheAppRoot() async throws {
         let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
@@ -2360,45 +2360,7 @@ struct RouterTests {
         await router.requestRoute(SettingsRoute())
         #expect(walletScope.path.count == 1)
 
-        // `.nearestBranch` is branch-scoped: from a pushed scope it clears the branch's own path back
-        // to its root but keeps the app root (the landing scope) — it does not escape the branch.
-        await router.unwind(to: .nearestBranch)
-        #expect(walletScope.path.isEmpty)
-        #expect(router.defaultSpace.rootPath.count == 1)
-    }
-
-    @Test func unwindToNearestBranchAtBranchRootIsNoOp() async throws {
-        let router = RouterEngine()
-        let (selection, _) = tabSelection(.wallet)
-        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
-
-        router.defaultSpace.rootPath.replaceTestPath([landingScope])
-        landingScope.defineTestMap(
-            id: RootRoute().id,
-            selection: AnyRouteBranchSelection(selection),
-            definitions: RouteDeclarationBuilder.buildBlock(
-                BranchDeclarationBuilder.buildExpression(
-                    Branch(AppTab.wallet) {
-                        testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default))
-                    }
-                )
-            )
-        )
-
-        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        walletScope.defineTestMap(
-            id: AnyHashable(AppTab.wallet),
-            selection: nil,
-            definitions: [
-                RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations),
-            ]
-        )
-        landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
-
-        // Already at the branch root (nothing pushed). `.nearestBranch` must not escape to the root
-        // path — it is a no-op that leaves the landing (app root) intact.
-        #expect(walletScope.path.isEmpty)
-        await router.unwind(to: .nearestBranch)
+        await Router(engine: router).unwind(from: SettingsRoute.self)
         #expect(walletScope.path.isEmpty)
         #expect(router.defaultSpace.rootPath.count == 1)
     }
@@ -2419,7 +2381,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(loginScope)
 
         let unwindTask = Task {
-            guard await router.unwind(to: .topmostAncestor) else {
+            guard await router.unwind(.current) else {
                 return
             }
 
@@ -2598,7 +2560,7 @@ struct RouterTests {
         #expect(router.defaultSpace.rootPath.last?.route is AlertRoute)
     }
 
-    @Test func namedRootUnwindTargetSurvivesNativeTeardown() async {
+    @Test func namedRootRetainsIdentityAcrossNativeTeardown() async {
         let engine = RouterEngine(routes: RootRouteMap(id: "custom") {
             testPush(testDestination(HomeDetailRoute.self))
         })
@@ -2606,7 +2568,7 @@ struct RouterTests {
         engine.routeScopeDidLeaveView(engine.root)
         #expect(engine.root.id == AnyHashable("custom"))
         await engine.present(HomeDetailRoute())
-        #expect(await engine.unwind(to: .id("custom")))
+        #expect(await engine.unwind(.root))
         #expect(engine.defaultSpace.rootPath.isEmpty)
     }
 
@@ -2759,7 +2721,7 @@ struct RouterTests {
         await router.requestRoute(MessageRoute())
         #expect(homeScope.path.count == 1)
 
-        await router.unwind(to: .topmostAncestor)
+        await router.unwind(.current)
 
         #expect(router.defaultSpace.rootPath.count == 1)
         #expect(router.defaultSpace.rootPath.last === landingScope)
@@ -2820,7 +2782,7 @@ struct RouterTests {
         #expect(router.spaces.highSpace?.currentRouteScope.route is LoginRoute)
         #expect(router.spaces.highSpace?.currentRoutePath === router.spaces.highSpace?.rootPath)
 
-        await router.unwind(to: .topmostAncestor)
+        await router.unwind(.current)
 
         #expect(router.defaultSpace.rootPath.count == 1)
         #expect(router.defaultSpace.rootPath.last === landingScope)
@@ -2883,7 +2845,7 @@ struct RouterTests {
         #expect(walletScope.path.count == 1)
         #expect(walletScope.path.last?.route is SettingsRoute)
 
-        let didUnwind = await router.unwind(to: .id(RootRoute().id))
+        let didUnwind = await Router(engine: router).unwind(from: SettingsRoute.self)
         if didUnwind {
             await router.requestRoute(MessageRoute())
             router.resumePendingRoute(for: AppTab.home, in: landingScope)
@@ -2918,7 +2880,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(thirdScope)
 
         let unwindTask = Task {
-            guard await router.unwind(to: .root) else {
+            guard await router.unwind(.root) else {
                 return
             }
 
@@ -2974,7 +2936,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(profileScope)
 
         let unwindTask = Task {
-            await router.unwindAndWait(to: .root)
+            await router.unwindAndWait(.root)
         }
 
         await Task.yield()
@@ -2989,7 +2951,7 @@ struct RouterTests {
         #expect(router.routePresentationBinding(from: homeScope, matching: .sheet).wrappedValue == nil)
     }
 
-    @Test func scopedTopmostAncestorKeepsModalPushSnapshotUntilSheetLeavesView() async throws {
+    @Test func scopedCurrentUnwindKeepsModalPushSnapshotUntilSheetLeavesView() async throws {
         let router = RouterEngine()
         let sheetScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         let pushedScope = RouteScope(id: HomeDetailRoute().id, route: HomeDetailRoute(), parent: sheetScope)
@@ -3020,7 +2982,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(sheetScope)
         router.routeScopeDidInstallInView(pushedScope)
 
-        let unwind = Task { await Router(engine: router, scope: sheetScope).unwind(to: .topmostAncestor) }
+        let unwind = Task { await Router(engine: router, scope: sheetScope).unwind(.current) }
         await Task.yield()
 
         #expect(router.hasOutgoingPresentations)
@@ -3165,7 +3127,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(pushedScope)
 
         let unwindTask = Task {
-            await router.unwind(to: .id(paymentMethodsID))
+            await Router(engine: router).unwind(from: AddMethodRoute.self)
         }
 
         for _ in 0..<10 where router.hasOutgoingPresentations == false {
@@ -3228,7 +3190,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(profileScope)
 
         let unwindTask = Task {
-            await router.unwindAndWait(to: .root)
+            await router.unwindAndWait(.root)
         }
 
         for _ in 0..<10 {
@@ -3301,7 +3263,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(detailScope)
 
         let unwindTask = Task {
-            await router.unwindAndWait(to: .root)
+            await router.unwindAndWait(.root)
         }
 
         for _ in 0..<10 {
@@ -3509,7 +3471,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(authenticationScope)
 
         let unwindTask = Task {
-            await router.unwindAndWait(to: .nearestBranch)
+            await router.unwindAndWait(.current)
         }
 
         for _ in 0..<10 {
@@ -3926,12 +3888,12 @@ struct RouterTests {
 
     @Test func unwindRequestLogMessagesDescribeTheirActualTargets() {
         #expect(
-            DepartureLogEvent.unwindRequested(target: nil).message
-                == "requested to previous route"
+            DepartureLogEvent.unwindRequested(target: .routeType(SettingsRoute.self)).message
+                == "requested from SettingsRoute"
         )
         #expect(
-            DepartureLogEvent.unwindRequested(target: .topmostAncestor).message
-                == "requested to topmostAncestor"
+            DepartureLogEvent.unwindRequested(target: .policy(.current)).message
+                == "requested current"
         )
         #expect(
             DepartureLogEvent.unwindPreviousRequested.message

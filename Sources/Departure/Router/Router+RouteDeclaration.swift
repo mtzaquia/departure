@@ -148,15 +148,6 @@ extension RouterEngine {
         var declaringPath: RoutePath { declaringScope.routePath }
         var presentationHostID: RoutePresentationHostID? { presentingScope.presentationHostID }
     }
-
-    /// The path owned by the branch nearest to the current position, or `nil` when the current
-    /// position is not inside any branch. `.nearestBranch` unwinds clear this path back to its root.
-    var nearestBranchPath: RoutePath? { nearestBranchPath(from: currentRouteScope) }
-
-    func nearestBranchPath(from sourceScope: RouteScope) -> RoutePath? {
-        sourceScope.ancestry.first { $0.branchID != nil }?.path
-    }
-
 }
 
 extension RouterEngine {

@@ -10,7 +10,7 @@ struct ScopedRouterTests {
         let environment = EnvironmentValues()
         #expect(environment.router == EnvironmentValues().router)
         await environment.router.present(SettingsRoute())
-        #expect(await environment.router.unwind(to: .root) == false)
+        #expect(await environment.router.unwind(.root) == false)
     }
 
     @Test func ownerCurrentSearchesItsCapturedCurrentScope() async {
@@ -214,14 +214,15 @@ struct ScopedRouterTests {
         #expect(fixture.engine.pendingRoute == nil)
     }
 
-    @Test func unwindNearestBranchIsLocalAndRootIsContainerWide() async {
+    @Test func scopedDismissalIsLocalAndRootIsContainerWide() async throws {
         let fixture = Fixture(concurrent: true)
         await fixture.root.branch("detail").present(SettingsRoute())
         await fixture.root.branch("content").present(HomeDetailRoute())
-        #expect(await fixture.root.branch("detail").unwind(to: .nearestBranch))
+        let destination = try #require(fixture.detail.path.first)
+        #expect(await fixture.local(destination).unwind(.current))
         #expect(fixture.detail.path.isEmpty)
         #expect(fixture.content.path.count == 1)
-        #expect(await fixture.root.unwind(to: .root))
+        #expect(await fixture.root.unwind(.root))
         #expect(fixture.content.path.isEmpty)
     }
 
@@ -241,9 +242,9 @@ struct ScopedRouterTests {
         await fixture.root.branch("detail").present(SettingsRoute())
         let removed = try #require(fixture.detail.path.last)
         let stored = fixture.local(removed)
-        #expect(await fixture.root.branch("detail").unwind(to: .nearestBranch))
+        #expect(await stored.unwind(.current))
         await stored.present(HomeDetailRoute())
-        #expect(await stored.unwind(to: .root) == false)
+        #expect(await stored.unwind(.root) == false)
         #expect(fixture.content.path.isEmpty)
         #expect(fixture.detail.path.isEmpty)
     }
@@ -259,9 +260,9 @@ struct ScopedRouterTests {
         await root.present(SettingsRoute())
         let destination = try #require(engine.defaultSpace.rootPath.last)
         let stored = Router(engine: engine, scope: destination).branch("content")
-        #expect(await root.unwind(to: .root))
+        #expect(await root.unwind(.root))
         await stored.present(HomeDetailRoute())
-        #expect(await stored.unwind(to: .root) == false)
+        #expect(await stored.unwind(.root) == false)
         #expect(engine.root.branchScopes["content"]?.path.isEmpty == true)
         #expect(engine.pendingRoute == nil)
     }
@@ -367,7 +368,7 @@ struct ScopedRouterTests {
         let local = fixture.local(destination)
         await local.present(NumberedRoute(number: 2))
         #expect(fixture.detail.path.count == 2)
-        #expect(await local.unwind(to: .topmostAncestor))
+        #expect(await local.unwind(.current))
         #expect(fixture.detail.path.isEmpty)
     }
 
@@ -398,7 +399,7 @@ struct ScopedRouterTests {
         ])
         let request = Task { await fixture.local(destination).present(ScopedDelayedRoute(gate: gate)) }
         await gate.waitForStart()
-        #expect(await fixture.root.branch("detail").unwind(to: .nearestBranch))
+        #expect(await fixture.local(destination).unwind(.current))
         await gate.release()
         await request.value
         #expect(fixture.detail.path.isEmpty)

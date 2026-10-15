@@ -64,7 +64,7 @@ import Testing
         await owner.current.present(LoginRoute())
         await owner.current.present(HigherChild())
         let space = try #require(engine.spaces.highSpace)
-        #expect(await owner.current.unwind(to: .root))
+        #expect(await owner.current.unwind(.root))
         await waitFor { probe.events.count == 2 }
         #expect(probe.events == ["handler", "completed"])
         #expect(engine.spaces.highSpace === space)
@@ -86,7 +86,7 @@ import Testing
             }.declaration,
         ])
         await owner.current.present(LoginRoute())
-        #expect(await owner.current.unwind(to: .topmostAncestor, payload: 42))
+        #expect(await owner.current.unwind(.current, payload: 42))
         #expect(probe.events == ["value:42"])
         #expect(owner.engine.spaces.highSpace == nil)
     }
@@ -106,7 +106,7 @@ import Testing
         await owner.current.present(HigherChild())
         let child = try #require(engine.spaces.highSpace?.rootPath.last)
         engine.routeScopeDidInstallInView(child)
-        let unwind = Task { await owner.current.unwind(to: .root) }
+        let unwind = Task { await owner.current.unwind(.root) }
         await waitFor { engine.pendingRoute != nil && engine.spaces.highSpace?.rootPath.isEmpty == true }
         let latest = Task {
             await owner.default.present(SettingsRoute())
@@ -164,7 +164,7 @@ import Testing
             ])
         }
         await owner.current.present(HigherChild())
-        #expect(await owner.current.unwind(to: .root))
+        #expect(await owner.current.unwind(.root))
         #expect(probe.events == (conflict ? [] : ["local"]))
     }
 

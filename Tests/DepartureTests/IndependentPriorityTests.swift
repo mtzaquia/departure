@@ -28,12 +28,12 @@ struct IndependentPriorityTests {
         await owner.current.present(HighEntry(value: 1))
         let high = try #require(owner.engine.spaces.highSpace)
         await owner.current.present(HighPush())
-        #expect(await owner.current.unwind(to: .root))
+        #expect(await owner.current.unwind(.root))
         #expect(owner.engine.spaces.highSpace === high)
         #expect(high.rootPath.isEmpty)
         #expect(owner.engine.defaultSpace.rootPath.last === defaultSource)
-        #expect(!((await owner.current.unwind(to: .root))))
-        #expect(await owner.current.unwind(to: .topmostAncestor))
+        #expect(!((await owner.current.unwind(.root))))
+        #expect(await owner.current.unwind(.current))
         #expect(owner.engine.spaces.highSpace == nil)
         #expect(owner.engine.defaultSpace.rootPath.last === defaultSource)
     }
@@ -51,7 +51,7 @@ struct IndependentPriorityTests {
         let highBinding = owner.engine.elevatedRoutePresentationBinding(priority: .high, matching: .sheet)
         await defaultSource.present(CriticalEntry())
         await defaultPush.present(DefaultPush())
-        #expect(!((await defaultPush.unwind(to: .root))))
+        #expect(!((await defaultPush.unwind(.root))))
         #expect(!((await defaultPush.dismissSpace())))
         defaultBinding.wrappedValue = nil
         #expect(owner.engine.defaultSpace.rootPath.count == 1)
@@ -60,7 +60,7 @@ struct IndependentPriorityTests {
         let critical = try #require(owner.engine.spaces.criticalSpace)
         await highRouter.present(HighEntry(value: 2))
         await highRouter.present(HighPush())
-        #expect(!((await highRouter.unwind(to: .root))))
+        #expect(!((await highRouter.unwind(.root))))
         #expect(!((await highRouter.dismissSpace())))
         highBinding.wrappedValue = nil
         #expect(owner.engine.spaces.highSpace === high)
@@ -105,14 +105,14 @@ struct IndependentPriorityTests {
         #expect(owner.engine.spaces.highSpace === second)
     }
 
-    @Test func localDefinitionsAndUnwindIDsDoNotFallBackToCoveredSpaces() async throws {
+    @Test func localDefinitionsAndRouteTypeUnwindsDoNotFallBackToCoveredSpaces() async throws {
         let owner = fixture()
         await owner.current.present(DefaultPush())
         await owner.current.present(HighEntry(value: 1))
         let high = try #require(owner.engine.spaces.highSpace)
         await owner.current.present(DefaultOnlyModal())
         #expect(high.rootPath.isEmpty)
-        #expect(!((await owner.current.unwind(to: .id("default-root")))))
+        #expect(!((await owner.current.unwind(from: DefaultPush.self))))
         #expect(owner.engine.defaultSpace.rootPath.count == 1)
     }
 
@@ -197,7 +197,7 @@ struct IndependentPriorityTests {
         let inactivePush = try #require(other.path.last)
         await rootRouter.branch("main").present(HighPush())
         for _ in 0..<1000 where owner.engine.pendingRoute != nil { await Task.yield() }
-        #expect(await owner.current.unwind(to: .root))
+        #expect(await owner.current.unwind(.root))
         #expect(high.root.branchScopes["main"]?.path.isEmpty == true)
         #expect(other.path.last === inactivePush)
         await owner.current.present(CriticalEntry())

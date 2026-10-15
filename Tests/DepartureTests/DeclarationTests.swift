@@ -89,9 +89,9 @@ import Testing
         #expect(outer.id == AnyHashable("outer-detail"))
         #expect(inner.id == AnyHashable("inner-detail"))
         await engine.present(SettingsRoute())
-        #expect(await engine.unwind(to: .id("inner-detail")))
+        #expect(await Router(engine: engine).unwind(from: SettingsRoute.self))
         #expect(engine.defaultSpace.rootPath.last === inner)
-        #expect(await engine.unwind(to: .id("outer-detail")))
+        #expect(await Router(engine: engine).unwind(from: NumberedRoute.self))
         #expect(engine.defaultSpace.rootPath.scopes.count == 1)
         #expect(engine.defaultSpace.rootPath.last === outer)
     }
@@ -113,7 +113,8 @@ import Testing
         #expect(home.branchID == AnyHashable(AppTab.home))
         #expect(engine.root.routeAttachments.count == 1)
         await Router(engine: engine, scope: engine.root).branch(AppTab.home).present(HomeDetailRoute())
-        #expect(await engine.unwind(to: .id("home-flow")))
+        let child = try #require(home.path.last)
+        #expect(await Router(engine: engine, scope: child).unwind(.current))
         #expect(home.path.isEmpty)
         #expect(engine.root.branchScopes[AppTab.home] === home)
     }
@@ -128,13 +129,13 @@ import Testing
         let space = try #require(engine.spaces.highSpace)
         #expect(space.root.id == AnyHashable("authentication"))
         await engine.present(HomeDetailRoute())
-        #expect(await engine.unwind(to: .id("authentication")))
+        #expect(await engine.unwind(.root))
         #expect(engine.spaces.highSpace === space)
         #expect(space.rootPath.isEmpty)
     }
 
     @Test(arguments: [false, true])
-    func conflictingMapIDsDisableTheIDTargetButKeepDefinitions(sameID: Bool) async {
+    func conflictingMapIDsRemoveTheExplicitIDButKeepDefinitions(sameID: Bool) async {
         let engine = RouterEngine(routes: RootRouteMap {
             testPush(detail) {
                 RouteMap(id: "first") { testPush(settings) }
@@ -147,8 +148,6 @@ import Testing
         #expect(scope.id != AnyHashable("second"))
         #expect(scope.id != AnyHashable(HomeDetailRoute().id))
         await engine.present(SettingsRoute())
-        #expect(!((await engine.unwind(to: .id("first")))))
-        #expect(!((await engine.unwind(to: .id("second")))))
         #expect(engine.defaultSpace.rootPath.scopes.count == 2)
     }
 

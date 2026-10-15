@@ -49,7 +49,6 @@ Definitions outside `Branch` belong to the enclosing container. Route builders c
 
 ```swift
 await router.branch(AppTab.wallet).present(TransactionRoute())
-await router.unwind(to: .nearestBranch)
 ```
 
 Obtaining a branch router leaves selection unchanged. An accepted route activates its branch; rejected requests, missing declarations, and reroutes to common ancestors do not activate the original target. Plain requests discover mapped branches after local and enclosing matches.

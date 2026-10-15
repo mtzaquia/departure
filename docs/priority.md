@@ -32,11 +32,11 @@ Only `RootRouteMap` declares high and critical entries. A high destination canno
 
 The entry destination becomes the space root at X0/Y0. Its outer modal presents that space; local modals advance Y within it. Replacement commits a new root before waiting for the outgoing presentation, so it never exposes a temporary lower space.
 
-Only the top space may originate navigation or dispatch actions. Covered scoped routers cannot push, replace, unwind, select a branch, perform an action, or open another priority. Deferred interceptor invocations recheck this authority before running. Lookup and unwind IDs stop at the space root; the owner's elevated entry definitions remain discoverable separately. Detached environment forwarding comes from the owner and does not establish navigation ancestry.
+Only the top space may originate navigation or dispatch actions. Covered scoped routers cannot push, replace, unwind, select a branch, perform an action, or open another priority. Deferred interceptor invocations recheck this authority before running. Lookup and unwind boundaries stop at the space root; the owner's elevated entry definitions remain discoverable separately. Detached environment forwarding comes from the owner and does not establish navigation ancestry.
 
 Use `rootRouter.default` for deep links and notifications. It captures a scope in the default flow and rejects commands while covered, so an external entry point cannot navigate behind or dismiss a critical lockscreen. Presentation attempts during an unfinished navigation operation wait and check coverage on resumption; they still drop if the lockscreen remains. `rootRouter.current` captures the top space; use it when acting deliberately in that space. Unrelated application background work remains independent of router command authority.
 
-`router.unwind(to: .root)` resets only its space and retains the entry and outer presentation. `router.dismissSpace()` or the elevated root's `unwindRoute()` removes the whole space. An explicit owner can also remove a covered space:
+`router.unwind(.root)` resets only its space and retains the entry and outer presentation. `router.dismissSpace()` or the elevated root's `unwindRoute()` removes the whole space. An explicit owner can also remove a covered space:
 
 ```swift
 @State private var rootRouter = RootRouter()

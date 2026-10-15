@@ -68,7 +68,7 @@ struct UnwindPresentationPolicyTests {
         for scope in [container, sheet, push] { engine.routeScopeDidInstallInView(scope) }
         let sheetBinding = engine.routePresentationBinding(from: branch, matching: .sheet)
         let pushBinding = engine.routePresentationBinding(from: sheet, matching: .push)
-        let unwind = Task { await owner.current.unwind(to: .root) }
+        let unwind = Task { await owner.current.unwind(.root) }
         for _ in 0..<1000 where !engine.defaultSpace.rootPath.isEmpty { await Task.yield() }
         #expect(engine.defaultSpace.rootPath.isEmpty)
         #expect(sheetBinding.wrappedValue?.scope === sheet)
@@ -91,7 +91,7 @@ struct UnwindPresentationPolicyTests {
 
     enum PushJump: String, CaseIterable, Sendable {
         case ancestor
-        case id
+        case routeType
         case capturedAction
     }
 
@@ -114,9 +114,9 @@ struct UnwindPresentationPolicyTests {
         let unwind = Task {
             switch jump {
             case .ancestor:
-                await router.unwind(to: .topmostAncestor)
-            case .id:
-                await router.unwind(to: .id(engine.root.id))
+                await router.unwind(.current)
+            case .routeType:
+                await router.unwind(from: NumberedRoute.self)
             case .capturedAction:
                 await UnwindRouteAction(router: engine, routeScope: scopes[0])()
             }

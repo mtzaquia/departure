@@ -108,4 +108,4 @@ selection appears, without adding a Back entry or clearing another column's navi
 
 ## Read an ancestor unwind action
 
-Open Profile while signed out, choose the login flow's detail push, then tap **Dismiss login flow**. The detail uses `@UnwindRoute(LoginRoute.self)` to dismiss its enclosing login route and descendants without receiving an action through an initializer or custom environment key. Other dismissal buttons use the local `@UnwindRoute` reader. The focused UI test is `testAncestorUnwindReaderDismissesLoginFlowFromPushedDetail`.
+Open Profile while signed out, choose the login flow's detail push, then tap **Dismiss login flow**. The detail uses `@UnwindRoute(.nearestModal)` to dismiss its enclosing modal route and descendants without receiving an action through an initializer or custom environment key. Other dismissal buttons use the local `@UnwindRoute` reader. The focused UI test is `testAncestorUnwindReaderDismissesLoginFlowFromPushedDetail`.

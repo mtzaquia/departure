@@ -189,7 +189,7 @@ struct RouteDestinationRenderingTests {
         #expect(!(await context.unwindRoute()))
         await context.router.present(DomainOnlyRoute())
         #expect(engine.defaultSpace.rootPath.last === nextScope)
-        #expect(await router.current.unwind(to: .root))
+        #expect(await router.current.unwind(.root))
     }
 
     @Test(arguments: [RoutePresentation.Style.push, .sheet, .cover(.slide), .cover(.fade)])
@@ -288,14 +288,18 @@ struct RouteDestinationRenderingTests {
         try #require(await waitUntil { engine.spaces.space(for: priority) == nil })
     }
 
-    @Test(arguments: [RoutePresentation.Style.sheet, .cover(.fade)], [false, true])
-    func ancestorReaderDismissesItsFlow(style: RoutePresentation.Style, childUnwindsFirst: Bool) async throws {
+    @Test(arguments: [RoutePresentation.Style.sheet, .cover(.fade)], [(false, false), (false, true), (true, false), (true, true)])
+    func ancestorReaderDismissesItsFlow(style: RoutePresentation.Style, options: (Bool, Bool)) async throws {
+        let (childUnwindsFirst, usePolicy) = options
         let router = RootRouter()
         let recorder = RenderedDestinationRecorder()
         let parent = RouteDestination(DomainOnlyRoute.self) { _, _ in
             NavigationStack { Text("Flow root").routing() }
         }
-        let child = RouteDestination(NumberedRoute.self) { _, _ in AncestorUnwindReader(recorder: recorder) }
+        let child = RouteDestination(NumberedRoute.self) { _, _ in
+            if usePolicy { PolicyUnwindReader(recorder: recorder, target: .nearestModal) }
+            else { AncestorUnwindReader(recorder: recorder) }
+        }
         let routes = RootRouteMap {
             testDeclaration(parent, presentation: .init(style: style, priority: .default), children: [
                 RouteScopeDeclaration(routes: testPush(child)._routeDeclarations)
@@ -445,6 +449,21 @@ private extension EnvironmentValues {
 private struct AncestorUnwindReader: View {
     let recorder: RenderedDestinationRecorder
     @UnwindRoute(DomainOnlyRoute.self) private var unwindFlow
+    var body: some View {
+        let action = unwindFlow
+        Text("Flow child").onAppear { recorder.unwindRoute = action }
+    }
+}
+
+private struct PolicyUnwindReader: View {
+    let recorder: RenderedDestinationRecorder
+    @UnwindRoute private var unwindFlow
+
+    init(recorder: RenderedDestinationRecorder, target: Router.UnwindTarget) {
+        self.recorder = recorder
+        _unwindFlow = UnwindRoute(target)
+    }
+
     var body: some View {
         let action = unwindFlow
         Text("Flow child").onAppear { recorder.unwindRoute = action }

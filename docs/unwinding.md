@@ -1,41 +1,30 @@
 # Unwinding
 
-Use the router to return to a known point in a flow.
+Use `@UnwindRoute` to read a captured action, or call `router.unwind` to choose a boundary when issuing a command. Both accept `Router.UnwindTarget`:
 
 ```swift
-await router.unwind(to: .root)
-await router.unwind(to: .topmostAncestor)
-await router.unwind(to: .id("settings-flow"))
+@UnwindRoute(.nearestModal) private var unwindModal
+
+// Either call dismisses the nearest sheet or cover, including its pushed screens.
+await unwindModal()
+await router.unwind(.nearestModal)
 ```
 
-The environment router resolves targets from its captured scope. `.nearestBranch` clears
-that scope’s enclosing branch; `.topmostAncestor` dismisses that scope and its descendants.
-`.root` resets only the receiving priority space and keeps its root visible. Inactive pushes survive only in branches owned by that retained root; removing a nested container removes all its branches from live navigation. Unwind targets stay within that space. Covered spaces reject ordinary unwinds.
+| Policy | Result |
+| --- | --- |
+| `.current` | Dismisses the current destination and its descendants. This is the reader's default. |
+| `.nearestModal` | Dismisses the nearest sheet or cover and all its descendants, regardless of push depth. Includes the current destination. |
+| `.root` | Resets the receiving priority space and retains its root and outer presentation. |
 
-`unwindRoute()` dismisses the captured destination. At an elevated root it removes the entire space; the permanent default root cannot be dismissed. `router.dismissSpace()` removes the receiving top elevated space from any descendant. `RootRouter.dismissSpace(_:)` and `dismissSpaces()` coordinate removal explicitly, including covered spaces, and finish after native teardown.
+Lookup starts at the captured source scope and stays within its priority space. Covered spaces reject ordinary unwinds. A reset removes every branch owned by a removed container; inactive pushes survive only in branches owned by the retained space root.
 
-Name a mapped scope to target it explicitly:
+A default local action at an elevated root removes that entire space; the permanent default root cannot be dismissed. `router.dismissSpace()` removes the receiving top elevated space from any descendant. `RootRouter.dismissSpace(_:)` and `dismissSpaces()` coordinate removal explicitly, including covered spaces, and finish after native teardown.
 
-```swift
-RootRouteMap(id: "app-root") {
-  Sheet(SettingsRoute.self) {
-    RouteMap(id: "settings-flow") {
-      Push(AdvancedSettingsRoute.self)
-    }
-  }
-} destinations: {
-  SettingsFeature.destination
-  SettingsFeature.advancedDestination
-}
-```
-
-A map ID names its receiving root, branch root, or destination; it adds no navigation scope. Use distinct IDs to distinguish repeated route types in an ancestry. One scope accepts one explicit ID, including an ID supplied on its containing root or presentation declaration. Conflicting IDs disable the explicit target and report a diagnostic; its destinations remain usable.
-
-`unwind(to:)` returns whether it found a target. Await it before continuing a flow.
+`unwind` returns whether the request was accepted and finishes after native teardown. Await it before continuing a flow. If the unwind removes the requesting destination, obtain a fresh router from the owning `RootRouter` for the next presentation:
 
 ```swift
-if await router.unwind(to: .id("settings-flow")) {
-  await router.present(LoginRoute())
+if await router.unwind(from: SettingsRoute.self) {
+  await rootRouter.current.present(LoginRoute())
 }
 ```
 
@@ -71,9 +60,18 @@ struct CheckoutConfirmationView: View {
 }
 ```
 
+Use the same route type with the router's `from:` overload:
+
+```swift
+await router.unwind(from: CheckoutRoute.self)
+await router.unwind(from: CheckoutRoute.self, payload: CheckoutResult.completed)
+```
+
 The action dismisses the matched `CheckoutRoute` and all its descendants. No publication modifier or custom environment key is needed. Lookup includes the current destination, crosses push and ordinary modal boundaries within its priority space, and never searches sibling branches or other priority spaces. If the route type appears more than once, the nearest occurrence wins.
 
-Each read resolves and captures one exact scope. A stored action never searches again or switches to a replacement route instance. Calling an action whose scope has left navigation returns `false`. A missing match also returns `false`, without falling back to the local destination, and emits a warning when invoked, including in Release builds and when debug logging is disabled.
+Each read captures the resolved boundary. Newly pushed descendants are included when the action runs. A stored action never searches again or switches to a replacement route instance. Dismissal actions remain usable while that destination is live, even after the child that read them has popped. The `.root` policy also captures its requesting scope for authority and handler delivery; both the requester and root must remain live.
+
+A missing match returns `false` and emits a warning when invoked, including in Release builds and when debug logging is disabled. A removed capture returns `false`. Neither case falls back to dismissing another destination.
 
 The existing covered-space restrictions apply when an action is invoked. Lookup can capture a live covered ancestor, but that action cannot unwind until its space is eligible again. Typed payload delivery and native teardown completion are identical for local and ancestor actions.
 

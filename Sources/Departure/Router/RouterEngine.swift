@@ -112,30 +112,30 @@ final class RouterEngine: Identifiable, Equatable {
         await requestRouteWhenReady(route)
     }
 
-    /// Dismisses route scopes to an explicit target.
+    /// Applies an unwind policy relative to the current scope.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
     /// and any removed installed route scopes have left the view hierarchy.
     ///
-    /// - Parameter target: The target to unwind to.
-    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
+    /// - Parameter target: The policy to apply from the current scope.
+    /// - Returns: Whether the unwind request was accepted.
     @discardableResult
-    func unwind(to target: UnwindTarget) async -> Bool {
-        await unwindAndWait(to: target)
+    func unwind(_ target: UnwindTarget) async -> Bool {
+        await unwindAndWait(target)
     }
 
-    /// Dismisses route scopes to an explicit target, delivering a payload to a matching ``UnwindHandler``.
+    /// Applies an unwind policy and delivers a payload to a matching ``UnwindHandler``.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
     /// and any removed installed route scopes have left the view hierarchy.
     ///
     /// - Parameters:
-    ///   - target: The target to unwind to.
+    ///   - target: The policy to apply from the current scope.
     ///   - payload: A value delivered to a matching ``UnwindHandler``.
-    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
+    /// - Returns: Whether the unwind request was accepted.
     @discardableResult
-    func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {
-        await unwindAndWait(to: target, payload: payload)
+    func unwind<Payload>(_ target: UnwindTarget, payload: Payload) async -> Bool {
+        await unwindAndWait(target, payload: payload)
     }
 
     /// Performs an action from the current route scope.

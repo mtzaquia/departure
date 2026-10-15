@@ -47,7 +47,7 @@ struct ProfileView: View {
 
                 LabAction(title: "Sign out to root", symbol: "rectangle.portrait.and.arrow.right", color: LabPalette.coral, role: .destructive) {
                     Storage.shared.isLoggedIn = false
-                    Task { await router.unwind(to: .root) }
+                    Task { await router.unwind(.root) }
                 }
                 .accessibilityIdentifier(SampleAppAccessibility.profileSignOutButton)
             }

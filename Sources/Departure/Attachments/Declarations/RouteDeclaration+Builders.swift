@@ -96,17 +96,17 @@ public struct RouteMap: Sendable {
     var scopeDeclarations: [RouteScopeDeclaration] {
         (destinations.isEmpty ? [] : [.init(destinations: destinations)]) + declarations
     }
-    /// Creates declarations and optionally names their receiving scope for ID-based unwinding.
+    /// Creates declarations and optionally names their receiving scope.
     ///
     /// A scope accepts one explicit ID across its containing declaration and composed maps.
-    /// Conflicting IDs report a diagnostic and disable that scope's explicit unwind target.
+    /// Conflicting IDs report a diagnostic and discard that scope's explicit name.
     ///
     /// Destination values contribute to one catalog for the complete root tree.
     /// Reusing a value is allowed; distinct destination values for the same route
     /// type conflict across all composed maps, including the root's contributions.
     ///
     /// - Parameters:
-    ///   - id: An optional unwind name for the receiving scope.
+    ///   - id: An optional name for the receiving scope.
     ///   - declarations: Routes, branches, and maps contributed to the receiving scope.
     ///   - destinations: Typed builders and destination collections for this contribution.
     public init(
@@ -139,7 +139,7 @@ public struct RootRouteMap: Sendable {
     /// throughout the tree. Destination views are evaluated only when rendered.
     ///
     /// - Parameters:
-    ///   - id: An explicit unwind name for the default root scope.
+    ///   - id: An explicit name for the default root scope.
     ///   - routes: The default declarations and optional elevated priority groups.
     ///   - destinations: Destination builders and collections available to this tree.
     public init(

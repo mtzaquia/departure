@@ -22,62 +22,57 @@
 
 import SwiftUI
 
-/// Reads an unwind action for this destination or its nearest matching ancestor route.
-///
-/// Use `@UnwindRoute` to dismiss the current route scope, or supply a route type
-/// to dismiss that route and its descendants without passing an action through views.
-/// Lookup includes the current scope and follows its logical ancestry within its
-/// priority space; sibling branches and other spaces are never searched.
+/// Reads an unwind action using the same policy as ``Router/unwind(_:)``.
 ///
 /// ```swift
 /// @UnwindRoute private var unwindRoute
+/// @UnwindRoute(.nearestModal) private var unwindModal
 /// @UnwindRoute(CheckoutRoute.self) private var unwindCheckout
 /// ```
 ///
-/// Each read captures the exact matched scope. Retained actions never retarget
-/// another instance after that scope is removed. A missing match produces an
-/// inactive action that returns `false` and emits a warning when invoked,
-/// including in Release builds and when debug logging is disabled.
+/// Lookup includes the current destination and follows its ancestry within the
+/// receiving priority space. Sibling branches and other spaces are never searched.
+/// Each read captures the resolved scope identities. A retained action never
+/// retargets a replacement instance. The root reset also captures its requesting
+/// scope for authority and handler delivery; that scope must remain live.
+/// A missing target returns `false` and emits a warning when invoked, including
+/// in Release builds and when debug logging is disabled.
 @propertyWrapper
 @MainActor
 public struct UnwindRoute: DynamicProperty {
     @Environment(\.routerEngine) private var engine
     @Environment(\.routeScope) private var scope
-    private let routeType: (any Route.Type)?
+    private let selection: RouterEngine.UnwindSelection
 
-    /// Reads a local action that dismisses the current destination and its descendants.
-    public init() { routeType = nil }
+    /// Reads an action for an unwind policy, defaulting to the current destination.
+    /// - Parameter target: The same policy accepted by ``Router/unwind(_:)``.
+    public init(_ target: Router.UnwindTarget = .current) { selection = .policy(target) }
 
-    /// Reads an action for the nearest live occurrence of a route type in this scope's ancestry.
-    /// - Parameter route: The exact route type to match, including the current destination.
-    public init<R: Route>(_ route: R.Type) { routeType = route }
+    /// Reads an action that dismisses the nearest live occurrence of the exact route type.
+    /// - Parameter route: The exact route type to dismiss, including its descendants.
+    public init<R: Route>(_ route: R.Type) { selection = .routeType(route) }
 
-    /// The action captured from the current scope or the nearest matching ancestor.
+    /// The action captured from this view's scope and the resolved policy boundary.
     ///
-    /// Outside a live router scope, the action is inactive. Calling the action
-    /// observes the existing unwind rules, including covered-space restrictions
-    /// and native teardown completion.
+    /// Calling the action observes live-scope authority, covered-space restrictions,
+    /// payload delivery, and native teardown completion in the shared unwind engine.
     public var wrappedValue: UnwindRouteAction {
         guard let engine else {
-            return routeType.map { UnwindRouteAction(missing: $0) } ?? UnwindRouteAction()
+            return selection == .policy(.current) ? UnwindRouteAction() : UnwindRouteAction(missing: selection)
         }
-        return engine.unwindRouteAction(from: scope, matching: routeType)
+        return engine.unwindRouteAction(from: scope, selection: selection)
     }
 }
 
 extension RouterEngine {
-    func unwindRouteAction(from source: RouteScope?, matching routeType: (any Route.Type)? = nil) -> UnwindRouteAction {
-        guard let source, let path = spaces.routePath(containing: source),
-              let space = spaces.space(containing: path) else {
-            return routeType.map { UnwindRouteAction(missing: $0) } ?? UnwindRouteAction()
+    func unwindRouteAction(from source: RouteScope?, target: UnwindTarget = .current) -> UnwindRouteAction {
+        unwindRouteAction(from: source, selection: .policy(target))
+    }
+
+    func unwindRouteAction(from source: RouteScope?, selection: UnwindSelection) -> UnwindRouteAction {
+        guard let source, let resolved = resolveUnwind(selection, from: source) else {
+            return selection == .policy(.current) ? UnwindRouteAction() : UnwindRouteAction(missing: selection)
         }
-        guard let routeType else { return UnwindRouteAction(router: self, routeScope: source) }
-        for scope in source.ancestry {
-            guard scope.space === space, spaces.routePath(containing: scope) != nil else { break }
-            if let route = scope.route, ObjectIdentifier(type(of: route)) == ObjectIdentifier(routeType) {
-                return UnwindRouteAction(router: self, routeScope: scope)
-            }
-        }
-        return UnwindRouteAction(missing: routeType)
+        return UnwindRouteAction(router: self, resolved: resolved)
     }
 }

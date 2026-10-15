@@ -194,7 +194,7 @@ struct ConcurrentResolutionProbeTests {
         await gate.waitForStart()
         let next = Task { await engine.requestRouteWhenReady(CountingProbeRoute(name: "removed", recorder: recorder), origin: RouteRequestOrigin(scope: old)) }
         try await waitUntil { engine.bufferedPresentationRequest != nil }
-        #expect(await root.unwind(to: .root))
+        #expect(await root.unwind(.root))
         gate.release()
         #expect(await first.value?.route is SlowProbeRoute)
         #expect(await next.value == nil)
@@ -295,7 +295,7 @@ struct ConcurrentResolutionProbeTests {
         let recorder = ResolutionRecorder()
         let first = Task { await engine.requestRouteWhenReady(SlowProbeRoute(gate: gate), origin: origin) }
         await gate.waitForStart()
-        let unwind = Task { await Router(engine: engine, scope: old).unwind(to: .root) }
+        let unwind = Task { await Router(engine: engine, scope: old).unwind(.root) }
         try await waitUntil { engine.defaultSpace.rootPath.isEmpty }
         let middle = Task { await engine.requestRouteWhenReady(CountingProbeRoute(name: "middle", recorder: recorder), origin: origin) }
         try await waitUntil { engine.bufferedPresentationRequest != nil }

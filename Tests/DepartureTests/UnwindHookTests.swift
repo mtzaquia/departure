@@ -78,12 +78,12 @@ struct UnwindHookTests {
                 if native == .repeatedNative { binding.wrappedValue = nil }
             } else if native == .repeatedExplicit {
                 let scoped = Router(engine: engine, scope: source)
-                async let first = scoped.unwind(to: .topmostAncestor)
-                async let second = scoped.unwind(to: .topmostAncestor)
+                async let first = scoped.unwind(.current)
+                async let second = scoped.unwind(.current)
                 let results = await (first, second)
                 #expect(results.0 || results.1)
             } else {
-                #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor))
+                #expect(await Router(engine: engine, scope: source).unwind(.current))
             }
         }
         await waitUntil { engine.defaultSpace.rootPath.isEmpty && recorder.events == ["handler"] }
@@ -127,7 +127,7 @@ struct UnwindHookTests {
         #expect(router.spaces.criticalSpace?.rootPath.scopes.count == 0)
         #expect(router.spaces.criticalSpace?.currentRouteScope.route is LockRoute)
 
-        await router.unwind(to: .topmostAncestor, payload: "unlocked")
+        await router.unwind(.current, payload: "unlocked")
 
         #expect(recorder.payloads == ["unlocked"])
         #expect(router.spaces.criticalSpace == nil)
@@ -135,7 +135,7 @@ struct UnwindHookTests {
         #expect(router.spaces.highSpace?.currentRouteScope.route is ChallengeRoute)
     }
 
-    @Test func landedScopeHandlerFiresForLowerDeclaredRoute() async throws {
+    @Test func landedScopeHandlerFiresForDismissedFlow() async throws {
         let router = RouterEngine()
         let recorder = UnwindRecorder()
 
@@ -158,7 +158,7 @@ struct UnwindHookTests {
         )
         cardsListScope.installHookDeclarations(
             hookDeclarations: [
-                UnwindHandler(AddCardRoute.self, expecting: String.self) { payload in
+                UnwindHandler(AddMethodRoute.self, expecting: String.self) { payload in
                     recorder.payloads.append(payload)
                 }.declaration,
             ]
@@ -175,7 +175,7 @@ struct UnwindHookTests {
         )
 
         await router.present(AddCardRoute())
-        await router.unwind(to: .id(CardsListRoute().id), payload: "card-added")
+        await Router(engine: router).unwind(from: AddMethodRoute.self, payload: "card-added")
 
         #expect(recorder.payloads == ["card-added"])
         #expect(router.defaultSpace.rootPath.scopes.count == 1)
@@ -229,7 +229,7 @@ struct UnwindHookTests {
         )
 
         await router.present(AddCardRoute())
-        await router.unwind(to: .id(CardsListRoute().id))
+        await Router(engine: router).unwind(from: AddCardRoute.self)
 
         #expect(recorder.events == ["cards"])
     }
@@ -269,20 +269,15 @@ struct UnwindHookTests {
         landingScope.attachTestBranch(homeScope, for: AppTab.home)
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
 
-        await router.unwind(to: .topmostAncestor)
+        await router.unwind(.current)
 
         #expect(recorder.events == ["home"])
         #expect(homeScope.path.isEmpty)
     }
 
-    @Test func unwindTargetChangesLandingButNotHandlerLookupRule() async {
-        let topmostAncestorEvents = await branchUnwindEvents(to: .topmostAncestor)
-        let explicitIDEvents = await branchUnwindEvents(to: .id(AppTab.home))
-        let nearestBranchEvents = await branchUnwindEvents(to: .nearestBranch)
-
-        #expect(topmostAncestorEvents == ["container"])
-        #expect(explicitIDEvents == ["container"])
-        #expect(nearestBranchEvents == ["container"])
+    @Test func currentAndRouteTypeUnwindsReachContainerHook() async {
+        #expect(await branchUnwindEvents(useRouteType: false) == ["container"])
+        #expect(await branchUnwindEvents(useRouteType: true) == ["container"])
     }
 
     @Test func swiftUIDismissBubblesHandlerFromDescendantLandingToAncestor() async throws {
@@ -336,7 +331,7 @@ struct UnwindHookTests {
         )
         router.defaultSpace.rootPath.replaceTestPath([parentScope, childScope])
 
-        await router.unwind(to: .topmostAncestor, payload: "done")
+        await router.unwind(.current, payload: "done")
 
         #expect(recorder.payloads == ["done"])
         #expect(router.defaultSpace.rootPath.count == 1)
@@ -357,13 +352,13 @@ struct UnwindHookTests {
         )
         router.defaultSpace.rootPath.replaceTestPath([parentScope, childScope])
 
-        await router.unwind(to: .topmostAncestor, payload: "wrong")
+        await router.unwind(.current, payload: "wrong")
 
         #expect(recorder.ints.isEmpty)
         #expect(router.defaultSpace.rootPath.count == 1)
     }
 
-    @Test func noPayloadHandlerTriggersForExplicitIDTarget() async {
+    @Test func noPayloadHandlerTriggersForRouteTypeTarget() async {
         let router = RouterEngine()
         let parentScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let childScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
@@ -378,7 +373,7 @@ struct UnwindHookTests {
         )
         router.defaultSpace.rootPath.replaceTestPath([parentScope, childScope])
 
-        await router.unwind(to: .id(RootRoute().id))
+        await Router(engine: router).unwind(from: LoginRoute.self)
 
         #expect(recorder.events == ["parent"])
         #expect(router.defaultSpace.rootPath.count == 1)
@@ -519,7 +514,7 @@ struct UnwindHookTests {
         #expect(recorder.events.isEmpty)
 
         await router.present(SettingsRoute())
-        #expect(await router.unwind(to: .topmostAncestor))
+        #expect(await router.unwind(.current))
         #expect(recorder.events == ["numbered"])
     }
 
@@ -538,7 +533,7 @@ struct UnwindHookTests {
         )
         router.defaultSpace.rootPath.replaceTestPath([parentScope, childScope])
 
-        await router.unwind(to: .root)
+        await router.unwind(.root)
 
         #expect(recorder.events == ["root"])
         #expect(router.defaultSpace.rootPath.isEmpty)
@@ -580,14 +575,14 @@ struct UnwindHookTests {
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
 
         await router.requestRoute(SettingsRoute())
-        await router.unwind(to: .root)
+        await router.unwind(.root)
 
         #expect(recorder.events == ["root"])
         #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: walletScope) == nil)
     }
 
-    @Test func nearestBranchTriggersContainerHookInsteadOfBranchRootHook() async {
+    @Test func routeTypeUnwindTriggersBranchRootHook() async {
         let router = RouterEngine()
         let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
@@ -613,39 +608,7 @@ struct UnwindHookTests {
         walletScope.path.replaceTestPath([settingsScope])
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
 
-        await router.unwind(to: .nearestBranch)
-
-        #expect(recorder.events == ["container"])
-        #expect(walletScope.path.isEmpty)
-    }
-
-    @Test func explicitBranchRootIDTriggersBranchRootHook() async {
-        let router = RouterEngine()
-        let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
-        let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
-        let settingsScope = RouteScope(id: SettingsRoute().id, route: SettingsRoute())
-        let recorder = UnwindRecorder()
-
-        router.defaultSpace.rootPath.replaceTestPath([landingScope])
-        landingScope.setActiveBranch(AnyHashable(AppTab.wallet))
-        landingScope.installHookDeclarations(
-            hookDeclarations: [
-                UnwindHandler(SettingsRoute.self) {
-                    recorder.events.append("container")
-                }.declaration,
-            ]
-        )
-        walletScope.installHookDeclarations(
-            hookDeclarations: [
-                UnwindHandler(SettingsRoute.self) {
-                    recorder.events.append("branch-root")
-                }.declaration,
-            ]
-        )
-        walletScope.path.replaceTestPath([settingsScope])
-        landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
-
-        await router.unwind(to: .id(AppTab.wallet))
+        await Router(engine: router).unwind(from: SettingsRoute.self)
 
         #expect(recorder.events == ["branch-root"])
         #expect(walletScope.path.isEmpty)
@@ -667,7 +630,7 @@ struct UnwindHookTests {
         )
         router.defaultSpace.rootPath.replaceTestPath([parentScope, childScope])
 
-        await router.unwind(to: .topmostAncestor, payload: "done")
+        await router.unwind(.current, payload: "done")
 
         #expect(recorder.payloads == ["done"])
         #expect(recorder.events == ["handler"])
@@ -692,7 +655,7 @@ struct UnwindHookTests {
         router.defaultSpace.rootPath.replaceTestPath([parentScope, childScope])
 
         let unwindTask = Task {
-            await router.unwind(to: .topmostAncestor)
+            await router.unwind(.current)
             recorder.events.append("unwind-returned")
         }
         await recorder.waitForEventCount(1)
@@ -733,7 +696,7 @@ struct UnwindHookTests {
         router.routeScopeDidInstallInView(childScope)
 
         let unwindTask = Task {
-            await router.unwind(to: .topmostAncestor)
+            await router.unwind(.current)
         }
         await recorder.waitForEventCount(1)
         await waitUntil {
@@ -859,7 +822,7 @@ struct UnwindHookTests {
         router.routeScopeDidInstallInView(dismissedScope)
 
         let unwindTask = Task {
-            await router.unwind(to: .id(RootRoute().id))
+            await Router(engine: router).unwind(from: LoginRoute.self)
         }
         await Task.yield()
 
@@ -883,7 +846,7 @@ struct UnwindHookTests {
         ])
         await owner.default.present(LoginRoute())
         let first = try #require(owner.engine.defaultSpace.rootPath.last)
-        #expect(await owner.current.unwind(to: .topmostAncestor))
+        #expect(await owner.current.unwind(.current))
         await recorder.waitForEventCount(1)
         #expect(recorder.events == ["handler"])
 
@@ -892,7 +855,7 @@ struct UnwindHookTests {
         let second = try #require(owner.engine.defaultSpace.rootPath.last)
         #expect(first !== second)
         #expect(first.id == second.id)
-        #expect(await owner.current.unwind(to: .topmostAncestor))
+        #expect(await owner.current.unwind(.current))
         await recorder.waitForEventCount(2)
         #expect(recorder.events == ["handler", "handler"])
     }
@@ -924,7 +887,7 @@ struct UnwindHookTests {
         await owner.current.present(LoginRoute())
         departingScope = owner.engine.currentRouteScope
         #expect(departingScope?.route is LoginRoute)
-        #expect(await owner.current.unwind(to: .topmostAncestor))
+        #expect(await owner.current.unwind(.current))
         #expect(recorder.events == ["handler"])
         #expect(departingScope == nil)
 
@@ -957,7 +920,7 @@ struct UnwindHookTests {
         router.routeScopeDidInstallInView(dismissedScope)
 
         let unwindTask = Task {
-            await router.unwind(to: .topmostAncestor)
+            await router.unwind(.current)
         }
         await waitUntil {
             router.spaces.highSpace == nil
@@ -1035,7 +998,7 @@ private final class UnwindRecorder {
 }
 
 @MainActor
-private func branchUnwindEvents(to target: RouterEngine.UnwindTarget) async -> [String] {
+private func branchUnwindEvents(useRouteType: Bool) async -> [String] {
     let router = RouterEngine()
     let landingScope = RouteScope(id: RootRoute().id, route: RootRoute())
     let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
@@ -1054,7 +1017,8 @@ private func branchUnwindEvents(to target: RouterEngine.UnwindTarget) async -> [
     homeScope.path.replaceTestPath([sourceScope])
     landingScope.attachTestBranch(homeScope, for: AppTab.home)
 
-    await router.unwind(to: target)
+    if useRouteType { await Router(engine: router).unwind(from: SettingsRoute.self) }
+    else { await router.unwind(.current) }
     return recorder.events
 }
 

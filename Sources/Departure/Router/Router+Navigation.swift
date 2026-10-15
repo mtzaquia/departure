@@ -24,75 +24,6 @@ import Foundation
 
 extension RouterEngine {
     @discardableResult
-    func unwindAndWait(to target: UnwindTarget?, payload: Any? = nil, origin: RouteRequestOrigin? = nil) async -> Bool {
-        #if DEBUG
-        guard DepartureLogTrace.id != nil else {
-            return await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "u")) {
-                await unwindAndWait(to: target, payload: payload, origin: origin)
-            }
-        }
-        #endif
-
-        log.departureDebug(.unwindRequested(target: target))
-        guard let sourceScope = navigationSource(origin) else { return false }
-
-        let retained: RouteScope
-        let handlerScope: RouteScope?
-        let plan: RouteSpaces.UnwindPlan
-        switch target {
-        case nil, .topmostAncestor:
-            return await unwindPrevious(from: sourceScope, payload: payload)
-
-        case .root:
-            guard let space = sourceScope.space else { return false }
-            retained = space.root
-            handlerScope = retained
-            plan = spaces.rootUnwindPlan(in: space)
-            guard !plan.removedScopes.isEmpty else {
-                log.departureDebug(.unwindSkippedNoRoute)
-                return false
-            }
-
-        case .nearestBranch:
-            guard let branchRoot = nearestBranchPath(from: sourceScope)?.owner else {
-                log.departureDebug(.unwindSkippedNotInsideBranch)
-                return false
-            }
-            retained = branchRoot
-            // Branch reset notifies its container. An explicit branch-root ID
-            // remains the opt-in target for a handler on the branch root itself.
-            handlerScope = branchRoot.parent
-            plan = RouteSpaces.UnwindPlan(retaining: [retained])
-
-        case .id(let id):
-            let path = spaces.routePath(containing: sourceScope) ?? spaces.activeSpace.currentRoutePath
-            if let local = path.scope(withID: id) {
-                retained = local
-                handlerScope = local
-                plan = RouteSpaces.UnwindPlan(retaining: [local])
-            } else {
-                guard let ancestor = spaces.ancestorUnwindScope(from: path, withID: id),
-                      let owner = path.owner else {
-                    log.departureDebug(.unwindDroppedTargetNotFound(target: target))
-                    return false
-                }
-                let ancestorPlan = RouteSpaces.UnwindPlan(retaining: [owner, ancestor])
-                log.departureDebug(.unwindAcceptedAncestorTarget(
-                    keepThrough: ancestor, removing: ancestorPlan.removedScopes.count
-                ))
-                return await performPlannedUnwind(beginNavigationOperation(plan: ancestorPlan),
-                    notifying: [sourceScope], payload: payload, in: ancestor,
-                    authority: .scope(sourceScope), logsCompletion: true)
-            }
-        }
-
-        log.departureDebug(.unwindAccepted(keepThrough: retained, removing: plan.removedScopes.count))
-        return await performPlannedUnwind(beginNavigationOperation(plan: plan),
-            notifying: [sourceScope], payload: payload, in: handlerScope,
-            authority: .scope(sourceScope), logsCompletion: true)
-    }
-
-    @discardableResult
     func unwindPrevious(from sourceScope: RouteScope, payload: Any? = nil) async -> Bool {
         log.departureDebug(.unwindPreviousRequested)
 
@@ -496,7 +427,7 @@ extension RouterEngine {
         }
     }
 
-    private enum UnwindAuthority {
+    enum UnwindAuthority {
         case scope(RouteScope), owner, nativeOwner
 
         func permitsCommit(in router: RouterEngine) -> Bool {
@@ -511,7 +442,7 @@ extension RouterEngine {
     /// Every unwind shares notification, commit, native completion and coordinator release.
     /// Already-committed operations still complete when their requesting task is cancelled.
     @discardableResult
-    private func performPlannedUnwind(
+    func performPlannedUnwind(
         _ operation: NavigationOperation,
         notifying sources: [RouteScope] = [],
         payload: Any? = nil,

@@ -12,7 +12,7 @@ Presentation declarations name domain route types. Feature-owned destination bui
 
 `RouteMap` contributes declarations to its receiving scope without adding a navigation scope. Its destinations join one catalog for the complete composed tree. Repeated contributions of the same value are allowed; different destination values for one type conflict throughout the tree. The root can supply missing values, with no override precedence.
 
-`RouteMap(id:)` optionally names that receiving scope for `.unwind(to: .id(...))`. A scope accepts one explicit ID across its root/presentation declaration and composed maps. Multiple explicit IDs report a diagnostic and disable the explicit target while retaining definitions.
+`RouteMap(id:)` optionally names that receiving scope. Unwinding selects a relative boundary or route type. A scope accepts one explicit ID across its root/presentation declaration and composed maps. Multiple explicit IDs report a diagnostic and discard the conflicting explicit ID while retaining definitions.
 
 `ModalRouteMap` composes sheets, covers, and other modal maps, with an optional `destinations:` builder. It can be used inside an elevated priority group. Ordinary `RouteMap` values belong in the main builder or inside an entry modal.
 

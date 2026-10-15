@@ -86,7 +86,7 @@ struct MacOSPresentationTests {
         })
         for payload in ["first", 7] as [Any] {
             await owner.current.present(LoginRoute())
-            #expect(await owner.current.unwind(to: .topmostAncestor, payload: payload))
+            #expect(await owner.current.unwind(.current, payload: payload))
         }
         #expect(control.events == ["string:first", "int:7"])
         control.duplicate = true
@@ -95,12 +95,12 @@ struct MacOSPresentationTests {
             return false
         })
         await owner.current.present(LoginRoute())
-        #expect(await owner.current.unwind(to: .topmostAncestor, payload: "blocked"))
+        #expect(await owner.current.unwind(.current, payload: "blocked"))
         #expect(control.events == ["string:first", "int:7"])
         control.duplicate = false
         try #require(await waitUntil { engine.root.hookBinding(for: stringKey, in: engine.spaces)?.declaration != nil })
         await owner.current.present(LoginRoute())
-        #expect(await owner.current.unwind(to: .topmostAncestor, payload: "restored"))
+        #expect(await owner.current.unwind(.current, payload: "restored"))
         #expect(control.events == ["string:first", "int:7", "string:restored"])
     }
 
@@ -119,7 +119,7 @@ struct MacOSPresentationTests {
         await owner.current.present(SettingsRoute())
         let modal = try #require(owner.engine.defaultSpace.rootPath.last)
         try #require(await waitUntil { modal.isInstalledInView && window.attachedSheet != nil })
-        #expect(await owner.current.unwind(to: .topmostAncestor))
+        #expect(await owner.current.unwind(.current))
         #expect(owner.engine.defaultSpace.rootPath.isEmpty)
         #expect(window.attachedSheet == nil)
         #expect(!owner.engine.isNavigating)
@@ -262,7 +262,7 @@ struct MacOSPresentationTests {
         await router.current.present(MacOSInlineRoute(number: 3, recorder: recorder))
         let third = await waitUntil { recorder.number == 3 }
         try #require(third)
-        #expect(await router.current.unwind(to: .root))
+        #expect(await router.current.unwind(.root))
         #expect(recorder.number == nil)
         #expect(router.engine.root.routeAttachments.count == 1)
     }

@@ -71,7 +71,7 @@ struct ReplaceTests {
         #expect(fixture.sidebar.path.first === sibling)
         #expect(fixture.engine.defaultSpace.currentModalScope == nil)
         #expect(fixture.engine.routePhase(for: sibling) == .active)
-        #expect(await fixture.local(previous).unwind(to: .root) == false)
+        #expect(await fixture.local(previous).unwind(.root) == false)
     }
 
     @Test func equivalentSelectionKeepsIdentityAndClearsItsChildPath() async throws {
@@ -123,9 +123,9 @@ struct ReplaceTests {
         fixture.installChildren(on: selected)
         await fixture.local(selected).present(ChildRoute())
         let child = try #require(fixture.wallet.path.last)
-        #expect(await fixture.local(child).unwind(to: .topmostAncestor))
+        #expect(await fixture.local(child).unwind(.current))
         #expect(fixture.wallet.path.first === selected)
-        #expect(await fixture.local(selected).unwind(to: .topmostAncestor))
+        #expect(await fixture.local(selected).unwind(.current))
         #expect(fixture.wallet.path.isEmpty)
         #expect(fixture.engine.routePresentation(from: fixture.wallet, matching: .replace) == nil)
     }

@@ -330,7 +330,7 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.authenticationTitle)
         assertGone(A11y.settingsAuthenticationButton)
 
-        tap(A11y.authenticationUnwindToNearestBranchButton)
+        tap(A11y.authenticationUnwindNearestModalButton)
         assertGone(A11y.authenticationTitle)
         assertExists(A11y.settingsAuthenticationButton)
 
@@ -340,7 +340,7 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.appearancePresentAuthenticationButton)
         assertExists(A11y.authenticationTitle)
 
-        tap(A11y.authenticationUnwindToNearestBranchButton)
+        tap(A11y.authenticationUnwindNearestModalButton)
         assertGone(A11y.authenticationTitle)
         assertGone(A11y.appearanceTitle)
         assertExists(A11y.settingsAuthenticationButton)
@@ -708,32 +708,30 @@ final class SampleAppUITests: XCTestCase {
         assertLabel(A11y.lifecycleTeardownRoutePhase, contains: "Nested route phase: active")
     }
 
-    func testUnwindTargetsAcrossBranchContainer() {
+    func testRelativeAndRouteTypeUnwindsAcrossBranchContainer() {
         openLanding()
         tapSettingsTab()
-
         tap(A11y.settingsAuthenticationButton)
         assertExists(A11y.authenticationTitle)
 
-        tap(A11y.authenticationUnwindToNearestBranchButton)
+        tap(A11y.authenticationUnwindFromRouteButton)
         assertGone(A11y.authenticationTitle)
         assertExists(A11y.settingsAuthenticationButton)
         assertExists(A11y.landing)
-        assertLabel(A11y.landingContainerHookStatus, contains: "Container unwind hooks: 1")
-        assertLabel(A11y.settingsBranchHookStatus, contains: "Branch unwind hooks: 0")
-
-        tap(A11y.settingsAuthenticationButton)
-        assertExists(A11y.authenticationTitle)
-
-        tap(A11y.authenticationUnwindToBranchIDButton)
-        assertGone(A11y.authenticationTitle)
-        assertExists(A11y.settingsAuthenticationButton)
-        assertLabel(A11y.landingContainerHookStatus, contains: "Container unwind hooks: 1")
+        assertLabel(A11y.landingContainerHookStatus, contains: "Container unwind hooks: 0")
         assertLabel(A11y.settingsBranchHookStatus, contains: "Branch unwind hooks: 1")
 
         tap(A11y.settingsAuthenticationButton)
         assertExists(A11y.authenticationTitle)
+        tap(A11y.authenticationUnwindNearestModalButton)
+        assertGone(A11y.landing)
+        assertExists(A11y.startButton)
+        assertLabel(A11y.rootHookStatus, contains: "Root unwind hooks: 0")
 
+        openLanding()
+        tapSettingsTab()
+        tap(A11y.settingsAuthenticationButton)
+        assertExists(A11y.authenticationTitle)
         tap(A11y.authenticationUnwindToRootButton)
         assertExists(A11y.startButton)
         assertGone(A11y.landing)
@@ -741,7 +739,6 @@ final class SampleAppUITests: XCTestCase {
 
         tap(A11y.startShowInfoButton)
         assertExists(A11y.startInfoText)
-
         tap(A11y.startInfoDismissButton)
         assertGone(A11y.startInfoText)
         assertExists(A11y.startButton)
@@ -901,13 +898,13 @@ final class SampleAppUITests: XCTestCase {
         assertLabel(A11y.homeUnwindPayloadStatus, contains: "message delivered")
     }
 
-    func testDirectCoverTopmostAncestorAndProtectedSettingsRoute() {
+    func testDirectCoverCurrentUnwindAndProtectedSettingsRoute() {
         openLanding()
         tapSettingsTab()
 
         tap(A11y.settingsAppearanceButton)
         tap(A11y.appearancePresentAuthenticationButton)
-        tap(A11y.authenticationUnwindToTopmostAncestorButton)
+        tap(A11y.authenticationUnwindCurrentButton)
         assertGone(A11y.authenticationTitle)
         assertExists(A11y.appearanceTitle)
 
@@ -919,7 +916,7 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.authenticationTitle)
 
         setSwitch(A11y.authenticationLoggedInToggle, on: true)
-        tap(A11y.authenticationUnwindToNearestBranchButton)
+        tap(A11y.authenticationUnwindNearestModalButton)
         tap(A11y.settingsProfileButton)
         assertExists(A11y.profileTitle)
     }
@@ -1154,9 +1151,9 @@ private enum A11y {
     static let authenticationPresentTopLevelCoverButton = "sample.authentication.present-top-level-cover"
     static let authenticationPresentRootSettingsPushButton = "sample.authentication.present-root-settings-push"
     static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
-    static let authenticationUnwindToTopmostAncestorButton = "sample.authentication.unwind-to-topmost-ancestor"
-    static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
-    static let authenticationUnwindToBranchIDButton = "sample.authentication.unwind-to-branch-id"
+    static let authenticationUnwindCurrentButton = "sample.authentication.unwind-current"
+    static let authenticationUnwindNearestModalButton = "sample.authentication.unwind-nearest-modal"
+    static let authenticationUnwindFromRouteButton = "sample.authentication.unwind-from-route"
     static let authenticationUnwindStoredActionButton = "sample.authentication.unwind-stored-action"
 
     static let topLevelSheetText = "sample.top-level-sheet.text"

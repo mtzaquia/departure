@@ -22,8 +22,8 @@ struct HookBindingTests {
             await router.present(LoginRoute())
             let source = try #require(engine.defaultSpace.rootPath.last)
             let scoped = Router(engine: engine, scope: source)
-            if let payload { #expect(await scoped.unwind(to: .topmostAncestor, payload: payload)) }
-            else { #expect(await scoped.unwind(to: .topmostAncestor)) }
+            if let payload { #expect(await scoped.unwind(.current, payload: payload)) }
+            else { #expect(await scoped.unwind(.current)) }
         }
         #expect(probe.events == ["string:done", "int:42", "payload-free"])
     }
@@ -41,10 +41,10 @@ struct HookBindingTests {
         ])
         await root.present(LoginRoute())
         var source = try #require(engine.defaultSpace.rootPath.last)
-        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor, payload: Optional<String>.none))
+        #expect(await Router(engine: engine, scope: source).unwind(.current, payload: Optional<String>.none))
         await root.present(LoginRoute())
         source = try #require(engine.defaultSpace.rootPath.last)
-        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor))
+        #expect(await Router(engine: engine, scope: source).unwind(.current))
         #expect(probe.events == ["optional", "payload-free"])
     }
 
@@ -69,13 +69,13 @@ struct HookBindingTests {
         for payload in ["blocked", 7] as [Any] {
             await root.present(LoginRoute())
             let source = try #require(engine.defaultSpace.rootPath.last)
-            #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor, payload: payload))
+            #expect(await Router(engine: engine, scope: source).unwind(.current, payload: payload))
         }
         #expect(probe.events == ["int:7"])
         engine.root.uninstallHookDeclarations(sourceID: "second")
         await root.present(LoginRoute())
         let source = try #require(engine.defaultSpace.rootPath.last)
-        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor, payload: "restored"))
+        #expect(await Router(engine: engine, scope: source).unwind(.current, payload: "restored"))
         #expect(probe.events == ["int:7", "first:restored"])
     }
 
@@ -98,13 +98,13 @@ struct HookBindingTests {
         let landingRouter = Router(engine: engine, scope: landing)
         await landingRouter.present(SettingsRoute())
         var source = try #require(engine.defaultSpace.rootPath.last)
-        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor, payload: "found"))
+        #expect(await Router(engine: engine, scope: source).unwind(.current, payload: "found"))
         #expect(probe.events == ["ancestor:found"])
         let string = UnwindHandler(SettingsRoute.self, expecting: String.self) { probe.events.append("local:\($0)") }.declaration
         landing.installHookDeclarations(sourceID: "duplicate", hookDeclarations: [string, string])
         await landingRouter.present(SettingsRoute())
         source = try #require(engine.defaultSpace.rootPath.last)
-        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor, payload: "blocked"))
+        #expect(await Router(engine: engine, scope: source).unwind(.current, payload: "blocked"))
         #expect(probe.events == ["ancestor:found"])
     }
 
@@ -149,7 +149,7 @@ struct HookBindingTests {
         await router.perform(HookBindingAction(probe: probe))
         await router.present(LoginRoute())
         let source = try #require(engine.defaultSpace.rootPath.last)
-        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor))
+        #expect(await Router(engine: engine, scope: source).unwind(.current))
         #expect(probe.events == ["action", "unwind"])
 
         engine.root.installHookDeclarations(sourceID: "actions", hookDeclarations: [
@@ -160,7 +160,7 @@ struct HookBindingTests {
         await router.perform(HookBindingAction(probe: probe))
         await router.present(LoginRoute())
         let second = try #require(engine.defaultSpace.rootPath.last)
-        #expect(await Router(engine: engine, scope: second).unwind(to: .topmostAncestor))
+        #expect(await Router(engine: engine, scope: second).unwind(.current))
         #expect(probe.events == ["action", "unwind", "updated", "body", "unwind"])
     }
 
@@ -237,13 +237,13 @@ struct HookBindingTests {
         }
         await receiverRouter.present(SettingsRoute())
         let source = try #require(engine.defaultSpace.rootPath.last)
-        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor))
+        #expect(await Router(engine: engine, scope: source).unwind(.current))
         #expect(probe.events.isEmpty)
 
         receiver.uninstallHookDeclarations(sourceID: "second")
         await receiverRouter.present(SettingsRoute())
         let second = try #require(engine.defaultSpace.rootPath.last)
-        #expect(await Router(engine: engine, scope: second).unwind(to: .topmostAncestor))
+        #expect(await Router(engine: engine, scope: second).unwind(.current))
         #expect(probe.events == ["first"])
     }
 
@@ -268,7 +268,7 @@ struct HookBindingTests {
         branch.installHookDeclarations(hookDeclarations: [hook])
         engine.routeScopeDidInstallInView(source)
 
-        let unwind = Task { await sourceRouter.unwind(to: .topmostAncestor) }
+        let unwind = Task { await sourceRouter.unwind(.current) }
         for _ in 0..<1000 where source.belongs(to: engine.defaultSpace) { await Task.yield() }
         #expect(!source.belongs(to: engine.defaultSpace))
         #expect(source.isInstalledInView)
@@ -332,7 +332,7 @@ struct HookBindingTests {
         await router.perform(HookBindingAction(probe: probe))
         let invocation = try #require(probe.invocation)
         probe.invocation = nil
-        #expect(await Router(engine: engine, scope: source).unwind(to: .topmostAncestor))
+        #expect(await Router(engine: engine, scope: source).unwind(.current))
         #expect(branch.path.isEmpty)
         do {
             try await invocation()

@@ -72,9 +72,4 @@ final class RoutePath: Identifiable {
         }
         return removed
     }
-
-    func scope(withID id: AnyHashable) -> RouteScope? {
-        if let owner, owner.id == id { return owner }
-        return scopes.last { $0.id == id }
-    }
 }

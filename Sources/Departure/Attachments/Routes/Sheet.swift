@@ -34,7 +34,7 @@ public struct Sheet: RouteDeclaration, Sendable {
     ///
     /// - Parameters:
     ///   - route: The route type available at this map location.
-    ///   - id: An explicit unwind name for the destination's scope.
+    ///   - id: An explicit name for the destination's scope.
     ///   - children: The navigation available from this destination.
     public init<R: Route>(
         _ route: R.Type,

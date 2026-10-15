@@ -204,7 +204,7 @@ private extension ScenePhase {
 
 struct LoginDetailView: View {
     @Environment(\.router) private var router
-    @UnwindRoute(LoginRoute.self) private var unwindLogin
+    @UnwindRoute(.nearestModal) private var unwindLogin
 
     var body: some View {
         LabScreen("Local push", eyebrow: "Inside high priority", symbol: "arrow.right.square.fill") {

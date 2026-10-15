@@ -117,15 +117,6 @@ struct RouteSpaces {
         return UnwindPlan(retaining: retained)
     }
 
-    func ancestorUnwindScope(from routePath: RoutePath, withID id: AnyHashable) -> RouteScope? {
-        var scope = routePath.owner?.parent
-        while let ancestor = scope {
-            if let target = self.routePath(containing: ancestor)?.scope(withID: id) { return target }
-            scope = ancestor.parent
-        }
-        return nil
-    }
-
     mutating func setElevatedSpace(_ space: RouteSpace?, for priority: RoutePriority) {
         switch priority {
         case .default:

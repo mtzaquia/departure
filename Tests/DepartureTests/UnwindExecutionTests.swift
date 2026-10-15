@@ -45,7 +45,7 @@ struct UnwindExecutionTests {
         }
 
         let task = Task {
-            if removal == .scoped { await source.unwind(to: .topmostAncestor) }
+            if removal == .scoped { await source.unwind(.current) }
             else { await owner.dismissSpace(.high) }
         }
         probe.task = task
