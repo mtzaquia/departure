@@ -51,11 +51,13 @@ public struct RouteDestination<R: Route>: Sendable {
     ///
     /// Copies retain that identity, including when added to destination collections.
     /// Creating another destination value for the same type creates a distinct binding.
+    /// Construction is nonisolated and stores the builder without evaluating it.
+    /// The builder runs on the main actor when the destination is rendered.
     ///
     /// - Parameters:
     ///   - route: The domain route type bound to this destination.
     ///   - destination: Builds a view from typed route data and the current rendering context.
-    public init<Content: View>(_ route: R.Type, @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content) {
+    public nonisolated init<Content: View>(_ route: R.Type, @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content) {
         build = { AnyView(destination($0, $1)) }
     }
 }
