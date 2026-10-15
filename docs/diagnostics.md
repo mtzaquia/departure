@@ -33,6 +33,8 @@ root
    └─ cover.slide LoginRoute → destination #2
 ```
 
+Large dumps use consecutive multiline log entries of at most 400 lines, split between tree rows with indentation preserved. Smaller trees remain one entry.
+
 Destination numbers identify the resolved builder values within this tree, in first-declaration order. Copies and repeated contributions of the same value retain the same number. They identify builders, not the views those builders eventually produce; rendering the trace does not evaluate a destination.
 
 The tree includes all defined branches and destination children, including those that have not mounted. It marks missing destinations, destination conflicts, duplicate declarations, duplicate branch values, and conflicting branch containers. A builder match does not make an unpresented child's declaration immediately navigable; ordinary route lookup still determines eligibility.

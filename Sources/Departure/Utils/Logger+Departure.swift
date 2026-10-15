@@ -144,8 +144,9 @@ extension Logger {
         let event = event()
         guard logLevel.includes(event.logLevel) else { return }
 
-        let message = event.renderedMessage
-        debug("\(message, privacy: .public)")
+        for message in event.renderedMessages {
+            debug("\(message, privacy: .public)")
+        }
 #endif
     }
 
@@ -209,6 +210,18 @@ extension DepartureLogEvent {
     var renderedMessage: String {
         let trace = DepartureLogTrace.id.map { "[\($0)]" } ?? ""
         return "[\(category)]\(trace) \(marker) \(message)"
+    }
+
+    var renderedMessages: [String] {
+        let rendered = renderedMessage
+        guard case .mapAdopted = self else { return [rendered] }
+
+        // Keep multiline trees below the console's per-record line limit.
+        let lines = rendered.split(separator: "\n", omittingEmptySubsequences: false)
+        let lineLimit = 400
+        return stride(from: 0, to: lines.count, by: lineLimit).map { start in
+            lines[start..<min(start + lineLimit, lines.count)].joined(separator: "\n")
+        }
     }
 
     private var category: String {
