@@ -230,7 +230,7 @@ struct RouterTests {
     @Test func publicUnwindReportsNoRouteAtRoot() async {
         let router = RouterEngine()
 
-        #expect(await router.unwind(.root) == false)
+        #expect(await router.resetToRoot() == false)
         #expect(await router.unwind(.current) == false)
         #expect(router.defaultSpace.rootPath.isEmpty)
     }
@@ -2105,7 +2105,7 @@ struct RouterTests {
         router.defaultSpace.rootPath.replaceTestPath([firstScope])
         router.installElevatedSpace(priority: .high, scopes: [secondScope])
 
-        await router.unwindAndWait(.root)
+        await router.resetToRoot()
 
         #expect(router.defaultSpace.rootPath.last === firstScope)
         #expect(router.spaces.highSpace?.root === secondScope)
@@ -2145,7 +2145,7 @@ struct RouterTests {
         #expect(router.defaultSpace.rootPath.count == 1)
 
         // `.root` reaches past the current branch path to the app root.
-        await router.unwind(.root)
+        await router.resetToRoot()
         #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: walletScope) == nil)
     }
@@ -2190,7 +2190,7 @@ struct RouterTests {
         #expect(homeScope.path.first?.route is SettingsRoute)
         #expect(homeScope.path.last?.route is MessageRoute)
 
-        await router.unwind(.root)
+        await router.resetToRoot()
 
         #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: homeScope) == nil)
@@ -2252,7 +2252,7 @@ struct RouterTests {
         #expect(homeScope.path.count == 2)
         #expect(walletScope.path.count == 1)
 
-        await router.unwind(.root)
+        await router.resetToRoot()
 
         #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(router.spaces.routePath(containing: homeScope) == nil)
@@ -2319,7 +2319,7 @@ struct RouterTests {
         #expect(homeScope.path.last?.route is HomeDetailRoute)
         #expect(walletScope.path.count == 2)
 
-        await router.unwind(.root)
+        await router.resetToRoot()
 
         #expect(router.defaultSpace.rootPath.isEmpty)
         #expect(homeScope.path.count == 1)
@@ -2568,7 +2568,7 @@ struct RouterTests {
         engine.routeScopeDidLeaveView(engine.root)
         #expect(engine.root.id == AnyHashable("custom"))
         await engine.present(HomeDetailRoute())
-        #expect(await engine.unwind(.root))
+        #expect(await engine.resetToRoot())
         #expect(engine.defaultSpace.rootPath.isEmpty)
     }
 
@@ -2880,7 +2880,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(thirdScope)
 
         let unwindTask = Task {
-            guard await router.unwind(.root) else {
+            guard await router.resetToRoot() else {
                 return
             }
 
@@ -2936,7 +2936,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(profileScope)
 
         let unwindTask = Task {
-            await router.unwindAndWait(.root)
+            await router.resetToRoot()
         }
 
         await Task.yield()
@@ -3190,7 +3190,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(profileScope)
 
         let unwindTask = Task {
-            await router.unwindAndWait(.root)
+            await router.resetToRoot()
         }
 
         for _ in 0..<10 {
@@ -3263,7 +3263,7 @@ struct RouterTests {
         router.routeScopeDidInstallInView(detailScope)
 
         let unwindTask = Task {
-            await router.unwindAndWait(.root)
+            await router.resetToRoot()
         }
 
         for _ in 0..<10 {

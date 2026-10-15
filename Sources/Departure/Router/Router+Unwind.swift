@@ -27,13 +27,6 @@ extension RouterEngine {
         case policy(UnwindTarget)
         case routeType(any Route.Type)
 
-        var dismissesScope: Bool {
-            switch self {
-            case .routeType, .policy(.current), .policy(.nearestModal): true
-            case .policy(.root): false
-            }
-        }
-
         static func == (lhs: Self, rhs: Self) -> Bool {
             switch (lhs, rhs) {
             case let (.policy(lhs), .policy(rhs)): lhs == rhs
@@ -43,43 +36,22 @@ extension RouterEngine {
         }
     }
 
-    /// Captures identities, rather than a plan, so new descendants are included on invocation.
-    /// Root resets also capture their requesting scope for handler delivery and authority.
-    struct ResolvedUnwind: Equatable {
-        let selection: UnwindSelection
-        let source: RouteRequestOrigin
-        let target: RouteRequestOrigin
-
-        init(_ selection: UnwindSelection, source: RouteScope, target: RouteScope) {
-            self.selection = selection
-            self.source = RouteRequestOrigin(scope: source)
-            self.target = RouteRequestOrigin(scope: target)
-        }
-
-        static func == (lhs: Self, rhs: Self) -> Bool {
-            lhs.source == rhs.source && lhs.target == rhs.target
-                && (lhs.selection == rhs.selection || (lhs.selection.dismissesScope && rhs.selection.dismissesScope))
-        }
-    }
-
-    func resolveUnwind(_ selection: UnwindSelection, from source: RouteScope) -> ResolvedUnwind? {
+    func resolveUnwind(_ selection: UnwindSelection, from source: RouteScope) -> RouteScope? {
         guard let path = spaces.routePath(containing: source), let space = spaces.space(containing: path) else { return nil }
         let ancestry = source.ancestry.prefix {
             $0.space === space && spaces.routePath(containing: $0) != nil
         }
         switch selection {
         case .policy(.current):
-            return .init(selection, source: source, target: source)
+            return source
         case .policy(.nearestModal):
             guard let modal = ancestry.first(where: { $0.routePresentation?.style.isModal == true }) else { return nil }
-            return .init(selection, source: modal, target: modal)
+            return modal
         case let .routeType(type):
             guard let match = ancestry.first(where: {
                 $0.route.map { ObjectIdentifier(Swift.type(of: $0)) == ObjectIdentifier(type) } == true
             }) else { return nil }
-            return .init(selection, source: match, target: match)
-        case .policy(.root):
-            return .init(selection, source: source, target: space.root)
+            return match
         }
     }
 
@@ -90,30 +62,34 @@ extension RouterEngine {
 
     @discardableResult
     func unwindAndWait(_ selection: UnwindSelection, payload: Any? = nil, origin: RouteRequestOrigin? = nil) async -> Bool {
-        guard let source = navigationSource(origin) else { return false }
-        guard let resolved = resolveUnwind(selection, from: source) else {
-            log.departureWarning(.unwindRouteTargetMissing(target: selection))
-            return false
-        }
-        return await unwindAndWait(resolved, payload: payload)
-    }
-
-    @discardableResult
-    func unwindAndWait(_ resolved: ResolvedUnwind, payload: Any? = nil) async -> Bool {
         #if DEBUG
         guard DepartureLogTrace.id != nil else {
             return await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "u")) {
-                await unwindAndWait(resolved, payload: payload)
+                await unwindAndWait(selection, payload: payload, origin: origin)
             }
         }
         #endif
-        log.departureDebug(.unwindRequested(target: resolved.selection))
-        guard let source = navigationSource(resolved.source), let target = navigationSource(resolved.target) else { return false }
-        if resolved.selection.dismissesScope {
-            return await unwindPrevious(from: target, payload: payload)
+        log.departureDebug(.unwindRequested(target: selection))
+        guard let source = navigationSource(origin) else { return false }
+        guard let target = resolveUnwind(selection, from: source) else {
+            log.departureWarning(.unwindRouteTargetMissing(target: selection))
+            return false
         }
+        return await unwindPrevious(from: target, payload: payload)
+    }
 
-        guard let space = target.space, target === space.root else { return false }
+    @discardableResult
+    func resetToRoot(payload: Any? = nil, origin: RouteRequestOrigin? = nil) async -> Bool {
+        #if DEBUG
+        guard DepartureLogTrace.id != nil else {
+            return await DepartureLogTrace.$id.withValue(DepartureLogTrace.nextID(prefix: "u")) {
+                await resetToRoot(payload: payload, origin: origin)
+            }
+        }
+        #endif
+        log.departureDebug(.resetToRootRequested)
+        guard let source = navigationSource(origin), let space = source.space else { return false }
+        let target = space.root
         let plan = spaces.rootUnwindPlan(in: space)
         guard !plan.removedScopes.isEmpty else {
             log.departureDebug(.unwindSkippedNoRoute)

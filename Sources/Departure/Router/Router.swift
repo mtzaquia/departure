@@ -39,8 +39,6 @@ public struct Router: Equatable {
         /// Includes the current destination and stays within its priority space.
         case nearestModal
 
-        /// Resets navigation in the receiving space, keeping its root and outer presentation.
-        case root
     }
 
     private weak var referencedEngine: RouterEngine?
@@ -104,7 +102,6 @@ public struct Router: Equatable {
 
     /// Applies an unwind policy from this router's captured scope within its priority space.
     ///
-    /// `.root` retains this space's root. Use `dismissSpace()` for whole-space removal.
     /// Waits for this unwind's native teardown. A buffered presentation waits for all
     /// ongoing unwinds, then continues in its own caller without delaying this return.
     /// - Returns: Whether the request was accepted for a live scope in the top space.
@@ -142,6 +139,31 @@ public struct Router: Equatable {
     public func unwind<R: Route, Payload>(from route: R.Type, payload: Payload) async -> Bool {
         guard let engine else { return false }
         return await engine.unwindAndWait(.routeType(route), payload: payload, origin: origin)
+    }
+
+    /// Resets navigation in this router's priority space, retaining its root and outer presentation.
+    ///
+    /// The captured source must be live in the top space. Waits for native teardown
+    /// and uses the source route for matching unwind-handler delivery.
+    /// Use ``dismissSpace()`` to remove the entire elevated space.
+    /// - Returns: Whether the reset was accepted. An empty space, removed source,
+    ///   or covered space returns `false`.
+    @discardableResult
+    public func resetToRoot() async -> Bool {
+        guard let engine else { return false }
+        return await engine.resetToRoot(origin: origin)
+    }
+
+    /// Resets this priority space to its root and delivers a payload to a matching ``UnwindHandler``.
+    ///
+    /// Retains the root and its outer presentation, and waits for native teardown.
+    /// The captured source must remain live in the top space until commit.
+    /// - Parameter payload: The value delivered for the requesting source route.
+    /// - Returns: Whether the reset was accepted. An empty space, removed source, or covered space returns `false`.
+    @discardableResult
+    public func resetToRoot<Payload>(payload: Payload) async -> Bool {
+        guard let engine else { return false }
+        return await engine.resetToRoot(payload: payload, origin: origin)
     }
 
     /// Performs an action from this router's scope, within its priority space.

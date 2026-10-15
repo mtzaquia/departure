@@ -199,7 +199,7 @@ struct RouteRequestCompletionTests {
         await owner.current.present(SettingsRoute())
         let outgoing = try #require(owner.engine.defaultSpace.rootPath.last)
         owner.engine.routeScopeDidInstallInView(outgoing)
-        let unwind = Task { await owner.current.unwind(.root) }
+        let unwind = Task { await owner.current.resetToRoot() }
         for _ in 0..<1000 where !owner.engine.isNavigating { await Task.yield() }
         let first = Task { await owner.engine.requestRouteWhenReady(LoginRoute(), origin: origin) }
         for _ in 0..<1000 where owner.engine.pendingRoute == nil { await Task.yield() }

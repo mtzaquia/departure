@@ -84,7 +84,6 @@ enum DepartureWarningEvent {
             let description = switch target {
             case .policy(.current): "a live destination"
             case .policy(.nearestModal): "an enclosing modal"
-            case .policy(.root): "a live priority-space root"
             case let .routeType(type): "a live \(departureDebugName(for: type))"
             }
             return "could not find \(description) from the source scope"
@@ -139,6 +138,7 @@ enum DepartureLogEvent {
     case viewExitWaitSkipped
     case viewExitWaitStarted(installed: Int)
     case ios17ViewExitWaitTimedOut(scope: RouteScope)
+    case resetToRootRequested
     case unwindAccepted(keepThrough: RouteScope, removing: Int)
     case unwindCompleted(path: String)
     case unwindPreviousRequested
@@ -283,7 +283,8 @@ extension DepartureLogEvent {
              .pathUnchanged:
             "path"
 
-        case .unwindAccepted,
+        case .resetToRootRequested,
+             .unwindAccepted,
              .unwindCompleted,
              .unwindPreviousRequested,
              .unwindRequested,
@@ -304,7 +305,7 @@ extension DepartureLogEvent {
 
     private var marker: String {
         switch self {
-        case .actionRequested, .routeRequested, .unwindPreviousRequested, .unwindRequested:
+        case .actionRequested, .routeRequested, .resetToRootRequested, .unwindPreviousRequested, .unwindRequested:
             "⇢"
 
         case .actionCompleted,
@@ -442,6 +443,8 @@ extension DepartureLogEvent {
             "view exit wait started | installed=\(installed)"
         case let .ios17ViewExitWaitTimedOut(scope):
             "iOS 17 view exit wait timed out — forcing reconciliation | scope=\(scope.departureDebugDescription)"
+        case .resetToRootRequested:
+            "requested reset to priority-space root"
         case let .unwindAccepted(keepThrough, removing):
             "removing \(removing) route scope\(removing == 1 ? "" : "s") through \(keepThrough.unwindDebugDescription)"
         case let .unwindCompleted(path):

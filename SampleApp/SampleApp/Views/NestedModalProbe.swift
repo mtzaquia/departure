@@ -162,7 +162,7 @@ private struct NestedModalProbeBPush: View {
                 .accessibilityIdentifier("sample.nested-modal.b-depth")
             Button("Unwind A to root") {
                 probe.beginExit()
-                Task { await probe.sheetARouter?.unwind(.root) }
+                Task { await probe.sheetARouter?.resetToRoot() }
             }
             .accessibilityIdentifier("sample.nested-modal.unwind")
             Button("Present existing A") {

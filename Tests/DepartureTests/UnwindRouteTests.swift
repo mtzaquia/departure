@@ -129,8 +129,7 @@ import Testing
     @Test(arguments: [false, true])
     func policiesMatchBetweenRouterAndReader(useReader: Bool) async throws {
         let cases: [(Router.UnwindTarget, Int, String)] = [
-            (.current, 3, "message"), (.nearestModal, 2, "numbered"),
-            (.root, 0, "message")
+            (.current, 3, "message"), (.nearestModal, 2, "numbered")
         ]
         for (policy, remaining, expectedSource) in cases {
             let (engine, leaf) = try await policyFlow()
@@ -149,7 +148,7 @@ import Testing
             }
             #expect(accepted, "policy: \(policy), reader: \(useReader)")
             #expect(engine.root.branchScopes["flow"]?.path.count == remaining)
-            #expect(engine.root.branchScopes["other"]?.path.count == (policy == .root ? 0 : 1))
+            #expect(engine.root.branchScopes["other"]?.path.count == 1)
             #expect(received == "\(expectedSource):done")
         }
     }
@@ -190,11 +189,11 @@ import Testing
         #expect(engine.root.branchScopes["flow"]?.path.count == 4)
     }
 
-    @Test func capturedRootResetRequiresItsOriginalRequester() async throws {
+    @Test func rootResetRequiresItsOriginalRequester() async throws {
         let (engine, _, _, leaf) = try await flow()
-        let reset = engine.unwindRouteAction(from: leaf, target: .root)
+        let router = Router(engine: engine, scope: leaf)
         #expect(await engine.unwindRouteAction(from: leaf)())
-        #expect(!(await reset()))
+        #expect(!(await router.resetToRoot()))
         #expect(engine.defaultSpace.rootPath.count == 2)
     }
 

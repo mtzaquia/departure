@@ -10,7 +10,7 @@ An elevated presentation still needs a synthetic base in its detached window. In
 
 The base is presentation infrastructure, not the destination targeted by navigation root reset, route lookup, hooks, or branch operations. The implementation may retain an internal base scope where the native presenter requires it; that does not make it an additional navigable X/Y position. Resetting a space keeps its entry destination and outer presentation visible. Dismissing the space tears down its destination and presentation base.
 
-`unwind(.root)` resets navigation within the requesting space while keeping its root visible. It never dismisses that space or resets another priority. Dismissing an entire space is a separate operation.
+`resetToRoot()` resets navigation within the requesting space while keeping its root visible. It never dismisses that space or resets another priority. Dismissing an entire space is a separate operation.
 
 Root reset preserves inactive branch pushes only when the space root itself owns that branch container. It clears participating branch navigation and modal presentations according to the retained root-unwind policy. Any branch container removed on the way to the root loses all of its branches, including inactive history. Dismissing the entire space discards all of its paths, including inactive branch history.
 
@@ -129,7 +129,7 @@ extension RootRouter {
 
 | Call | Meaning |
 | --- | --- |
-| `router.unwind(.root)` | Reset the receiving space to its root. Preserve inactive pushes only for that retained root's own branches. Require the source space to be top. |
+| `router.resetToRoot()` | Reset the receiving space to its root. Preserve inactive pushes only for that retained root's own branches. Require the source space to be top. |
 | `unwindRoute()` | Dismiss the receiving destination; at an elevated space root, remove the whole space. Require the source space to be top. |
 | `router.dismissSpace()` | Remove the receiving high or critical space from any depth. Require that exact live source space to be top. |
 | `rootRouter.dismissSpace(.high)` | Remove the high space present when the owner command is accepted, including when it is covered. Other spaces remain intact. |

@@ -32,9 +32,9 @@ import SwiftUI
 ///
 /// Lookup includes the current destination and follows its ancestry within the
 /// receiving priority space. Sibling branches and other spaces are never searched.
-/// Each read captures the resolved scope identities. A retained action never
-/// retargets a replacement instance. The root reset also captures its requesting
-/// scope for authority and handler delivery; that scope must remain live.
+/// Each read captures the destination it will dismiss. A retained action never
+/// retargets a replacement instance. It remains usable while that destination is
+/// live, even after the child that read it has popped.
 /// A missing target returns `false` and emits a warning when invoked, including
 /// in Release builds and when debug logging is disabled.
 @propertyWrapper
@@ -70,9 +70,9 @@ extension RouterEngine {
     }
 
     func unwindRouteAction(from source: RouteScope?, selection: UnwindSelection) -> UnwindRouteAction {
-        guard let source, let resolved = resolveUnwind(selection, from: source) else {
+        guard let source, let target = resolveUnwind(selection, from: source) else {
             return selection == .policy(.current) ? UnwindRouteAction() : UnwindRouteAction(missing: selection)
         }
-        return UnwindRouteAction(router: self, resolved: resolved)
+        return UnwindRouteAction(router: self, routeScope: target)
     }
 }

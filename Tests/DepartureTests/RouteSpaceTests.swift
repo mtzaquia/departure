@@ -40,7 +40,7 @@ struct RouteSpaceTests {
         #expect(plan.removedScopes.contains { $0 === inactivePush })
         #expect(plan.preservedPaths.contains { $0.routePath === inactive.path })
         #expect(!plan.retainedScopes.contains { $0 === active || $0 === inactive })
-        #expect(await Router(engine: engine, scope: container).unwind(.root))
+        #expect(await Router(engine: engine, scope: container).resetToRoot())
         #expect(!container.belongs(to: engine.defaultSpace))
         #expect(!activePush.belongs(to: engine.defaultSpace))
         #expect(!inactivePush.belongs(to: engine.defaultSpace))

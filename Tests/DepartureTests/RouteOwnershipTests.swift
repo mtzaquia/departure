@@ -62,7 +62,7 @@ struct RouteOwnershipTests {
         #expect(source.values.locale.identifier == "nl_NL")
         #expect(await action() == false)
         await scoped.present(LoginRoute())
-        #expect(await scoped.unwind(.root) == false)
+        #expect(await scoped.resetToRoot() == false)
     }
 
     @Test func explicitlyCreatedRouterOwnsItsContainer() {

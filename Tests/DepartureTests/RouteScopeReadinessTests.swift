@@ -23,7 +23,7 @@ import Testing
         for _ in 0..<1000 where !started { await Task.yield() }
         #expect(!scope.isInstalledInView)
         if elevated { #expect(await engine.dismissSpace(engine.spaces.activeSpace)) }
-        else { #expect(await engine.unwind(.root)) }
+        else { #expect(await engine.resetToRoot()) }
         #expect(!(await installation.value))
         // Outgoing references cannot make a removed destination ready again.
         engine.routeScopeDidInstallInView(scope)
@@ -82,7 +82,7 @@ import Testing
         let destination = try #require(engine.defaultSpace.rootPath.last)
         #expect(retained != nil)
         #expect(!destination.isInstalledInView)
-        #expect(await engine.unwind(.root))
+        #expect(await engine.resetToRoot())
         for _ in 0..<1000 where retained != nil { await Task.yield() }
         #expect(retained == nil)
         engine.routeScopeDidInstallInView(destination)

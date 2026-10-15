@@ -68,7 +68,7 @@ struct UnwindPresentationPolicyTests {
         for scope in [container, sheet, push] { engine.routeScopeDidInstallInView(scope) }
         let sheetBinding = engine.routePresentationBinding(from: branch, matching: .sheet)
         let pushBinding = engine.routePresentationBinding(from: sheet, matching: .push)
-        let unwind = Task { await owner.current.unwind(.root) }
+        let unwind = Task { await owner.current.resetToRoot() }
         for _ in 0..<1000 where !engine.defaultSpace.rootPath.isEmpty { await Task.yield() }
         #expect(engine.defaultSpace.rootPath.isEmpty)
         #expect(sheetBinding.wrappedValue?.scope === sheet)

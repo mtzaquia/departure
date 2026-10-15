@@ -25,7 +25,7 @@
 /// Unwinds can be requested with ``UnwindRouteAction`` from ``UnwindRoute`` for
 /// captured route-scope dismissal, or with ``Router/unwind(_:)`` and
 /// ``Router/unwind(_:payload:)`` for explicit router-level targets.
-/// Explicit whole-space removal and native Back or dismissal also notify handlers.
+/// Root resets, explicit whole-space removal, and native Back or dismissal also notify handlers.
 /// Presenting a route never notifies them: ancestor crawlback, equality reuse,
 /// and replacement can remove destinations without being an unwind request.
 ///

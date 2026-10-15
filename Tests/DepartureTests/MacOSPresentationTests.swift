@@ -262,7 +262,7 @@ struct MacOSPresentationTests {
         await router.current.present(MacOSInlineRoute(number: 3, recorder: recorder))
         let third = await waitUntil { recorder.number == 3 }
         try #require(third)
-        #expect(await router.current.unwind(.root))
+        #expect(await router.current.resetToRoot())
         #expect(recorder.number == nil)
         #expect(router.engine.root.routeAttachments.count == 1)
     }

@@ -184,7 +184,7 @@ import RouteDomainFixtures
         let child = try #require(engine.spaces.space(for: priority)?.rootPath.last)
         #expect(child.routePresentation?.style == .push)
         #expect(child.routePresentation?.priority == priority)
-        #expect(await engine.unwind(.root))
+        #expect(await engine.resetToRoot())
         #expect(child.routePresentation?.priority == priority)
     }
 

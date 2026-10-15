@@ -189,7 +189,7 @@ struct RouteDestinationRenderingTests {
         #expect(!(await context.unwindRoute()))
         await context.router.present(DomainOnlyRoute())
         #expect(engine.defaultSpace.rootPath.last === nextScope)
-        #expect(await router.current.unwind(.root))
+        #expect(await router.current.resetToRoot())
     }
 
     @Test(arguments: [RoutePresentation.Style.push, .sheet, .cover(.slide), .cover(.fade)])

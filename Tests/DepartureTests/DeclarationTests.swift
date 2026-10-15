@@ -129,7 +129,7 @@ import Testing
         let space = try #require(engine.spaces.highSpace)
         #expect(space.root.id == AnyHashable("authentication"))
         await engine.present(HomeDetailRoute())
-        #expect(await engine.unwind(.root))
+        #expect(await engine.resetToRoot())
         #expect(engine.spaces.highSpace === space)
         #expect(space.rootPath.isEmpty)
     }

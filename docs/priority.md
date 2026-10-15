@@ -36,7 +36,7 @@ Only the top space may originate navigation or dispatch actions. Covered scoped 
 
 Use `rootRouter.default` for deep links and notifications. It captures a scope in the default flow and rejects commands while covered, so an external entry point cannot navigate behind or dismiss a critical lockscreen. Presentation attempts during an unfinished navigation operation wait and check coverage on resumption; they still drop if the lockscreen remains. `rootRouter.current` captures the top space; use it when acting deliberately in that space. Unrelated application background work remains independent of router command authority.
 
-`router.unwind(.root)` resets only its space and retains the entry and outer presentation. `router.dismissSpace()` or the elevated root's `unwindRoute()` removes the whole space. An explicit owner can also remove a covered space:
+`router.resetToRoot()` resets only its space and retains the entry and outer presentation. `router.dismissSpace()` or the elevated root's `unwindRoute()` removes the whole space. An explicit owner can also remove a covered space:
 
 ```swift
 @State private var rootRouter = RootRouter()

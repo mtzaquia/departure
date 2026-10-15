@@ -533,7 +533,7 @@ struct UnwindHookTests {
         )
         router.defaultSpace.rootPath.replaceTestPath([parentScope, childScope])
 
-        await router.unwind(.root)
+        await router.resetToRoot()
 
         #expect(recorder.events == ["root"])
         #expect(router.defaultSpace.rootPath.isEmpty)
@@ -575,7 +575,7 @@ struct UnwindHookTests {
         landingScope.attachTestBranch(walletScope, for: AppTab.wallet)
 
         await router.requestRoute(SettingsRoute())
-        await router.unwind(.root)
+        await router.resetToRoot()
 
         #expect(recorder.events == ["root"])
         #expect(router.defaultSpace.rootPath.isEmpty)

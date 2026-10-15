@@ -133,7 +133,7 @@ private struct DismissalStackProbeSecond: View {
                 .accessibilityIdentifier("sample.dismissal-probe.current-depth")
             Button("Unwind to root") {
                 probe.beginExit()
-                Task { await probe.sheetRouter?.unwind(.root) }
+                Task { await probe.sheetRouter?.resetToRoot() }
             }
             .accessibilityIdentifier("sample.dismissal-probe.unwind")
             Button("Unwind to ancestor") {

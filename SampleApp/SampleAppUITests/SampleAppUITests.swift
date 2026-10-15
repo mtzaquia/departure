@@ -732,7 +732,7 @@ final class SampleAppUITests: XCTestCase {
         tapSettingsTab()
         tap(A11y.settingsAuthenticationButton)
         assertExists(A11y.authenticationTitle)
-        tap(A11y.authenticationUnwindToRootButton)
+        tap(A11y.authenticationResetToRootButton)
         assertExists(A11y.startButton)
         assertGone(A11y.landing)
         assertLabel(A11y.rootHookStatus, contains: "Root unwind hooks: 1")
@@ -1150,7 +1150,7 @@ private enum A11y {
     static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
     static let authenticationPresentTopLevelCoverButton = "sample.authentication.present-top-level-cover"
     static let authenticationPresentRootSettingsPushButton = "sample.authentication.present-root-settings-push"
-    static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
+    static let authenticationResetToRootButton = "sample.authentication.reset-to-root"
     static let authenticationUnwindCurrentButton = "sample.authentication.unwind-current"
     static let authenticationUnwindNearestModalButton = "sample.authentication.unwind-nearest-modal"
     static let authenticationUnwindFromRouteButton = "sample.authentication.unwind-from-route"

@@ -71,7 +71,7 @@ struct ReplaceTests {
         #expect(fixture.sidebar.path.first === sibling)
         #expect(fixture.engine.defaultSpace.currentModalScope == nil)
         #expect(fixture.engine.routePhase(for: sibling) == .active)
-        #expect(await fixture.local(previous).unwind(.root) == false)
+        #expect(await fixture.local(previous).resetToRoot() == false)
     }
 
     @Test func equivalentSelectionKeepsIdentityAndClearsItsChildPath() async throws {

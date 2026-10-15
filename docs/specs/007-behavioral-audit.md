@@ -143,11 +143,11 @@ Evidence: [unwind execution](../../Sources/Departure/Router/Router+Navigation.sw
 
 | ID | Current behavior | Review point |
 | --- | --- | --- |
-| U1 | `.root` resets the receiving space, retaining its root. It returns `false` when there is nothing to remove. | Keep local root semantics. |
+| U1 | `resetToRoot()` resets the receiving space, retaining its root. It returns `false` when there is nothing to remove. | Keep local root semantics. |
 | U2 | `.current` and `unwindRoute()` dismiss the captured receiving destination and its descendants, rather than invariably the owner's foreground destination. On an elevated root they remove the whole space. | Naming should communicate scope-local dismissal. |
 | U3 | `.nearestModal` dismisses the nearest sheet or cover and its descendants, including later pushes. Lookup includes the current destination and stays in its priority space. | Accepted relative dismissal. Branch-specific reset policy removed. |
 | U4 | `@UnwindRoute(Type.self)` and `router.unwind(from: Type.self)` dismiss the nearest exact route type and its descendants. Captured actions never retarget a replacement instance. | Accepted route-type selection; ID-based unwind removed. |
-| U5 | The Boolean reports an accepted unwind. Missing, removed, or covered sources and empty `.root` resets return `false`. | Accepted relative policies and explicit type selection share one executor. |
+| U5 | The Boolean reports an accepted unwind. Missing, removed, or covered sources and empty `resetToRoot()` calls return `false`. | Accepted relative policies and explicit type selection share one executor. |
 | U6 | Logical path removal is immediate when committed. Awaiting an unwind/removal waits for the removed scopes that were installed to leave, plus required outgoing-projection release; it does not wait for asynchronous handler bodies. | Keep distinct mutation, native completion, and callback completion. |
 | U7 | Cancellation before commit prevents the change; cancellation after committed removal does not restore the outgoing tree. A cancelled replacement finishes cleanup without inserting its continuation. | Keep irreversible accepted-removal semantics explicit. |
 | U8 | Multiple accepted unwinds/owner removals can overlap. Plans protect exact captured structures and merge path trims through their shallowest retained positions; completion order does not erase another operation's projections. | Preserve robustness; decide how much ordering consumers can rely on. |

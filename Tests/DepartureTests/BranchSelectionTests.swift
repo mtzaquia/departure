@@ -100,7 +100,7 @@ import Testing
         let owner = RoutePresentationHostID()
         bind(selection, owner: owner, in: engine, scope: outgoing)
         bind(duplicate, owner: RoutePresentationHostID(), in: engine, scope: outgoing)
-        #expect(await engine.unwind(.root))
+        #expect(await engine.resetToRoot())
         selection.value = "second"
         duplicate.value = "second"
         engine.synchronizeBranchSelection(ownedBy: owner, in: outgoing)

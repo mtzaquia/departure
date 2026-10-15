@@ -51,7 +51,7 @@ enum IndependentSpaceProbeMap {
                 }
             }
             RouteDestination(SpaceProbeDetail.self) { _, context in
-                Button("Reset high to its root") { Task { await context.router.unwind(.root) } }
+                Button("Reset high to its root") { Task { await context.router.resetToRoot() } }
                     .accessibilityIdentifier("sample.spaces.reset")
             }
             RouteDestination(SpaceProbeCritical.self) { _, context in

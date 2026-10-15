@@ -114,7 +114,7 @@ enum SampleAppAccessibility {
     static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
     static let authenticationPresentTopLevelCoverButton = "sample.authentication.present-top-level-cover"
     static let authenticationPresentRootSettingsPushButton = "sample.authentication.present-root-settings-push"
-    static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
+    static let authenticationResetToRootButton = "sample.authentication.reset-to-root"
     static let authenticationUnwindCurrentButton = "sample.authentication.unwind-current"
     static let authenticationUnwindNearestModalButton = "sample.authentication.unwind-nearest-modal"
     static let authenticationUnwindFromRouteButton = "sample.authentication.unwind-from-route"

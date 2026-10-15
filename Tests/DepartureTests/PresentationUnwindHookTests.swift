@@ -79,7 +79,7 @@ import Testing
         #expect(space.rootPath.isEmpty)
         #expect(events.values.isEmpty)
         await owner.current.present(Child())
-        #expect(await owner.current.unwind(.root))
+        #expect(await owner.current.resetToRoot())
         #expect(events.values == [local ? "local" : "lower"])
     }
 

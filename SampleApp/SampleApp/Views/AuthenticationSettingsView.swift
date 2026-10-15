@@ -68,7 +68,7 @@ struct AuthenticationSettingsView: View {
                     action("Top-level cover", symbol: "rectangle.fill", id: SampleAppAccessibility.authenticationPresentTopLevelCoverButton) { await router.present(TopLevelCoverRoute()) }
                     action("Declaration crawl", symbol: "arrow.up.left.and.arrow.down.right", color: LabPalette.blue) { await router.present(StartInfoRoute()) }
                     action("Root settings push", symbol: "arrow.uturn.backward.square.fill", color: LabPalette.blue, id: SampleAppAccessibility.authenticationPresentRootSettingsPushButton) { await router.present(LocalDetailRoute()) }
-                    action("Root", symbol: "house.fill", color: LabPalette.coral, id: SampleAppAccessibility.authenticationUnwindToRootButton) { await router.unwind(.root) }
+                    action("Reset to root", symbol: "house.fill", color: LabPalette.coral, id: SampleAppAccessibility.authenticationResetToRootButton) { await router.resetToRoot() }
                     action("Current destination", symbol: "arrow.up.to.line", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindCurrentButton) { await router.unwind(.current) }
                     action("Nearest modal", symbol: "rectangle.portrait.and.arrow.right", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindNearestModalButton) { await router.unwind(.nearestModal) }
                     action("Authentication flow", symbol: "arrow.uturn.backward", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindFromRouteButton) { await router.unwind(from: AuthenticationSettingsRoute.self) }

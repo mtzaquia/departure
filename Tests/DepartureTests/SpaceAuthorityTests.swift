@@ -26,7 +26,7 @@ struct SpaceAuthorityTests {
         await external.perform(AuthorityAction(probe: probe))
         await external.present(HomeDetailRoute())
         await external.present(LockRoute())
-        #expect(!((await external.unwind(.root))))
+        #expect(!((await external.resetToRoot())))
         #expect(!((await external.unwind(.current))))
         #expect(!((await external.dismissSpace())))
         #expect(probe.events.isEmpty)

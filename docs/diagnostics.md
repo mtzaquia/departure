@@ -65,6 +65,8 @@ The hint describes the registered host and suggests a placement to check; it doe
 
 Invoking `@UnwindRoute` or `router.unwind` with a missing route type or modal emits a warning identifying the requested boundary, including in Release builds and with `Departure.debug = .off`. The request returns `false` and does not dismiss a different destination.
 
+`router.resetToRoot()` logs “requested reset to priority-space root” before the existing removal and completion events. Its trace identifier correlates handler delivery and native teardown with that reset.
+
 ## Logging and privacy
 
 Engine events use unified logging with subsystem `eu.lelfe.departure` and category `Departure`; the adoption tree is the standard-output exception described above. The bracketed domain, such as `[map]` or `[route]`, distinguishes event kinds. Route, action, and unwind operations retain their existing task-local correlation IDs; the adoption event identifies its routing owner.
