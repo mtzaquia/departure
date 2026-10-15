@@ -78,7 +78,7 @@ private struct SplitPaneRoute: Route, Equatable {
 
 private struct SplitPaneDestination: View {
     let column: NavigationSplitViewColumn
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
     @Environment(\.router) private var router
 
     var body: some View {
@@ -109,7 +109,7 @@ private struct SplitSelectionRoute: Route, Equatable {
 private struct SplitSelectionDestination: View {
     let number: Int
     @Environment(\.router) private var router
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
     @Environment(\.routePhase) private var phase
 
     var body: some View {
@@ -141,7 +141,7 @@ private struct SplitSelectionChildRoute: Route, Equatable {
 private struct SplitSelectionChildDestination: View {
     let number: Int
     @Environment(\.router) private var router
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
 
     var body: some View {
         List {
@@ -161,7 +161,7 @@ private struct SplitPreviewRoute: Route {
 }
 
 private struct SplitPreview: View {
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
     var body: some View {
         VStack(spacing: 20) {
             Text("Detail-owned cover")

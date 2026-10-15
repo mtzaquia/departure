@@ -105,3 +105,7 @@ focus retention, swipe dismissal, replacement of a visible sheet, and repeated r
 The **Split-view lab** covers replacing selected content from a pushed child. Select a detail
 root, open its child, and choose **Replace from child**. The child must pop before the next
 selection appears, without adding a Back entry or clearing another column's navigation.
+
+## Read an ancestor unwind action
+
+Open Profile while signed out, choose the login flow's detail push, then tap **Dismiss login flow**. The detail uses `@UnwindRoute(LoginRoute.self)` to dismiss its enclosing login route and descendants without receiving an action through an initializer or custom environment key. Other dismissal buttons use the local `@UnwindRoute` reader. The focused UI test is `testAncestorUnwindReaderDismissesLoginFlowFromPushedDetail`.

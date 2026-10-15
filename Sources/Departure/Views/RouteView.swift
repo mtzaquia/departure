@@ -45,7 +45,7 @@ private struct DestinationContent: View {
         if let route = scope.route, let destination = scope.presentation?.destination, let presentation = scope.routePresentation {
             destination.build(route, RouteContext(
                 router: Router(engine: router, scope: scope),
-                unwindRoute: UnwindRouteAction(router: router, routeScope: scope),
+                unwindRoute: router.unwindRouteAction(from: scope),
                 presentation: presentation,
                 environment: environment
             ))

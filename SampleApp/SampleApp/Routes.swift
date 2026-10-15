@@ -149,7 +149,7 @@ struct LifecycleTeardownRoute: SampleDeepLinkRoute {
 }
 
 struct PendingPriorityView: View {
-    @Environment(\.unwindRoute) var unwindRoute
+    @UnwindRoute var unwindRoute
 
     var body: some View {
         ZStack {

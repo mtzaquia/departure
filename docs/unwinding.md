@@ -41,11 +41,11 @@ if await router.unwind(to: .id("settings-flow")) {
 
 ## Dismiss from a route
 
-`RouteContext.unwindRoute` and the environment `unwindRoute` are local dismissal actions. It stays tied to the scope where it was read, making it ideal for child views and callbacks.
+`@UnwindRoute` reads a local dismissal action. `RouteContext.unwindRoute` supplies the same `UnwindRouteAction` in destination builders. Actions stay tied to the exact scope where they were read, making them suitable for child views and callbacks.
 
 ```swift
 struct EditorView: View {
-  @Environment(\.unwindRoute) private var unwindRoute
+  @UnwindRoute private var unwindRoute
 
   var body: some View {
     Button("Done") {
@@ -54,6 +54,28 @@ struct EditorView: View {
   }
 }
 ```
+
+## Dismiss an enclosing flow
+
+Supply a route type to read the nearest matching destination in the current scope's logical ancestry:
+
+```swift
+struct CheckoutConfirmationView: View {
+  @UnwindRoute(CheckoutRoute.self) private var unwindCheckout
+
+  var body: some View {
+    Button("Done") {
+      Task { await unwindCheckout() }
+    }
+  }
+}
+```
+
+The action dismisses the matched `CheckoutRoute` and all its descendants. No publication modifier or custom environment key is needed. Lookup includes the current destination, crosses push and ordinary modal boundaries within its priority space, and never searches sibling branches or other priority spaces. If the route type appears more than once, the nearest occurrence wins.
+
+Each read resolves and captures one exact scope. A stored action never searches again or switches to a replacement route instance. Calling an action whose scope has left navigation returns `false`. A missing match also returns `false`, without falling back to the local destination, and emits a warning when invoked, including in Release builds and when debug logging is disabled.
+
+The existing covered-space restrictions apply when an action is invoked. Lookup can capture a live covered ancestor, but that action cannot unwind until its space is eligible again. Typed payload delivery and native teardown completion are identical for local and ancestor actions.
 
 ## Return a value
 

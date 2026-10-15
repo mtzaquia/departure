@@ -122,7 +122,6 @@ private func storedRoutingEnvironment() -> (RoutingOwnershipProbe, RouteSourceEn
     environment.routerEngine = engine
     environment.routeScope = scope
     environment.router = scoped
-    environment.unwindRoute = action
     environment.locale = Locale(identifier: "nl_NL")
     scope.bindRoutingHost(RoutePresentationHostID(), automatic: true, environment: environment)
     return (RoutingOwnershipProbe(engine: engine, scope: scope), scope.sourceEnvironmentReference, scoped, action)

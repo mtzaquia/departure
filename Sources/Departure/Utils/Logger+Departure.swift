@@ -61,17 +61,27 @@ enum DepartureLogTrace {
 
 enum DepartureWarningEvent {
     case routeDroppedNoDeclaration(routeType: any Route.Type)
+    case unwindRouteTargetMissing(routeType: any Route.Type)
 
     var renderedMessage: String {
         let trace = DepartureLogTrace.id.map { "[\($0)]" } ?? ""
         let marker = "⊘"
-        return "[route]\(trace) \(marker) \(message)"
+        return "[\(category)]\(trace) \(marker) \(message)"
+    }
+
+    private var category: String {
+        switch self {
+        case .routeDroppedNoDeclaration: "route"
+        case .unwindRouteTargetMissing: "unwind"
+        }
     }
 
     private var message: String {
         switch self {
         case let .routeDroppedNoDeclaration(routeType):
             "dropped \(String(reflecting: routeType)) — no declaration found"
+        case let .unwindRouteTargetMissing(routeType):
+            "could not find a live \(departureDebugName(for: routeType)) in the unwind reader's scope ancestry"
         }
     }
 }

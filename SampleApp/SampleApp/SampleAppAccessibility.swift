@@ -176,6 +176,7 @@ enum SampleAppAccessibility {
 
     static let loginDetailText = "sample.login-detail.text"
     static let loginDetailPresentLoginButton = "sample.login-detail.present-login"
+    static let loginDetailDismissFlowButton = "sample.login-detail.dismiss-flow"
     static let loginNoticeText = "sample.login-notice.text"
     static let loginNoticeDismissButton = "sample.login-notice.dismiss"
 

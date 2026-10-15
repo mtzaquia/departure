@@ -171,7 +171,7 @@ struct RouteDestinationRenderingTests {
         #expect(context.presentation.priority == .default)
         #expect(context.router == Router(engine: engine, scope: firstScope))
         #expect(context.environment.router == context.router)
-        #expect(context.environment.unwindRoute == context.unwindRoute)
+        #expect(recorder.unwindRoute == context.unwindRoute)
         #expect(context.environment.routeScope === firstScope)
         #expect(context.environment.routePhase == .active)
         #expect(recorder.environment?.router == context.router)
@@ -225,7 +225,7 @@ struct RouteDestinationRenderingTests {
         #expect(context.environment.destinationTestValue == "local")
         #expect(recorder.environment?.destinationTestValue == "local")
         #expect(context.environment.router == context.router)
-        #expect(context.environment.unwindRoute == context.unwindRoute)
+        #expect(recorder.unwindRoute == context.unwindRoute)
         #expect(recorder.environment?.router == context.router)
         if style == .push {
             #expect(await context.unwindRoute())
@@ -286,6 +286,40 @@ struct RouteDestinationRenderingTests {
         #expect(await childContext.unwindRoute())
         recorderDismiss(parentRecorder)
         try #require(await waitUntil { engine.spaces.space(for: priority) == nil })
+    }
+
+    @Test(arguments: [RoutePresentation.Style.sheet, .cover(.fade)])
+    func ancestorReaderKeepsItsCapturedFlowAfterItsChildUnwinds(style: RoutePresentation.Style) async throws {
+        let router = RootRouter()
+        let recorder = RenderedDestinationRecorder()
+        let parent = RouteDestination(DomainOnlyRoute.self) { _, _ in
+            NavigationStack { Text("Flow root").routing() }
+        }
+        let child = RouteDestination(NumberedRoute.self) { _, _ in AncestorUnwindReader(recorder: recorder) }
+        let routes = RootRouteMap {
+            testDeclaration(parent, presentation: .init(style: style, priority: .default), children: [
+                RouteScopeDeclaration(routes: testPush(child)._routeDeclarations)
+            ])
+        } destinations: { parent; child }
+        let window = mount(WithRouter(routes: routes, router: router) { Text("Root").routing() })
+        defer { close(window) }
+        try #require(await waitUntil { router.engine.root.presentationHostID != nil })
+        await router.default.present(DomainOnlyRoute())
+        let parentScope = try #require(router.engine.defaultSpace.rootPath.last)
+        try #require(await waitUntil { parentScope.isInstalledInView && parentScope.presentationHostID != nil })
+        await Router(engine: router.engine, scope: parentScope).present(NumberedRoute(number: 1))
+        try #require(await waitUntil { recorder.unwindRoute != nil })
+        let action = try #require(recorder.unwindRoute)
+        #expect(action == UnwindRouteAction(router: router.engine, routeScope: parentScope))
+        let childScope = try #require(router.engine.defaultSpace.rootPath.last)
+        #expect(await UnwindRouteAction(router: router.engine, routeScope: childScope)())
+        #expect(router.engine.defaultSpace.rootPath.last === parentScope)
+        var completed: Bool?
+        let unwind = Task { completed = await action() }
+        defer { unwind.cancel() }
+        try #require(await waitUntil { completed != nil })
+        #expect(completed == true)
+        #expect(router.engine.defaultSpace.rootPath.isEmpty)
     }
 
     private func recorderDismiss(_ recorder: RenderedDestinationRecorder) {
@@ -386,20 +420,31 @@ private final class RenderedDestinationRecorder {
     var values: [String] = []
     var number: Int?
     var dismiss: (() -> Void)?
+    var unwindRoute: UnwindRouteAction?
 }
 
 private struct DestinationEnvironmentReader: View {
     let recorder: RenderedDestinationRecorder
     @Environment(\.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    @UnwindRoute private var unwindRoute
     var body: some View {
         Text("Destination")
             .frame(width: 240, height: 160)
-            .onAppear { recorder.environment = environment; recorder.dismiss = { dismiss() } }
+            .onAppear { recorder.environment = environment; recorder.unwindRoute = unwindRoute; recorder.dismiss = { dismiss() } }
             .onChange(of: environment.destinationTestValue) { _, _ in recorder.environment = environment }
     }
 }
 
 private extension EnvironmentValues {
     @Entry var destinationTestValue = "default"
+}
+
+private struct AncestorUnwindReader: View {
+    let recorder: RenderedDestinationRecorder
+    @UnwindRoute(DomainOnlyRoute.self) private var unwindFlow
+    var body: some View {
+        let action = unwindFlow
+        Text("Flow child").onAppear { recorder.unwindRoute = action }
+    }
 }

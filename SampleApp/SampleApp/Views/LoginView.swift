@@ -30,7 +30,7 @@ struct LoginView: View {
     @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
     @State private var presentationProbeCount = 0
 
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
@@ -115,7 +115,7 @@ struct LoginReplacementView: View {
     @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
 
     var body: some View {
         LabScreen("Replacement cover", eyebrow: "Same priority", symbol: "arrow.triangle.2.circlepath") {
@@ -152,7 +152,7 @@ struct CriticalView: View {
     @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
 
     var body: some View {
         LabModalCard("Critical route", subtitle: "A critical window floats above the high-priority login tree.", symbol: "exclamationmark.triangle.fill", color: LabPalette.coral) {
@@ -177,7 +177,7 @@ struct CriticalView: View {
 
 struct CriticalReplacementView: View {
     @Environment(\.isPresented) private var isPresented
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
 
     var body: some View {
         LabModalCard("Critical replacement", subtitle: "Same-priority replacement, still above login.", symbol: "bolt.shield.fill", color: LabPalette.coral) {
@@ -204,6 +204,7 @@ private extension ScenePhase {
 
 struct LoginDetailView: View {
     @Environment(\.router) private var router
+    @UnwindRoute(LoginRoute.self) private var unwindLogin
 
     var body: some View {
         LabScreen("Local push", eyebrow: "Inside high priority", symbol: "arrow.right.square.fill") {
@@ -217,6 +218,9 @@ struct LoginDetailView: View {
                 Button("Present equal login route") { Task { await router.present(LoginRoute(nextRoute: nil)) } }
                     .labPrimaryButton()
                     .accessibilityIdentifier(SampleAppAccessibility.loginDetailPresentLoginButton)
+                Button("Dismiss login flow") { Task { await unwindLogin() } }
+                    .labPrimaryButton(color: LabPalette.blue)
+                    .accessibilityIdentifier(SampleAppAccessibility.loginDetailDismissFlowButton)
             }
             Spacer()
         }

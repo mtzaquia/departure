@@ -22,7 +22,7 @@
 
 /// Handles a matching route when it unwinds.
 ///
-/// Unwinds can be requested with ``UnwindRouteAction`` from `@Environment(\.unwindRoute)` for
+/// Unwinds can be requested with ``UnwindRouteAction`` from ``UnwindRoute`` for
 /// captured route-scope dismissal, or with ``Router/unwind(to:)`` and
 /// ``Router/unwind(to:payload:)`` for explicit router-level targets.
 /// Explicit whole-space removal and native Back or dismissal also notify handlers.

@@ -32,7 +32,7 @@ struct LandingView: View {
     @State private var tab: TabItem = .home
     @State private var legacySheet: LegacySheet?
     @Environment(\.router) private var router
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
 
     var body: some View {
         TabView(selection: $tab) {

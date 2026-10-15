@@ -747,6 +747,18 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.startButton)
     }
 
+    func testAncestorUnwindReaderDismissesLoginFlowFromPushedDetail() {
+        openLanding()
+        tap(A11y.homeProfileButton)
+        assertExists(A11y.loginTitle)
+        tap(A11y.loginPushDetailButton)
+        assertExists(A11y.loginDetailText)
+        tap(A11y.loginDetailDismissFlowButton)
+        assertGone(A11y.loginDetailText)
+        assertGone(A11y.loginTitle)
+        assertExists(A11y.homeProfileButton)
+    }
+
     func testStoredUnwindRouteActionDismissesCapturedRouteScope() {
         openLanding()
         tapSettingsTab()
@@ -1203,6 +1215,7 @@ private enum A11y {
 
     static let loginDetailText = "sample.login-detail.text"
     static let loginDetailPresentLoginButton = "sample.login-detail.present-login"
+    static let loginDetailDismissFlowButton = "sample.login-detail.dismiss-flow"
     static let loginNoticeText = "sample.login-notice.text"
     static let loginNoticeDismissButton = "sample.login-notice.dismiss"
 

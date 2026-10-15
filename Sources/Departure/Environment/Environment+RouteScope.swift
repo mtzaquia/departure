@@ -26,7 +26,7 @@ import SwiftUI
 /// Unwinds the captured route scope from SwiftUI views.
 ///
 /// ```swift
-/// @Environment(\.unwindRoute) private var unwindRoute
+/// @UnwindRoute private var unwindRoute
 ///
 /// Button("Done") {
 ///     Task {
@@ -36,12 +36,19 @@ import SwiftUI
 /// ```
 public struct UnwindRouteAction: Equatable {
     private let router: Router
+    private let missingRouteType: (any Route.Type)?
 
     /// Creates an inactive unwind action.
-    public init() { router = .inactive }
+    public init() { router = .inactive; missingRouteType = nil }
 
     init(router: RouterEngine, routeScope: RouteScope) {
         self.router = Router(engine: router, scope: routeScope)
+        missingRouteType = nil
+    }
+
+    init(missing routeType: any Route.Type) {
+        router = .inactive
+        missingRouteType = routeType
     }
 
     /// Unwinds the captured route scope.
@@ -50,7 +57,11 @@ public struct UnwindRouteAction: Equatable {
     /// and any removed installed route scopes have left the view hierarchy.
     @discardableResult
     public func callAsFunction() async -> Bool {
-        await router.unwind(to: .topmostAncestor)
+        if let missingRouteType {
+            log.departureWarning(.unwindRouteTargetMissing(routeType: missingRouteType))
+            return false
+        }
+        return await router.unwind(to: .topmostAncestor)
     }
 
     /// Unwinds the captured route scope and delivers a payload to a matching ``UnwindHandler``.
@@ -59,10 +70,17 @@ public struct UnwindRouteAction: Equatable {
     /// and any removed installed route scopes have left the view hierarchy.
     @discardableResult
     public func callAsFunction<Payload>(payload: Payload) async -> Bool {
-        await router.unwind(to: .topmostAncestor, payload: payload)
+        if let missingRouteType {
+            log.departureWarning(.unwindRouteTargetMissing(routeType: missingRouteType))
+            return false
+        }
+        return await router.unwind(to: .topmostAncestor, payload: payload)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool { lhs.router == rhs.router }
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.router == rhs.router
+            && lhs.missingRouteType.map(ObjectIdentifier.init) == rhs.missingRouteType.map(ObjectIdentifier.init)
+    }
 }
 
 /// Whether a scope is a current endpoint of a participating path in the top space.
@@ -114,9 +132,6 @@ public extension EnvironmentValues {
     /// The router bound to this view's route scope, or an inactive router outside `WithRouter`.
     @Entry var router = Router.inactive
 
-    /// Unwinds the captured route scope.
-    @Entry var unwindRoute = UnwindRouteAction()
-
     /// The current routing phase for this view's local route scope.
     ///
     /// Current endpoints in participating paths of the top space read ``RoutePhase/active``.
@@ -139,7 +154,6 @@ extension View {
             .environment(\.routeScope, routeScope)
             .environment(\.router, Router(engine: router, scope: routeScope))
             .environment(\.routePhase, router.routePhase(for: routeScope))
-            .environment(\.unwindRoute, UnwindRouteAction(router: router, routeScope: routeScope))
     }
 }
 

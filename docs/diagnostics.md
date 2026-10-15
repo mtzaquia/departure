@@ -63,6 +63,8 @@ RouteDestination(SettingsRoute.self) { _, _ in
 
 The hint describes the registered host and suggests a placement to check; it does not infer the contents of the destination builder. An explicit host suppresses the hint.
 
+Invoking a typed `@UnwindRoute` action with no matching live route emits a warning naming the requested route type, including in Release builds and with `Departure.debug = .off`. The action returns `false` and does not dismiss a different destination.
+
 ## Logging and privacy
 
 Engine events use unified logging with subsystem `eu.lelfe.departure` and category `Departure`; the adoption tree is the standard-output exception described above. The bracketed domain, such as `[map]` or `[route]`, distinguishes event kinds. Route, action, and unwind operations retain their existing task-local correlation IDs; the adoption event identifies its routing owner.
