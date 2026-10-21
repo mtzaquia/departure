@@ -23,29 +23,55 @@
 import XCTest
 
 final class SheetFocusTests: XCTestCase {
-    func testPushedHostReplacementAcrossAnUpdateShowsSuccessor() {
-        let app = XCUIApplication()
-        app.launchArguments = ["--sheet-focus-probe", "--sheet-focus-pushed"]
-        continueAfterFailure = false
-        app.launch()
-        defer { app.terminate() }
-        tap("sample.sheet-focus.open-host", in: app)
-        verifyImmediateReplacement(in: app, trigger: "sample.sheet-focus.present-then-replace-update")
-    }
-
-    func testRootReplacementAcrossAnUpdateShowsSuccessor() {
+    func testRootReplacementBeforeFirstSheetAppearsShowsSuccessor() {
         let app = launch(root: true)
         defer { app.terminate() }
-        verifyImmediateReplacement(in: app, trigger: "sample.sheet-focus.present-then-replace-update")
+        verifyImmediateReplacement(in: app)
+    }
+
+    func testBranchReplacementBeforeFirstSheetAppearsShowsSuccessor() {
+        let app = launch()
+        defer { app.terminate() }
+        verifyImmediateReplacement(in: app)
+    }
+
+    func testPushedHostReplacementBeforeFirstSheetAppearsShowsSuccessor() {
+        verifyPushedHostReplacement(acrossUpdate: false)
+    }
+
+    func testPushedHostReplacementAcrossAnUpdateShowsSuccessor() {
+        verifyPushedHostReplacement(acrossUpdate: true)
     }
 
     func testFadeCoverReplacementAcrossAnUpdateShowsSuccessor() {
-        let app = XCUIApplication()
-        app.launchArguments = ["--sheet-focus-probe", "--sheet-focus-root", "--sheet-focus-fade"]
+        let app = launch(root: true, fade: true)
+        defer { app.terminate() }
+        for _ in 0..<5 {
+            verifyImmediateReplacement(in: app, trigger: "sample.sheet-focus.present-then-replace-update")
+        }
+    }
+
+    private func verifyPushedHostReplacement(acrossUpdate: Bool) {
         continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--sheet-focus-probe", "--sheet-focus-pushed"]
         app.launch()
         defer { app.terminate() }
-        verifyImmediateReplacement(in: app, trigger: "sample.sheet-focus.present-then-replace-update")
+        tap("sample.sheet-focus.open-host", in: app)
+        verifyImmediateReplacement(in: app, trigger: acrossUpdate
+            ? "sample.sheet-focus.present-then-replace-update" : "sample.sheet-focus.present-then-replace")
+    }
+
+    private func verifyImmediateReplacement(in app: XCUIApplication,
+        trigger: String = "sample.sheet-focus.present-then-replace") {
+        tap(trigger, in: app)
+        let number = app.staticTexts["sample.sheet-focus.number"]
+        XCTAssertTrue(number.waitForExistence(timeout: 8), "The successor sheet never appeared")
+        let successor = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Sheet 2"), object: number)
+        XCTAssertEqual(XCTWaiter.wait(for: [successor], timeout: 8), .completed, "Expected the successor sheet to remain visible")
+        tap("sample.sheet-focus.unwind", in: app)
+        XCTAssertTrue(app.buttons["sample.sheet-focus.present"].waitForExistence(timeout: 5))
+        XCTAssertFalse(number.exists)
     }
 
     func testBranchSheetRetainsFocusAndReopensAfterNativeDismissal() {
@@ -78,34 +104,6 @@ final class SheetFocusTests: XCTestCase {
         XCTAssertFalse(number.exists)
     }
 
-    func testRootReplacementBeforeFirstSheetAppearsShowsSuccessor() {
-        verifyImmediateReplacement(root: true)
-    }
-
-    func testBranchReplacementBeforeFirstSheetAppearsShowsSuccessor() {
-        verifyImmediateReplacement(root: false)
-    }
-
-    func testPushedHostReplacementBeforeFirstSheetAppearsShowsSuccessor() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments = ["--sheet-focus-probe", "--sheet-focus-pushed"]
-        app.launch()
-        defer { app.terminate() }
-        tap("sample.sheet-focus.open-host", in: app)
-        verifyImmediateReplacement(in: app)
-    }
-
-    func testPushedHostReplacementWhileFirstSheetPresentsShowsSuccessor() {
-        continueAfterFailure = false
-        let app = XCUIApplication()
-        app.launchArguments = ["--sheet-focus-probe", "--sheet-focus-pushed"]
-        app.launch()
-        defer { app.terminate() }
-        tap("sample.sheet-focus.open-host", in: app)
-        verifyImmediateReplacement(in: app, trigger: "sample.sheet-focus.present-then-replace-delayed")
-    }
-
     func testBranchSheetSwipeDismissalAllowsReopening() {
         let app = launch()
         defer { app.terminate() }
@@ -129,10 +127,24 @@ final class SheetFocusTests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 5), "First presentation must contain the destination")
         let identity = app.staticTexts["sample.sheet-focus.identity"].label
         field.tap()
+        let responder = app.staticTexts["sample.sheet-focus.responder"]
+        let enoughSamples = NSPredicate { object, _ in
+            guard let element = object as? XCUIElement else { return false }
+            let parts = element.label.components(separatedBy: ",")
+            return parts.count == 6 && (Int(parts[5]) ?? 0) >= 12
+        }
+        let sampled = XCTNSPredicateExpectation(predicate: enoughSamples, object: responder)
+        XCTAssertEqual(XCTWaiter.wait(for: [sampled], timeout: 5), .completed, responder.label)
+        let initialNative = responder.label.components(separatedBy: ",")
+        XCTAssertEqual(Array(initialNative.prefix(4)), ["1", "0", "0", "true"], responder.label)
+        let nativeIdentity = initialNative[4]
         field.typeText("Coffee")
         XCTAssertEqual(field.value as? String, "Coffee")
         XCTAssertEqual(app.staticTexts["sample.sheet-focus.focus"].label, "focused")
         XCTAssertEqual(app.staticTexts["sample.sheet-focus.identity"].label, identity)
+        let retainedNative = responder.label.components(separatedBy: ",")
+        XCTAssertEqual(Array(retainedNative.prefix(4)), ["1", "0", "0", "true"], responder.label)
+        XCTAssertEqual(retainedNative[4], nativeIdentity)
         tap("sample.sheet-focus.done", in: app)
         tap("sample.sheet-focus.save", in: app)
         XCTAssertTrue(app.staticTexts["sample.sheet-focus.error"].waitForExistence(timeout: 3))
@@ -140,6 +152,9 @@ final class SheetFocusTests: XCTestCase {
         XCTAssertEqual(field.value as? String, "Coffee beans")
         XCTAssertEqual(app.staticTexts["sample.sheet-focus.focus"].label, "focused")
         XCTAssertEqual(app.staticTexts["sample.sheet-focus.identity"].label, identity)
+        let refocusedNative = responder.label.components(separatedBy: ",")
+        XCTAssertEqual(Array(refocusedNative.prefix(4)), ["2", "1", "0", "true"], responder.label)
+        XCTAssertEqual(refocusedNative[4], nativeIdentity)
         tap("sample.sheet-focus.dismiss", in: app)
         XCTAssertTrue(app.buttons["sample.sheet-focus.present"].waitForExistence(timeout: 5))
         tap("sample.sheet-focus.present", in: app)
@@ -147,31 +162,30 @@ final class SheetFocusTests: XCTestCase {
         XCTAssertNotEqual(app.staticTexts["sample.sheet-focus.identity"].label, identity)
     }
 
-    private func verifyImmediateReplacement(root: Bool) {
-        let app = launch(root: root)
+    func testImmediatePresentationAndUnwindCanBeRepeated() {
+        verifyImmediatePresentationAndUnwind(fade: false)
+    }
+
+    func testImmediateFadePresentationAndUnwindCanBeRepeated() {
+        verifyImmediatePresentationAndUnwind(fade: true)
+    }
+
+    private func verifyImmediatePresentationAndUnwind(fade: Bool) {
+        let app = launch(root: true, fade: fade)
         defer { app.terminate() }
-        verifyImmediateReplacement(in: app)
+        tap("sample.sheet-focus.cycle", in: app)
+        let cycles = app.staticTexts["sample.sheet-focus.cycles"]
+        let completed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Cycles: 10"), object: cycles)
+        XCTAssertEqual(XCTWaiter.wait(for: [completed], timeout: 20), .completed, cycles.label)
+        tap("sample.sheet-focus.present", in: app)
+        XCTAssertTrue(app.textFields["sample.sheet-focus.field"].waitForExistence(timeout: 5))
     }
 
-    private func verifyImmediateReplacement(
-        in app: XCUIApplication,
-        trigger: String = "sample.sheet-focus.present-then-replace"
-    ) {
-        tap(trigger, in: app)
-        let number = app.staticTexts["sample.sheet-focus.number"]
-        XCTAssertTrue(number.waitForExistence(timeout: 8), "The successor sheet never appeared")
-        let successor = NSPredicate(format: "label == %@", "Sheet 2")
-        expectation(for: successor, evaluatedWith: number)
-        waitForExpectations(timeout: 8)
-        tap("sample.sheet-focus.unwind", in: app)
-        XCTAssertTrue(app.buttons["sample.sheet-focus.present"].waitForExistence(timeout: 5))
-        XCTAssertFalse(number.exists)
-    }
-
-    private func launch(root: Bool = false) -> XCUIApplication {
+    private func launch(root: Bool = false, fade: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["--sheet-focus-probe"] + (root ? ["--sheet-focus-root"] : [])
+            + (fade ? ["--sheet-focus-fade"] : [])
         app.launch()
         return app
     }

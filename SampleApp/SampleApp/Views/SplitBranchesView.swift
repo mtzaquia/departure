@@ -2,7 +2,7 @@ import Departure
 import SwiftUI
 
 struct SplitBranchesRoute: Route {
-    func destination() -> some View { SplitBranchesView() }
+
 }
 
 struct SplitBranchesView: View {
@@ -13,28 +13,20 @@ struct SplitBranchesView: View {
         NavigationSplitView(columnVisibility: $visibility, preferredCompactColumn: $column) {
             NavigationStack {
                 SplitBranchPane(column: .sidebar)
-                    .routeBranch(NavigationSplitViewColumn.sidebar)
+                    .routing(NavigationSplitViewColumn.sidebar)
             }
         } content: {
             NavigationStack {
                 SplitBranchPane(column: .content)
-                    .routeBranch(NavigationSplitViewColumn.content)
+                    .routing(NavigationSplitViewColumn.content)
             }
         } detail: {
             NavigationStack {
                 SplitBranchPane(column: .detail)
-                    .routeBranch(NavigationSplitViewColumn.detail)
+                    .routing(NavigationSplitViewColumn.detail)
             }
         }
-        .routes(branch: $column, concurrent: true) {
-            Branch(.sidebar) { Push(SplitPaneRoute.self) }
-            Branch(.content) { Push(SplitPaneRoute.self) }
-            Branch(.detail) {
-                Push(SplitPaneRoute.self)
-                Replace(SplitSelectionRoute.self)
-                Cover(SplitPreviewRoute.self, providesNavigation: false)
-            }
-        }
+        .routing(branch: $column)
     }
 }
 
@@ -81,12 +73,12 @@ private struct SplitBranchPane: View {
 
 private struct SplitPaneRoute: Route, Equatable {
     let column: NavigationSplitViewColumn
-    func destination() -> some View { SplitPaneDestination(column: column) }
+
 }
 
 private struct SplitPaneDestination: View {
     let column: NavigationSplitViewColumn
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
     @Environment(\.router) private var router
 
     var body: some View {
@@ -111,13 +103,13 @@ private struct SplitPaneDestination: View {
 
 private struct SplitSelectionRoute: Route, Equatable {
     let number: Int
-    func destination() -> some View { SplitSelectionDestination(number: number) }
+
 }
 
 private struct SplitSelectionDestination: View {
     let number: Int
     @Environment(\.router) private var router
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
     @Environment(\.routePhase) private var phase
 
     var body: some View {
@@ -137,19 +129,19 @@ private struct SplitSelectionDestination: View {
             }
         }
         .navigationTitle("Selected detail")
-        .routes { Push(SplitSelectionChildRoute.self) }
+        .routing()
     }
 }
 
 private struct SplitSelectionChildRoute: Route, Equatable {
     let number: Int
-    func destination() -> some View { SplitSelectionChildDestination(number: number) }
+
 }
 
 private struct SplitSelectionChildDestination: View {
     let number: Int
     @Environment(\.router) private var router
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
 
     var body: some View {
         List {
@@ -165,11 +157,11 @@ private struct SplitSelectionChildDestination: View {
 }
 
 private struct SplitPreviewRoute: Route {
-    func destination() -> some View { SplitPreview() }
+
 }
 
 private struct SplitPreview: View {
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
     var body: some View {
         VStack(spacing: 20) {
             Text("Detail-owned cover")
@@ -179,5 +171,48 @@ private struct SplitPreview: View {
                 .accessibilityIdentifier(SampleAppAccessibility.splitCoverDone)
         }
         .padding()
+    }
+}
+
+
+private enum SplitDestinations {
+    static let splitBranchesRoute = RouteDestination(SplitBranchesRoute.self) { route, context in
+        SplitBranchesView()
+    }
+    static let splitPaneRoute = RouteDestination(SplitPaneRoute.self) { route, context in
+        let column = route.column
+        SplitPaneDestination(column: column)
+    }
+    static let splitSelectionRoute = RouteDestination(SplitSelectionRoute.self) { route, context in
+        let number = route.number
+        SplitSelectionDestination(number: number)
+    }
+    static let splitSelectionChildRoute = RouteDestination(SplitSelectionChildRoute.self) { route, context in
+        let number = route.number
+        SplitSelectionChildDestination(number: number)
+    }
+    static let splitPreviewRoute = RouteDestination(SplitPreviewRoute.self) { route, context in
+        SplitPreview()
+    }
+}
+
+
+enum SplitBranchMap {
+    static let destination = RouteDestination(SplitBranchesRoute.self) { _, _ in SplitBranchesView() }
+    static let routes = RouteMap {
+        Branches(concurrent: true) {
+            Branch(NavigationSplitViewColumn.sidebar) { Push(SplitPaneRoute.self) }
+            Branch(NavigationSplitViewColumn.content) { Push(SplitPaneRoute.self) }
+            Branch(NavigationSplitViewColumn.detail) {
+                Push(SplitPaneRoute.self)
+                Replace(SplitSelectionRoute.self) { Push(SplitSelectionChildRoute.self) }
+                Cover(SplitPreviewRoute.self)
+            }
+        }
+    } destinations: {
+        SplitDestinations.splitPaneRoute
+        SplitDestinations.splitSelectionRoute
+        SplitDestinations.splitSelectionChildRoute
+        SplitDestinations.splitPreviewRoute
     }
 }

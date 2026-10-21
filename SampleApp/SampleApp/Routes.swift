@@ -24,29 +24,17 @@ import Departure
 import SwiftUI
 
 struct LandingRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        LandingView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
-struct StartInfoRoute: SampleDeepLinkRoute {}
+struct StartInfoRoute: SampleDeepLinkRoute {
 
-@MainActor
-enum SampleDestinations {
-    static let startInfo = RouteDestination(StartInfoRoute.self) { _, context in
-        StartInfoView(unwindRoute: context.unwindRoute, presentation: context.presentation)
-            .modifier(SampleRoutingContext())
-    }
 }
 
 struct LoginRoute: SampleDeepLinkRoute, Equatable {
     let nextRoute: (any Route)?
 
-    func destination() -> some View {
-        LoginView(nextRoute: nextRoute)
-            .modifier(SampleRoutingContext())
-    }
+
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         true
@@ -54,24 +42,15 @@ struct LoginRoute: SampleDeepLinkRoute, Equatable {
 }
 
 struct LoginReplacementRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        LoginReplacementView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct LoginDetailRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        LoginDetailView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct LoginNoticeRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        LoginNoticeView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct ProfileRoute: SampleDeepLinkRoute {
@@ -79,10 +58,7 @@ struct ProfileRoute: SampleDeepLinkRoute {
         Storage.shared.isLoggedIn ? .allow : .reroute(LoginRoute(nextRoute: ProfileRoute()))
     }
 
-    func destination() -> some View {
-        ProfileView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 @Observable
@@ -101,17 +77,11 @@ struct AuthenticationSettingsRoute: SampleDeepLinkRoute {
         self.state = state
     }
 
-    func destination() -> some View {
-        AuthenticationSettingsView(state: state)
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct LocalDetailRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        LocalDetailView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 private struct LocalDetailView: View {
@@ -147,68 +117,44 @@ private struct LocalDetailView: View {
 }
 
 struct TopLevelSheetRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        TopLevelSheetView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct TopLevelCoverRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        TopLevelCoverView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct TopLevelReplacementCoverRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        TopLevelReplacementCoverView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct HighPriorityPassthroughSheetRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        HighPriorityPassthroughSheetView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct HighPriorityBlockingSheetRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        HighPriorityBlockingSheetView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct PendingPriorityRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        PendingPriorityView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct NavigationBarFadeOcclusionRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        NavigationBarFadeOcclusionView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct LifecycleTeardownRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        LifecycleTeardownView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct PendingPriorityView: View {
-    @Environment(\.unwindRoute) var unwindRoute
+    @UnwindRoute var unwindRoute
 
     var body: some View {
         ZStack {
             LabBackground()
-            LabModalCard("Priority won", subtitle: "The pending elevated request blocked the normal sheet before its window started.", symbol: "flag.checkered", color: LabPalette.coral) {
+            LabModalCard("Priority won", subtitle: "The pending elevated request blocked the default sheet before its window started.", symbol: "flag.checkered", color: LabPalette.coral) {
                 Text("Pending high-priority route")
                     .font(.caption.weight(.semibold))
                     .accessibilityIdentifier(SampleAppAccessibility.pendingPriorityText)
@@ -254,7 +200,7 @@ struct TopLevelCoverView: View {
     var body: some View {
         ZStack {
             LabBackground()
-            LabModalCard("Top-level cover", subtitle: "A normal full-screen cover can replace the sheet that requested it.", symbol: "rectangle.fill") {
+            LabModalCard("Top-level cover", subtitle: "A default full-screen cover can replace the sheet that requested it.", symbol: "rectangle.fill") {
                 Text("Top-level cover")
                     .font(.caption.weight(.semibold))
                     .accessibilityIdentifier(SampleAppAccessibility.topLevelCoverText)
@@ -388,59 +334,35 @@ private extension View {
 struct AppearanceSettingsRoute: SampleDeepLinkRoute, Equatable {
     let value: UUID?
 
-    func destination() -> some View {
-        AppearanceSettingsView(value: value)
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct AlertRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        AlertView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct CriticalRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        CriticalView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct CriticalReplacementRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        CriticalReplacementView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct MessageRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        MessageView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct DismissProbeRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        DismissProbeView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct NestedModalRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        NestedModalView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct SettingsModalRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        SettingsModalView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct RerouteChainStartRoute: SampleDeepLinkRoute {
@@ -448,10 +370,7 @@ struct RerouteChainStartRoute: SampleDeepLinkRoute {
         .reroute(RerouteChainIntermediateRoute())
     }
 
-    func destination() -> some View {
-        EmptyView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct RerouteChainIntermediateRoute: SampleDeepLinkRoute {
@@ -459,17 +378,11 @@ struct RerouteChainIntermediateRoute: SampleDeepLinkRoute {
         .reroute(RerouteChainFinalRoute())
     }
 
-    func destination() -> some View {
-        EmptyView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct RerouteChainFinalRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
-        RerouteChainFinalView()
-            .modifier(SampleRoutingContext())
-    }
+
 }
 
 struct DismissProbeView: View {
@@ -494,9 +407,7 @@ struct DismissProbeView: View {
             .buttonStyle(.bordered)
             .accessibilityIdentifier(SampleAppAccessibility.dismissProbeDismissButton)
         }
-        .routes {
-            Sheet(NestedModalRoute.self, providesNavigation: false)
-        }
+        .routing()
     }
 }
 
@@ -553,17 +464,232 @@ struct DroppedRoute: SampleDeepLinkRoute {
         .drop
     }
 
-    func destination() -> some View {
+
+}
+
+struct UndeclaredRoute: SampleDeepLinkRoute {
+
+}
+
+
+enum Destinations {
+    static let landingRoute = RouteDestination(LandingRoute.self) { route, context in
+        LandingView()
+            .modifier(SampleRoutingContext())
+    }
+    static let startInfoRoute = RouteDestination(StartInfoRoute.self) { route, context in
+        StartInfoView(unwindRoute: context.unwindRoute, presentation: context.presentation)
+            .modifier(SampleRoutingContext())
+    }
+    static let loginRoute = RouteDestination(LoginRoute.self) { route, context in
+        let nextRoute = route.nextRoute
+        NavigationStack {
+            LoginView(nextRoute: nextRoute)
+                .modifier(SampleRoutingContext())
+                .routing()
+        }
+    }
+    static let loginReplacementRoute = RouteDestination(LoginReplacementRoute.self) { route, context in
+        NavigationStack {
+            LoginReplacementView()
+                .modifier(SampleRoutingContext())
+                .routing()
+        }
+    }
+    static let loginDetailRoute = RouteDestination(LoginDetailRoute.self) { route, context in
+        LoginDetailView()
+            .modifier(SampleRoutingContext())
+    }
+    static let loginNoticeRoute = RouteDestination(LoginNoticeRoute.self) { route, context in
+        LoginNoticeView()
+            .modifier(SampleRoutingContext())
+    }
+    static let profileRoute = RouteDestination(ProfileRoute.self) { route, context in
+        NavigationStack {
+            ProfileView()
+                .modifier(SampleRoutingContext())
+                .routing()
+        }
+    }
+    static let authenticationSettingsRoute = RouteDestination(AuthenticationSettingsRoute.self) { route, context in
+        let state = route.state
+        AuthenticationSettingsView(state: state)
+            .modifier(SampleRoutingContext())
+    }
+    static let localDetailRoute = RouteDestination(LocalDetailRoute.self) { route, context in
+        LocalDetailView()
+            .modifier(SampleRoutingContext())
+    }
+    static let topLevelSheetRoute = RouteDestination(TopLevelSheetRoute.self) { route, context in
+        TopLevelSheetView()
+            .modifier(SampleRoutingContext())
+    }
+    static let topLevelCoverRoute = RouteDestination(TopLevelCoverRoute.self) { route, context in
+        TopLevelCoverView()
+            .modifier(SampleRoutingContext())
+    }
+    static let topLevelReplacementCoverRoute = RouteDestination(TopLevelReplacementCoverRoute.self) { route, context in
+        TopLevelReplacementCoverView()
+            .modifier(SampleRoutingContext())
+    }
+    static let highPriorityPassthroughSheetRoute = RouteDestination(HighPriorityPassthroughSheetRoute.self) { route, context in
+        HighPriorityPassthroughSheetView()
+            .modifier(SampleRoutingContext())
+    }
+    static let highPriorityBlockingSheetRoute = RouteDestination(HighPriorityBlockingSheetRoute.self) { route, context in
+        HighPriorityBlockingSheetView()
+            .modifier(SampleRoutingContext())
+    }
+    static let pendingPriorityRoute = RouteDestination(PendingPriorityRoute.self) { route, context in
+        PendingPriorityView()
+            .modifier(SampleRoutingContext())
+    }
+    static let navigationBarFadeOcclusionRoute = RouteDestination(NavigationBarFadeOcclusionRoute.self) { route, context in
+        NavigationStack {
+            NavigationBarFadeOcclusionView()
+                .modifier(SampleRoutingContext())
+                .routing()
+        }
+    }
+    static let lifecycleTeardownRoute = RouteDestination(LifecycleTeardownRoute.self) { route, context in
+        LifecycleTeardownView()
+            .modifier(SampleRoutingContext())
+    }
+    static let appearanceSettingsRoute = RouteDestination(AppearanceSettingsRoute.self) { route, context in
+        let value = route.value
+        AppearanceSettingsView(value: value)
+            .modifier(SampleRoutingContext())
+    }
+    static let alertRoute = RouteDestination(AlertRoute.self) { route, context in
+        AlertView()
+            .modifier(SampleRoutingContext())
+    }
+    static let criticalRoute = RouteDestination(CriticalRoute.self) { route, context in
+        CriticalView()
+            .modifier(SampleRoutingContext())
+    }
+    static let criticalReplacementRoute = RouteDestination(CriticalReplacementRoute.self) { route, context in
+        CriticalReplacementView()
+            .modifier(SampleRoutingContext())
+    }
+    static let messageRoute = RouteDestination(MessageRoute.self) { route, context in
+        MessageView()
+            .modifier(SampleRoutingContext())
+    }
+    static let dismissProbeRoute = RouteDestination(DismissProbeRoute.self) { route, context in
+        DismissProbeView()
+            .modifier(SampleRoutingContext())
+    }
+    static let nestedModalRoute = RouteDestination(NestedModalRoute.self) { route, context in
+        NestedModalView()
+            .modifier(SampleRoutingContext())
+    }
+    static let settingsModalRoute = RouteDestination(SettingsModalRoute.self) { route, context in
+        SettingsModalView()
+            .modifier(SampleRoutingContext())
+    }
+    static let rerouteChainStartRoute = RouteDestination(RerouteChainStartRoute.self) { route, context in
+        EmptyView()
+            .modifier(SampleRoutingContext())
+    }
+    static let rerouteChainIntermediateRoute = RouteDestination(RerouteChainIntermediateRoute.self) { route, context in
+        EmptyView()
+            .modifier(SampleRoutingContext())
+    }
+    static let rerouteChainFinalRoute = RouteDestination(RerouteChainFinalRoute.self) { route, context in
+        RerouteChainFinalView()
+            .modifier(SampleRoutingContext())
+    }
+    static let droppedRoute = RouteDestination(DroppedRoute.self) { route, context in
         Text("Dropped route should not appear.")
             .accessibilityIdentifier(SampleAppAccessibility.droppedRouteText)
             .modifier(SampleRoutingContext())
     }
-}
-
-struct UndeclaredRoute: SampleDeepLinkRoute {
-    func destination() -> some View {
+    static let undeclaredRoute = RouteDestination(UndeclaredRoute.self) { route, context in
         Text("Undeclared route should not appear.")
             .accessibilityIdentifier(SampleAppAccessibility.undeclaredRouteText)
             .modifier(SampleRoutingContext())
+    }
+}
+
+
+enum AppRouteMaps {
+    static let authentication = RouteMap {
+        Sheet(TopLevelSheetRoute.self)
+    } destinations: {
+        Destinations.topLevelSheetRoute
+    }
+    static let landing = RouteMap {
+        Sheet(TopLevelSheetRoute.self)
+        Cover(TopLevelCoverRoute.self)
+        Cover(TopLevelReplacementCoverRoute.self)
+        Branches {
+            Branch(LandingView.TabItem.home) {
+                Push(LifecycleTeardownRoute.self) { LifecycleTeardownMap.routes }
+                Sheet(ProfileRoute.self)
+                Sheet(DismissProbeRoute.self) { Sheet(NestedModalRoute.self) }
+                Cover(MessageRoute.self, transition: .fade)
+                Cover(NavigationBarFadeOcclusionRoute.self, transition: .fade)
+            }
+            Branch(LandingView.TabItem.settings) {
+                Push(LocalDetailRoute.self)
+                Push(AppearanceSettingsRoute.self) {
+                    Push(AuthenticationSettingsRoute.self) { authentication }
+                }
+                Push(AuthenticationSettingsRoute.self) { authentication }
+                Sheet(SettingsModalRoute.self)
+                Sheet(RerouteChainFinalRoute.self)
+            }
+        }
+    } destinations: {
+        Destinations.topLevelSheetRoute
+        Destinations.topLevelCoverRoute
+        Destinations.topLevelReplacementCoverRoute
+        Destinations.lifecycleTeardownRoute
+        Destinations.profileRoute
+        Destinations.dismissProbeRoute
+        Destinations.nestedModalRoute
+        Destinations.messageRoute
+        Destinations.navigationBarFadeOcclusionRoute
+        Destinations.localDetailRoute
+        Destinations.appearanceSettingsRoute
+        Destinations.authenticationSettingsRoute
+        Destinations.settingsModalRoute
+        Destinations.rerouteChainFinalRoute
+    }
+    static let root = RootRouteMap(id: SampleAppAccessibility.startScopeID) {
+        Cover(LandingRoute.self) { landing }
+        Cover(SplitBranchesRoute.self) { SplitBranchMap.routes }
+        Sheet(StartInfoRoute.self)
+
+        HighPriority {
+            Cover(LoginRoute.self) {
+                Push(LoginDetailRoute.self)
+                Sheet(LoginNoticeRoute.self)
+            }
+            Cover(LoginReplacementRoute.self)
+            Cover(AlertRoute.self, transition: .fade)
+            Sheet(HighPriorityPassthroughSheetRoute.self)
+            Sheet(HighPriorityBlockingSheetRoute.self)
+            Cover(PendingPriorityRoute.self)
+        }
+        CriticalPriority {
+            Cover(CriticalRoute.self, transition: .fade)
+            Cover(CriticalReplacementRoute.self, transition: .fade)
+        }
+    } destinations: {
+        Destinations.landingRoute
+        SplitBranchMap.destination
+        Destinations.startInfoRoute
+        Destinations.loginRoute
+        Destinations.loginDetailRoute
+        Destinations.loginNoticeRoute
+        Destinations.loginReplacementRoute
+        Destinations.alertRoute
+        Destinations.highPriorityPassthroughSheetRoute
+        Destinations.highPriorityBlockingSheetRoute
+        Destinations.pendingPriorityRoute
+        Destinations.criticalRoute
+        Destinations.criticalReplacementRoute
     }
 }

@@ -51,9 +51,9 @@ struct AuthenticationSettingsView: View {
                 @Bindable var routeState = state
                 Toggle(isOn: $routeState.attachesLocalRoute) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Label("Attach local sheet declaration", systemImage: "paperclip")
+                        Label("Rebuild route controls", systemImage: "arrow.clockwise")
                             .font(.subheadline.weight(.semibold))
-                        Text("Shows nearest-declaration routing")
+                        Text("Local routes stay available as this view updates")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -68,10 +68,10 @@ struct AuthenticationSettingsView: View {
                     action("Top-level cover", symbol: "rectangle.fill", id: SampleAppAccessibility.authenticationPresentTopLevelCoverButton) { await router.present(TopLevelCoverRoute()) }
                     action("Declaration crawl", symbol: "arrow.up.left.and.arrow.down.right", color: LabPalette.blue) { await router.present(StartInfoRoute()) }
                     action("Root settings push", symbol: "arrow.uturn.backward.square.fill", color: LabPalette.blue, id: SampleAppAccessibility.authenticationPresentRootSettingsPushButton) { await router.present(LocalDetailRoute()) }
-                    action("Root", symbol: "house.fill", color: LabPalette.coral, id: SampleAppAccessibility.authenticationUnwindToRootButton) { await router.unwind(to: .root) }
-                    action("Topmost ancestor", symbol: "arrow.up.to.line", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindToTopmostAncestorButton) { await router.unwind(to: .topmostAncestor) }
-                    action("Nearest branch", symbol: "arrow.uturn.backward", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindToNearestBranchButton) { await router.unwind(to: .nearestBranch) }
-                    action("Branch ID", symbol: "number.square.fill", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindToBranchIDButton) { await router.unwind(to: .id(LandingView.TabItem.settings)) }
+                    action("Reset to root", symbol: "house.fill", color: LabPalette.coral, id: SampleAppAccessibility.authenticationResetToRootButton) { await router.resetToRoot() }
+                    action("Current destination", symbol: "arrow.up.to.line", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindCurrentButton) { await router.unwind(.current) }
+                    action("Nearest modal", symbol: "rectangle.portrait.and.arrow.right", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindNearestModalButton) { await router.unwind(.nearestModal) }
+                    action("Authentication flow", symbol: "arrow.uturn.backward", color: LabPalette.amber, id: SampleAppAccessibility.authenticationUnwindFromRouteButton) { await router.unwind(from: AuthenticationSettingsRoute.self) }
                     action("Stored unwind", symbol: "bookmark.fill", color: LabPalette.coral, id: SampleAppAccessibility.authenticationUnwindStoredActionButton) { await storage.landingUnwindRoute() }
                 }
             }
@@ -80,11 +80,7 @@ struct AuthenticationSettingsView: View {
         }
         .navigationTitle("Authentication")
         .navigationBarTitleDisplayMode(.inline)
-        .routes {
-            if state.attachesLocalRoute {
-                Sheet(TopLevelSheetRoute.self, providesNavigation: false)
-            }
-        }
+        .routing()
         .environment(\.samplePresentationSource, "authentication settings scope")
     }
 

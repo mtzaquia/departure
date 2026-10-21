@@ -64,7 +64,7 @@ struct SettingsView: View {
                     action("Undeclared route", symbol: "questionmark.folder", color: LabPalette.coral, id: SampleAppAccessibility.settingsPresentUndeclaredRouteButton) { await router.present(UndeclaredRoute()) }
                     action("Reroute chain", symbol: "point.3.filled.connected.trianglepath.dotted", color: LabPalette.amber, id: SampleAppAccessibility.settingsPresentRerouteChainButton) { await router.present(RerouteChainStartRoute()) }
                     action("Missing unwind", symbol: "scope", color: LabPalette.amber, id: SampleAppAccessibility.settingsMissingUnwindButton) {
-                        storage.missingUnwindResult = await router.unwind(to: .id("missing"))
+                        storage.missingUnwindResult = await router.unwind(from: AuthenticationSettingsRoute.self)
                     }
                 }
             }
@@ -78,9 +78,7 @@ struct SettingsView: View {
                 Storage.shared.settingsBranchUnwindHookCount += 1
             }
         }
-        .routes {
-            Push(LocalDetailRoute.self)
-        }
+        .routing()
     }
 
     private func action(

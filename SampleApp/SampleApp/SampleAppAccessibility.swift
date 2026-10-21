@@ -114,10 +114,10 @@ enum SampleAppAccessibility {
     static let authenticationPresentTopLevelSheetButton = "sample.authentication.present-top-level-sheet"
     static let authenticationPresentTopLevelCoverButton = "sample.authentication.present-top-level-cover"
     static let authenticationPresentRootSettingsPushButton = "sample.authentication.present-root-settings-push"
-    static let authenticationUnwindToRootButton = "sample.authentication.unwind-to-root"
-    static let authenticationUnwindToTopmostAncestorButton = "sample.authentication.unwind-to-topmost-ancestor"
-    static let authenticationUnwindToNearestBranchButton = "sample.authentication.unwind-to-nearest-branch"
-    static let authenticationUnwindToBranchIDButton = "sample.authentication.unwind-to-branch-id"
+    static let authenticationResetToRootButton = "sample.authentication.reset-to-root"
+    static let authenticationUnwindCurrentButton = "sample.authentication.unwind-current"
+    static let authenticationUnwindNearestModalButton = "sample.authentication.unwind-nearest-modal"
+    static let authenticationUnwindFromRouteButton = "sample.authentication.unwind-from-route"
     static let authenticationUnwindStoredActionButton = "sample.authentication.unwind-stored-action"
 
     static let topLevelSheetText = "sample.top-level-sheet.text"
@@ -176,6 +176,7 @@ enum SampleAppAccessibility {
 
     static let loginDetailText = "sample.login-detail.text"
     static let loginDetailPresentLoginButton = "sample.login-detail.present-login"
+    static let loginDetailDismissFlowButton = "sample.login-detail.dismiss-flow"
     static let loginNoticeText = "sample.login-notice.text"
     static let loginNoticeDismissButton = "sample.login-notice.dismiss"
 

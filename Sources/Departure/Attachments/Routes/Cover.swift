@@ -20,67 +20,35 @@
 //  SOFTWARE.
 //
 
-/// Declares a route as a full-screen cover.
-///
-/// ```swift
-/// .routes {
-///     Cover(OnboardingRoute.self)
-///     Cover(LoginRoute.self, priority: .high)
-///     Cover(NoticeRoute.self, transition: .fade)
-/// }
-/// ```
+import Foundation
+
+/// Declares a route presented as a cover, with optional child definitions.
 public struct Cover: RouteDeclaration, Sendable {
     let declaration: AnyRouteDeclaration
 
-    /// Creates a cover declaration.
+    /// Declares a route type and its child definitions without a destination builder.
     ///
-    /// - Important: Set `providesNavigation` to `false` when the route destination
-    ///   already provides its own navigation container.
-    public init<R: Route>(
-        _ routeType: R.Type,
-        priority: RoutePriority = .normal,
-        transition: Transition = .slide,
-        providesNavigation: Bool = true
-    ) {
-        self.declaration = AnyRouteDeclaration(
-            routeType: routeType,
-            kind: .cover(priority: priority, transition: transition, providesNavigation: providesNavigation)
-        )
-    }
-
-    /// Binds a feature destination to a cover declaration.
+    /// Requests matching this declaration report a diagnostic and leave navigation
+    /// unchanged while it has no destination. Lookup does not fall back to another
+    /// declaration of the same route type.
     ///
     /// - Parameters:
-    ///   - destination: The typed builder used for this declaration.
-    ///   - priority: The presentation priority, using the existing routing rules.
-    ///   - transition: The animation style for this cover.
-    ///   - providesNavigation: Whether Departure wraps the view in a `NavigationStack`.
-    ///     Defaults to `true`, matching the route-type initializer.
+    ///   - route: The route type available at this map location.
+    ///   - transition: The cover transition, defaulting to `.slide`.
+    ///   - id: An explicit name for the destination's scope.
+    ///   - children: The navigation available from this destination.
     public init<R: Route>(
-        _ destination: RouteDestination<R>,
-        priority: RoutePriority = .normal,
+        _ route: R.Type,
         transition: Transition = .slide,
-        providesNavigation: Bool = true
+        id: AnyHashable? = nil,
+        @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        self.declaration = AnyRouteDeclaration(
-            routeType: R.self,
-            kind: .cover(priority: priority, transition: transition, providesNavigation: providesNavigation),
-            destination: destination.destination
-        )
+        declaration = AnyRouteDeclaration(route, presentation: .init(style: .cover(transition), priority: .default), id: id, children: children())
     }
 
-    public var _routeDeclarations: [AnyRouteDeclaration] {
-        [declaration]
-    }
+    public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }
 
 extension Cover {
-    /// Animation style for ``Cover``.
-    public enum Transition: Hashable, Sendable, CaseIterable {
-        /// Uses SwiftUI full-screen cover movement.
-        case slide
-
-        /// Uses a cross-dissolve presentation.
-        case fade
-    }
+    public enum Transition: Hashable, Sendable, CaseIterable { case slide, fade }
 }

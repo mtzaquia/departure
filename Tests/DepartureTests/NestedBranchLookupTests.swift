@@ -28,40 +28,108 @@ import Testing
 @Suite
 struct NestedBranchLookupTests {
     @Test(arguments: [false, true])
+    func publicBranchPushBehindModalKeepsItsExactAnchor(declaredAtBranchRoot: Bool) async throws {
+        let owner = RootRouter()
+        let settings = testDestination(SettingsRoute.self)
+        _ = WithRouter(routes: RootRouteMap {
+            testSheet(testDestination(MessageRoute.self))
+            Branches {
+                Branch("wallet") {
+                    if declaredAtBranchRoot { testPush(settings) }
+                    testPush(testDestination(HomeDetailRoute.self)) {
+                        if !declaredAtBranchRoot { testPush(settings) }
+                    }
+                }
+            }
+        }, router: owner) { EmptyView() }
+        let engine = owner.engine
+        let branch = try #require(engine.root.branchScopes["wallet"])
+        await owner.default.present(HomeDetailRoute())
+        let detail = try #require(branch.path.last)
+        await owner.default.present(MessageRoute())
+        let modal = try #require(engine.defaultSpace.rootPath.last)
+        let match = try #require(engine.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        #expect(match.presentingScope === (declaredAtBranchRoot ? branch : detail))
+        #expect(match.declaringScope === engine.root)
+        #expect(match.branchID == AnyHashable("wallet"))
+
+        await owner.default.present(SettingsRoute())
+        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.spaces.routePath(containing: modal) == nil)
+        #expect(branch.path.count == (declaredAtBranchRoot ? 1 : 2))
+        #expect(branch.path.last?.route is SettingsRoute)
+        #expect(branch.path.last?.presentationOrigin === match.presentingScope)
+        #expect((engine.spaces.routePath(containing: detail) != nil) == !declaredAtBranchRoot)
+    }
+
+    @Test func publicSelectedNestedDestinationKeepsItsOuterContainerAnchor() async throws {
+        let owner = RootRouter()
+        _ = WithRouter(routes: RootRouteMap {
+            testSheet(testDestination(MessageRoute.self))
+            Branches {
+                Branch("outer") {
+                    Branches {
+                        Branch("inner") {
+                            testPush(testDestination(HomeDetailRoute.self)) {
+                                testPush(testDestination(SettingsRoute.self))
+                            }
+                        }
+                    }
+                }
+            }
+        }, router: owner) { EmptyView() }
+        let engine = owner.engine
+        let outer = try #require(engine.root.branchScopes["outer"])
+        let inner = try #require(outer.branchScopes["inner"])
+        await owner.default.present(HomeDetailRoute())
+        let detail = try #require(inner.path.last)
+        await owner.default.present(MessageRoute())
+        let match = try #require(engine.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        #expect(match.presentingScope === detail)
+        #expect(match.declaringScope === engine.root)
+        #expect(match.branchID == AnyHashable("outer"))
+        await owner.default.present(SettingsRoute())
+        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(inner.path.first === detail)
+        #expect(inner.path.count == 2)
+        #expect(inner.path.last?.presentationOrigin === detail)
+    }
+
+    @Test(arguments: [false, true])
     func enclosingLocalDeclarationWinsOverLazyContainer(hasLazyDeclaration: Bool) async throws {
         let (router, outer, _) = makeNestedBranches(hasLazyDeclaration: hasLazyDeclaration)
-        outer.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations: [
-            RouteScopeDeclaration(routes: Sheet(SettingsRoute.self)._routeDeclarations),
+        outer.defineTestMap(id: nil, selection: nil, definitions: [
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
         ])
         outer.setActiveBranch("inner")
 
-        let match = try #require(router.routeForest.firstDeclaration(including: SettingsRoute.self))
-        #expect(match.presentationHost === outer)
-        #expect(match.lookupStrategy == .ancestorPath(treePriority: .normal))
+        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        #expect(match.presentingScope === outer)
+        #expect(match.lookupStrategy == .currentPath(spacePriority: .default))
         #if DEBUG
         #expect(DepartureLogEvent.routeMatched(route: SettingsRoute(), match: match).message.contains(
-            "lookup=enclosing branch path in normal tree, nearest scope first"
+            "lookup=current route path in default space, nearest scope first"
         ))
         #endif
         #expect(match.declaration.presentationKind == .sheet)
         await router.present(SettingsRoute())
         #expect(outer.path.last?.route is SettingsRoute)
         #expect(router.routePresentation(from: outer, matching: .sheet) != nil)
-        #expect(router.normalTree.rootPath.isEmpty)
+        #expect(router.defaultSpace.rootPath.isEmpty)
     }
 
     @Test func innermostLocalDeclarationStillWins() async throws {
         let (router, outer, inner) = makeNestedBranches(hasLazyDeclaration: true)
-        outer.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations: [
-            RouteScopeDeclaration(routes: Sheet(SettingsRoute.self)._routeDeclarations),
+        outer.defineTestMap(id: nil, selection: nil, definitions: [
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
         ])
         outer.setActiveBranch("inner")
-        inner.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations: [
-            RouteScopeDeclaration(routes: Cover(SettingsRoute.self)._routeDeclarations),
+        inner.defineTestMap(id: nil, selection: nil, definitions: [
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
         ])
 
-        let match = try #require(router.routeForest.firstDeclaration(including: SettingsRoute.self))
-        #expect(match.presentationHost === inner)
+        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        #expect(match.presentingScope === inner)
         await router.present(SettingsRoute())
         #expect(inner.path.last?.route is SettingsRoute)
         #expect(router.routePresentation(from: inner, matching: .cover(.slide)) != nil)
@@ -70,8 +138,8 @@ struct NestedBranchLookupTests {
 
     @Test func lazyDeclarationRemainsAvailableWithoutLocalOverride() async throws {
         let (router, outer, inner) = makeNestedBranches(hasLazyDeclaration: true)
-        let match = try #require(router.routeForest.firstDeclaration(including: SettingsRoute.self))
-        #expect(match.presentationHost === outer)
+        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        #expect(match.presentingScope === outer)
         await router.present(SettingsRoute())
         #expect(outer.path.last?.route is SettingsRoute)
         #expect(router.routePresentation(from: outer, matching: .push) != nil)
@@ -80,20 +148,20 @@ struct NestedBranchLookupTests {
 
     @Test func enclosingPushedScopeParticipatesInDiscovery() async throws {
         let (router, outer, inner) = makeNestedBranches(hasLazyDeclaration: true)
-        outer.unregisterBranchScope(inner, for: "inner")
+        outer.detachTestBranch(inner, for: "inner")
         let container = RouteScope(id: "container", route: HomeDetailRoute())
-        container.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations: [
-            RouteScopeDeclaration(routes: Sheet(SettingsRoute.self)._routeDeclarations),
+        container.defineTestMap(id: nil, selection: nil, definitions: [
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
         ])
         router.mutateRouteGraph {
             outer.path.append(container)
             container.setActiveBranch("inner")
-            container.registerBranchScope(inner, for: "inner")
+            container.attachTestBranch(inner, for: "inner")
         }
 
         #expect(router.currentRouteScope === inner)
-        let match = try #require(router.routeForest.firstDeclaration(including: SettingsRoute.self))
-        #expect(match.presentationHost === container)
+        let match = try #require(router.spaces.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        #expect(match.presentingScope === container)
         await router.present(SettingsRoute())
         #expect(outer.path.first === container)
         #expect(outer.path.last?.route is SettingsRoute)
@@ -105,15 +173,15 @@ struct NestedBranchLookupTests {
         let outer = RouteScope(id: "outer", route: nil)
         let inner = RouteScope(id: "inner", route: nil)
         if hasLazyDeclaration {
-            router.root.installRouteDeclarations(id: nil, branchSelection: nil, routeDeclarations:
-                Branch("outer") { Push(SettingsRoute.self) }.routeScopeDeclarations
+            router.root.defineTestMap(id: nil, selection: nil, definitions:
+                Branch("outer") { testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations
             )
         }
         router.mutateRouteGraph {
             router.root.setActiveBranch("outer")
-            router.root.registerBranchScope(outer, for: "outer")
+            router.root.attachTestBranch(outer, for: "outer")
             outer.setActiveBranch("inner")
-            outer.registerBranchScope(inner, for: "inner")
+            outer.attachTestBranch(inner, for: "inner")
         }
         return (router, outer, inner)
     }

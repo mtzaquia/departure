@@ -96,7 +96,7 @@ final class ViewLifecycleTeardownDelivery {
             handler(view, lifecycleID, event)
             return nil
 
-        case .dismantled, .deinitialized:
+        case .ended:
             if installed?.id == lifecycleID {
                 return schedule(for: lifecycleID) { handler(nil, lifecycleID, event) }
             }
@@ -155,8 +155,8 @@ struct ViewLifecycleBridge {
         case created
         case updated(isInstalledInWindow: Bool)
         case installedInWindow(isInitial: Bool)
-        case dismantled
-        case deinitialized
+        /// Representable dismantling, with deinitialization as a fallback.
+        case ended
     }
 
     let onEvent: @MainActor (LifecycleView, Event) -> Void
@@ -173,7 +173,7 @@ struct ViewLifecycleBridge {
 
     fileprivate func updateView(_ view: LifecycleView) {
         view.onEvent = onEvent
-        view.onEvent(view, .updated(isInstalledInWindow: view.window != nil))
+        view.notifyUpdated()
     }
 }
 
@@ -181,14 +181,14 @@ struct ViewLifecycleBridge {
 extension ViewLifecycleBridge: UIViewRepresentable {
     func makeUIView(context: Context) -> LifecycleView { makeView() }
     func updateUIView(_ uiView: LifecycleView, context: Context) { updateView(uiView) }
-    static func dismantleUIView(_ uiView: LifecycleView, coordinator: ()) { uiView.notifyDismantled() }
+    static func dismantleUIView(_ uiView: LifecycleView, coordinator: ()) { uiView.notifyEnded() }
 }
 
 #else
 extension ViewLifecycleBridge: NSViewRepresentable {
     func makeNSView(context: Context) -> LifecycleView { makeView() }
     func updateNSView(_ nsView: LifecycleView, context: Context) { updateView(nsView) }
-    static func dismantleNSView(_ nsView: LifecycleView, coordinator: ()) { nsView.notifyDismantled() }
+    static func dismantleNSView(_ nsView: LifecycleView, coordinator: ()) { nsView.notifyEnded() }
 }
 #endif
 
@@ -197,7 +197,7 @@ extension ViewLifecycleBridge {
         let id = UUID()
         var onEvent: @MainActor (LifecycleView, Event) -> Void
         private var hasInstalledInWindow = false
-        private var hasDismantled = false
+        private var hasEnded = false
 
         init(onIdentifiedEvent: @escaping @MainActor (LifecycleView, Event) -> Void) {
             self.onEvent = onIdentifiedEvent
@@ -234,24 +234,24 @@ extension ViewLifecycleBridge {
 
             let isInitial = hasInstalledInWindow == false
             hasInstalledInWindow = true
+            hasEnded = false
             onEvent(self, .installedInWindow(isInitial: isInitial))
         }
 
-        func notifyDismantled() {
-            guard hasDismantled == false else {
-                return
-            }
-
-            hasDismantled = true
-            onEvent(self, .dismantled)
+        func notifyUpdated() {
+            let isInstalled = window != nil
+            if isInstalled { hasEnded = false }
+            onEvent(self, .updated(isInstalledInWindow: isInstalled))
         }
 
-        func notifyDeinitialized() {
-            onEvent(self, .deinitialized)
+        func notifyEnded() {
+            guard !hasEnded else { return }
+            hasEnded = true
+            onEvent(self, .ended)
         }
 
         isolated deinit {
-            notifyDeinitialized()
+            notifyEnded()
         }
     }
 }

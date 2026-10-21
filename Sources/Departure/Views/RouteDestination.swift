@@ -24,56 +24,90 @@ import SwiftUI
 
 /// Binds a domain route to a feature view without extending the route type.
 ///
-/// Pass this value to ``Push``, ``Replace``, ``Sheet``, or ``Cover``. Its builder runs on
-/// the main actor with the requested route and the destination's own routing context.
-/// The same route type can use different builders in different declaration scopes.
+/// Supply this value in a map's `destinations:` builder, independently of the
+/// route's ``Push``, ``Replace``, ``Sheet``, or ``Cover`` declaration.
+/// Its builder runs on the main actor with the requested route and the destination's
+/// own routing context. Each composed ``RootRouteMap`` accepts one destination value
+/// per route type. Reusing that value in multiple maps is allowed; distinct values
+/// for the same type conflict throughout the tree. Compose destination values
+/// independently of route declarations with ``RouteDestinations``.
 ///
 /// ```swift
 /// let profile = RouteDestination(ProfileRoute.self) { route, context in
 ///     ProfileView(userID: route.userID)
 /// }
 ///
-/// // Inside a NavigationStack:
-/// .routes { Push(profile) }
+/// let routes = RootRouteMap {
+///     Push(ProfileRoute.self)
+/// } destinations: {
+///     profile
+/// }
 /// ```
 public struct RouteDestination<R: Route>: Sendable {
-    let destination: AnyRouteDestination
+    let identity = UUID()
+    let build: @MainActor @Sendable (R, RouteContext) -> AnyView
 
-    /// Creates a reusable destination builder for a route type.
+    /// Creates a reusable destination builder with its own identity for a route type.
+    ///
+    /// Copies retain that identity, including when added to destination collections.
+    /// Creating another destination value for the same type creates a distinct binding.
+    /// Construction is nonisolated and stores the builder without evaluating it.
+    /// The builder runs on the main actor when the destination is rendered.
     ///
     /// - Parameters:
     ///   - route: The domain route type bound to this destination.
     ///   - destination: Builds a view from typed route data and the current rendering context.
-    nonisolated public init<Content: View>(
-        _ route: R.Type,
-        @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content
-    ) {
-        self.destination = AnyRouteDestination { route, context in
-            guard let route = route as? R else {
-                preconditionFailure("A destination builder must receive its declared route type.")
-            }
-            return AnyView(destination(route, context))
+    public nonisolated init<Content: View>(_ route: R.Type, @ViewBuilder destination: @escaping @MainActor @Sendable (R, RouteContext) -> Content) {
+        build = { AnyView(destination($0, $1)) }
+    }
+}
+
+/// A destination builder whose route type is retained without a generic parameter.
+///
+/// ``RouteDestinationBuilder`` uses these values to compose builders for different
+/// route types. Erasing a destination does not declare a navigation position or
+/// evaluate its builder.
+public struct AnyRouteDestination: Sendable, Hashable {
+    private let identity: UUID
+    let routeType: any Route.Type
+    let build: @MainActor @Sendable (any Route, RouteContext) -> AnyView
+
+    /// Stores a typed destination for composition with other destination builders.
+    /// - Parameter destination: The builder and route type to retain.
+    public init<R: Route>(_ destination: RouteDestination<R>) {
+        identity = destination.identity
+        routeType = R.self
+        build = { route, context in
+            // A declaration is matched by concrete route type before rendering.
+            destination.build(route as! R, context)
         }
     }
+
+    /// Compares the original destination values by identity, independently of route equality.
+    public static func == (lhs: Self, rhs: Self) -> Bool { lhs.identity == rhs.identity }
+    /// Hashes this destination's identity.
+    public nonisolated func hash(into hasher: inout Hasher) { hasher.combine(identity) }
 }
 
 /// Presentation metadata for the particular destination being rendered.
 ///
-/// Style describes this destination; priority describes its enclosing routing tree.
+/// Style describes this destination; priority describes its enclosing priority space.
 /// A push inside a high-priority cover has ``Style/push`` style and ``RoutePriority/high`` priority.
 public struct RoutePresentation: Hashable, Sendable {
     /// The presentation style used for this destination.
     public enum Style: Hashable, Sendable {
         /// Pushes onto a navigation stack.
         case push
-        /// Replaces the declaring view's content without a Back entry.
+        /// Replaces the declaring scope's content without a Back entry.
         case replace
         /// Presents a sheet.
         case sheet
         /// Presents a cover with the declared transition.
         case cover(Cover.Transition)
+        var isModal: Bool {
+            switch self { case .sheet, .cover: true; case .push, .replace: false }
+        }
     }
-
     /// The matched presentation style, including a cover's transition.
     public let style: Style
     /// The effective priority, including priority inherited from an enclosing flow.
@@ -97,23 +131,4 @@ public struct RouteContext {
     public let presentation: RoutePresentation
     /// The environment visible to this destination during the current builder evaluation.
     public let environment: EnvironmentValues
-}
-
-final class AnyRouteDestination: Sendable {
-    let build: @MainActor @Sendable (any Route, RouteContext) -> AnyView
-
-    nonisolated init(build: @escaping @MainActor @Sendable (any Route, RouteContext) -> AnyView) {
-        self.build = build
-    }
-}
-
-extension RoutePresentation.Style {
-    init(_ kind: RoutePresentationKind) {
-        switch kind {
-        case .push: self = .push
-        case .replace: self = .replace
-        case .sheet: self = .sheet
-        case .cover(let transition): self = .cover(transition)
-        }
-    }
 }

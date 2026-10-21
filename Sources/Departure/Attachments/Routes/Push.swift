@@ -20,41 +20,29 @@
 //  SOFTWARE.
 //
 
-/// Declares a route as a navigation push.
-///
-/// ```swift
-/// .routes {
-///     Push(DetailRoute.self)
-/// }
-/// ```
+import Foundation
+
+/// Declares a route presented as a push, with optional child definitions.
 public struct Push: RouteDeclaration, Sendable {
     let declaration: AnyRouteDeclaration
 
-    /// Creates a push declaration.
+    /// Declares a route type and its child definitions without a destination builder.
     ///
-    /// - Important: The declaring view must be inside a SwiftUI `NavigationStack`.
-    public init<R: Route>(_ routeType: R.Type) {
-        self.declaration = AnyRouteDeclaration(
-            routeType: routeType,
-            kind: .push
-        )
-    }
-
-    /// Binds a feature destination to a push declaration.
+    /// Requests matching this declaration report a diagnostic and leave navigation
+    /// unchanged while it has no destination. Lookup does not fall back to another
+    /// declaration of the same route type.
     ///
-    /// - Parameter destination: The typed builder used for this declaration.
-    /// - Important: The declaring view must be inside a SwiftUI `NavigationStack`.
+    /// - Parameters:
+    ///   - route: The route type available at this map location.
+    ///   - id: An explicit name for the destination's scope.
+    ///   - children: The navigation available from this destination.
     public init<R: Route>(
-        _ destination: RouteDestination<R>
+        _ route: R.Type,
+        id: AnyHashable? = nil,
+        @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        self.declaration = AnyRouteDeclaration(
-            routeType: R.self,
-            kind: .push,
-            destination: destination.destination
-        )
+        declaration = AnyRouteDeclaration(route, presentation: .init(style: .push, priority: .default), id: id, children: children())
     }
 
-    public var _routeDeclarations: [AnyRouteDeclaration] {
-        [declaration]
-    }
+    public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }

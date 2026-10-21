@@ -25,7 +25,7 @@ import SwiftUI
 
 struct MessageView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
     @Environment(\.samplePresentationSource) private var samplePresentationSource
 
     var body: some View {

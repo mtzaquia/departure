@@ -23,21 +23,5 @@
 import Foundation
 
 struct BranchContainerState {
-    var defaultBranch: AnyHashable
-    var selection: AnyRouteBranchSelection?
-
-    var isConcurrent: Bool { selection?.concurrent ?? false }
-
-    var activeBranch: AnyHashable {
-        selection?.value() ?? defaultBranch
-    }
-
-    mutating func setActiveBranch(_ branch: AnyHashable) -> Bool {
-        if let selection {
-            return selection.setValue(branch)
-        }
-
-        defaultBranch = branch
-        return true
-    }
+    var selectedBranch: AnyHashable
 }

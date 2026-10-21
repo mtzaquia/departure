@@ -24,6 +24,8 @@ Task {
 
 When an action throws `.reroute(route)`, Departure presents that route and retries the action once.
 
+The requesting scope must belong to the top priority space. A covered or removed scope cannot dispatch an action or enter its interceptor. External entry points should use `rootRouter.default.perform(...)`, so a covering high or critical flow blocks them.
+
 ## Intercept an action
 
 Attach an interceptor to a route scope when it needs to wrap, replace, or observe a matching action.
@@ -42,6 +44,12 @@ Attach an interceptor to a route scope when it needs to wrap, replace, or observ
 
 Calling `invocation()` runs the original action. Omitting it consumes the action—for example, after a confirmation prompt is declined. Only the scope captured by the receiving router participates in interception.
 
-If that invocation asks to reroute, it throws `CancellationError` back to the interceptor. Departure automatically routes using the usual rules, then retries the action once in its new scope.
+Multiple `.hooks` modifiers in the same scope compose distinct keys. An interceptor's key is its action type; an unwind handler's key includes its route and expected payload type, with a separate payload-free key. Duplicate keys warn and disable only that hook until one declaration remains. A conflicting interceptor consumes the request; it does not run the action without interception.
+
+An outgoing scope's hooks stop participating as soon as the scope leaves navigation, even while its view remains alive for dismissal. Calling a retained invocation after its intercepting scope leaves navigation or becomes covered throws `CancellationError`.
+
+If an invocation asks to reroute, it throws `CancellationError` back to the interceptor. Departure automatically routes using the usual rules, waits for the destination to install, then retries the action once through the new scope's interceptor.
+
+The retry stays within the space selected by that routing request. A request rejected during resolution cannot transfer the action to an unrelated foreground space. An intentional reroute into an elevated entry can still retry there.
 
 Next: [Unwinding](unwinding.md)

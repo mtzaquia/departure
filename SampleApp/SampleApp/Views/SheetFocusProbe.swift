@@ -23,48 +23,73 @@
 import Departure
 import SwiftUI
 import UIKit
+import Combine
 
 extension EnvironmentValues {
     @Entry var sheetFocusKeyboard = false
+    @Entry var sheetFocusUpdate = 0
 }
 
 private enum SheetFocusTab: nonisolated Hashable, Sendable { case home, other }
 
-/// Public-routing reproduction for first presentation and keyboard-driven environment changes.
+/// Public-routing probe for stable native focus through parent and form-layout updates.
 struct SheetFocusProbeRoot: View {
     @State private var selection = SheetFocusTab.home
+    @State private var sourceUpdates = 0
     @State private var keyboard = false
+    @State private var updates = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
+
+    static var routes: RootRouteMap {
+        let destination = RouteDestination(SheetFocusProbeRoute.self) { route, _ in
+            NavigationStack { SheetFocusProbeForm(number: route.number).routing() }
+        }
+        if ProcessInfo.processInfo.arguments.contains("--sheet-focus-pushed") {
+            return RootRouteMap {
+                Push(SheetFocusProbeHostRoute.self) { Sheet(SheetFocusProbeRoute.self) }
+            } destinations: {
+                RouteDestination(SheetFocusProbeHostRoute.self) { _, _ in SheetFocusProbeControls().routing() }
+                destination
+            }
+        }
+        if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root") {
+            if ProcessInfo.processInfo.arguments.contains("--sheet-focus-fade") {
+                return RootRouteMap { Cover(SheetFocusProbeRoute.self, transition: .fade) } destinations: {
+                    destination
+                }
+            }
+            return RootRouteMap { Sheet(SheetFocusProbeRoute.self) } destinations: {
+                destination
+            }
+        }
+        return RootRouteMap {
+            Branches {
+                Branch(SheetFocusTab.home) { Sheet(SheetFocusProbeRoute.self) }
+                Branch(SheetFocusTab.other) { Sheet(SheetFocusProbeRoute.self) }
+            }
+        } destinations: {
+            destination
+        }
+    }
 
     var body: some View {
         Group {
             if ProcessInfo.processInfo.arguments.contains("--sheet-focus-pushed") {
-                NavigationStack {
-                    SheetFocusProbeOpener()
-                        .routes { Push(SheetFocusProbeHostRoute.self) }
-                }
+                NavigationStack { SheetFocusProbeOpener().routing() }
             } else if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root") {
-                NavigationStack { SheetFocusProbeControls() }
-                    .routes {
-                        if ProcessInfo.processInfo.arguments.contains("--sheet-focus-fade") {
-                            Cover(SheetFocusProbeRoute.self, transition: .fade)
-                        } else {
-                            Sheet(SheetFocusProbeRoute.self)
-                        }
-                    }
+                NavigationStack { SheetFocusProbeControls().routing() }
             } else {
                 TabView(selection: $selection) {
-                    NavigationStack { SheetFocusProbeControls().routeBranch(SheetFocusTab.home) }
+                    NavigationStack { SheetFocusProbeControls().routing(SheetFocusTab.home) }
                         .tabItem { Text("Home") }.tag(SheetFocusTab.home)
-                    NavigationStack { SheetFocusProbeControls().routeBranch(SheetFocusTab.other) }
+                    NavigationStack { SheetFocusProbeControls().routing(SheetFocusTab.other) }
                         .tabItem { Text("Other") }.tag(SheetFocusTab.other)
                 }
-                .routes(branch: $selection) {
-                    Branch(SheetFocusTab.home) { Sheet(SheetFocusProbeRoute.self) }
-                    Branch(SheetFocusTab.other) { Sheet(SheetFocusProbeRoute.self) }
-                }
+                .routing(branch: $selection)
             }
         }
         .environment(\.sheetFocusKeyboard, keyboard)
+        .environment(\.sheetFocusUpdate, sourceUpdates)
+        .onReceive(updates) { _ in sourceUpdates += 1 }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboard = true }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboard = false }
     }
@@ -72,12 +97,25 @@ struct SheetFocusProbeRoot: View {
 
 private struct SheetFocusProbeControls: View {
     @Environment(\.router) private var router
+    @State private var completedCycles = 0
 
     var body: some View {
         VStack {
-            Button("Present sheet") { Task { await router.present(SheetFocusProbeRoute(number: 1)) } }
-                .accessibilityIdentifier("sample.sheet-focus.present")
-            // Replaces the first sheet as soon as its request returns, before SwiftUI shows it.
+            Text("Cycles: \(completedCycles)").accessibilityIdentifier("sample.sheet-focus.cycles")
+            Button("Present and unwind repeatedly") {
+                Task {
+                    for number in 1...10 {
+                        await router.present(SheetFocusProbeRoute(number: number))
+                        await Task.yield()
+                        await router.unwind(.current)
+                        completedCycles = number
+                    }
+                }
+            }.accessibilityIdentifier("sample.sheet-focus.cycle")
+            Button("Present sheet") {
+                Task { await router.present(SheetFocusProbeRoute(number: 1)) }
+            }
+            .accessibilityIdentifier("sample.sheet-focus.present")
             Button("Present then replace") {
                 Task {
                     await router.present(SheetFocusProbeRoute(number: 1))
@@ -93,20 +131,10 @@ private struct SheetFocusProbeControls: View {
                 }
             }
             .accessibilityIdentifier("sample.sheet-focus.present-then-replace-update")
-            // Lets the first sheet reach the host in its own update, as a fast network reply would.
-            Button("Present then replace after a beat") {
-                Task {
-                    await router.present(SheetFocusProbeRoute(number: 1))
-                    try? await Task.sleep(for: .milliseconds(10))
-                    await router.present(SheetFocusProbeRoute(number: 2))
-                }
-            }
-            .accessibilityIdentifier("sample.sheet-focus.present-then-replace-delayed")
         }
     }
 }
 
-/// Opens a pushed screen that owns the sheet declaration, as a pushed review screen would.
 private struct SheetFocusProbeOpener: View {
     @Environment(\.router) private var router
 
@@ -116,33 +144,41 @@ private struct SheetFocusProbeOpener: View {
     }
 }
 
-private struct SheetFocusProbeHostRoute: Route, Equatable {
-    func destination() -> some View {
-        SheetFocusProbeControls()
-            .routes { Sheet(SheetFocusProbeRoute.self) }
-    }
-}
+private struct SheetFocusProbeHostRoute: Route, Equatable {}
 
 private struct SheetFocusProbeRoute: Route, Equatable {
     let number: Int
-    func destination() -> some View { SheetFocusProbeForm(number: number) }
 }
+
+private final class WeakFocusField { weak var value: UITextField? }
 
 private struct SheetFocusProbeForm: View {
     let number: Int
     @Environment(\.router) private var router
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.sheetFocusKeyboard) private var keyboard
+    @State private var keyboard = false
     @State private var identity = UUID()
     @State private var name = ""
     @State private var errors = false
     @FocusState private var focus: Bool
+    @State private var nativeField = WeakFocusField()
+    @State private var nativeBegins = 0
+    @State private var nativeEnds = 0
+    @State private var unexpectedResignations = 0
+    @State private var focusSamples = 0
+    @State private var monitorsFocus = false
+    @State private var layoutUpdate = 0
+    @State private var updates = Timer.publish(every: 0.05, on: .main, in: .common).autoconnect()
 
     var body: some View {
         ScrollView {
             VStack {
                 TextField("Coffee", text: $name).focused($focus)
                     .accessibilityIdentifier("sample.sheet-focus.field")
+                Text(verbatim: "\(nativeBegins),\(nativeEnds),\(unexpectedResignations),\(nativeField.value?.isFirstResponder == true),\(nativeField.value.map { String(describing: ObjectIdentifier($0)) } ?? "nil"),\(focusSamples)")
+                    .accessibilityIdentifier("sample.sheet-focus.responder")
+                Text(keyboard ? "keyboard shown" : "keyboard hidden")
+                    .accessibilityIdentifier("sample.sheet-focus.keyboard")
                 Text(focus ? "focused" : "unfocused")
                     .accessibilityIdentifier("sample.sheet-focus.focus")
                 Text(identity.uuidString).accessibilityIdentifier("sample.sheet-focus.identity")
@@ -150,7 +186,9 @@ private struct SheetFocusProbeForm: View {
                 if errors { Text("Required").accessibilityIdentifier("sample.sheet-focus.error") }
                 Button("Replace sheet") { Task { await router.present(SheetFocusProbeRoute(number: number + 1)) } }
                     .accessibilityIdentifier("sample.sheet-focus.replace")
-                Button("Unwind sheet") { Task { await router.unwind(to: .topmostAncestor) } }
+                Button("Unwind sheet") { Task {
+                    await router.unwind(.current)
+                } }
                     .accessibilityIdentifier("sample.sheet-focus.unwind")
                 ForEach(0..<10, id: \.self) { Text("Item \($0)") }
             }.padding()
@@ -164,14 +202,36 @@ private struct SheetFocusProbeForm: View {
         }
         .safeAreaInset(edge: .bottom) {
             if focus {
-                Button("Done") { focus = false }
+                Button("Done") { monitorsFocus = false; focus = false }
                     .accessibilityIdentifier("sample.sheet-focus.done")
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in keyboard = true }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in keyboard = false }
+        .onReceive(NotificationCenter.default.publisher(for: UITextField.textDidBeginEditingNotification)) { notification in
+            guard let field = notification.object as? UITextField else { return }
+            nativeField.value = field
+            nativeBegins += 1
+            monitorsFocus = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UITextField.textDidEndEditingNotification)) { notification in
+            guard let field = notification.object as? UITextField, field === nativeField.value else { return }
+            nativeEnds += 1
+        }
+        .onReceive(updates) { _ in
+            layoutUpdate += 1
+            if monitorsFocus {
+                focusSamples += 1
+                if nativeField.value?.isFirstResponder != true { unexpectedResignations += 1 }
+            }
+        }
+        .safeAreaInset(edge: .top) {
+            if layoutUpdate.isMultiple(of: 2) { Text("Layout update").frame(height: 1) }
         }
         .navigationTitle("Focus probe")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Dismiss", action: dismiss.callAsFunction)
+                Button("Dismiss") { monitorsFocus = false; dismiss() }
                     .accessibilityIdentifier("sample.sheet-focus.dismiss")
             }
         }

@@ -20,20 +20,32 @@
 //  SOFTWARE.
 //
 
-/// Handles a matching route when it unwinds to this scope.
+/// Handles a matching route when it unwinds.
 ///
-/// Unwinds can be requested with ``UnwindRouteAction`` from `@Environment(\.unwindRoute)` for
-/// captured route-scope dismissal, or with ``Router/unwind(to:)`` and
-/// ``Router/unwind(to:payload:)`` for explicit router-level targets.
+/// Unwinds can be requested with ``UnwindRouteAction`` from ``UnwindRoute`` for
+/// captured route-scope dismissal, or with ``Router/unwind(_:)`` and
+/// ``Router/unwind(_:payload:)`` for explicit router-level targets.
+/// Root resets, explicit whole-space removal, and native Back or dismissal also notify handlers.
+/// Presenting a route never notifies them: ancestor crawlback, equality reuse,
+/// and replacement can remove destinations without being an unwind request.
 ///
-/// The handler runs after the unwind request is accepted. The router does not wait for the handler
-/// body to finish before continuing the unwind. If the handler presents another route, that request
-/// is deferred until the active navigation has finished.
+/// Lookup starts at the surviving landing scope and climbs to its space root.
+/// If no handler matches there, lookup continues from each surviving lower
+/// priority space's current scope, nearest priority first. A conflicting handler
+/// stops lookup. Covered scopes can receive notification without gaining routing authority.
 ///
-/// Handlers in one scope compose by route and expected payload type. An exact payload-type
-/// match takes precedence; otherwise, a sole compatible typed handler can receive the payload.
-/// Duplicate or ambiguous matching handlers report a warning and do not run. The initializer
-/// without an expected payload type handles only payload-free unwinds.
+/// Native and explicit unwinds enter the handler after acceptance and before the
+/// path changes. The router continues once the handler suspends; it does not wait
+/// for the asynchronous body to finish. A presentation requested by the handler
+/// waits until the active navigation has finished, then rechecks source membership
+/// and priority coverage. It is dropped if a higher space still covers its source.
+///
+/// Handlers in one scope compose by route and expected payload type. Duplicate keys
+/// report a warning and are disabled until only one declaration remains.
+/// For a provided payload, an exact type match takes precedence; otherwise, a sole
+/// compatible typed handler can receive it. Multiple compatible keys without an
+/// exact match warn and stop lookup. Payload-free handlers receive only payload-free
+/// unwinds, including native dismissal; they never consume a provided payload.
 ///
 /// ```swift
 /// .hooks {
@@ -48,8 +60,9 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
     /// Creates an unwind handler.
     ///
     /// If this handler matches an ``UnwindRouteAction/callAsFunction(payload:)`` or
-    /// ``Router/unwind(to:payload:)`` request, `handle` is scheduled when the unwind is accepted.
-    /// The router does not wait for `handle` to return.
+    /// ``Router/unwind(_:payload:)`` request, `handle` is scheduled when the unwind is accepted.
+    /// Delivery starts before the path changes. The router does not wait for `handle` to return.
+    /// An optional `nil` passed to the payload overload is still a typed payload.
     public init<Payload>(
         _ routeType: R.Type,
         expecting payloadType: Payload.Type,
@@ -78,7 +91,8 @@ public struct UnwindHandler<R: Route>: HookDeclaration, Sendable {
     /// Creates an unwind handler for payload-free unwind requests.
     ///
     /// If this handler matches an ``UnwindRouteAction/callAsFunction()`` or
-    /// ``Router/unwind(to:)`` request, `handle` is scheduled when the unwind is accepted.
+    /// ``Router/unwind(_:)`` request, `handle` is scheduled when the unwind is accepted.
+    /// Native dismissal uses the same before-commit timing.
     public init(
         _ routeType: R.Type,
         handle: @escaping @MainActor @Sendable () async -> Void
@@ -105,11 +119,9 @@ struct AnyUnwindHandler {
     let acceptsPayload: @MainActor (Any?) -> Bool
     let invoke: @MainActor (any Route, Any?, AnyHashable) async -> Void
 
-    init(
-        payloadType: Any.Type? = nil,
-        acceptsPayload: @escaping @MainActor (Any?) -> Bool = { $0 == nil },
-        invoke: @escaping @MainActor (any Route, Any?, AnyHashable) async -> Void
-    ) {
+    init(payloadType: Any.Type? = nil,
+         acceptsPayload: @escaping @MainActor (Any?) -> Bool = { $0 == nil },
+         invoke: @escaping @MainActor (any Route, Any?, AnyHashable) async -> Void) {
         self.payloadType = payloadType
         self.acceptsPayload = acceptsPayload
         self.invoke = invoke

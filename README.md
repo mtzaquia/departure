@@ -7,108 +7,100 @@
 
 <a href="https://www.buymeacoffee.com/mtzaquia" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" style="height: 30px !important;" ></a>
 
-`Departure` is a robust, expressive routing framework for SwiftUI.
+`Departure` is a SwiftUI routing framework with composable route maps and scoped navigation.
 
-Declare the destinations a screen owns. Request them from wherever the user’s intent starts. Departure finds the closest eligible owner, presents with the right style, and gives actions a route-aware place to run.
+Declare the navigation tree once. Feature modules supply typed destination builders; views bind their place in the tree. Departure finds the nearest eligible declaration, coordinates branches and modal lanes, and unwinds through one shared plan.
 
-- Push, sheet, and cover routes from one small API.
-- Keep domain routes independent from the feature modules that build their views.
-- Preserve independent navigation paths across tabs and concurrent split-view columns.
-- Reroute guarded flows, unwind precisely, and intercept route-scoped actions.
-- Raise a critical flow above the app when it truly cannot wait.
+- Push, replace, sheet, and cover destinations.
+- Keep domain routes independent of feature views.
+- Preserve independent paths in tabs and concurrent split columns.
+- Resolve guarded routes, intercept actions, and return unwind payloads.
+- Declare high and critical presentations at the root.
 
 ```swift
-await router.present(SettingsRoute())
+let routes = RootRouteMap {
+  Sheet(SettingsRoute.self) {
+    Push(AdvancedSettingsRoute.self)
+  }
+} destinations: {
+  SettingsFeature.destination
+  SettingsFeature.advancedDestination
+}
 ```
 
 ## Install
 
-Departure requires Swift 6.3+, supports iOS 17+ and macOS 14+, and is available through Swift Package Manager.
+Departure requires Swift 6.3+, iOS 17+, or macOS 14+.
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/mtzaquia/departure.git", from: "2.1.0"),
-],
+  .package(url: "https://github.com/mtzaquia/departure.git", from: "3.0.0"),
+]
 ```
 
 ## Five-minute start
 
-Install `WithRouter`, make a route, declare how `HomeView` presents it, then request it.
+Create route data and its destination, then pass the map to `WithRouter`.
 
 ```swift
-@main
-struct ExampleApp: App {
-  var body: some Scene {
-    WindowGroup {
-      WithRouter {
-        NavigationStack {
-          HomeView()
-        }
-      }
+import Departure
+import SwiftUI
+
+struct SettingsRoute: Route, Equatable {}
+
+@MainActor
+enum SettingsFeature {
+  static let destination = RouteDestination(SettingsRoute.self) { _, context in
+    Button("Done") {
+      Task { await context.unwindRoute() }
     }
   }
 }
 
-struct SettingsRoute: Route {}
+@main
+struct ExampleApp: App {
+  private let routes = RootRouteMap {
+    Sheet(SettingsRoute.self)
+  } destinations: {
+    SettingsFeature.destination
+  }
 
-struct SettingsView: View {
-  var body: some View { Text("Settings") }
+  var body: some Scene {
+    WindowGroup {
+      WithRouter(routes: routes) { HomeView() }
+    }
+  }
 }
 
 struct HomeView: View {
   @Environment(\.router) private var router
-  private static let settings = RouteDestination(SettingsRoute.self) { _, _ in
-    SettingsView()
-  }
 
   var body: some View {
     Button("Settings") {
       Task { await router.present(SettingsRoute()) }
     }
-    .routes {
-      Sheet(Self.settings)
-    }
   }
 }
 ```
 
-That’s the core idea: the screen that owns the presentation declares it; the screen that starts the flow simply asks for the route.
+The map owns definitions independently of mounted views. `WithRouter` and destinations bind their scopes automatically. When a scope declares pushes, explicitly supply `NavigationStack { content.routing() }`, placing `.routing()` on the root content inside the stack. Destinations choose their containers explicitly.
 
-Routes may also omit `destination()` and let a feature module bind a typed destination:
-
-```swift
-let settings = RouteDestination(SettingsRoute.self) { route, context in
-  SettingsView()
-}
-
-// On the owning view:
-.routes { Sheet(settings) }
-```
-
-The builder receives route data, scoped routing actions, presentation style and priority,
-and the destination's environment. See [Routing](docs/routing.md#supply-a-view-from-a-feature-module)
-for the module layout and migration from the deprecated `RouteViewProviding` protocol.
-Existing `Route.destination()` implementations remain functional but are deprecated too;
-route-type declarations remain supported.
-
-> [!NOTE]
-> `RouteDestination` is available on this development branch and is not yet in the v2.1.0 release.
-
-> [!NOTE]
-> Declare `Push(...)` inside a `NavigationStack`.
-
-Use `Replace(...)` for selected content that should change in place without navigation
-history. It clears that slot's descendants and keeps other branch paths. See
-[Branches](docs/branches.md#route-across-concurrent-columns) for a split-view example.
+Route maps separate type-only declarations from [composable destination bindings](docs/routing.md#compose-destination-bindings) and use root-only `HighPriority` and `CriticalPriority` groups. For changes from version 2, see the [v3.0.0 migration notes](https://github.com/mtzaquia/departure/releases/tag/v3.0.0#migration-notes).
 
 ## Documentation
 
-- [Getting started](docs/getting-started.md) — setup, routes, and declarations.
-- [Routing](docs/routing.md) — presentation styles, ownership, and guarded routes.
+- [Getting started](docs/getting-started.md) — maps, destinations, and view bindings.
+- [Routing](docs/routing.md) — lookup, presentation styles, context, and guarded routes.
 - [Actions](docs/actions.md) — route-aware work and interception.
 - [Unwinding](docs/unwinding.md) — dismissing flows and returning values.
-- [Branches](docs/branches.md) — routing in tabs and other selection containers.
-- [Priority](docs/priority.md) — high- and critical-priority presentations.
+- [Branches](docs/branches.md) — tabs, concurrent columns, and replacement selections.
+- [Priority](docs/priority.md) — high and critical root presentations.
+- [Diagnostics](docs/diagnostics.md) — trace the adopted map and routing decisions.
+- [Rewrite specifications](docs/specs/README.md) — agreed contracts and implementation inventory.
+
+## Sample app
+
+Open `SampleApp/SampleApp.xcodeproj`. The app exercises tabs, concurrent split columns, replacements, actions, payloads, elevated windows, and nested-modal unwind snapshots.
 
 ## License
 

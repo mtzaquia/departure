@@ -28,9 +28,8 @@ import Foundation
 @MainActor
 final class RouteScopeAttachment {
     enum Kind: String {
-        case routes = ".routes"
         case hooks = ".hooks"
-        case branch = ".routeBranch"
+        case routing = ".routing"
     }
 
     let id = AnyHashable(UUID())
@@ -38,7 +37,6 @@ final class RouteScopeAttachment {
     private weak var view: PlatformView?
     private var lifecycleID: UUID?
     private var target: RouteScope?
-    private var key: AnyHashable?
     private var installed: RouteScope?
     private var apply: ((RouteScope) -> Void)?
     private var remove: ((RouteScope) -> Void)?
@@ -50,17 +48,15 @@ final class RouteScopeAttachment {
 
     func update(
         target: RouteScope?,
-        key: AnyHashable? = nil,
         view: PlatformView?,
         apply: @escaping (RouteScope) -> Void,
         remove: @escaping (RouteScope) -> Void
     ) {
         let currentView = view ?? self.view
-        if self.target !== target || self.key != key {
+        if self.target !== target {
             detach()
             self.target = target
-            self.key = key
-            target?.ledger.observe(self)
+            target?.observe(self)
         }
 
         self.view = currentView
@@ -69,22 +65,21 @@ final class RouteScopeAttachment {
         reconcile()
     }
 
-    func handle(_ event: ViewLifecycleBridge.Event, id: UUID, target: RouteScope?,
-                key: AnyHashable? = nil, view: PlatformView?,
+    func handle(_ event: ViewLifecycleBridge.Event, id: UUID, target: RouteScope?, view: PlatformView?,
                 apply: @escaping (RouteScope) -> Void, remove: @escaping (RouteScope) -> Void) {
         switch event {
         case .created:
-            // An off-window replacement inherits the modifier's registration, without
-            // admitting a new presentation host. Its predecessor cannot detach it.
+            // The modifier still owns its registration when SwiftUI recreates an off-window
+            // bridge. Creation replaces its identity without admitting a new native host.
             lifecycleID = id
         case .installedInWindow:
-            update(target: target, key: key, view: view, apply: apply, remove: remove)
+            update(target: target, view: view, apply: apply, remove: remove)
             lifecycleID = id
         case .updated:
             guard lifecycleID == id else { return }
-            update(target: target, key: key, view: view, apply: apply, remove: remove)
+            update(target: target, view: view, apply: apply, remove: remove)
             lifecycleID = id
-        case .dismantled, .deinitialized:
+        case .ended:
             guard lifecycleID == id else { return }
             detach()
         }
@@ -96,9 +91,8 @@ final class RouteScopeAttachment {
             remove?(installed)
         }
         installed = nil
-        target?.ledger.stopObserving(self)
+        target?.stopObserving(self)
         target = nil
-        key = nil
         view = nil
         apply = nil
         remove = nil
@@ -109,11 +103,11 @@ final class RouteScopeAttachment {
             return
         }
 
-        switch target.ledger.ownership(of: view) {
+        switch target.ownership(of: view) {
         case .pending:
-            // An anchor can disappear during a transient bridge replacement.
-            // Retain an existing registration until the attachment itself ends.
-            break
+            // Refresh only an exact attachment already admitted by the ownership gate.
+            // Window loss prevents new admission, but does not freeze captured consumer data.
+            if installed === target { apply?(target) }
 
         case .managed:
             installed = target

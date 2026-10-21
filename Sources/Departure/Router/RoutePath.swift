@@ -21,230 +21,55 @@
 //
 
 import Foundation
-import Observation
 
-struct RoutePathTrim {
-    let path: RoutePath
-    let keepThrough: RoutePath.Position
-
-    var removedScopes: [RouteScope] {
-        path.scopesRemovedAfter(keepThrough)
-    }
-}
-
-@Observable
 final class RoutePath: Identifiable {
-    enum Position: Equatable, CustomStringConvertible {
-        case owner
-        case scope(RouteScope)
-
-        static func == (lhs: Self, rhs: Self) -> Bool {
-            switch (lhs, rhs) {
-            case (.owner, .owner):
-                true
-
-            case let (.scope(lhs), .scope(rhs)):
-                lhs === rhs
-
-            case (.owner, .scope), (.scope, .owner):
-                false
-            }
+    let id = UUID()
+    weak var owner: RouteScope?
+    var scopes: [RouteScope] {
+        var result: [RouteScope] = []
+        var current = owner
+        while let next = current?.next(in: self) {
+            result.append(next)
+            current = next
         }
-
-        var description: String {
-            switch self {
-            case .owner:
-                "owner"
-
-            case let .scope(scope):
-                "scope(\(scope.departureDebugDescription))"
-            }
-        }
+        return result
     }
 
-    enum UnwindResolution {
-        case noRouteToUnwind
-        case targetNotFound
-        case keepPathThrough(Position)
-    }
+    init(owner: RouteScope) { self.owner = owner }
 
-    @ObservationIgnored let id = UUID()
-    @ObservationIgnored weak var owner: RouteScope?
-    var scopes: [RouteScope] = [] {
-        didSet {
-            let currentScopeIDs = Set(scopes.map(ObjectIdentifier.init))
-            for routeScope in oldValue where currentScopeIDs.contains(ObjectIdentifier(routeScope)) == false {
-                if routeScope.owningPath === self {
-                    routeScope.owningPath = nil
-                }
-            }
-
-            for routeScope in scopes {
-                routeScope.owningPath = self
-            }
-        }
-    }
-
-    init(owner: RouteScope? = nil) {
-        self.owner = owner
-    }
-
-    var isEmpty: Bool {
-        scopes.isEmpty
-    }
-
-    var count: Int {
-        scopes.count
-    }
-
-    var first: RouteScope? {
-        scopes.first
-    }
-
-    var last: RouteScope? {
-        scopes.last
-    }
+    var isEmpty: Bool { first == nil }
+    var count: Int { scopes.count }
+    var first: RouteScope? { owner?.next(in: self) }
+    var last: RouteScope? { scopes.last }
 
     func append(_ routeScope: RouteScope) {
-        scopes.append(routeScope)
-    }
-
-    func position(of routeScope: RouteScope) -> Position? {
-        guard routeScope !== owner else {
-            return .owner
-        }
-
-        if let scope = scopes.first(where: { $0 === routeScope }) {
-            return .scope(scope)
-        }
-
-        guard let parent = routeScope.parent else {
-            return nil
-        }
-
-        return position(of: parent)
+        (last ?? owner)?.append(routeScope, in: self)
     }
 
     func contains(_ routeScope: RouteScope) -> Bool {
-        routeScope === owner
-        || position(of: routeScope) != nil
-        || routeScope.parent === owner
+        routeScope === owner || scopes.contains { $0 === routeScope }
+        || routeScope.parent.map(contains) == true
     }
 
-    func scope(at position: Position) -> RouteScope? {
-        switch position {
-        case .owner:
-            return owner
-
-        case let .scope(scope):
-            return scope
-        }
+    func scope(before routeScope: RouteScope) -> RouteScope? {
+        guard contains(routeScope) else { return nil }
+        return routeScope === owner ? owner : routeScope.previousRouteScope
     }
 
-    func keepThrough(_ position: Position) {
-        guard let removalStartIndex = index(after: position) else {
-            return
-        }
-
-        scopes.removeSubrange(removalStartIndex..<scopes.endIndex)
+    func keepThrough(_ scope: RouteScope) {
+        guard contains(scope) else { return }
+        // Cut one owning edge. Outgoing snapshots retain the detached subtree until exit.
+        scope.removeContinuation(in: self)
     }
 
-    func scopesRemovedAfter(_ position: Position) -> [RouteScope] {
-        guard let removalStartIndex = index(after: position) else {
-            return []
+    func scopesRemoved(after scope: RouteScope) -> [RouteScope] {
+        guard contains(scope) else { return [] }
+        var removed: [RouteScope] = []
+        var current = scope
+        while let next = current.next(in: self) {
+            removed.append(next)
+            current = next
         }
-
-        guard removalStartIndex < scopes.endIndex else {
-            return []
-        }
-
-        return Array(scopes[removalStartIndex..<scopes.endIndex])
-    }
-
-    func positionBefore(_ routeScope: RouteScope) -> Position? {
-        guard let index = scopes.firstIndex(where: { $0 === routeScope }) else {
-            return position(of: routeScope)
-        }
-
-        guard index > scopes.startIndex else {
-            return .owner
-        }
-
-        return .scope(scopes[scopes.index(before: index)])
-    }
-
-    var lastPosition: Position {
-        guard let last else {
-            return .owner
-        }
-
-        return .scope(last)
-    }
-
-    func shallower(_ lhs: Position, _ rhs: Position) -> Position {
-        if lhs == .owner || rhs == .owner {
-            return .owner
-        }
-
-        guard case let .scope(lhsScope) = lhs,
-              case let .scope(rhsScope) = rhs,
-              let lhsIndex = scopes.firstIndex(where: { $0 === lhsScope }),
-              let rhsIndex = scopes.firstIndex(where: { $0 === rhsScope })
-        else {
-            assertionFailure("Route trim positions must belong to their route path.")
-            return lhs
-        }
-
-        return lhsIndex <= rhsIndex ? lhs : rhs
-    }
-
-    func unwindResolution(to target: RouterEngine.UnwindTarget?) -> UnwindResolution {
-        guard let target else {
-            guard let currentScope = scopes.last else {
-                return .noRouteToUnwind
-            }
-
-            return .keepPathThrough(positionBefore(currentScope) ?? .owner)
-        }
-
-        switch target {
-        case .root, .nearestBranch:
-            // Both clear the resolved path entirely; they differ only in which path
-            // `RouterEngine.unwindAndWait` resolves against (the root path vs. the nearest branch path).
-            // Clearing an already-empty branch path is the `.nearestBranch` no-op.
-            return .keepPathThrough(.owner)
-
-        case .topmostAncestor:
-            guard let currentScope = scopes.last else {
-                return .noRouteToUnwind
-            }
-
-            return .keepPathThrough(positionBefore(currentScope) ?? .owner)
-
-        case let .id(id):
-            if owner?.id == id {
-                return .keepPathThrough(.owner)
-            }
-
-            guard let scope = scopes.last(where: { $0.id == id }) else {
-                return .targetNotFound
-            }
-
-            return .keepPathThrough(.scope(scope))
-        }
-    }
-
-    private func index(after position: Position) -> [RouteScope].Index? {
-        switch position {
-        case .owner:
-            return scopes.startIndex
-
-        case let .scope(scope):
-            guard let index = scopes.firstIndex(where: { $0 === scope }) else {
-                return nil
-            }
-
-            return scopes.index(after: index)
-        }
+        return removed
     }
 }

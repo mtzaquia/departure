@@ -1,0 +1,168 @@
+import SwiftUI
+import Testing
+@testable import Departure
+
+@MainActor
+@Suite(.timeLimit(.minutes(1)))
+struct SpaceAuthorityTests {
+    @Test(arguments: [RoutePriority.high, .critical])
+    func externalDefaultHandleCannotActInOrDismissACoveringSpace(priority: RoutePriority) async throws {
+        let owner = fixture()
+        await owner.default.present(SettingsRoute())
+        let defaultScope = try #require(owner.engine.defaultSpace.rootPath.last)
+        if priority == .high { await owner.current.present(LoginRoute()) }
+        else { await owner.current.present(LockRoute()) }
+        let elevated = try #require(owner.engine.spaces.space(for: priority))
+        let probe = AuthorityProbe()
+        defaultScope.installHookDeclarations(hookDeclarations: [
+            ActionInterceptor(AuthorityAction.self) { invocation in
+                probe.events.append("interceptor")
+                try? await invocation()
+            }.declaration,
+        ])
+
+        // Capture after the covering space appears, as an external callback would.
+        let external = owner.default
+        await external.perform(AuthorityAction(probe: probe))
+        await external.present(HomeDetailRoute())
+        await external.present(LockRoute())
+        #expect(!((await external.resetToRoot())))
+        #expect(!((await external.unwind(.current))))
+        #expect(!((await external.dismissSpace())))
+        #expect(probe.events.isEmpty)
+        #expect(owner.engine.defaultSpace.rootPath.last === defaultScope)
+        #expect(owner.engine.spaces.activeSpace === elevated)
+
+        await owner.current.perform(AuthorityAction(probe: probe))
+        #expect(probe.events == ["body"])
+        #expect(await owner.dismissSpace(priority))
+        await external.perform(AuthorityAction(probe: probe))
+        #expect(probe.events == ["body", "interceptor", "body"])
+    }
+
+    @Test func deferredInvocationCannotExecuteAfterItsSourceIsCovered() async throws {
+        let owner = fixture()
+        let probe = AuthorityProbe()
+        owner.engine.root.installHookDeclarations(hookDeclarations: [
+            ActionInterceptor(AuthorityAction.self) { invocation in probe.invocation = invocation }.declaration,
+        ])
+        await owner.default.perform(AuthorityAction(probe: probe))
+        let invocation = try #require(probe.invocation)
+        probe.invocation = nil
+        await owner.current.present(LockRoute())
+        do {
+            try await invocation()
+            Issue.record("A covered action invocation executed")
+        } catch { #expect(error is CancellationError) }
+        #expect(probe.events.isEmpty)
+        #expect(owner.engine.spaces.criticalSpace?.root.route is LockRoute)
+    }
+
+    @Test func rerouteBlockedDuringResolutionCannotRetryThroughTheLockscreen() async throws {
+        let owner = fixture()
+        let probe = AuthorityProbe()
+        let gate = AuthorityGate()
+        await owner.default.perform(AuthorityRerouteAction(probe: probe, gate: gate))
+        await gate.waitUntilEntered()
+        // Install independent coverage to test the action retry's authority check.
+        // An ordinary presentation cannot overtake the suspended resolver.
+        let entry = LockRoute()
+        let lock = RouteScope(id: entry.id, route: entry)
+        let critical = RouteSpace(priority: .critical, root: lock)
+        owner.engine.mutateRouteGraph { owner.engine.spaces.setElevatedSpace(critical, for: .critical) }
+        lock.installHookDeclarations(hookDeclarations: [
+            ActionInterceptor(AuthorityRerouteAction.self) { _ in probe.events.append("lock-interceptor") }.declaration,
+        ])
+        owner.engine.routeScopeDidInstallInView(lock)
+        gate.release()
+        for _ in 0..<1000 { await Task.yield() }
+        #expect(probe.events == ["reroute"])
+        #expect(owner.engine.defaultSpace.rootPath.isEmpty)
+        #expect(owner.engine.spaces.criticalSpace?.root === lock)
+    }
+
+    @Test func intentionalRerouteIntoHigherPriorityStillRetriesAtItsDestination() async throws {
+        let owner = fixture()
+        let probe = AuthorityProbe()
+        await owner.default.perform(AuthorityElevatedAction(probe: probe))
+        for _ in 0..<1000 where owner.engine.spaces.highSpace == nil { await Task.yield() }
+        let destination = try #require(owner.engine.spaces.highSpace?.root)
+        #expect(probe.events == ["reroute"])
+        destination.installHookDeclarations(hookDeclarations: [
+            ActionInterceptor(AuthorityElevatedAction.self) { invocation in
+                probe.events.append("destination")
+                try? await invocation()
+            }.declaration,
+        ])
+        owner.engine.routeScopeDidInstallInView(destination)
+        for _ in 0..<1000 where probe.events.count < 3 { await Task.yield() }
+        #expect(probe.events == ["reroute", "destination", "body"])
+    }
+
+    private func fixture() -> RootRouter {
+        let owner = RootRouter()
+        _ = WithRouter(routes: RootRouteMap {
+            testPush(testDestination(SettingsRoute.self))
+            testPush(testDestination(HomeDetailRoute.self))
+            testPush(testDestination(AuthorityDestination.self))
+
+            HighPriority {
+                testSheet(testDestination(LoginRoute.self))
+            }
+            CriticalPriority {
+                testCover(testDestination(LockRoute.self))
+            }
+        }, router: owner) { EmptyView() }
+        return owner
+    }
+}
+
+@MainActor private final class AuthorityProbe {
+    var events: [String] = []
+    var invocation: ActionInvocation<Void>?
+}
+
+@MainActor private struct AuthorityAction: Action {
+    let probe: AuthorityProbe
+    func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
+        probe.events.append("body")
+    }
+}
+
+@MainActor private struct AuthorityRerouteAction: Action {
+    let probe: AuthorityProbe
+    let gate: AuthorityGate
+    func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
+        if context.isRunning(in: AuthorityDestination.self) { probe.events.append("body"); return }
+        probe.events.append("reroute")
+        throw .reroute(AuthorityDestination(gate: gate))
+    }
+}
+
+@MainActor private struct AuthorityElevatedAction: Action {
+    let probe: AuthorityProbe
+    func attemptAction(in context: ActionContext) async throws(ActionInvocationError) {
+        if context.isRunning(in: LoginRoute.self) { probe.events.append("body"); return }
+        probe.events.append("reroute")
+        throw .reroute(LoginRoute())
+    }
+}
+
+private struct AuthorityDestination: Route {
+    let gate: AuthorityGate
+    func resolveRoute() async -> RouteResolution { await gate.enter(); return .allow }
+}
+
+@MainActor private final class AuthorityGate {
+    private var entered = false
+    private var continuation: CheckedContinuation<Void, Never>?
+    func enter() async {
+        entered = true
+        await withCheckedContinuation { continuation = $0 }
+    }
+    func waitUntilEntered() async {
+        for _ in 0..<1000 where !entered { await Task.yield() }
+        #expect(entered)
+    }
+    func release() { continuation?.resume(); continuation = nil }
+}

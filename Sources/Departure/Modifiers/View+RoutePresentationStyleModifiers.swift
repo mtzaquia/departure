@@ -23,37 +23,43 @@
 import SwiftUI
 
 extension View {
-    /// Installs detached push and cover hosts; sheet presenters attach to primary content.
+    /// Installs navigation and modal hosts for the compiled styles of this scope.
     ///
     /// Replace wraps the caller's actual content separately, before its environment and registration
     /// modifiers. Keeping this background outside those modifiers preserves source-environment cascading.
     ///
-    /// Each detached style occupies an independent, stable background slot. Its host is present only
+    /// Each style occupies an independent, stable background slot. The slot's host is present only
     /// while that style is declared — notably `navigationDestination` (push) is never attached when
     /// no push exists, so scopes that never push don't require a surrounding `NavigationStack`.
     func routePresentationStyleModifiers(
-        for declarations: [RouteScopeDeclaration],
+        for styles: Set<RoutePresentationKind>,
         hostedBy presentationHostID: RoutePresentationHostID,
         pushHostIdentity: Bool = true
     ) -> some View {
         self
             .background {
-                if declarations.containsPresentationKind(.push) {
+                if styles.contains(.push) {
                     presentationHost
-                        .modifier(PushPresentationStyleModifier(presentationHostID: presentationHostID))
+                        .modifier(NativePresentationStyleModifier(style: .push, presentationHostID: presentationHostID))
                         .id(pushHostIdentity)
                 }
             }
             .background {
-                if declarations.containsPresentationKind(.cover(.slide)) {
+                if styles.contains(.sheet) {
                     presentationHost
-                        .modifier(CoverSlidePresentationStyleModifier(presentationHostID: presentationHostID))
+                        .modifier(NativePresentationStyleModifier(style: .sheet, presentationHostID: presentationHostID))
                 }
             }
             .background {
-                if declarations.containsPresentationKind(.cover(.fade)) {
+                if styles.contains(.cover(.slide)) {
                     presentationHost
-                        .modifier(CoverFadePresentationStyleModifier(presentationHostID: presentationHostID))
+                        .modifier(NativePresentationStyleModifier(style: .cover(.slide), presentationHostID: presentationHostID))
+                }
+            }
+            .background {
+                if styles.contains(.cover(.fade)) {
+                    presentationHost
+                        .modifier(NativePresentationStyleModifier(style: .cover(.fade), presentationHostID: presentationHostID))
                 }
             }
     }

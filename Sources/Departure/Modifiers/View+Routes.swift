@@ -20,169 +20,106 @@
 //  SOFTWARE.
 //
 
-import Foundation
 import SwiftUI
 
 public extension View {
-    /// Declares routes for the current route scope.
-    ///
-    /// ```swift
-    /// ProfileView()
-    ///     .routes {
-    ///         Sheet(EditProfileRoute.self)
-    ///     }
-    /// ```
-    ///
-    /// - Important: `id` is the scope ID used by ``Router/UnwindTarget/id(_:)``.
-    func routes<ID: Hashable>(
-        id: ID? = AnyHashable?.none,
-        @RouteDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration]
-    ) -> some View {
-        modifier(
-            RoutesModifier(
-                explicitScopeID: id.map({ AnyHashable($0) }),
-                selection: nil,
-                declarations: declarations()
-            )
-        )
+    /// Connects presentation at this view to the current mapped scope.
+    func routing() -> some View { modifier(RoutingModifier()) }
+
+    /// Connects a branch's content to its predefined scope.
+    func routing<Branch: Hashable & Sendable>(_ branch: Branch) -> some View {
+        modifier(BranchRoutingModifier(branch: AnyHashable(branch)))
     }
 
-    /// Declares routes for a selection-based scope.
-    ///
-    /// ```swift
-    /// TabView(selection: $tab) { ... }
-    ///     .routes(branch: $tab) {
-    ///         Branch(AppTab.home) {
-    ///             Push(HomeDetailRoute.self)
-    ///         }
-    ///     }
-    /// ```
-    ///
-    /// Set `concurrent` for containers whose branches participate together, such as
-    /// split views. The selection binding identifies the branch to reveal during
-    /// programmatic navigation; changing it does not clear other branch paths.
-    /// In a split view, connect it to the preferred compact column, or adapt an
-    /// app-defined branch value to the container's visibility state.
-    /// Keep this enabled when a split view collapses; it describes the container,
-    /// rather than the size class or number of currently visible columns.
-    ///
-    /// - Parameter concurrent: Whether all registered branches participate together.
-    /// - Important: Place branch content under ``SwiftUICore/View/routeBranch(_:)`` so branch-local
-    ///   presentations are hosted by the selected branch view.
-    func routes<ID: Hashable, Selection: Hashable>(
-        id: ID? = AnyHashable?.none,
-        branch selection: Binding<Selection>,
-        concurrent: Bool = false,
-        @BranchedRouteDeclarationBuilder<Selection> _ declarations: () -> [RouteScopeDeclaration]
-    ) -> some View {
-        modifier(
-            RoutesModifier(
-                explicitScopeID: id.map({ AnyHashable($0) }),
-                selection: AnyRouteBranchSelection(selection, concurrent: concurrent),
-                declarations: declarations()
-            )
-        )
+    /// Connects a branch container's presentation and selection to its mapped scope.
+    /// Use exactly one selection binding per container. Its `Branch` values must
+    /// be representable by the binding's selection type.
+    func routing<Selection: Hashable & Sendable>(branch selection: Binding<Selection>) -> some View {
+        modifier(RoutingModifier(selection: AnyRouteBranchSelection(selection)))
     }
 }
 
-// MARK: - Private
+extension View {
+    func routingAutomatically(nativePresentation: NativePresentationLifetime? = nil,
+                              windowDestinationBuilder: WindowDestinationBuilder? = nil) -> some View {
+        modifier(RoutingModifier(automatic: true, nativePresentation: nativePresentation,
+                                 windowDestinationBuilder: windowDestinationBuilder))
+    }
+}
 
-private struct RoutesModifier: ViewModifier {
-    let explicitScopeID: AnyHashable?
-    let selection: AnyRouteBranchSelection?
-    let declarations: [RouteScopeDeclaration]
-
-    @State private var presentationHostID = RoutePresentationHostID()
-    @State private var attachment = RouteScopeAttachment(kind: .routes)
-
-    @Environment(RouterEngine.self) private var router
-    @Environment(\.routeScope) private var routeScope
-    @Environment(\.branchRouteDeclarations) private var branchRouteDeclarations
-    @Environment(\.self) private var sourceEnvironment
+private struct RoutingModifier: ViewModifier {
+    @RouterEnvironment private var router
+    @Environment(\.routeScope) private var scope
+    @Environment(\.self) private var environment
+    var automatic = false
+    var selection: AnyRouteBranchSelection?
+    weak var nativePresentation: NativePresentationLifetime?
+    var windowDestinationBuilder: WindowDestinationBuilder?
+    @State private var hostID = RoutePresentationHostID()
+    @State private var attachment = RouteScopeAttachment(kind: .routing)
 
     func body(content: Content) -> some View {
-        let activeBranch = selection?.value()
-
+        let owns = scope?.presentationHostID == hostID
+        let pushHostIdentity = scope?.branchID.map {
+            router.ios17NavigationStackPushWorkaround?.pushHostIdentity(for: $0, in: scope?.parent, router: router) ?? true
+        } ?? true
+        let styles = owns ? scope?.definitions.presentationStyles ?? [] : []
         content
-            // Replace changes this content slot; keep declaration injection and registration outside it.
-            .modifier(ReplacePresentationStyleModifier(presentationHostID: presentationHostID,
-                isEnabled: hostedDeclarations.containsPresentationKind(.replace)))
-            .environment(\.branchRouteDeclarations, accumulatedBranchRouteDeclarations)
-            .onLifecycleEvent { lifecycleView, lifecycleID, event in
-                configureAttachment(view: lifecycleView, event: event, lifecycleID: lifecycleID)
-            }
-            .onChange(of: activeBranch) { _, _ in
-                configureAttachment()
-            }
-            .onChange(of: selection?.concurrent) { _, _ in
-                configureAttachment()
-            }
-            .onChange(of: declarations) { _, _ in
-                configureAttachment()
-            }
-            // Keep the sheet presenter on primary content throughout keyboard/layout updates.
-            .modifier(SheetPresentationStyleModifier(presentationHostID: presentationHostID))
-            // Push and cover hosts remain in a detached background layer. They are installed
-            // only for the declared styles (so e.g. `navigationDestination` is never attached
-            // without a push declaration), which means the host set changes as declarations
-            // change. Keeping that conditional structure off the primary content prevents its
-            // `_ConditionalContent` churn from tearing down the lifecycle bridge above, which
-            // would otherwise uninstall the scope's freshly installed route declarations.
+            .modifier(ReplacePresentationStyleModifier(presentationHostID: hostID, isEnabled: styles.contains(.replace)))
             .background {
-                Color.black.frame(width: .zero, height: .zero)
-                    .routePresentationStyleModifiers(
-                        for: hostedDeclarations,
-                        hostedBy: presentationHostID
-                    )
+                Color.clear.frame(width: 0, height: 0)
+                    .routePresentationStyleModifiers(for: styles, hostedBy: hostID, pushHostIdentity: pushHostIdentity)
+            }
+            .onLifecycleEvent { view, id, event in
+                if automatic, let scope {
+                    if let windowDestinationBuilder { router.windowDestinationBuilder = windowDestinationBuilder }
+                    // Keep the shared anchor at the outer routing boundary: modal creation
+                    // must not wait for nested navigation backgrounds to materialize.
+                    router.handleHostEvent(event, scope: scope, view: view, id: id)
+                    nativePresentation?.handleDestinationEvent(event, of: ObjectIdentifier(scope))
+                }
+                attachment.handle(event, id: id, target: scope, view: view,
+                    apply: { scope in
+                        scope.bindRoutingHost(hostID, automatic: automatic, environment: environment, selection: selection)
+                        reconcileSelection(in: scope)
+                    }, remove: { scope in
+                        scope.unbindRoutingHost(hostID)
+                        reconcileSelection(in: scope, restoring: true)
+                    })
+            }
+            .onChange(of: selection?.value(), initial: true) { _, _ in
+                guard let scope else { return }
+                reconcileSelection(in: scope, deferred: false)
             }
     }
 
-    private func configureAttachment(view: PlatformView? = nil, event: ViewLifecycleBridge.Event? = nil, lifecycleID: UUID? = nil) {
-        let router = router
-        let sourceID = attachment.id
-        let explicitScopeID = explicitScopeID
-        let selection = selection
-        let declarations = hostedDeclarations
-        let sourceEnvironment = sourceEnvironment
-        let apply: (RouteScope) -> Void = { scope in
-            let requiresCommit = scope.prepareRouteDeclarationInstallation(
-                sourceID: sourceID,
-                id: explicitScopeID,
-                branchSelection: selection,
-                routeDeclarations: declarations,
-                sourceEnvironment: sourceEnvironment
-            )
-            guard requiresCommit else { return }
-            router.mutateRouteGraph { scope.commitRouteDeclarationInstallation() }
-            if let parent = scope.parent {
-                router.resumePendingRoute(for: scope.id, in: parent)
-            }
+    private func reconcileSelection(in scope: RouteScope, restoring: Bool = false, deferred: Bool = true) {
+        guard selection != nil, scope.needsBranchSelectionSynchronization else { return }
+        let router = router, owner = hostID
+        if !deferred {
+            router.synchronizeBranchSelection(ownedBy: owner, in: scope, restoring: restoring)
+            return
         }
-        let remove: (RouteScope) -> Void = { scope in
-            router.mutateRouteGraph { scope.uninstallRouteDeclarations(sourceID: sourceID) }
+        // Native updates can be inside SwiftUI's transaction; reconcile the live
+        // registration after leaving that callback, without retaining a departed host.
+        Task { @MainActor [weak router, weak scope] in
+            guard let router, let scope, scope.needsBranchSelectionSynchronization else { return }
+            router.synchronizeBranchSelection(ownedBy: owner, in: scope, restoring: restoring)
         }
+    }
+}
 
-        if let event, let lifecycleID {
-            attachment.handle(event, id: lifecycleID, target: routeScope, view: view, apply: apply, remove: remove)
+private struct BranchRoutingModifier: ViewModifier {
+    let branch: AnyHashable
+    @RouterEnvironment private var router
+    @Environment(\.routeScope) private var parent
+    func body(content: Content) -> some View {
+        if let scope = parent?.branchScopes[branch] {
+            content
+                .routingAutomatically()
+                .routeScopeEnvironment(scope, router: router)
         } else {
-            attachment.update(target: routeScope, view: view, apply: apply, remove: remove)
-        }
-    }
-
-    private var accumulatedBranchRouteDeclarations: [RouteScopeDeclaration] {
-        branchRouteDeclarations + declarations.filter { $0.branch != nil }
-    }
-
-    private var hostedDeclarations: [RouteScopeDeclaration] {
-        declarations.map { declaration in
-            guard declaration.branch == nil else {
-                return declaration
-            }
-
-            return RouteScopeDeclaration(
-                branch: nil,
-                routes: declaration.routes.hosted(by: presentationHostID)
-            )
+            content
         }
     }
 }

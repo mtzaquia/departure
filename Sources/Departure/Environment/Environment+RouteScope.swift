@@ -26,7 +26,7 @@ import SwiftUI
 /// Unwinds the captured route scope from SwiftUI views.
 ///
 /// ```swift
-/// @Environment(\.unwindRoute) private var unwindRoute
+/// @UnwindRoute private var unwindRoute
 ///
 /// Button("Done") {
 ///     Task {
@@ -35,108 +35,109 @@ import SwiftUI
 /// }
 /// ```
 public struct UnwindRouteAction: Equatable {
-    private enum Identity: Equatable {
-        case inactive
-        case routeScope(routerID: UUID, routeScopeID: ObjectIdentifier)
-    }
-
-    private let identity: Identity
-    private let handler: Handler?
+    private let router: Router
+    private let missingTarget: RouterEngine.UnwindSelection?
 
     /// Creates an inactive unwind action.
-    public init() {
-        self.identity = .inactive
-        self.handler = nil
-    }
+    public init() { router = .inactive; missingTarget = nil }
 
     init(router: RouterEngine, routeScope: RouteScope) {
-        self.identity = .routeScope(
-            routerID: router.id,
-            routeScopeID: ObjectIdentifier(routeScope)
-        )
-        self.handler = Handler(router: router, routeScope: routeScope)
+        self.router = Router(engine: router, scope: routeScope)
+        missingTarget = nil
     }
 
-    /// Unwinds the captured route scope.
-    ///
-    /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed installed route scopes have left the view hierarchy.
+    init(missing target: RouterEngine.UnwindSelection) {
+        router = .inactive
+        missingTarget = target
+    }
+
+    /// Dismisses the captured destination and awaits its native teardown.
+    /// - Returns: Whether the captured request was accepted. Removed or covered scopes return `false`.
     @discardableResult
     public func callAsFunction() async -> Bool {
-        await handler?.unwind(payload: nil) ?? false
+        guard !reportMissingTargetIfNeeded() else { return false }
+        return await router.unwind(.current)
     }
 
-    /// Unwinds the captured route scope and delivers a payload to a matching ``UnwindHandler``.
-    ///
-    /// This method returns after the unwind request has resolved, the router path has been updated,
-    /// and any removed installed route scopes have left the view hierarchy.
+    /// Dismisses the captured destination and delivers a payload to a matching ``UnwindHandler``.
+    /// - Parameter payload: The value delivered for the captured route.
+    /// - Returns: Whether the captured request was accepted, after native teardown completes.
     @discardableResult
     public func callAsFunction<Payload>(payload: Payload) async -> Bool {
-        await handler?.unwind(payload: payload) ?? false
+        guard !reportMissingTargetIfNeeded() else { return false }
+        return await router.unwind(.current, payload: payload)
+    }
+
+    private func reportMissingTargetIfNeeded() -> Bool {
+        guard let missingTarget else { return false }
+        log.departureWarning(.unwindRouteTargetMissing(target: missingTarget))
+        return true
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.identity == rhs.identity
-    }
-
-    private final class Handler {
-        let router: RouterEngine
-        weak var routeScope: RouteScope?
-
-        init(router: RouterEngine, routeScope: RouteScope) {
-            self.router = router
-            self.routeScope = routeScope
-        }
-
-        func unwind(payload: Any?) async -> Bool {
-            guard let routeScope else {
-                return false
-            }
-
-            return await router.unwindPrevious(from: routeScope, payload: payload)
-        }
+        lhs.router == rhs.router && lhs.missingTarget == rhs.missingTarget
     }
 }
 
-/// The current routing phase for a view's local route scope.
+/// Whether a scope is a current endpoint of a participating path in the top space.
+///
+/// Phase describes foreground navigation position, not command authority or host
+/// installation. Inactive live scopes in the top space may still issue commands.
 public enum RoutePhase: Equatable, Sendable {
-    /// This view's route scope is current within its participating branch.
+    /// This scope is current within its participating branch and modal subtree.
+    /// Concurrent branches may each have an active endpoint.
     case active
 
-    /// This view's scope is behind another destination or belongs to an unselected exclusive branch.
+    /// This scope is covered, removed, behind a destination or modal, or in an unselected branch.
     case inactive
 }
 
+private struct RoutingEnvironmentReference {
+    weak var engine: RouterEngine?
+    weak var scope: RouteScope?
+}
+
+@propertyWrapper
+struct RouterEnvironment: DynamicProperty {
+    @Environment(\.routerEngine) private var engine
+
+    var wrappedValue: RouterEngine {
+        guard let engine else {
+            preconditionFailure("A routing view requires a live WithRouter owner.")
+        }
+        return engine
+    }
+}
+
 extension EnvironmentValues {
-    @Entry var routeScope: RouteScope?
-    @Entry var unscopedRouter = Router.inactive
+    @Entry private var routingReference = RoutingEnvironmentReference()
+
+    var routeScope: RouteScope? {
+        get { routingReference.scope }
+        set { routingReference.scope = newValue }
+    }
+
+    var routerEngine: RouterEngine? {
+        get { routingReference.engine }
+        set { routingReference.engine = newValue }
+    }
+
 }
 
 public extension EnvironmentValues {
     /// The router bound to this view's route scope, or an inactive router outside `WithRouter`.
     @Entry var router = Router.inactive
 
-    /// Unwinds the captured route scope.
-    @Entry var unwindRoute = UnwindRouteAction()
-
     /// The current routing phase for this view's local route scope.
     ///
-    /// This value is local to the view hierarchy it is read from. The current route destination,
-    /// branch root, or root content reads ``RoutePhase/active``; installed scopes behind another
-    /// route read ``RoutePhase/inactive``.
-    @Entry var routePhase = RoutePhase.inactive
-}
-
-public extension Environment where Value == Router {
-    /// Reads the unscoped router using the legacy type-based spelling.
+    /// Current endpoints in participating paths of the top space read ``RoutePhase/active``.
+    /// Concurrent branches can each be active. A modal makes scopes outside its subtree
+    /// inactive; a covered or removed scope is always inactive.
     ///
-    /// Unlike `@Environment(\.router)`, this router searches without a captured
-    /// view scope. Both spellings are inactive outside `WithRouter`.
-    /// - Parameter type: The router type identifying the compatibility lookup.
-    @available(*, deprecated, message: "Use @Environment(\\.router) instead.")
-    init(_ type: Router.Type) {
-        self.init(\.unscopedRouter)
-    }
+    /// Command authority requires live membership in the top space, rather than an
+    /// active phase. An inactive ancestor or unselected branch there can still navigate.
+    /// Neither phase nor command authority requires a mounted presentation host.
+    @Entry var routePhase = RoutePhase.inactive
 }
 
 extension View {
@@ -148,34 +149,25 @@ extension View {
         self
             .environment(\.routeScope, routeScope)
             .environment(\.router, Router(engine: router, scope: routeScope))
-            .environment(\.unscopedRouter, Router(engine: router))
             .environment(\.routePhase, router.routePhase(for: routeScope))
-            .environment(\.unwindRoute, UnwindRouteAction(router: router, routeScope: routeScope))
     }
 }
 
 extension RouterEngine {
     func routePhase(for routeScope: RouteScope) -> RoutePhase {
         _ = activeRouteScopeID
-        _ = routeScope.participation.isBranchHostRegistered
-        guard let path = routeForest.routePath(containing: routeScope),
-              let tree = routeForest.tree(containing: path), tree === routeForest.activeTree else { return .inactive }
+        guard let path = spaces.routePath(containing: routeScope),
+              let space = spaces.space(containing: path), space === spaces.activeSpace else { return .inactive }
         // A modal suspends scopes outside its subtree. Concurrent columns hosted
         // inside that modal still participate together.
-        if let deepestModal = tree.currentModalScope {
-            var ancestor: RouteScope? = routeScope
-            while let current = ancestor, current !== deepestModal {
-                ancestor = current.previousScopeInTree
-            }
-            guard ancestor === deepestModal else { return .inactive }
+        if let deepestModal = space.currentModalScope,
+           !routeScope.ancestry.contains(where: { $0 === deepestModal }) {
+            return .inactive
         }
-        var scope = routeScope
-        while let previous = scope.previousScopeInTree {
-            if let branch = scope.branchID,
+        for scope in routeScope.ancestry {
+            if let branch = scope.branchID, let previous = scope.previousScopeInSpace,
                previous.participates(inBranch: branch) == false { return .inactive }
-            scope = previous
         }
-        let current = path.last?.activeLocalScope ?? path.owner?.activeLocalScope
-        return current === routeScope ? .active : .inactive
+        return path.owner?.activeLocalScope === routeScope ? .active : .inactive
     }
 }

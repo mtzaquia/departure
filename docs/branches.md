@@ -1,157 +1,97 @@
 # Branches
 
-Branches are named routing scopes hosted by a container. Use exclusive selection for `TabView`, or concurrent participation for a split view. Each branch keeps its own push path, and the container can make routes discoverable before their branch has been built.
+`Branches` accepts only `Branch` declarations. Put routes shared by the container beside the group in its enclosing map; declare branch-local routes inside each `Branch`.
+
+A branch owns an independent navigation path. `Branches(concurrent:)` declares whether one branch or several branches participate at once; all branches share their enclosing modal lane.
+
+A scope accepts exactly one `Branches` group, including through composed `RouteMap` values. Declare `Branch` values inside that group. To compose features, put their maps inside the corresponding `Branch` builders. Multiple groups report a diagnostic and disable that scope's branch container; sibling route declarations remain available.
+
+## Map tabs and connect selection
 
 ```swift
-enum AppTab: Hashable, Sendable {
-  case home
-  case wallet
+enum AppTab: Hashable, Sendable { case home, wallet }
+
+let routes = RootRouteMap {
+  Cover(LoginRoute.self)
+  Branches {
+    Branch(AppTab.home) { Push(HomeDetailRoute.self) }
+    Branch(AppTab.wallet) { Sheet(TransactionRoute.self) }
+  }
+} destinations: {
+  LoginFeature.destination
+  HomeFeature.detailDestination
+  WalletFeature.transactionDestination
 }
 
 struct RootView: View {
   @State private var tab: AppTab = .home
-
   var body: some View {
     TabView(selection: $tab) {
-      NavigationStack { HomeView().routeBranch(AppTab.home) }
+      NavigationStack { HomeView().routing(AppTab.home) }
         .tag(AppTab.home)
-
-      NavigationStack { WalletView().routeBranch(AppTab.wallet) }
+      NavigationStack { WalletView().routing(AppTab.wallet) }
         .tag(AppTab.wallet)
     }
-    .routes(branch: $tab) {
-      Cover(LoginRoute.self)
-      Branch(.home) { Push(HomeDetailRoute.self) }
-      Branch(.wallet) { Sheet(TransactionRoute.self) }
-    }
+    .routing(branch: $tab)
   }
 }
 ```
 
-Read the scoped router from the environment and explicitly target another branch:
+`WithRouter(routes: routes) { RootView() }` seeds the scope. `.routing(branchValue)` enters its mapped branch and binds presentation. `.routing(branch: binding)` connects the container's presentation and selection to its existing mapped scope; a separate `.routing()` is unnecessary. `Branches` defaults to exclusive participation and the first declared branch supplies the initial selection when there is no binding.
+
+The model owns one selected value. When connected to a view, the container accepts exactly one `.routing(branch:)` binding owner. Multiple owners report a diagnostic, retain the current selection, and disable selection changes until one remains. Removing a binding retains the model's selection and branch history. Once the scope leaves the live tree, outgoing attachments cannot synchronize or restore its bindings. Plain `.routing()` hosts and branch-content `.routing(branchValue)` modifiers do not own the container's selection.
+
+Use branch values representable by the binding's selection type. For example, enum branch values should use a binding to that enum rather than to strings. An incompatible write reports the branch value and both types, rejects activation, and leaves navigation unchanged. Optional bindings can represent their corresponding nonoptional branch values.
+
+Definitions outside `Branch` belong to the enclosing container. Route builders can contain further branch maps, allowing nested containers without a view registration step.
+
+## Target a branch
 
 ```swift
 await router.branch(AppTab.wallet).present(TransactionRoute())
 ```
 
-Obtaining a branch router does not change selection. After a route is resolved and
-accepted in that branch, Departure selects it before presenting the destination.
-Rejected routes, missing declarations, and reroutes to common ancestors leave the
-target selection unchanged. Plain `router.present(...)` searches its branch and
-enclosing scopes first, then discovers matching container `Branch(...)` declarations
-and automatically selects their branch. This also works before the matching host
-has been built. Discovery does not search arbitrary destinations inside sibling stacks.
-An explicit `router.branch(...)` target does not fall back to another branch when
-its branch has no matching declaration.
+Obtaining a branch router leaves selection unchanged. An accepted route activates its branch; rejected requests, missing declarations, and reroutes to common ancestors do not activate the original target. Plain requests discover mapped branches after local and enclosing matches.
 
-A request whose branch host has not registered remains pending while that branch
-becomes available. After the selection or host registration callback returns,
-Departure rechecks the pending request and participating branch before inserting
-the destination. Repeated registration updates insert once; an older wakeup cannot
-consume a replacement pending request.
+A branch router belongs to its enclosing container, so it survives dismissal of the requesting destination. Removing that container makes it inactive. Chained `branch(...)` calls address mapped nested containers. An explicit target does not search sibling branches.
 
-A branch router belongs to the nearest enclosing container. It remains usable after
-the requesting destination is dismissed, and can address a branch whose view has
-not been built yet. Removing its owning container makes it inactive. Chain `branch(...)`
-calls to address an already-declared nested container.
-
-## Choose where to declare a route
-
-- Declare a route with `.routes { ... }` inside a feature when it only needs to be found while that feature is active.
-- Put it in the container's `Branch(...)` map when a request should select an inactive branch or the branch may not have been built yet. The matching `.routeBranch(...)` host adopts the declaration and presents it.
-- Declare the same route in both places only deliberately. A local declaration takes precedence, which supports a feature-specific presentation or a view reused outside the branched container. Ordinary branch routing does not require duplicate declarations.
-
-Declarations outside `Branch(...)` belong to the container, making them useful for flows such as login that are available above every tab.
-
-Branches keep independent push paths, but share modal presentations. A sheet or cover from one branch replaces a current modal from another branch.
-
-To clear the current branch back to its root without leaving the container:
+## Keep concurrent columns
 
 ```swift
-await router.unwind(to: .nearestBranch)
-```
-
-## Route across concurrent columns
-
-Set `concurrent: true` when branches participate together. Use the container's preferred
-compact-column binding to reveal a routed destination on a phone:
-
-Keep `concurrent` enabled across size classes. It describes a split container even when
-only one column is visible. Departure detects registered hosts and waits for missing
-ones automatically. Host registration cannot determine participation: a tab container
-can also retain several registered hosts while only its selected branch participates.
-
-```swift
-struct LibraryView: View {
-  @State private var column = NavigationSplitViewColumn.sidebar
-
-  var body: some View {
-    NavigationSplitView(preferredCompactColumn: $column) {
-      NavigationStack {
-        SidebarView().routeBranch(NavigationSplitViewColumn.sidebar)
+let columns = RouteMap {
+  Branches(concurrent: true) {
+    Branch(NavigationSplitViewColumn.sidebar) { Push(LibrarySettingsRoute.self) }
+    Branch(NavigationSplitViewColumn.content) { Push(CollectionRoute.self) }
+    Branch(NavigationSplitViewColumn.detail) {
+      Replace(MessageRoute.self) {
+        Push(AttachmentRoute.self)
       }
-    } content: {
-      NavigationStack {
-        CollectionView().routeBranch(NavigationSplitViewColumn.content)
-      }
-    } detail: {
-      NavigationStack {
-        DetailView().routeBranch(NavigationSplitViewColumn.detail)
-      }
-    }
-    .routes(branch: $column, concurrent: true) {
-      Branch(.sidebar) { Push(LibrarySettingsRoute.self) }
-      Branch(.content) { Push(CollectionRoute.self) }
-      Branch(.detail) {
-        Push(CoffeeDetailRoute.self)
-        Cover(PreviewRoute.self)
-      }
+      Cover(PreviewRoute.self)
     }
   }
+} destinations: {
+  LibraryFeature.settingsDestination
+  CollectionFeature.destination
+  MessageFeature.destinations
+  PreviewFeature.destination
 }
-```
 
-A sidebar action can call:
-
-```swift
-await router.branch(NavigationSplitViewColumn.detail)
-  .present(CoffeeDetailRoute(coffeeID: id))
-```
-
-The detail branch receives the route and the compact-column binding becomes `.detail`.
-The other branches retain their push paths. The app owns column visibility, widths,
-and adaptive layout; hiding a column does not clear its navigation state. An app-defined
-branch enum can also be adapted to the container’s selection or visibility bindings.
-
-Each concurrent branch’s current scope can read `routePhase == .active`. A shared modal
-suspends the other branches. Sheets and covers retain their existing modal presentation
-behavior; branch ownership does not confine them to a column’s bounds.
-
-Changing one branch does not infer changes to others. The app must coordinate selections
-that depend on each other. Use `Replace` when a branch displays a selected root rather
-than a history of pushed selections:
-
-```swift
-.routes(branch: $column, concurrent: true) {
-    Branch(.detail) { Replace(MessageRoute.self) }
+NavigationSplitView(preferredCompactColumn: $column) {
+  NavigationStack { SidebarView().routing(NavigationSplitViewColumn.sidebar) }
+} content: {
+  NavigationStack { CollectionView().routing(NavigationSplitViewColumn.content) }
+} detail: {
+  NavigationStack { DetailView().routing(NavigationSplitViewColumn.detail) }
 }
+.routing(branch: $column)
 ```
 
-`router.branch(NavigationSplitViewColumn.detail).present(MessageRoute(id: messageID))`
-selects the detail branch and renders the message in place. A different message replaces
-the previous root and clears its descendant paths. It does not add a Back entry, and
-other branches retain their paths. The destination can declare `Push` routes when hosted
-inside a `NavigationStack`. A sheet or cover overlays the selected root as usual.
+Keep concurrency enabled across size classes. It describes the container, independently of how many columns SwiftUI currently displays. Targeting a column updates the connected compact-column binding and retains the other paths. The app controls visibility, widths, and adaptive layout.
 
-Unwinding the selected root reveals the original branch content. Presenting an equivalent
-selected route keeps its scope identity and unwinds its descendants back to that root.
-If the selected root has pushed children, Departure waits for them to leave before
-replacing the root. Cancelling the request during that pop leaves the selected root
-in place; a newer waiting request takes precedence.
-An equal route pushed elsewhere is not reused as the selected root. A `Replace` declared
-locally with `.routes` replaces that declaring view's slot rather than the entire branch.
+A branch's root replacement changes its selection without a Back entry. A different value clears that slot's descendants; an equal value retains its scope and unwinds descendants. Removing it reveals the original branch content. Other columns retain their paths.
 
-The [split-view sample](../SampleApp/SampleApp/Views/SplitBranchesView.swift) demonstrates
-three concurrent columns, targeted pushes, replacement selections, and a detail-owned cover.
+A sheet or cover in one branch replaces another modal in the same lane. Modals are not confined to column bounds. Nested modal destinations create the next lane, which remains shared by their own branches.
+
+The [split-view sample](../SampleApp/SampleApp/Views/SplitBranchesView.swift) exercises targeted pushes, replacement selections, and detail-owned covers.
 
 Next: [Priority](priority.md)
