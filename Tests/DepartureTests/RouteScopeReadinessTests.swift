@@ -79,13 +79,13 @@ import Testing
         }
         await start()
         for _ in 0..<1000 where engine.defaultSpace.rootPath.isEmpty { await Task.yield() }
-        let destination = try #require(engine.defaultSpace.rootPath.last)
+        let destinationScope = try #require(engine.defaultSpace.rootPath.last)
         #expect(retained != nil)
-        #expect(!destination.isInstalledInView)
+        #expect(!destinationScope.isInstalledInView)
         #expect(await engine.resetToRoot())
         for _ in 0..<1000 where retained != nil { await Task.yield() }
         #expect(retained == nil)
-        engine.routeScopeDidInstallInView(destination)
+        engine.routeScopeDidInstallInView(destinationScope)
         #expect(!retried)
     }
 
