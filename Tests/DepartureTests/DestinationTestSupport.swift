@@ -98,6 +98,7 @@ func testDeclaration<R: Route>(
         .compiled(destinations: RouteDestinationBindings([AnyRouteDestination(destination)], declarations: children))
 }
 
+@MainActor
 extension RouteMap {
     var declaration: AnyRouteDeclaration {
         RouteDefinitions(scopeDeclarations).routeAttachments[0]
@@ -105,6 +106,7 @@ extension RouteMap {
     var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }
 
+@MainActor
 extension ModalRouteMap {
     var declaration: AnyRouteDeclaration {
         RouteDefinitions(scopeDeclarations).routeAttachments[0]

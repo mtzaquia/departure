@@ -409,6 +409,7 @@ private struct MacOSInlinePlaceholder: View {
 private struct MacOSInlineRoute: Route {
     let number: Int
     let recorder: MacOSInlineRecorder
+    @MainActor
     func destination() -> some View {
         Text("Selected \(number)").frame(width: 320, height: 240)
             .onAppear { recorder.number = number }

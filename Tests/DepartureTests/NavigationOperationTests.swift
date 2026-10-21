@@ -25,9 +25,9 @@ struct NavigationOperationTests {
         #expect(!completed)
         if insert { engine.routeScopeDidInstallInView(branch) }
         else { engine.replacePendingRoute(nil) }
-        let destination = await caller.value
+        let presentedScope = await caller.value
         #expect(completed)
-        #expect(destination === (insert ? branch.path.last : nil))
+        #expect(presentedScope === (insert ? branch.path.last : nil))
         #expect(branch.path.count == (insert ? 1 : 0))
         engine.resumePendingRoute(for: "host", in: engine.root)
         #expect(branch.path.count == (insert ? 1 : 0))

@@ -25,6 +25,7 @@ import SwiftUI
 
 // Unit scenarios compile definitions before issuing routing operations. Selection and
 // environment are explicit test inputs instead of requiring a mounted platform view.
+@MainActor
 extension RouteScope {
     static let testSelectionOwner = RoutePresentationHostID()
 
@@ -83,6 +84,7 @@ extension RouteScope {
     }
 }
 
+@MainActor
 extension RouterEngine {
     func bindTestBranchSelection(_ selection: AnyRouteBranchSelection, in scope: RouteScope) {
         scope.bindRoutingHost(RouteScope.testSelectionOwner, automatic: false, environment: scope.sourceEnvironment, selection: selection)
@@ -95,6 +97,7 @@ extension RouterEngine {
 }
 
 // Fixture construction uses the same topology operations as production mutations.
+@MainActor
 extension RoutePath {
     func replaceTestPath(_ scopes: [RouteScope]) {
         if let owner { keepThrough(owner) }
