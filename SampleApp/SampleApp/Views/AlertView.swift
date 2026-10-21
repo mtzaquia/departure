@@ -25,7 +25,7 @@ import SwiftUI
 
 struct AlertView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.unwindRoute) private var unwindRoute
+    @UnwindRoute private var unwindRoute
 
     var body: some View {
         LabModalCard("Ancestor alert", subtitle: "This high-priority fade cover was declared above login and replaces it.", symbol: "exclamationmark.bubble.fill", color: LabPalette.coral) {

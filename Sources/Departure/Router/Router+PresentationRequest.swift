@@ -23,38 +23,33 @@
 import Foundation
 
 extension RouterEngine {
-    struct BufferedPresentationRequest {
-        let id: UUID
-        let route: any Route
-        let continuation: CheckedContinuation<Bool, Never>
-    }
-
-    /// Reserves the presentation pipeline before route resolution can suspend.
-    /// A buffered caller resumes in its own task, retaining its cancellation state.
+    /// Resolution owns admission through routing-state completion. The latest
+    /// waiter resumes in its own task; it is not executed by the finishing caller.
     func beginPresentationRequest(_ route: any Route) async -> Bool {
         guard isPresentationRequestInProgress else {
             isPresentationRequestInProgress = true
             return true
         }
-
-        let requestID = UUID()
+        let request = PendingNavigation.Request(route: route)
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                guard Task.isCancelled == false else {
+                guard !Task.isCancelled else {
                     continuation.resume(returning: false)
                     return
                 }
-
-                bufferedPresentationRequest?.continuation.resume(returning: false)
-                bufferedPresentationRequest = BufferedPresentationRequest(
-                    id: requestID,
-                    route: route,
-                    continuation: continuation
-                )
+                request.continuation = continuation
+                bufferedPresentationRequest?.resume()
+                bufferedPresentationRequest = request
+                // Native readiness and deferred host insertion remain latest-only.
+                // Supersede the active caller's pending continuation, not its resolver
+                // or a committed unwind's teardown and completion.
+                replacePendingRoute(nil)
             }
         } onCancel: {
             Task { @MainActor [weak self] in
-                self?.cancelBufferedPresentationRequest(id: requestID)
+                guard self?.bufferedPresentationRequest === request else { return }
+                self?.bufferedPresentationRequest = nil
+                request.resume()
             }
         }
     }
@@ -64,16 +59,9 @@ extension RouterEngine {
             isPresentationRequestInProgress = false
             return
         }
-
         bufferedPresentationRequest = nil
-        // Keep the pipeline reserved until the granted caller resumes. A newer caller
-        // must buffer instead of overtaking the request whose turn has just been granted.
-        request.continuation.resume(returning: true)
-    }
-
-    private func cancelBufferedPresentationRequest(id: UUID) {
-        guard let request = bufferedPresentationRequest, request.id == id else { return }
-        bufferedPresentationRequest = nil
-        request.continuation.resume(returning: false)
+        // Keep admission reserved across the wake-up so another caller cannot
+        // overtake the granted waiter before it resumes and checks its own state.
+        request.resume(true)
     }
 }

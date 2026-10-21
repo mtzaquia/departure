@@ -22,201 +22,121 @@
 
 import Foundation
 
-/// Identifies one SwiftUI presentation-host installation independently of declaration value equality.
 struct RoutePresentationHostID: Hashable, Sendable {
     private let value = UUID()
 }
 
-/// Type-erased route presentation metadata and an optional destination binding.
+/// One route occurrence in a map, with presentation metadata and child definitions.
 ///
-/// Equality includes the destination builder's identity. Copies of one ``RouteDestination``
-/// preserve that identity; independently created builders remain distinct even for the same
-/// route type and presentation style. Presentation-host installation identity is excluded.
-public struct AnyRouteDeclaration: Sendable, Hashable {
-    enum Kind: Hashable, Sendable {
-        case push
-        case replace
-        case sheet(priority: RoutePriority, providesNavigation: Bool)
-        case cover(priority: RoutePriority, transition: Cover.Transition, providesNavigation: Bool)
-    }
-
+/// A declaration can describe a route type without supplying a destination builder.
+public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
+    let identity: UUID
     let routeType: any Route.Type
-    let kind: Kind
-    let drivesPresentation: Bool
+    let presentation: RoutePresentation
+    let scopeID: AnyHashable?
+    let children: [RouteScopeDeclaration]
+    let childScope: RouteDefinitions?
     let destination: AnyRouteDestination?
-    /// Internal presentation provenance; deliberately excluded from public value equality and hashing.
-    let presentationHostID: RoutePresentationHostID?
 
-    init(
-        routeType: any Route.Type,
-        kind: Kind,
-        drivesPresentation: Bool = true,
-        destination: AnyRouteDestination? = nil,
-        presentationHostID: RoutePresentationHostID? = nil
-    ) {
-        self.routeType = routeType
-        self.kind = kind
-        self.drivesPresentation = drivesPresentation
+    init(_ route: any Route.Type, presentation: RoutePresentation, id: AnyHashable? = nil, children: [RouteScopeDeclaration] = []) {
+        precondition(presentation.style.isModal || presentation.priority == .default,
+                     "Only modal declarations can start a priority space.")
+        identity = UUID()
+        routeType = route
+        self.presentation = presentation
+        scopeID = id
+        self.children = children
+        childScope = nil
+        destination = nil
+    }
+
+    private init(copy: Self, destination: AnyRouteDestination?, presentation: RoutePresentation? = nil, identity: UUID? = nil, childScope: RouteDefinitions? = nil) {
+        self.identity = identity ?? copy.identity
+        routeType = copy.routeType
+        self.presentation = presentation ?? copy.presentation
+        scopeID = copy.scopeID
+        children = copy.children
+        self.childScope = childScope ?? copy.childScope
         self.destination = destination
-        self.presentationHostID = presentationHostID
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.routeType == rhs.routeType
-        && lhs.kind == rhs.kind
-        && lhs.drivesPresentation == rhs.drivesPresentation
-        && lhs.destination.map(ObjectIdentifier.init) == rhs.destination.map(ObjectIdentifier.init)
+    func compiled(destinations: RouteDestinationBindings) -> Self {
+        Self(copy: self, destination: destinations.binding(for: routeType)?.declaration,
+             identity: UUID(), childScope: RouteDefinitions(children, id: scopeID, destinations: destinations))
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(ObjectIdentifier(routeType))
-        hasher.combine(kind)
-        hasher.combine(drivesPresentation)
-        hasher.combine(destination.map(ObjectIdentifier.init))
+    func withPriority(_ priority: RoutePriority) -> Self {
+        precondition(presentation.style.isModal || priority == .default,
+                     "Root priority builders accept only modal presentations.")
+        return Self(copy: self, destination: destination, presentation: .init(style: presentation.style, priority: priority))
     }
+
+    public var _routeDeclarations: [AnyRouteDeclaration] { [self] }
+    public static func == (lhs: Self, rhs: Self) -> Bool { lhs.identity == rhs.identity }
+    public nonisolated func hash(into hasher: inout Hasher) { hasher.combine(identity) }
+
+    var priority: RoutePriority { presentation.priority }
+    var presentationKind: RoutePresentationKind { presentation.style }
 }
 
-enum RoutePresentationKind: Hashable, Sendable {
-    case push
-    case replace
-    case sheet
-    case cover(Cover.Transition)
+typealias RoutePresentationKind = RoutePresentation.Style
 
-    var isModal: Bool {
-        switch self {
-        case .push, .replace: false
-        case .sheet, .cover: true
-        }
-    }
+/// Priority of a presentation. Elevated presentations are anchored at the routing root.
+public enum RoutePriority: Int, Comparable, Hashable, Sendable {
+    /// The permanent application flow, covered while an elevated space exists.
+    case `default`
+    /// A modal space presented above the default flow.
+    case high
+    /// The highest-priority modal space.
+    case critical
+    public nonisolated static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 
-extension AnyRouteDeclaration {
-    var priority: RoutePriority {
-        switch kind {
-        case .push, .replace: .normal
-        case let .sheet(priority, _), let .cover(priority, _, _): priority
-        }
-    }
-
-    var presentationKind: RoutePresentationKind {
-        switch kind {
-        case .push: .push
-        case .replace: .replace
-        case .sheet: .sheet
-        case let .cover(_, transition, _): .cover(transition)
-        }
-    }
-
-    var providesNavigation: Bool {
-        switch kind {
-        case .push, .replace: false
-        case let .sheet(_, providesNavigation), let .cover(_, _, providesNavigation):
-            providesNavigation
-        }
-    }
-
-    func drivingPresentation(_ value: Bool) -> Self {
-        .init(
-            routeType: routeType,
-            kind: kind,
-            drivesPresentation: value,
-            destination: destination,
-            presentationHostID: presentationHostID
-        )
-    }
-
-    func hosted(by presentationHostID: RoutePresentationHostID) -> Self {
-        .init(
-            routeType: routeType,
-            kind: kind,
-            drivesPresentation: drivesPresentation,
-            destination: destination,
-            presentationHostID: presentationHostID
-        )
-    }
-}
-
-extension [AnyRouteDeclaration] {
-    func drivingPresentation(_ value: Bool) -> Self {
-        map { $0.drivingPresentation(value) }
-    }
-
-    func hosted(by presentationHostID: RoutePresentationHostID) -> Self {
-        map { $0.hosted(by: presentationHostID) }
-    }
-}
-
-/// A group of route declarations attached to a route scope.
+/// A declaration group in a map. Branch groups preserve their own child definitions.
 public struct RouteScopeDeclaration: Sendable, Hashable {
-    let branch: AnyHashable?
-    let routes: [AnyRouteDeclaration]
-
+    enum Content: Sendable, Hashable {
+        case scopeID(AnyHashable)
+        case routes([AnyRouteDeclaration])
+        case destinations([AnyRouteDestination])
+        case branch(AnyHashable, children: [RouteScopeDeclaration])
+        case branches(concurrent: Bool, children: [RouteScopeDeclaration])
+    }
+    let content: Content
+    var branch: AnyHashable? {
+        if case let .branch(value, _) = content { return value }
+        return nil
+    }
+    var routes: [AnyRouteDeclaration] {
+        if case let .routes(routes) = content { return routes }
+        return []
+    }
     init(routes: [AnyRouteDeclaration]) {
-        self.branch = nil
-        self.routes = routes
+        content = .routes(routes)
     }
-
-    init(branch: AnyHashable?, routes: [AnyRouteDeclaration]) {
-        self.branch = branch
-        self.routes = routes
+    init(destinations: [AnyRouteDestination]) {
+        content = .destinations(destinations)
     }
-
-    init<Branch: Hashable>(branch: Branch, routes: [AnyRouteDeclaration]) {
-        self.branch = AnyHashable(branch)
-        self.routes = routes
+    init<Selection: Hashable>(branch: Selection, children: [RouteScopeDeclaration]) {
+        content = .branch(AnyHashable(branch), children: children)
     }
-}
-
-extension [RouteScopeDeclaration] {
-    func containsPresentationKind(_ kind: RoutePresentationKind) -> Bool {
-        flatMap(\.routes).contains {
-            $0.drivesPresentation && $0.presentationKind == kind
-        }
+    init(branches: [RouteScopeDeclaration], concurrent: Bool) {
+        content = .branches(concurrent: concurrent, children: branches)
     }
-
-    func hosted(by presentationHostID: RoutePresentationHostID) -> Self {
-        map {
-            RouteScopeDeclaration(
-                branch: $0.branch,
-                routes: $0.routes.hosted(by: presentationHostID)
-            )
+    init(scopeID: AnyHashable) {
+        content = .scopeID(scopeID)
+    }
+    func withPriority(_ priority: RoutePriority) -> Self {
+        switch content {
+        case .routes(let routes):
+            return Self(routes: routes.map { $0.withPriority(priority) })
+        case .destinations:
+            return self
+        default:
+            preconditionFailure("Root priority groups accept only modal route declarations.")
         }
     }
 }
 
-/// A value accepted by ``SwiftUICore/View/routes(id:_:)``.
-///
-/// ``Push``, ``Replace``, ``Sheet``, and ``Cover`` conform to this protocol.
 public protocol RouteDeclaration {
     var _routeDeclarations: [AnyRouteDeclaration] { get }
-}
-
-/// Presentation priority for ``Sheet`` and ``Cover`` declarations.
-///
-/// ```swift
-/// Cover(LoginRoute.self, priority: .high)
-/// ```
-public enum RoutePriority: Int, Comparable, Hashable, Sendable {
-    /// Presents from the declaring scope.
-    ///
-    /// - Important: Normal-priority requests are ignored while an elevated-priority presentation is
-    ///   active, unless they are declared inside that presentation.
-    case normal
-
-    /// Presents above normal-priority routes.
-    ///
-    /// - Important: High-priority requests from normal content replace the active high-priority
-    ///   presentation. From inside an equal-or-higher-priority presentation, they behave as local
-    ///   navigation.
-    case high
-
-    /// Presents above high-priority routes.
-    ///
-    /// - Important: Critical-priority requests replace an active critical-priority presentation
-    ///   when matched outside it. From inside that presentation, they behave as local navigation.
-    case critical
-
-    public static func < (lhs: Self, rhs: Self) -> Bool {
-        lhs.rawValue < rhs.rawValue
-    }
 }

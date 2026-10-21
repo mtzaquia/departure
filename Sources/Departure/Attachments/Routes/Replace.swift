@@ -20,43 +20,29 @@
 //  SOFTWARE.
 //
 
-/// Declares a route that replaces the declaring view’s content in place.
-///
-/// In a ``Branch`` map, replaces that branch’s selected destination and clears
-/// its descendant navigation. Other branches retain their paths. The destination
-/// does not create a Back entry; it can still declare pushes inside a surrounding
-/// SwiftUI `NavigationStack`.
-///
-/// ```swift
-/// Branch(AppColumn.detail) { Replace(MessageRoute.self) }
-/// ```
-///
-/// Use the contextual ``UnwindRouteAction`` or unwind to the nearest branch to
-/// clear the selection and reveal the original content. Requests use normal
-/// priority and retain the existing route discovery and branch activation rules.
+import Foundation
+
+/// Declares a route presented as a replacement, with optional child definitions.
 public struct Replace: RouteDeclaration, Sendable {
     let declaration: AnyRouteDeclaration
 
-    /// Creates an in-place replacement declaration.
-    /// - Parameter routeType: The destination to select in the declaring view’s slot.
-    public init<R: Route>(_ routeType: R.Type) {
-        self.declaration = AnyRouteDeclaration(routeType: routeType, kind: .replace)
-    }
-
-    /// Binds a feature destination to an in-place replacement declaration.
+    /// Declares a route type and its child definitions without a destination builder.
     ///
-    /// - Parameter destination: The typed builder used for this declaration.
+    /// Requests matching this declaration report a diagnostic and leave navigation
+    /// unchanged while it has no destination. Lookup does not fall back to another
+    /// declaration of the same route type.
+    ///
+    /// - Parameters:
+    ///   - route: The route type available at this map location.
+    ///   - id: An explicit name for the destination's scope.
+    ///   - children: The navigation available from this destination.
     public init<R: Route>(
-        _ destination: RouteDestination<R>
+        _ route: R.Type,
+        id: AnyHashable? = nil,
+        @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        self.declaration = AnyRouteDeclaration(
-            routeType: R.self,
-            kind: .replace,
-            destination: destination.destination
-        )
+        declaration = AnyRouteDeclaration(route, presentation: .init(style: .replace, priority: .default), id: id, children: children())
     }
 
-    public var _routeDeclarations: [AnyRouteDeclaration] {
-        [declaration]
-    }
+    public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }

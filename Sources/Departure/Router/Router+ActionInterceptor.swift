@@ -44,7 +44,7 @@ extension RouterEngine {
         logsStart: Bool = true,
         origin: RouteRequestOrigin? = nil
     ) async throws -> A.Output {
-        guard let source = resolveRequestOrigin(origin)?.scope else { throw CancellationError() }
+        guard let source = navigationSource(origin) else { throw CancellationError() }
         do {
             let currentRoute: (any Route.Type)? = source.currentRoute.map { type(of: $0) }
             if logsStart {
@@ -63,17 +63,16 @@ extension RouterEngine {
                 log.departureDebug(.actionRerouteRequested(action: action, route: route))
                 Task {
                     let sourceScope = source
-                    let continuationOwner = origin == nil ? nil : (nearestBranchPath(from: source)?.owner ?? root)
-                    await requestRouteWhenReady(route, origin: origin)
-                    let targetScope = continuationOwner?.activeLocalScope ?? currentRouteScope
+                    guard let targetScope = await requestRouteWhenReady(route, origin: origin),
+                          isNavigationEligible(targetScope) else { return }
 
                     if targetScope !== sourceScope || targetScope.isInstalledInView {
-                        await waitForRouteScopeToInstall(targetScope)
+                        guard await targetScope.waitUntilInstalled(in: self) else { return }
                     }
 
-                    await performAction(action, hasRerouted: true, origin: continuationOwner.map { RouteRequestOrigin(scope: $0.activeLocalScope) })
+                    await performAction(action, hasRerouted: true, origin: RouteRequestOrigin(scope: targetScope))
                 }
-                
+
                 throw CancellationError()
 
             case let .invocationError(error):
@@ -85,13 +84,9 @@ extension RouterEngine {
 }
 
 private extension RouterEngine {
-    func waitForRouteScopeToInstall(_ routeScope: RouteScope) async {
-        await routeScope.ledger.waitUntilInstalled()
-    }
-
     func performAction<A: Action>(_ action: A, hasRerouted: Bool, origin: RouteRequestOrigin? = nil) async {
-        guard let source = resolveRequestOrigin(origin)?.scope else { return }
-        if let binding = source.hookBinding(for: .actionInterceptor(ObjectIdentifier(A.self))) {
+        guard let source = navigationSource(origin) else { return }
+        if let binding = source.hookBinding(for: .actionInterceptor(ObjectIdentifier(A.self)), in: spaces) {
             guard let interceptor = binding.declaration?.interceptor(for: A.self) else { return }
             log.departureDebug(.actionIntercepted(action: action, scope: source))
             await interceptor.invoke(self, action, hasRerouted, origin)

@@ -20,46 +20,24 @@
 //  SOFTWARE.
 //
 
-import Foundation
-
-/// Groups declarations under a branch selection value.
-///
-/// Use ``Branch`` inside ``SwiftUICore/View/routes(id:branch:concurrent:_:)`` so routes are discoverable even when
-/// a branch view has not been built yet.
-///
-/// ```swift
-/// TabView(selection: $tab) {
-///     HomeView()
-///         .routeBranch(AppTab.home)
-/// }
-/// .routes(branch: $tab) {
-///     Branch(AppTab.home) {
-///         Push(DetailRoute.self)
-///     }
-/// }
-/// ```
-///
-/// - Important: Declarations inside ``Branch`` are discovery-only until a matching
-///   ``SwiftUICore/View/routeBranch(_:)`` adopts them.
-public struct Branch<Selection: Hashable>: Sendable where Selection: Sendable {
+/// Definitions for a named child scope.
+public struct Branch<Selection: Hashable & Sendable>: Sendable {
     let selection: Selection
     let declarations: [RouteScopeDeclaration]
-
-    /// Creates a branch declaration group.
-    public init(
-        _ selection: Selection,
-        @RouteDeclarationBuilder declarations: () -> [RouteScopeDeclaration]
-    ) {
+    public init(_ selection: Selection, @RouteDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration]) {
         self.selection = selection
         self.declarations = declarations()
     }
+    var routeScopeDeclarations: [RouteScopeDeclaration] { [.init(branch: selection, children: declarations)] }
+}
 
-    var routeScopeDeclarations: [RouteScopeDeclaration] {
-        declarations.map { declaration in
-            RouteScopeDeclaration(
-                branch: selection,
-                routes: declaration.routes.drivingPresentation(false)
-            )
-        }
+/// Branches have independent paths and share the enclosing modal lane.
+public struct Branches: Sendable {
+    let declarations: [RouteScopeDeclaration]
+    /// Creates independent branch paths with optional concurrent participation.
+    /// Put push, replace, sheet, and cover declarations beside this group in its map.
+    /// A receiving scope accepts exactly one group, including through composed maps.
+    public init(concurrent: Bool = false, @BranchDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration]) {
+        self.declarations = [.init(branches: declarations(), concurrent: concurrent)]
     }
 }

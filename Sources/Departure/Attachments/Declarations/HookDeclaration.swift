@@ -39,22 +39,6 @@ public protocol HookDeclaration {
 
 // MARK: - Internal helpers
 
-enum HookDeclarationBinding {
-    case declared(AnyHookDeclaration)
-    case conflict(AnyHookDeclaration)
-
-    var candidate: AnyHookDeclaration {
-        switch self {
-        case let .declared(declaration), let .conflict(declaration): declaration
-        }
-    }
-
-    var declaration: AnyHookDeclaration? {
-        guard case let .declared(declaration) = self else { return nil }
-        return declaration
-    }
-}
-
 enum HookDeclarationIdentity: Hashable {
     case actionInterceptor(ObjectIdentifier)
     case unwindHandler(ObjectIdentifier, payload: ObjectIdentifier? = nil)
@@ -68,6 +52,16 @@ extension AnyHookDeclaration {
 
         case let .unwindHandler(routeType, handler):
             .unwindHandler(ObjectIdentifier(routeType), payload: handler.payloadType.map(ObjectIdentifier.init))
+        }
+    }
+
+    var description: String {
+        switch kind {
+        case let .actionInterceptor(actionType, _):
+            "ActionInterceptor<\(String(reflecting: actionType))>"
+        case let .unwindHandler(routeType, handler):
+            "UnwindHandler<\(String(reflecting: routeType)), "
+                + "\(handler.payloadType.map { String(reflecting: $0) } ?? "payload-free")>"
         }
     }
 

@@ -30,30 +30,30 @@ final class RouterEngine: Identifiable, Equatable {
     /// Stable identity for this router instance.
     @ObservationIgnored let id = UUID()
 
-    var routeForest: RouteForest
+    @ObservationIgnored private var isConfigured = false
+#if DEBUG
+    @ObservationIgnored private(set) var hasTracedMapAdoption = false
+#endif
+
+    var spaces: RouteSpaces
 
     @ObservationIgnored
-    var pendingRoute: PendingRoute?
+    var pendingRoute: PendingNavigation?
 
-    @ObservationIgnored
-    var isPresentationRequestInProgress = false
+    @ObservationIgnored var isPresentationRequestInProgress = false
+    @ObservationIgnored var bufferedPresentationRequest: PendingNavigation.Request?
 
-    @ObservationIgnored
-    var bufferedPresentationRequest: BufferedPresentationRequest?
+    /// Operations retain their outgoing projections until native teardown completes.
+    var navigationOperations: [NavigationOperation] = []
 
-    var unwindPresentationSnapshot: UnwindPresentationSnapshot?
+    var isNavigating: Bool { !navigationOperations.isEmpty }
 
-    @ObservationIgnored
-    var navigationTransaction = NavigationTransaction()
-
-    @ObservationIgnored
-    var deliveredUnwindHandlers: [UnwindHandlerDeliveryKey: DeliveredUnwindHandler] = [:]
+    var hasOutgoingPresentations: Bool {
+        navigationOperations.contains { !$0.outgoing.isEmpty }
+    }
 
     @ObservationIgnored
     var routeGraphMutationDepth = 0
-
-    @ObservationIgnored
-    private(set) var didWarnAboutUnscopedRouter = false
 
     @ObservationIgnored
     var ios17NavigationStackPushWorkaround: (any IOS17NavigationStackPushWorkaroundHandling)? =
@@ -62,68 +62,80 @@ final class RouterEngine: Identifiable, Equatable {
     @ObservationIgnored
     var windowDestinationBuilder = WindowDestinationBuilder.passthrough
 
-    var activeRouteScopeID: ObjectIdentifier
+    var activeRouteScopeID: ObjectIdentifier { ObjectIdentifier(currentRouteScope) }
 
     var root: RouteScope {
-        routeForest.normalTree.root
+        spaces.defaultSpace.root
     }
 
-    var normalTree: RouteTree {
-        routeForest.normalTree
+    var defaultSpace: RouteSpace {
+        spaces.defaultSpace
     }
 
     var currentRouteScope: RouteScope {
-        routeForest.activeTree.currentRouteScope
-    }
-
-    func warnAboutUnscopedRouterIfNeeded() {
-        guard didWarnAboutUnscopedRouter == false else { return }
-        didWarnAboutUnscopedRouter = true
-        log.departureWarning(.unscopedRouterUsed)
+        spaces.activeSpace.currentRouteScope
     }
 
     /// Creates an empty router.
-    init() {
+    init(routes: RootRouteMap? = nil) {
         let root = RouteScope(id: UUID(), route: nil)
-        let rootPath = RoutePath(owner: root)
-        let normalTree = RouteTree(priority: .normal, root: root, rootPath: rootPath)
-        self.routeForest = RouteForest(normalTree: normalTree)
-        self.activeRouteScopeID = normalTree.activeRouteScopeID
+        if let routes {
+            isConfigured = true
+            root.useDefinitions(RouteDefinitions(routes.scopeDeclarations, id: routes.scopeID))
+        }
+        let defaultSpace = RouteSpace(priority: .default, root: root)
+        self.spaces = RouteSpaces(defaultSpace: defaultSpace)
     }
+
+    func configureMap(_ map: RootRouteMap) {
+        guard !isConfigured else { return }
+        isConfigured = true
+        root.useDefinitions(RouteDefinitions(map.scopeDeclarations, id: map.scopeID))
+    }
+
+#if DEBUG
+    /// Logs the compiled map once after its WithRouter host actually appears.
+    @discardableResult
+    func traceMapAdoption() -> Bool {
+        guard !hasTracedMapAdoption, Departure.debug == .trace else { return false }
+        hasTracedMapAdoption = true
+        log.departureDebug(.mapAdopted(definitions: root.definitions, ownerID: id))
+        return true
+    }
+#endif
 
     /// Requests a route presentation.
     ///
-    /// Requests resolve and update routing state one at a time, retaining only the latest
-    /// waiting request. This method returns after the request completes or is superseded.
-    /// It does not wait for SwiftUI to mount or display the destination view.
+    /// Returns after insertion or reuse, including deferred parent-host staging, or when the
+    /// request ends without presentation. It does not wait for the destination view to mount.
     func present(_ route: any Route) async {
         await requestRouteWhenReady(route)
     }
 
-    /// Dismisses route scopes to an explicit target.
+    /// Applies an unwind policy relative to the current scope.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
     /// and any removed installed route scopes have left the view hierarchy.
     ///
-    /// - Parameter target: The target to unwind to.
-    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
+    /// - Parameter target: The policy to apply from the current scope.
+    /// - Returns: Whether the unwind request was accepted.
     @discardableResult
-    func unwind(to target: UnwindTarget) async -> Bool {
-        await unwindAndWait(to: target)
+    func unwind(_ target: UnwindTarget) async -> Bool {
+        await unwindAndWait(target)
     }
 
-    /// Dismisses route scopes to an explicit target, delivering a payload to a matching ``UnwindHandler``.
+    /// Applies an unwind policy and delivers a payload to a matching ``UnwindHandler``.
     ///
     /// This method returns after the unwind request has resolved, the router path has been updated,
     /// and any removed installed route scopes have left the view hierarchy.
     ///
     /// - Parameters:
-    ///   - target: The target to unwind to.
+    ///   - target: The policy to apply from the current scope.
     ///   - payload: A value delivered to a matching ``UnwindHandler``.
-    /// - Returns: `false` when no route can be unwound or an ``UnwindTarget/id(_:)`` target is not found.
+    /// - Returns: Whether the unwind request was accepted.
     @discardableResult
-    func unwind<Payload>(to target: UnwindTarget, payload: Payload) async -> Bool {
-        await unwindAndWait(to: target, payload: payload)
+    func unwind<Payload>(_ target: UnwindTarget, payload: Payload) async -> Bool {
+        await unwindAndWait(target, payload: payload)
     }
 
     /// Performs an action from the current route scope.
@@ -137,37 +149,6 @@ final class RouterEngine: Identifiable, Equatable {
 }
 
 extension RouterEngine {
-    struct NavigationTransaction {
-        struct Token: Hashable {
-            let id = UUID()
-
-            static func == (lhs: Self, rhs: Self) -> Bool {
-                lhs.id == rhs.id
-            }
-
-            func hash(into hasher: inout Hasher) {
-                hasher.combine(id)
-            }
-        }
-
-        private var activeTokens: Set<Token> = []
-
-        var isInProgress: Bool {
-            activeTokens.isEmpty == false
-        }
-
-        mutating func begin() -> Token {
-            let token = Token()
-            activeTokens.insert(token)
-            return token
-        }
-
-        @discardableResult
-        mutating func finish(_ token: Token) -> Bool {
-            activeTokens.remove(token) != nil
-        }
-    }
-
     func mutateRouteGraph(_ mutation: () -> Void) {
         routeGraphMutationDepth += 1
         mutation()
@@ -175,24 +156,39 @@ extension RouterEngine {
 
         if routeGraphMutationDepth == 0 {
             ios17NavigationStackPushWorkaround?.routeGraphDidMutate(in: self)
-            reconcileActiveRouteScopeID()
             #if DEBUG
-            routeForest.validateInvariants()
+            spaces.validateInvariants()
             #endif
         }
     }
 
-    /// Resolves a command's captured origin; an absent origin is the internal
-    /// current-scope lookup used by engine operations.
-    func resolveRequestOrigin(_ origin: RouteRequestOrigin?) -> RouteRequestOrigin.Target? {
-        if let origin { return origin.resolve(in: routeForest) }
-        return .scope(currentRouteScope)
+    func isNavigationEligible(_ scope: RouteScope) -> Bool {
+        scope.belongs(to: spaces.activeSpace)
     }
 
-    private func reconcileActiveRouteScopeID() {
-        let routeScopeID = routeForest.activeTree.activeRouteScopeID
-        if activeRouteScopeID != routeScopeID {
-            activeRouteScopeID = routeScopeID
+    func synchronizeBranchSelection(ownedBy owner: RoutePresentationHostID, in scope: RouteScope, restoring: Bool = false) {
+        guard spaces.routePath(containing: scope) != nil else { return }
+        guard !restoring, let selection = scope.branchSelection(ownedBy: owner) else {
+            scope.restoreBranchSelection()
+            return
         }
+        guard isNavigationEligible(scope) else {
+            _ = selection.setValue(scope.activeBranch)
+            return
+        }
+        scope.bindBranchSelection(selection)
     }
+
+    func navigationSource(_ origin: RouteRequestOrigin?) -> RouteScope? {
+        guard let scope = resolveRequestOrigin(origin), isNavigationEligible(scope) else { return nil }
+        return scope
+    }
+
+    /// Resolves a command's captured origin; an absent origin is the internal
+    /// current-scope lookup used by engine operations.
+    func resolveRequestOrigin(_ origin: RouteRequestOrigin?) -> RouteScope? {
+        if let origin { return origin.resolve(in: spaces) }
+        return currentRouteScope
+    }
+
 }

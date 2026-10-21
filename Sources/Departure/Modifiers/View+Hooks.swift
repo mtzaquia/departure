@@ -26,11 +26,12 @@ import SwiftUI
 public extension View {
     /// Declares hooks for the current route scope.
     ///
-    /// Multiple modifiers in one scope combine their hooks. Updating or removing a
-    /// modifier changes only its own declarations. Duplicate hooks report a warning
-    /// and are disabled until only one declaration remains. Interceptors are keyed
-    /// by action type; unwind handlers by route and expected payload type, with a
-    /// separate key for payload-free handlers.
+    /// Multiple modifiers in one scope compose distinct action-interceptor and unwind-handler keys.
+    /// Updating or removing a modifier changes only its own declarations and captured callbacks.
+    /// Interceptors are keyed by action type; unwind handlers by route and expected payload type,
+    /// with a separate key for payload-free handlers. Duplicate keys disable that hook and report
+    /// a warning until only one declaration remains. Hooks stop participating when their scope
+    /// leaves navigation, including while an outgoing view is retained for dismissal.
     ///
     /// ```swift
     /// DetailView()
@@ -62,9 +63,9 @@ private struct HooksModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onLifecycleEvent { lifecycleView, lifecycleID, event in
+            .onLifecycleEvent { lifecycleView, id, event in
                 let sourceID = attachment.id
-                attachment.handle(event, id: lifecycleID, target: routeScope, view: lifecycleView,
+                attachment.handle(event, id: id, target: routeScope, view: lifecycleView,
                     apply: { $0.installHookDeclarations(sourceID: sourceID, hookDeclarations: declarations) },
                     remove: { $0.uninstallHookDeclarations(sourceID: sourceID) })
             }

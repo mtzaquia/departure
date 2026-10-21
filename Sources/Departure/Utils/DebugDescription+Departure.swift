@@ -69,19 +69,18 @@ extension AnyRouteDeclaration {
     var departureDebugDescription: String {
         let presentationDescription: String
 
-        switch kind {
+        switch presentation.style {
         case .push:
             presentationDescription = "push"
         case .replace:
             presentationDescription = "replace"
-        case let .sheet(priority, _):
+        case .sheet:
             presentationDescription = "sheet@\(priority)"
-        case let .cover(priority, transition, _):
+        case let .cover(transition):
             presentationDescription = "cover.\(transition)@\(priority)"
         }
 
-        let drivesPresentationDescription = drivesPresentation ? "" : ", discovery"
-        return "\(departureDebugName(for: routeType))[\(presentationDescription)\(drivesPresentationDescription)]"
+        return "\(departureDebugName(for: routeType))[\(presentationDescription)]"
     }
 }
 
@@ -95,11 +94,9 @@ extension RouteScope {
             return "routeScope#\(id.departureDebugDescription)(\(route.departureDebugDescription))"
         }
 
-        #if DEBUG
-        if debugKind == .branch {
+        if branchID != nil {
             return "branchScope#\(id.departureDebugDescription)"
         }
-        #endif
 
         let branchDescription = isFlatScope ? "" : ", active=\(activeBranch.departureDebugDescription)"
         return "rootScope#\(id.departureDebugDescription)\(branchDescription)"
@@ -110,11 +107,11 @@ extension RouteScope {
             return nil
         }
 
-        return "[\(declarations.branchIDs.map(\.departureDebugDescription).joined(separator: ", "))]"
+        return "[\(branchScopes.keys.map(\.departureDebugDescription).joined(separator: ", "))]"
     }
 
     private var isFlatScope: Bool {
         branchContainer == nil
-        || declarations.branchIDs == [activeBranch]
+        || branchScopes.keys == [activeBranch]
     }
 }

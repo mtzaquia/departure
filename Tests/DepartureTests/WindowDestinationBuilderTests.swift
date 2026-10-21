@@ -61,7 +61,7 @@ private struct RecordingWindowDestinationView: View {
 @Suite
 struct WindowDestinationBuilderTests {
     @Test func withRouterDefaultWindowDestinationBuildsRouteDestination() {
-        let host = WithRouter {
+        let host = WithRouter(routes: RootRouteMap {}) {
             Text("Root")
         }
 
@@ -70,16 +70,9 @@ struct WindowDestinationBuilderTests {
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "source"
 
-        let route = PresentedRoute(
-            scope: RouteScope(id: RootRoute().id, route: RootRoute()),
-            declaration: Push(RootRoute.self)._routeDeclarations[0]
-        )
+        let route = PresentedRoute(scope: RouteScope(id: RootRoute().id, route: RootRoute()))
         let snapshot = RouteDestinationSnapshot(
-            route: PresentedRoute(
-                scope: route.scope,
-                declaration: route.declaration,
-                sourceEnvironment: environment
-            ),
+            route: PresentedRoute(scope: route.scope, sourceEnvironment: environment),
             destinationBuilder: host.windowDestinationBuilder
         )
 
@@ -89,7 +82,7 @@ struct WindowDestinationBuilderTests {
     @Test func withRouterRegistersCustomWindowDestinationBuilderOnRouter() {
         let router = RouterEngine()
         let recorder = WindowDestinationRecorder()
-        let host = WithRouter(router: Router(engine: router, scope: router.root)) {
+        let host = WithRouter(routes: RootRouteMap {}, router: RootRouter(engine: router)) {
             Text("Root")
         } windowDestination: { destination, environment in
             RecordingWindowDestinationView(
@@ -100,11 +93,7 @@ struct WindowDestinationBuilderTests {
         }
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "redirected"
-        let route = PresentedRoute(
-            scope: RouteScope(id: RootRoute().id, route: RootRoute()),
-            declaration: Push(RootRoute.self)._routeDeclarations[0],
-            sourceEnvironment: environment
-        )
+        let route = PresentedRoute(scope: RouteScope(id: RootRoute().id, route: RootRoute()), sourceEnvironment: environment)
 
         _ = RouteDestinationSnapshot(
             route: route,
@@ -120,13 +109,9 @@ struct WindowDestinationBuilderTests {
         let router = RouterEngine()
         let recorder = WindowDestinationRecorder()
 
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations),
-            ]
-        )
+        router.root.defineTestMap(id: nil, selection: nil, definitions: [
+                RouteScopeDeclaration(routes: testDeclaration(testDestination(LoginRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
+            ])
 
         await router.requestRoute(LoginRoute())
         let presentation = try #require(router.elevatedRoutePresentationBinding(
@@ -149,11 +134,7 @@ struct WindowDestinationBuilderTests {
         }
 
         _ = RouteDestinationSnapshot(
-            route: PresentedRoute(
-                scope: presentation.scope,
-                declaration: presentation.declaration,
-                sourceEnvironment: environment
-            ),
+            route: PresentedRoute(scope: presentation.scope, sourceEnvironment: environment),
             destinationBuilder: destinationBuilder
         )
 
@@ -165,14 +146,9 @@ struct WindowDestinationBuilderTests {
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "installed"
 
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations),
-            ],
-            sourceEnvironment: environment
-        )
+        router.root.defineTestMap(id: nil, selection: nil, definitions: [
+                RouteScopeDeclaration(routes: testDeclaration(testDestination(LoginRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
+            ], environment: environment)
 
         await router.requestRoute(LoginRoute())
         let presentation = try #require(router.elevatedRoutePresentationBinding(
@@ -185,9 +161,7 @@ struct WindowDestinationBuilderTests {
 
     @Test func elevatedPresentationRetainsSourceEnvironmentAfterOriginScopeIsReleased() throws {
         let router = RouterEngine()
-        let declaration = Cover(LoginRoute.self, priority: .high)._routeDeclarations[0]
-        let elevatedRoot = RouteScope(id: UUID(), route: nil)
-        let elevatedPath = RoutePath(owner: elevatedRoot)
+        let declaration = testDeclaration(testDestination(LoginRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations[0]
         let presentedScope = RouteScope(id: LoginRoute().id, route: LoginRoute())
         weak var releasedOrigin: RouteScope?
 
@@ -199,16 +173,9 @@ struct WindowDestinationBuilderTests {
             releasedOrigin = origin
 
             presentedScope.attachPresentation(to: origin, declaration: declaration)
-            elevatedPath.append(presentedScope)
-            router.routeForest.highTree = RouteTree(
+            router.spaces.highSpace = RouteSpace(
                 priority: .high,
-                root: elevatedRoot,
-                rootPath: elevatedPath,
-                elevatedOrigin: .init(
-                    scope: origin,
-                    declaration: declaration,
-                    sourceEnvironment: origin.sourceEnvironmentReference
-                )
+                root: presentedScope
             )
         }
 
@@ -233,14 +200,9 @@ struct WindowDestinationBuilderTests {
         var initialEnvironment = EnvironmentValues()
         initialEnvironment.windowDestinationTestValue = "initial"
 
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations),
-            ],
-            sourceEnvironment: initialEnvironment
-        )
+        router.root.defineTestMap(id: nil, selection: nil, definitions: [
+                RouteScopeDeclaration(routes: testDeclaration(testDestination(LoginRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
+            ], environment: initialEnvironment)
 
         await router.requestRoute(LoginRoute())
         let initialPresentation = try #require(router.elevatedRoutePresentationBinding(
@@ -255,14 +217,9 @@ struct WindowDestinationBuilderTests {
 
         var updatedEnvironment = EnvironmentValues()
         updatedEnvironment.windowDestinationTestValue = "updated"
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations),
-            ],
-            sourceEnvironment: updatedEnvironment
-        )
+        router.root.defineTestMap(id: nil, selection: nil, definitions: [
+                RouteScopeDeclaration(routes: testDeclaration(testDestination(LoginRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
+            ], environment: updatedEnvironment)
 
         let updatedPresentation = try #require(router.elevatedRoutePresentationBinding(
             priority: .high,
@@ -285,20 +242,13 @@ struct WindowDestinationBuilderTests {
             )
         }
         let routeDeclarations = [
-            RouteScopeDeclaration(
-                routes: Cover(LoginRoute.self, priority: .high)._routeDeclarations
-                    + Cover(AlertRoute.self, priority: .high)._routeDeclarations
-            ),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(LoginRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations
+                    + testDeclaration(testDestination(AlertRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
         ]
         var initialEnvironment = EnvironmentValues()
         initialEnvironment.windowDestinationTestValue = "initial"
 
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: nil,
-            routeDeclarations: routeDeclarations,
-            sourceEnvironment: initialEnvironment
-        )
+        router.root.defineTestMap(id: nil, selection: nil, definitions: routeDeclarations, environment: initialEnvironment)
 
         await router.requestRoute(LoginRoute())
         let initialPresentation = try #require(router.elevatedRoutePresentationBinding(
@@ -313,12 +263,7 @@ struct WindowDestinationBuilderTests {
 
         var replacementEnvironment = EnvironmentValues()
         replacementEnvironment.windowDestinationTestValue = "replacement"
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: nil,
-            routeDeclarations: routeDeclarations,
-            sourceEnvironment: replacementEnvironment
-        )
+        router.root.defineTestMap(id: nil, selection: nil, definitions: routeDeclarations, environment: replacementEnvironment)
 
         await router.requestRoute(AlertRoute())
         let replacementPresentation = try #require(router.elevatedRoutePresentationBinding(
@@ -336,19 +281,14 @@ struct WindowDestinationBuilderTests {
         #expect(recorder.values == ["initial", "replacement"])
     }
 
-    @Test func normalPresentationUsesDeclaringScopeSourceEnvironment() async throws {
+    @Test func defaultPresentationUsesDeclaringScopeSourceEnvironment() async throws {
         let router = RouterEngine()
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "declaring"
 
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Sheet(LoginRoute.self)._routeDeclarations),
-            ],
-            sourceEnvironment: environment
-        )
+        router.root.defineTestMap(id: nil, selection: nil, definitions: [
+                RouteScopeDeclaration(routes: testDeclaration(testDestination(LoginRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
+            ], environment: environment)
 
         await router.requestRoute(LoginRoute())
         let presentation = try #require(router.routePresentationBinding(
@@ -368,33 +308,23 @@ struct WindowDestinationBuilderTests {
         var branchEnvironment = EnvironmentValues()
         branchEnvironment.windowDestinationTestValue = "branch"
 
-        router.normalTree.rootPath.scopes = [landingScope]
-        landingScope.installRouteDeclarations(
-            id: RootRoute().id,
-            branchSelection: AnyRouteBranchSelection(selection),
-            routeDeclarations: BranchedRouteDeclarationBuilder<AppTab>.buildBlock(
-                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
-                    Sheet(MessageRoute.self)
+        router.defaultSpace.rootPath.replaceTestPath([landingScope])
+        landingScope.defineTestMap(id: RootRoute().id, selection: AnyRouteBranchSelection(selection), definitions: RouteDeclarationBuilder.buildBlock(
+                RouteDeclarationBuilder.buildExpression(
+                    testDeclaration(testDestination(MessageRoute.self), presentation: .init(style: .sheet, priority: .default))
                 ),
-                BranchedRouteDeclarationBuilder<AppTab>.buildExpression(
-                    Branch(.home) {
-                        Push(SettingsRoute.self)
-                    }
+                RouteDeclarationBuilder.buildExpression(
+                    Branches { Branch(AppTab.home) {
+                        testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default))
+                    } }
                 )
-            ),
-            sourceEnvironment: containerEnvironment
-        )
+            ), environment: containerEnvironment)
 
         let homeScope = RouteScope(id: AnyHashable(AppTab.home), route: nil)
-        homeScope.installRouteDeclarations(
-            id: AnyHashable(AppTab.home),
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Push(SettingsRoute.self)._routeDeclarations),
-            ],
-            sourceEnvironment: branchEnvironment
-        )
-        landingScope.registerBranchScope(homeScope, for: AppTab.home, sourceEnvironment: branchEnvironment)
+        homeScope.defineTestMap(id: AnyHashable(AppTab.home), selection: nil, definitions: [
+                RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations),
+            ], environment: branchEnvironment)
+        landingScope.attachTestBranch(homeScope, for: AppTab.home, environment: branchEnvironment)
 
         await router.requestRoute(SettingsRoute())
         await router.requestRoute(MessageRoute())
@@ -407,11 +337,11 @@ struct WindowDestinationBuilderTests {
         #expect(presentation.sourceEnvironment.windowDestinationTestValue == "container")
     }
 
-    @Test func normalSheetPresentationDoesNotUseWindowDestinationBuilder() async throws {
+    @Test func defaultSheetPresentationDoesNotUseWindowDestinationBuilder() async throws {
         let router = RouterEngine()
         let recorder = WindowDestinationRecorder()
 
-        let host = WithRouter {
+        let host = WithRouter(routes: RootRouteMap {}) {
             Text("Root")
         } windowDestination: { destination, environment in
             RecordingWindowDestinationView(
@@ -423,13 +353,9 @@ struct WindowDestinationBuilderTests {
 
         #expect(host.windowDestinationBuilder.hasWindowDestination)
 
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Sheet(SettingsRoute.self)._routeDeclarations),
-            ]
-        )
+        router.root.defineTestMap(id: nil, selection: nil, definitions: [
+                RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
+            ])
 
         await router.requestRoute(SettingsRoute())
         let presentation = try #require(router.routePresentationBinding(
@@ -437,51 +363,34 @@ struct WindowDestinationBuilderTests {
             matching: .sheet
         ).wrappedValue)
 
-        #expect(presentation.scope === router.normalTree.rootPath.last)
+        #expect(presentation.scope === router.defaultSpace.rootPath.last)
         #expect(recorder.values.isEmpty)
         _ = host
     }
 
     #if !canImport(UIKit)
-    @Test func elevatedBridgeUsesWindowDestinationBuilderOnMacOS() {
+    @Test func elevatedSnapshotUsesWindowDestinationBuilderOnMacOS() {
         let recorder = WindowDestinationRecorder()
         var environment = EnvironmentValues()
         environment.windowDestinationTestValue = "macOS elevated"
-        let presentation = PresentedRoute(
-            scope: RouteScope(id: SettingsRoute().id, route: SettingsRoute()),
-            declaration: Sheet(SettingsRoute.self, priority: .high)._routeDeclarations[0],
-            sourceEnvironment: environment
-        )
+        let presentation = PresentedRoute(scope: RouteScope(id: SettingsRoute().id, route: SettingsRoute()), sourceEnvironment: environment)
         let builder = WindowDestinationBuilder { destination, environment in
-            RecordingWindowDestinationView(
-                destination: destination, environment: environment, recorder: recorder
-            )
+            RecordingWindowDestinationView(destination: destination, environment: environment, recorder: recorder)
         }
-        let bridge = ElevatedPriorityPresentationWindowBridge(
-            priority: .high,
-            route: .constant(presentation),
-            sourceScenePhase: .active,
-            windowDestinationBuilder: builder
-        ) { snapshot, _ in
-            snapshot.destination
-        }
-
-        _ = bridge.body
+        let lifetime = NativePresentationLifetime()
+        lifetime.synchronize(presentation) { RouteDestinationSnapshot(route: $0, destinationBuilder: builder) }
+        #expect(lifetime.presentation?.id == presentation.id)
         #expect(recorder.values == ["macOS elevated"])
     }
     #endif
 
-    @Test func normalFadeCoverDestinationUsesWindowDestinationBuilder() async throws {
+    @Test func defaultFadeCoverDestinationUsesWindowDestinationBuilder() async throws {
         let router = RouterEngine()
         let recorder = WindowDestinationRecorder()
 
-        router.root.installRouteDeclarations(
-            id: nil,
-            branchSelection: nil,
-            routeDeclarations: [
-                RouteScopeDeclaration(routes: Cover(SettingsRoute.self, transition: .fade)._routeDeclarations),
-            ]
-        )
+        router.root.defineTestMap(id: nil, selection: nil, definitions: [
+                RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .cover(.fade), priority: .default))._routeDeclarations),
+            ])
 
         await router.requestRoute(SettingsRoute())
         let presentation = try #require(router.routePresentationBinding(
@@ -500,11 +409,7 @@ struct WindowDestinationBuilderTests {
         }
 
         _ = RouteDestinationSnapshot(
-            route: PresentedRoute(
-                scope: presentation.scope,
-                declaration: presentation.declaration,
-                sourceEnvironment: environment
-            ),
+            route: PresentedRoute(scope: presentation.scope, sourceEnvironment: environment),
             destinationBuilder: destinationBuilder
         )
 

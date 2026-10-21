@@ -1,65 +1,87 @@
 # Getting started
 
-Departure has three moving parts: a `Router`, route values, and declarations that say how a scope presents each route.
+Departure separates domain route data, feature destination builders, and a persistent map. Views connect presentation to their mapped scope.
 
-## Install the router
-
-Wrap the root of your app with `WithRouter`.
+## Define route data and a destination
 
 ```swift
-@main
-struct ExampleApp: App {
-  var body: some Scene {
-    WindowGroup {
-      WithRouter {
-        NavigationStack { HomeView() }
-      }
-    }
-  }
-}
-```
+import Departure
+import SwiftUI
 
-## Create and present a route
-
-A route carries a navigation request and its data. Bind it to a feature view using
-`RouteDestination`, declare that destination on the view that owns its presentation, then
-request the route from the environment router.
-
-```swift
-struct ProfileRoute: Route {
+struct ProfileRoute: Route, Equatable {
   let userID: String
 }
 
-struct HomeView: View {
-  @Environment(\.router) private var router
-  private static let profile = RouteDestination(ProfileRoute.self) { route, context in
-    ProfileView(userID: route.userID)
-  }
-
-  var body: some View {
-    Button("View profile") {
-      Task { await router.present(ProfileRoute(userID: "42")) }
-    }
-    .routes {
-      Push(Self.profile)
-    }
+@MainActor
+enum ProfileFeature {
+  static let destination = RouteDestination(ProfileRoute.self) { route, context in
+    ProfileView(userID: route.userID, close: context.unwindRoute)
   }
 }
 ```
 
-The environment router captures the view's scope. Keeping a copy preserves that origin;
-it does not follow whichever pane or tab becomes current later. After the scope leaves
-the routing graph, its router becomes inactive. Outside `WithRouter`, the environment
-router is inactive and commands do nothing.
+`RouteDestination` associates the route type with a view builder. The route can live in a Domain module; the feature imports it without adding a conformance or extension to the domain type.
 
-Use `Push` inside a `NavigationStack`. `Sheet` and `Cover` present modally and provide a navigation stack around their destination by default.
+## Compose the map
 
-`RouteDestination` is available on this development branch and is not yet in v2.1.0.
-Existing `Route.destination()` implementations and `RouteViewProviding` conformances are
-deprecated but remain functional. Route-type presentation declarations remain supported.
+```swift
+let profileRoutes = RouteMap {
+  Push(ProfileRoute.self)
+} destinations: {
+  ProfileFeature.destination
+}
 
-For an app split into Domain and Feature modules, define the route in Domain and its
-`RouteDestination` in the feature. See
-[Supply a view from a feature module](routing.md#supply-a-view-from-a-feature-module).
+let appRoutes = RootRouteMap {
+  profileRoutes
+  Sheet(SettingsRoute.self) {
+    Push(AdvancedSettingsRoute.self)
+  }
+} destinations: {
+  SettingsFeature.destination
+  SettingsFeature.advancedDestination
+}
+```
+
+A nested builder declares routes available in that destination's scope. Inserting a `RouteMap` contributes its definitions without introducing another scope. Definitions are fixed for the routing owner's lifetime; view rebuilds do not add or remove them.
+
+Feature maps can supply some or all of their destination builders. All contributions form one catalog for the complete root tree, and the root can supply missing destinations. Reusing the same destination value across maps is allowed. Distinct values for one route type conflict throughout the tree; no map overrides another. Binding runs when the root is installed, before views mount. Missing builders report diagnostics and block presentation through their declarations without changing navigation.
+
+## Bind views and request routes
+
+```swift
+WithRouter(routes: appRoutes) {
+  NavigationStack {
+    HomeView()
+      .routing()
+  }
+}
+
+// In HomeView:
+@Environment(\.router) private var router
+
+Button("View profile") {
+  Task { await router.present(ProfileRoute(userID: "42")) }
+}
+```
+
+`WithRouter` binds the root automatically. Every destination receives its own bound scope. For pushes, explicitly provide a `NavigationStack` and apply `.routing()` to its root content inside the stack. Automatic scope binding does not place presentation inside your navigation container.
+
+Use `.routing()` inside a custom container when it should own presentation or capture environment values applied within that container. It uses the same scope and takes precedence over automatic wiring.
+
+Sheets, covers, and replacements require a stack only when their content needs one. Departure never adds a navigation container to a destination.
+
+An environment router captures the view's scope. Stored copies retain that origin and become inactive when it leaves the graph. Outside `WithRouter`, commands do nothing.
+
+For deep links and notifications, keep an explicit owner and capture the default flow when issuing navigation:
+
+```swift
+@State private var rootRouter = RootRouter()
+WithRouter(routes: appRoutes, router: rootRouter) { HomeView() }
+await rootRouter.default.present(ProfileRoute(userID: "42"))
+```
+
+`RootRouter` owns the container. `Router` is a weak scope-bound handle; a saved copy does not retarget itself after suspension or removal.
+
+`default` captures the default flow even while a high or critical space covers it. That captured router rejects navigation and action dispatch while covered, protecting a lockscreen from external navigation. `current` captures the top space and carries that space's local authority.
 
 Next: [Routing](routing.md)

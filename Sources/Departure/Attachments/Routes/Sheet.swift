@@ -20,52 +20,29 @@
 //  SOFTWARE.
 //
 
-/// Declares a route as a sheet.
-///
-/// ```swift
-/// .routes {
-///     Sheet(SettingsRoute.self)
-///     Sheet(LoginRoute.self, priority: .high)
-/// }
-/// ```
+import Foundation
+
+/// Declares a route presented as a sheet, with optional child definitions.
 public struct Sheet: RouteDeclaration, Sendable {
     let declaration: AnyRouteDeclaration
 
-    /// Creates a sheet declaration.
+    /// Declares a route type and its child definitions without a destination builder.
     ///
-    /// - Important: Set `providesNavigation` to `false` when the route destination
-    ///   already provides its own navigation container.
-    public init<R: Route>(
-        _ routeType: R.Type,
-        priority: RoutePriority = .normal,
-        providesNavigation: Bool = true
-    ) {
-        self.declaration = AnyRouteDeclaration(
-            routeType: routeType,
-            kind: .sheet(priority: priority, providesNavigation: providesNavigation)
-        )
-    }
-
-    /// Binds a feature destination to a sheet declaration.
+    /// Requests matching this declaration report a diagnostic and leave navigation
+    /// unchanged while it has no destination. Lookup does not fall back to another
+    /// declaration of the same route type.
     ///
     /// - Parameters:
-    ///   - destination: The typed builder used for this declaration.
-    ///   - priority: The presentation priority, using the existing routing rules.
-    ///   - providesNavigation: Whether Departure wraps the view in a `NavigationStack`.
-    ///     Defaults to `true`, matching the route-type initializer.
+    ///   - route: The route type available at this map location.
+    ///   - id: An explicit name for the destination's scope.
+    ///   - children: The navigation available from this destination.
     public init<R: Route>(
-        _ destination: RouteDestination<R>,
-        priority: RoutePriority = .normal,
-        providesNavigation: Bool = true
+        _ route: R.Type,
+        id: AnyHashable? = nil,
+        @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        self.declaration = AnyRouteDeclaration(
-            routeType: R.self,
-            kind: .sheet(priority: priority, providesNavigation: providesNavigation),
-            destination: destination.destination
-        )
+        declaration = AnyRouteDeclaration(route, presentation: .init(style: .sheet, priority: .default), id: id, children: children())
     }
 
-    public var _routeDeclarations: [AnyRouteDeclaration] {
-        [declaration]
-    }
+    public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
 }

@@ -1,196 +1,152 @@
 # Routing
 
-Declare each route on the scope that should present it.
+A map describes where route values can be presented. `router.present(...)` resolves the value, finds the nearest eligible declaration, and coordinates the transition.
 
-```swift
-.routes {
-  Push(ProfileRoute.self)
-  Sheet(SettingsRoute.self)
-  Cover(OnboardingRoute.self)
-}
-```
-
-`router.present(...)` starts at the scope captured by that router and uses the closest matching declaration in its branch or enclosing scopes. If the current branch has no match, discovery crawls up to container `Branch(...)` declarations and automatically selects the branch owning the match, including a branch whose view has not been built yet. It does not search arbitrary destination scopes inside sibling stacks. The same route type may be declared in more than one scope; the nearest owner wins. Use `router.branch(...)` to explicitly choose a branch when needed. If no eligible scope owns the route, nothing is presented.
-
-Requests sharing a routing container resolve and update routing state one at a time, including requests sent from separate `Task` closures or different scoped routers. While a request is in progress, the router retains one waiting request; a newer waiting request replaces it. Superseded callers return without resolving or presenting their routes. Requests waiting for an unwind to finish also retain only the latest request.
-
-`await router.present(...)` returns when that request completes or is superseded. It does not wait for SwiftUI to mount the destination or finish its presentation animation. Send consecutive requests from the same task when their order matters:
-
-```swift
-await router.present(ProfileRoute(userID: "42"))
-await router.present(SettingsRoute())
-```
-
-## Supply a view from a feature module
-
-A route can live in a top-level Domain module without depending on its feature view. Omit
-`destination()` from the route declaration:
+## Supply a destination from a feature
 
 ```swift
 // Domain module
 import Departure
-
 public struct SettingsRoute: Route {
   public init() {}
 }
-```
 
-The feature module imports Domain and binds the route to a view:
-
-```swift
 // SettingsFeature module
 import Departure
 import Domain
 import SwiftUI
 
-let settings = RouteDestination(SettingsRoute.self) { route, context in
-  SettingsView()
-}
-
-// On the owning view:
-.routes {
-  Sheet(settings)
+@MainActor
+public enum SettingsFeature {
+  public static let destination = RouteDestination(SettingsRoute.self) { _, context in
+    SettingsView(close: context.unwindRoute)
+  }
 }
 ```
 
-`Push`, `Replace`, `Sheet`, and `Cover` infer the route type from the destination value.
-Requests still use domain instances: `await router.present(SettingsRoute())`. Builders can
-capture feature dependencies, and the same route type can have different builders in
-different declaration scopes. The matched declaration selects the builder; there is no
-global registry or extra conformance.
-
-`RouteDestination` and its context are available on this development branch; they are not
-yet part of the v2.1.0 release.
-
-### Destination context
-
-Each builder receives typed route data and a `RouteContext`:
-
-| Value | Purpose |
-| --- | --- |
-| `context.router` | Routes from this destination's own scope. |
-| `context.unwindRoute` | Unwinds this exact scope, optionally delivering a payload. |
-| `context.presentation.style` | `.push`, `.replace`, `.sheet`, or `.cover(transition)`. |
-| `context.presentation.priority` | Effective priority, including the enclosing elevated flow. |
-| `context.environment` | Environment snapshot for this rendering, including local routing values. |
-
-A push inside a high-priority cover reports `.push` and `.high`. Metadata describes the
-matched presentation after route resolution. Use it to configure your feature's controls:
+Declare the route type in the map, then supply the feature builder through `destinations:`:
 
 ```swift
-let editProfile = RouteDestination(EditProfileRoute.self) { route, context in
-  EditProfileView(
-    userID: route.userID,
-    showsCloseButton: context.presentation.style != .push,
-    onClose: { await context.unwindRoute() }
+RootRouteMap {
+  Sheet(SettingsRoute.self)
+} destinations: {
+  SettingsFeature.destination
+}
+```
+
+No fallback view or retroactive conformance is needed. Builders are bound when the root is installed; their views are built later in the destination's own context.
+
+## Compose destination bindings
+
+A feature map can describe routes implemented by other modules and supply only its own builders. The enclosing map completes the missing bindings:
+
+```swift
+let settings = RouteMap {
+  Sheet(SettingsRoute.self) {
+    Push(ProfileRoute.self)
+  }
+} destinations: {
+  SettingsFeature.destination
+}
+
+let routes = RootRouteMap {
+  settings
+} destinations: {
+  ProfileFeature.destinations
+}
+```
+
+`RouteDestinations` composes individual typed builders and other destination collections, including conditionals and loops:
+
+```swift
+let destinations = RouteDestinations {
+  ProfileFeature.destination
+  SettingsFeature.destinations
+}
+```
+
+All destination contributions from the composed tree form one catalog when the root is installed, including contributions from inactive branches and unpresented destination children. Each route type accepts one destination value. Reusing that value, its copies, or a collection containing it is allowed. Distinct values for the same type report a diagnostic and disable that binding throughout the tree, regardless of composition order. There is no map-specific override precedence. Collections retain entries without evaluating view builders.
+
+A registered builder does not declare a route or expand route discoverability. Missing builders are diagnosed during root installation. Requests matching an unbound declaration leave navigation unchanged and do not fall back to another declaration of that type.
+
+## Choose a style and children
+
+```swift
+RootRouteMap {
+  Push(ProfileRoute.self)
+  Replace(MessageRoute.self) {
+    Push(AttachmentRoute.self)
+  }
+  Sheet(SettingsRoute.self)
+  Cover(OnboardingRoute.self, transition: .fade)
+} destinations: {
+  ProfileFeature.destination
+  MessageFeature.destinations
+  SettingsFeature.destination
+  OnboardingFeature.destination
+}
+```
+
+| Declaration | Presentation |
+| --- | --- |
+| `Push` | Pushes in an explicitly supplied navigation stack. |
+| `Replace` | Changes the declaring scope's selected content without a Back entry. |
+| `Sheet` | Presents a sheet. |
+| `Cover` | Presents a cover, using `.slide` by default or `.fade`. |
+
+All four declarations accept route types and optional child declarations. View builders belong in `destinations:`. Destinations explicitly construct stacks when needed. A replacement clears its descendants and keeps other branch paths. Fade covers use detached hosts; forward custom environment values through `WithRouter`'s `windowDestination` as described in [Priority](priority.md).
+
+Reusable `RouteMap` values compose in ordinary builders. `ModalRouteMap` composes sheets and covers and can supply destination builders. Root-only `HighPriority` and `CriticalPriority` groups accept modal declarations and modal maps; their entries' children accept ordinary declarations and maps.
+
+## Use destination context
+
+The builder receives route data and `RouteContext`:
+
+```swift
+RouteDestination(EditorRoute.self) { route, context in
+  EditorView(
+    documentID: route.documentID,
+    close: context.unwindRoute,
+    presentation: context.presentation
   )
 }
 ```
 
-`EditProfileView` and its parameters are illustrative feature APIs. The context and the
-view's environment refer to the same destination scope. Captured routers and unwind actions
-remain tied to that scope and become inactive when it leaves the routing graph.
+`context.router` and `context.unwindRoute` belong to this destination's scope. `context.presentation.style` reports push, replace, sheet, or cover; `.priority` reports its effective priority. `context.environment` contains the values supplied to the destination and refreshes when they change. The builder can choose wrapping content directly using that context.
 
-The builder runs on the main actor. Read environment values during builder evaluation;
-environment changes reevaluate it. Copy individual values when you need them later, rather
-than retaining the context for later environment reads. Read route phase through
-`context.environment.routePhase`.
-Local presentations inherit their host's environment. Detached hosts retain the existing
-`WithRouter(windowDestination:)` forwarding mechanism for custom values; forward those values
-onto the supplied destination so its view and context receive the same environment.
+## Find the nearest eligible declaration
 
-### Migrate a provider conformance
+A scoped request searches its own branch and enclosing scopes. The same type may occur in several scopes; the nearest eligible owner wins. Duplicate route types at one scope report a diagnostic and disable that key, just like duplicate hooks. A conflict stops lookup; it cannot fall back to an ancestor or sibling declaration. Duplicate branch values disable that branch. Distinct declarations remain available.
 
-`RouteViewProviding` is deprecated. Replace its conformance with a `RouteDestination` value
-in the feature module, then change `Sheet(SettingsRoute.self)` to `Sheet(settings)` (or the
-corresponding `Push`, `Cover`, or `Replace` declaration). Remove the provider extension when
-all its declaration sites use explicit destination values.
+When no local match exists, discovery can select another mapped branch before that branch's view is built. It does not search arbitrary destination scopes in sibling stacks. `router.branch(...)` chooses a branch explicitly and never falls back to siblings. Knowing a nested definition does not make it available before its parent destination exists.
 
-Existing APIs continue to build destinations in this order:
+Modal lanes are shared across branches. Presenting a branch-root modal replaces a modal in that lane while retaining pushed content. A modal's own child declarations can create another modal lane. See [Branches](branches.md).
 
-1. The matched declaration's explicit `RouteDestination` builder.
-2. `RouteViewProviding.destination()` when the route conforms to that protocol.
-3. The route's existing `Route.destination()` implementation.
-4. A diagnostic view naming the route type in Debug builds, or an empty view in Release builds,
-   when the route uses the default `destination()` implementation.
-
-`Route.destination()` (including its default implementation) and `RouteViewProviding` are
-deprecated but remain functional. Route-type declaration initializers remain supported without
-deprecation. Destination-value initializers preserve the existing `priority:`, `transition:`,
-and `providesNavigation:` options and defaults, including automatic modal navigation stacks.
-
-## Styles
-
-| Declaration | Presentation |
-| --- | --- |
-| `Push` | Pushes onto the nearest `NavigationStack`. |
-| `Replace` | Replaces the declaring view's content and clears its descendants without adding a Back entry. |
-| `Sheet` | Presents a sheet. |
-| `Cover` | Presents a full-screen cover. |
-
-`Replace` needs no `NavigationStack` unless its destination declares pushes. In a `Branch`
-map, it changes that branch's selected root while preserving other branches. See
-[replacement selections](branches.md#route-across-concurrent-columns) for the split-view workflow.
-
-`Sheet` and `Cover` wrap destinations in a `NavigationStack`. Use `providesNavigation: false` when that is not wanted.
-
-```swift
-.routes {
-  Sheet(SettingsRoute.self, providesNavigation: false)
-}
-```
-
-`Cover` uses a slide transition by default; choose `.fade` for a cross-dissolve.
-
-```swift
-Cover(OnboardingRoute.self, transition: .fade)
-```
-
-Fade covers render in a detached host. As with elevated-priority presentations, forward any custom environment values they need with `WithRouter`’s `windowDestination`.
-
-## Route phase
-
-Read `routePhase` when a view needs to react to whether its local scope is current within its participating branch. Several concurrent branches can have active scopes at once; visibility and focus are separate from this phase.
-
-```swift
-@Environment(\.routePhase) private var routePhase
-
-SaveButton()
-  .disabled(routePhase != .active)
-```
-
-## Guard a route
-
-Routes can permit, replace, or reject themselves before they are presented.
+## Resolve guarded routes and stop at equality
 
 ```swift
 struct ProtectedSettingsRoute: Route {
   let isLoggedIn: Bool
-
   func resolveRoute() async -> RouteResolution {
     isLoggedIn ? .allow : .reroute(LoginRoute())
   }
-
-  func destination() -> some View { SettingsView() }
 }
 ```
 
-Keep resolution fast. A rerouted route is resolved too, so make sure the flow cannot loop.
+Resolution may `.allow`, `.reroute`, or `.drop`. Every rerouted value is resolved too. Make the chain finite.
 
-## Avoid duplicate destinations
+Presentations are admitted one at a time through resolution, rerouting, and insertion or reuse in routing state. If a resolver suspends, a newer attempt waits instead of overtaking it. Only the latest waiting attempt is retained; an attempt superseded before admission returns without resolving. Each admitted request continues in its original caller's task, preserving cancellation and task-local values.
 
-Make a route `Equatable` when its value identifies a destination. If routing finds an equal route on the active path, it stops lookup and unwinds to that route instead of presenting a duplicate.
+A presentation also waits for ongoing unwind teardown and any required parent host. Superseding a presentation waiting for teardown or its parent host prevents its pending insertion; committed teardown still completes. Unwind returns after its own teardown independently of the next resolver. `await router.present(...)` completes after insertion, reuse, or rejection, without waiting for SwiftUI to display the destination.
 
-```swift
-struct ReceiptRoute: Route, Equatable {
-  let receiptID: UUID
+Make a route `Equatable` when its value identifies a destination. An equal current route stops; an eligible equal ancestor is retained and its descendants unwind. Replacement equality is limited to the selected slot, so an equal push elsewhere does not become that replacement.
 
-  func destination() -> some View { ReceiptView(id: receiptID) }
-}
-```
+Removal performed to present a route does not invoke unwind handlers. This includes ancestor crawlback, equality reuse, and replacement. The retained equal destination keeps its existing route value and view instance.
 
-## One declaration per type
+## Observe route phase
 
-Within one scope, the first route declaration for a route type wins. Later route duplicates are ignored and emit a runtime warning. Multiple `.hooks` modifiers combine their declarations; updating or removing one modifier changes only its own hooks. Duplicate hooks emit a runtime warning and are disabled until only one declaration remains. An interceptor is keyed by action type; an unwind handler is keyed by route type and expected payload type. Payload-free handlers have their own key and participate only when no payload is sent.
+Read `@Environment(\.routePhase)` to determine whether a scope is a current endpoint of a participating path in the top space. Concurrent branches may each have an active endpoint. A shared modal makes scopes outside its subtree inactive; covered and removed scopes are always inactive.
+
+Live membership and phase answer different questions. Any live scope in the top space may issue commands, including inactive ancestors and unselected branches. Covered and removed scopes cannot. Neither command eligibility nor phase requires a mounted host, and phase does not imply focus or physical visibility.
 
 Next: [Actions](actions.md) · [Unwinding](unwinding.md)

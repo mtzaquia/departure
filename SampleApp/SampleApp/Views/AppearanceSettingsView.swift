@@ -52,7 +52,7 @@ struct AppearanceSettingsView: View {
                     action("Nested push", symbol: "arrow.right.square.fill", id: SampleAppAccessibility.appearancePresentAuthenticationButton) { await router.present(AuthenticationSettingsRoute()) }
                     action("Unwind then route", symbol: "arrow.uturn.backward.square.fill", color: LabPalette.amber, id: SampleAppAccessibility.appearanceUnwindToLandingPresentMessageButton) {
                         let home = router.branch(LandingView.TabItem.home)
-                        guard await router.unwind(to: .id(LandingRoute().id)) else { return }
+                        guard await router.unwind(from: AppearanceSettingsRoute.self) else { return }
                         await home.present(MessageRoute())
                     }
                     action("Intercepted save", symbol: "tray.and.arrow.down.fill", color: LabPalette.mint, id: SampleAppAccessibility.appearanceSaveButton) { await router.perform(SaveAppearanceSettingsAction()) }
@@ -63,7 +63,7 @@ struct AppearanceSettingsView: View {
         }
         .navigationTitle("Appearance")
         .navigationBarTitleDisplayMode(.inline)
-        .routes { Push(AuthenticationSettingsRoute.self) }
+        .routing()
         .hooks {
             ActionInterceptor(SaveAppearanceSettingsAction.self) { invocation in
                 try? await invocation()

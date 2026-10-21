@@ -33,3 +33,12 @@ public struct FeatureProvidedRoute: Route {
         self.destinationDidBuild = destinationDidBuild
     }
 }
+
+/// A flow composed in a module that does not import feature views or SwiftUI.
+@MainActor public enum DomainRouteMaps {
+    public static let feature = RouteMap {
+        Sheet(DomainOnlyRoute.self, id: "domain-sheet") {
+            Push(FeatureProvidedRoute.self)
+        }
+    }
+}

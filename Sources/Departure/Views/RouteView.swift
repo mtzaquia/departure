@@ -24,89 +24,31 @@ import SwiftUI
 
 public struct RouteView: View {
     let scope: RouteScope
-    let providesNavigation: Bool
-    private let lifecycleHandler: (@MainActor (ViewLifecycleBridge.Event) -> Void)?
-
-    @Environment(RouterEngine.self) private var router
-
-    init(scope: RouteScope, providesNavigation: Bool = false,
-        lifecycleHandler: (@MainActor (ViewLifecycleBridge.Event) -> Void)? = nil) {
+    @RouterEnvironment private var router
+    private weak var nativePresentation: NativePresentationLifetime?
+    init(scope: RouteScope, nativePresentation: NativePresentationLifetime? = nil) {
         self.scope = scope
-        self.providesNavigation = providesNavigation
-        self.lifecycleHandler = lifecycleHandler
+        self.nativePresentation = nativePresentation
     }
-
     public var body: some View {
-        content
+        DestinationContent(scope: scope)
+            .routingAutomatically(nativePresentation: nativePresentation)
             .routeScopeEnvironment(scope, router: router)
-            .onLifecycleEvent { lifecycleView, lifecycleID, event in
-                switch event {
-                case .created: break
-                case .updated(isInstalledInWindow: true), .installedInWindow:
-                    guard let lifecycleView else { return }
-                    scope.ledger.installManagedView(lifecycleView, id: lifecycleID)
-                    if case .installedInWindow = event {
-                        router.routeScopeDidInstallInView(scope)
-                    }
-
-                case .updated(isInstalledInWindow: false):
-                    break
-
-                case .dismantled, .deinitialized:
-                    scope.ledger.uninstallManagedView(id: lifecycleID)
-                    router.routeScopeDidLeaveView(scope)
-                }
-                lifecycleHandler?(event)
-            }
     }
-
-    @ViewBuilder
-    private var content: some View {
-        let destination = RouteDestinationContent(scope: scope)
-
-        if providesNavigation {
-            NavigationStack {
-                destination
-            }
-        } else {
-            destination
-        }
-    }
-
 }
 
-func routeDestination(for route: any Route) -> AnyView {
-    if let provider = route as? any RouteViewProviding {
-        return AnyView(provider.destination())
-    }
-
-    return eraseRouteDestination(route)
-}
-
-private func eraseRouteDestination<R: Route>(_ route: R) -> AnyView {
-    AnyView(route.destination())
-}
-
-private struct RouteDestinationContent: View {
+private struct DestinationContent: View {
     let scope: RouteScope
+    @RouterEnvironment private var router
     @Environment(\.self) private var environment
-
     var body: some View {
-        if let route = scope.route {
-            if let presentation = scope.presentation,
-               let destination = presentation.declaration.destination {
-                destination.build(route, RouteContext(
-                    router: environment.router,
-                    unwindRoute: environment.unwindRoute,
-                    presentation: RoutePresentation(
-                        style: .init(presentation.declaration.presentationKind),
-                        priority: presentation.priority
-                    ),
-                    environment: environment
-                ))
-            } else {
-                routeDestination(for: route)
-            }
+        if let route = scope.route, let destination = scope.presentation?.destination, let presentation = scope.routePresentation {
+            destination.build(route, RouteContext(
+                router: Router(engine: router, scope: scope),
+                unwindRoute: router.unwindRouteAction(from: scope),
+                presentation: presentation,
+                environment: environment
+            ))
         }
     }
 }

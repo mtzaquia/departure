@@ -23,20 +23,29 @@
 import SwiftUI
 
 struct AnyRouteBranchSelection {
-    let concurrent: Bool
     let value: @MainActor () -> AnyHashable
+    let acceptsValue: @MainActor (AnyHashable) -> Bool
     let setValue: @MainActor (AnyHashable) -> Bool
 
-    init<Selection: Hashable>(_ selection: Binding<Selection>, concurrent: Bool = false) {
-        self.concurrent = concurrent
+    init<Selection: Hashable>(_ selection: Binding<Selection>) {
         self.value = {
             AnyHashable(selection.wrappedValue)
         }
-        self.setValue = { value in
+        let convertedValue: @MainActor (AnyHashable) -> Selection? = { value in
             guard let selectionValue = value.base as? Selection else {
-                return false
+                log.departureWarning(
+                    "Cannot select branch `\(value)` of type `\(type(of: value.base))` through "
+                        + "`Binding<\(Selection.self)>`. Use the same selection type for every `Branch(...)` "
+                        + "value and `.routing(branch:)` binding in this container."
+                )
+                return nil
             }
 
+            return selectionValue
+        }
+        self.acceptsValue = { convertedValue($0) != nil }
+        self.setValue = { value in
+            guard let selectionValue = convertedValue(value) else { return false }
             selection.wrappedValue = selectionValue
             return true
         }
