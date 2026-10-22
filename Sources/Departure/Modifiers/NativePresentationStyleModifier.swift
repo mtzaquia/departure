@@ -52,7 +52,10 @@ struct NativePresentationStyleModifier: ViewModifier {
                 from: routeScope, hostedBy: presentationHostID
             )
             content
-                .navigationDestination(item: presentation) { RouteView(scope: $0.scope) }
+                .navigationDestination(item: presentation) {
+                    // The stack may live outside WithRouter's environment.
+                    RouteView(scope: $0.scope).environment(\.routerEngine, router)
+                }
                 .transaction { transaction in
                     if disablesDismissalAnimations { transaction.disablesAnimations = true }
                 }

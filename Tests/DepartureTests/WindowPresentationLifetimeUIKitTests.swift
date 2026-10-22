@@ -23,8 +23,8 @@ struct WindowPresentationLifetimeUIKitTests {
         let notification = NotificationCenter.default.addObserver(
             forName: UIWindow.didBecomeKeyNotification, object: nil, queue: nil
         ) { notification in
+            guard let window = notification.object as? PassThroughWindow else { return }
             MainActor.assumeIsolated {
-                guard let window = notification.object as? PassThroughWindow else { return }
                 facts.window = window
                 facts.insertionAnimations = UIView.areAnimationsEnabled
             }

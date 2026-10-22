@@ -1,5 +1,24 @@
 # Departure Sample App
 
+## Push host placement probes
+
+Launch with `--push-host-probe=<scenario>` to exercise navigation host placement through the public API. The controls open sheets, slide and fade covers with their own path-bound stacks, push two levels, unwind, and push again. The first pushed destination deliberately omits `.routing()`.
+
+| Scenario | Shape |
+| --- | --- |
+| `explicit` | `WithRouter { NavigationStack { Root().routing() } }`; also opens modal-owned stacks and plain modals. |
+| `outer` | `NavigationStack { WithRouter { Root() } }`, using an automatic host. |
+| `missing` | `WithRouter { NavigationStack { Root() } }`; a push reports the required stack-side `.routing()` placement. |
+| `late` | The missing-host shape with an install button that adds `.routing()` inside the stack after a push is pending. |
+| `handover` | The outer-stack shape with a removable explicit host; remove it to exercise automatic takeover. |
+| `branch` | Two tab branches with their own stacks, `.routing(branchValue)`, and container selection. |
+
+**Read console** queries the whole process log, including `com.apple.SwiftUI` and `eu.lelfe.departure`. The UI tests assert zero misplaced-navigation warnings and attach the captured console for each scenario. A launch option alone selects a fixture; ordinary launches keep the route lab below.
+
+**Push immediate child** requests the next route from the first pushed destination's `.task`, exercising iOS 17's incoming-navigation-transition timing in root and modal-owned stacks.
+
+## Route lab
+
 The sample app registers the `departure-sample` URL scheme so every sample `Route` can be created from a URL and requested through `Router.present(_:)`.
 
 Open a link in the booted simulator with:

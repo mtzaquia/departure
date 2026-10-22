@@ -24,6 +24,10 @@ import SwiftUI
 
 public extension View {
     /// Connects presentation at this view to the current mapped scope.
+    ///
+    /// When the scope creates a `NavigationStack`, apply this modifier to its
+    /// root content inside the stack: `NavigationStack { RootView().routing() }`.
+    /// A pushed destination already in a stack can use its automatic host.
     func routing() -> some View { modifier(RoutingModifier()) }
 
     /// Connects a branch's content to its predefined scope.
@@ -57,13 +61,16 @@ private struct RoutingModifier: ViewModifier {
     var windowDestinationBuilder: WindowDestinationBuilder?
     @State private var hostID = RoutePresentationHostID()
     @State private var attachment = RouteScopeAttachment(kind: .routing)
+    @State private var automaticPushHost = AutomaticPushHost()
 
     func body(content: Content) -> some View {
-        let owns = scope?.presentationHostID == hostID
         let pushHostIdentity = scope?.branchID.map {
             router.ios17NavigationStackPushWorkaround?.pushHostIdentity(for: $0, in: scope?.parent, router: router) ?? true
         } ?? true
-        let styles = owns ? scope?.definitions.presentationStyles ?? [] : []
+        let styles = scope?.presentationStyles(hostedBy: hostID,
+            automaticPushIsReady: automaticPushHost.placement == .insideStack) ?? []
+        let unhostedPush = automatic && automaticPushHost.placement == .outsideStack
+            ? scope.flatMap { router.routePresentation(from: $0, matching: .push, hostedBy: hostID) } : nil
         content
             .modifier(ReplacePresentationStyleModifier(presentationHostID: hostID, isEnabled: styles.contains(.replace)))
             .background {
@@ -71,6 +78,7 @@ private struct RoutingModifier: ViewModifier {
                     .routePresentationStyleModifiers(for: styles, hostedBy: hostID, pushHostIdentity: pushHostIdentity)
             }
             .onLifecycleEvent { view, id, event in
+                if automatic { automaticPushHost.handle(event, id: id, view: view) }
                 if automatic, let scope {
                     if let windowDestinationBuilder { router.windowDestinationBuilder = windowDestinationBuilder }
                     // Keep the shared anchor at the outer routing boundary: modal creation
@@ -90,6 +98,10 @@ private struct RoutingModifier: ViewModifier {
             .onChange(of: selection?.value(), initial: true) { _, _ in
                 guard let scope else { return }
                 reconcileSelection(in: scope, deferred: false)
+            }
+            .onChange(of: unhostedPush?.id, initial: true) { _, id in
+                guard id != nil else { return }
+                log.departureWarning(.pushHostOutsideNavigationStack)
             }
     }
 

@@ -26,6 +26,12 @@ import Testing
 
 #if DEBUG
 @MainActor @Suite struct RouteAppendLoggingTests {
+    @Test func missingStackHostExplainsTheRequiredPlacement() {
+        #expect(DepartureWarningEvent.pushHostOutsideNavigationStack.renderedMessage ==
+            "[route] ⊘ cannot push from an automatic routing host outside a NavigationStack. "
+                + "Add `.routing()` to the content inside your NavigationStack, "
+                + "for example: `NavigationStack { Root().routing() }`.")
+    }
     @Test(arguments: [RoutePresentation.Style.sheet, .cover(.slide), .cover(.fade)], [false, true])
     func modalPushExplainsItsSelectedHostAndConditionalFix(ownerStyle: RoutePresentation.Style, explicit: Bool) async throws {
         let (engine, owner, match) = try await context(ownerStyle: ownerStyle)

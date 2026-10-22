@@ -25,6 +25,51 @@ import Testing
 @testable import Departure
 
 @MainActor @Suite struct PresentationHostOwnershipTests {
+    @Test func automaticPushWaitsForStackPlacementWithoutDisablingOtherStyles() {
+        let engine = RouterEngine(routes: RootRouteMap {
+            testPush(testDestination(NumberedRoute.self))
+            testSheet(testDestination(SettingsRoute.self))
+        })
+        let host = RoutePresentationHostID()
+        engine.root.bindRoutingHost(host, automatic: true, environment: engine.root.sourceEnvironment)
+        #expect(engine.root.presentationStyles(hostedBy: host, automaticPushIsReady: false) == [.sheet])
+        #expect(engine.root.presentationStyles(hostedBy: host, automaticPushIsReady: true) == [.push, .sheet])
+        #expect(engine.root.presentationHostID == host)
+    }
+
+    @Test func explicitHostDoesNotWaitForAutomaticStackPlacement() {
+        let engine = RouterEngine(routes: RootRouteMap { testPush(testDestination(NumberedRoute.self)) })
+        let automatic = RoutePresentationHostID(), explicit = RoutePresentationHostID()
+        let scope = engine.root
+        scope.bindRoutingHost(automatic, automatic: true, environment: scope.sourceEnvironment)
+        scope.bindRoutingHost(explicit, automatic: false, environment: scope.sourceEnvironment)
+        #expect(scope.presentationStyles(hostedBy: explicit, automaticPushIsReady: false) == [.push])
+        #expect(scope.presentationStyles(hostedBy: automatic, automaticPushIsReady: true).isEmpty)
+        scope.unbindRoutingHost(explicit)
+        #expect(scope.presentationStyles(hostedBy: automatic, automaticPushIsReady: true) == [.push])
+        #expect(scope.presentationStyles(hostedBy: automatic, automaticPushIsReady: false).isEmpty)
+    }
+
+    @Test func pendingPushSurvivesHostHandoverAndStaleNilWriteBack() async throws {
+        let engine = RouterEngine(routes: RootRouteMap { testPush(testDestination(NumberedRoute.self)) })
+        let automatic = RoutePresentationHostID(), explicit = RoutePresentationHostID()
+        let scope = engine.root
+        scope.bindRoutingHost(automatic, automatic: true, environment: scope.sourceEnvironment)
+        await engine.present(NumberedRoute(number: 1))
+        let pushed = try #require(engine.defaultSpace.rootPath.last)
+        engine.routeScopeDidInstallInView(pushed)
+        let old = engine.routePresentationBinding(from: scope, matching: .push, hostedBy: automatic)
+        scope.bindRoutingHost(explicit, automatic: false, environment: scope.sourceEnvironment)
+        old.wrappedValue = nil
+        #expect(engine.defaultSpace.rootPath.last === pushed)
+        let explicitBinding = engine.routePresentationBinding(from: scope, matching: .push, hostedBy: explicit)
+        #expect(explicitBinding.wrappedValue?.scope === pushed)
+        scope.unbindRoutingHost(explicit)
+        explicitBinding.wrappedValue = nil
+        #expect(engine.defaultSpace.rootPath.last === pushed)
+        #expect(engine.routePresentationBinding(from: scope, matching: .push, hostedBy: automatic).wrappedValue?.scope === pushed)
+    }
+
     @Test(arguments: [false, true])
     func duplicateExplicitHostsDisablePresentationUntilOneRemains(removeFirst: Bool) async {
         let engine = RouterEngine(routes: RootRouteMap { testSheet(testDestination(SettingsRoute.self)) })

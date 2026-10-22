@@ -88,7 +88,9 @@ struct DepartureSampleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if ProcessInfo.processInfo.arguments.contains("--sheet-focus-probe") {
+            if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--push-host-probe=") }) {
+                PushHostProbe(scenario: String(argument.dropFirst("--push-host-probe=".count)))
+            } else if ProcessInfo.processInfo.arguments.contains("--sheet-focus-probe") {
                 WithRouter(routes: SheetFocusProbeRoot.routes) { SheetFocusProbeRoot() }
             } else if ProcessInfo.processInfo.arguments.contains("--independent-space-probe") {
                 WithRouter(routes: IndependentSpaceProbeMap.root(owner: router), router: router) {

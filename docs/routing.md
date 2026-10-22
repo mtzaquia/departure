@@ -98,6 +98,25 @@ All four declarations accept route types and optional child declarations. View b
 
 Reusable `RouteMap` values compose in ordinary builders. `ModalRouteMap` composes sheets and covers and can supply destination builders. Root-only `HighPriority` and `CriticalPriority` groups accept modal declarations and modal maps; their entries' children accept ordinary declarations and maps.
 
+## Connect pushes to a navigation stack
+
+Put `.routing()` on the content **inside** a stack that your root view or destination creates:
+
+```swift
+WithRouter(routes: appRoutes) {
+  NavigationStack {
+    RootView()
+      .routing()
+  }
+}
+```
+
+Use the same placement in a sheet or cover destination, including stacks that bind their own path or declare native value destinations. `WithRouter` and `RouteView` bind scopes automatically, but an outside modifier cannot install a push destination inside a stack created by its content. On iOS, a push requested from that outside automatic host logs a Departure warning showing the required placement.
+
+A pushed destination already inside its parent's stack can declare push children without calling `.routing()`: its automatic host uses the surrounding stack. `NavigationStack { WithRouter(routes: appRoutes) { RootView() } }` also uses the surrounding stack. Sheet and cover destinations without push children do not need a stack.
+
+One explicit host takes precedence over the automatic host; removing it restores automatic hosting when that host is inside a stack. Two explicit hosts in the same scope still report a conflict and disable presentation until one remains. Branches keep their own hosts through `.routing(branchValue)` and selection through `.routing(branch: $selection)`; see [Branches](branches.md).
+
 ## Use destination context
 
 The builder receives route data and `RouteContext`:

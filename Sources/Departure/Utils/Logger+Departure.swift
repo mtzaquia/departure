@@ -60,6 +60,7 @@ enum DepartureLogTrace {
 }
 
 enum DepartureWarningEvent {
+    case pushHostOutsideNavigationStack
     case routeDroppedNoDeclaration(routeType: any Route.Type)
     case unwindRouteTargetMissing(target: RouterEngine.UnwindSelection)
 
@@ -71,6 +72,7 @@ enum DepartureWarningEvent {
 
     private var category: String {
         switch self {
+        case .pushHostOutsideNavigationStack: "route"
         case .routeDroppedNoDeclaration: "route"
         case .unwindRouteTargetMissing: "unwind"
         }
@@ -78,6 +80,10 @@ enum DepartureWarningEvent {
 
     private var message: String {
         switch self {
+        case .pushHostOutsideNavigationStack:
+            return "cannot push from an automatic routing host outside a NavigationStack. "
+                + "Add `.routing()` to the content inside your NavigationStack, "
+                + "for example: `NavigationStack { Root().routing() }`."
         case let .routeDroppedNoDeclaration(routeType):
             return "dropped \(String(reflecting: routeType)) — no declaration found"
         case let .unwindRouteTargetMissing(target):

@@ -208,7 +208,10 @@ struct RouteScopeHostUIKitTests {
         scope.hostAvailabilityDidChange(id: hostID)
         #expect(scope.isInstalledInView)
         #expect(!scope.isAvailableForPresentation)
-        existing.handle(.updated(isInstalledInWindow: false), target: scope, view: declarationView,
+        let lifecycleID = UUID()
+        existing.handle(.created, id: lifecycleID, target: scope, view: declarationView,
+            apply: { _ in value = "initial" }, remove: { _ in })
+        existing.handle(.updated(isInstalledInWindow: false), id: lifecycleID, target: scope, view: declarationView,
             apply: { _ in value = "refreshed" }, remove: { _ in })
         #expect(value == "refreshed")
         let pending = RouteScopeAttachment(kind: .hooks)

@@ -303,6 +303,13 @@ extension RouteScope {
         return selectedHost(in: routingHosts)
     }
 
+    func presentationStyles(hostedBy id: RoutePresentationHostID, automaticPushIsReady: Bool) -> Set<RoutePresentationKind> {
+        guard presentationHostID == id else { return [] }
+        var styles = definitions.presentationStyles
+        if routingHosts[id]?.automatic == true && !automaticPushIsReady { styles.remove(.push) }
+        return styles
+    }
+
 #if DEBUG
     enum PresentationHostKind: String {
         case automatic, explicit, missing, conflict

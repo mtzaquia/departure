@@ -330,7 +330,7 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.authenticationTitle)
         assertGone(A11y.settingsAuthenticationButton)
 
-        tap(A11y.authenticationUnwindNearestModalButton)
+        tap(A11y.authenticationUnwindCurrentButton)
         assertGone(A11y.authenticationTitle)
         assertExists(A11y.settingsAuthenticationButton)
 
@@ -343,6 +343,11 @@ final class SampleAppUITests: XCTestCase {
         tap(A11y.authenticationUnwindNearestModalButton)
         assertGone(A11y.authenticationTitle)
         assertGone(A11y.appearanceTitle)
+        assertGone(A11y.landing)
+        assertExists(A11y.startButton)
+
+        openLanding()
+        tapSettingsTab()
         assertExists(A11y.settingsAuthenticationButton)
         assertExists(A11y.settingsAppearanceButton)
 
@@ -917,6 +922,9 @@ final class SampleAppUITests: XCTestCase {
 
         setSwitch(A11y.authenticationLoggedInToggle, on: true)
         tap(A11y.authenticationUnwindNearestModalButton)
+        assertExists(A11y.startButton)
+        openLanding()
+        tapSettingsTab()
         tap(A11y.settingsProfileButton)
         assertExists(A11y.profileTitle)
     }
