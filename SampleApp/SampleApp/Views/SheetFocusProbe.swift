@@ -43,6 +43,19 @@ struct SheetFocusProbeRoot: View {
         let destination = RouteDestination(SheetFocusProbeRoute.self) { route, _ in
             NavigationStack { SheetFocusProbeForm(number: route.number).routing() }
         }
+        if ProcessInfo.processInfo.arguments.contains("--sheet-focus-elevated") {
+            return RootRouteMap {
+                HighPriority {
+                    if ProcessInfo.processInfo.arguments.contains("--sheet-focus-fade") {
+                        Cover(SheetFocusProbeRoute.self, transition: .fade)
+                    } else if ProcessInfo.processInfo.arguments.contains("--sheet-focus-slide") {
+                        Cover(SheetFocusProbeRoute.self)
+                    } else {
+                        Sheet(SheetFocusProbeRoute.self)
+                    }
+                }
+            } destinations: { destination }
+        }
         if ProcessInfo.processInfo.arguments.contains("--sheet-focus-pushed") {
             return RootRouteMap {
                 Push(SheetFocusProbeHostRoute.self) { Sheet(SheetFocusProbeRoute.self) }
@@ -75,7 +88,8 @@ struct SheetFocusProbeRoot: View {
         Group {
             if ProcessInfo.processInfo.arguments.contains("--sheet-focus-pushed") {
                 NavigationStack { SheetFocusProbeOpener().routing() }
-            } else if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root") {
+            } else if ProcessInfo.processInfo.arguments.contains("--sheet-focus-root")
+                || ProcessInfo.processInfo.arguments.contains("--sheet-focus-elevated") {
                 NavigationStack { SheetFocusProbeControls().routing() }
             } else {
                 TabView(selection: $selection) {

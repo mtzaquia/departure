@@ -90,6 +90,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
         private var priority: RoutePriority?
         private var latestSourceScenePhase: ScenePhase?
         private var windowDestinationBuilder = WindowDestinationBuilder.passthrough
+        private var dismissingPresentationID: PresentedRoute.ID?
 
         init(content: @escaping (RouteDestinationSnapshot, @escaping @MainActor () -> Void) -> HostedContent) {
             self.content = content
@@ -139,7 +140,8 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
         func detach() {
             desiredRoute = nil
             guard let id = lifetime.presentation?.id else { return }
-            if lifetime.beginDismissal(of: id) { dismissWindow() }
+            lifetime.beginDismissal(of: id)
+            dismissWindow()
         }
 
         private func present(
@@ -189,37 +191,52 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
 
         private func dismissFromPresentedHost(id: PresentedRoute.ID) {
             guard lifetime.beginDismissal(of: id) else { return }
-            if let scope = lifetime.presentation?.route.scope, scope.isNativePresentationOwned(by: lifetime) {
-                router?.nativePresentationDidDismiss(scope)
-            }
-            dismissWindow()
+            dismissWindow(notifyRouter: true)
         }
 
-        private func dismissWindow() {
-            guard let presentation = lifetime.presentation else { return }
-            hostingController?.onDismiss = nil
-            let dismissedWindow = window
-            let completion: () -> Void = { [self] in
-                // Retain the native owner through destruction, even if its representable is gone.
+        private func dismissWindow(notifyRouter: Bool = false) {
+            guard let presentation = lifetime.presentation,
+                  dismissingPresentationID != presentation.id else { return }
+            dismissingPresentationID = presentation.id
+            // SwiftUI's onDismiss and UIKit's viewDidDisappear may still hold exclusive
+            // access to presentation state. Only record dismissal on their callback stack.
+            // Retain this owner even when detach has removed its representable entirely.
+            DispatchQueue.main.async { [self] in
                 guard lifetime.presentation?.id == presentation.id else { return }
-                let restoresKeyWindow = dismissedWindow?.isKeyWindow == true
-                UIView.performWithoutAnimation {
-                    dismissedWindow?.isHidden = true
-                    dismissedWindow?.rootViewController = nil
-                    if restoresKeyWindow, previousKeyWindow?.isHidden == false { previousKeyWindow?.makeKey() }
+                if notifyRouter, presentation.route.scope.isNativePresentationOwned(by: lifetime) {
+                    router?.nativePresentationDidDismiss(presentation.route.scope)
                 }
-                previousKeyWindow = nil
-                window = nil
-                hostingController = nil
-                cascadedScenePhase = nil
-                if let router { lifetime.completeDismissal(of: presentation.id, in: router) }
-                synchronize()
+                hostingController?.onDismiss = nil
+                let dismissedWindow = window
+                let completion: () -> Void = { [self] in
+                    // UIKit's dismissal completion is also a presentation callback.
+                    DispatchQueue.main.async { [self] in
+                        finishDismissWindow(dismissedWindow, id: presentation.id)
+                    }
+                }
+                if let root = dismissedWindow?.rootViewController, root.presentedViewController != nil {
+                    root.dismiss(animated: true, completion: completion)
+                } else {
+                    completion()
+                }
             }
-            if let root = dismissedWindow?.rootViewController, root.presentedViewController != nil {
-                root.dismiss(animated: true, completion: completion)
-            } else {
-                completion()
+        }
+
+        private func finishDismissWindow(_ dismissedWindow: UIWindow?, id: PresentedRoute.ID) {
+            guard lifetime.presentation?.id == id, dismissingPresentationID == id else { return }
+            let restoresKeyWindow = dismissedWindow?.isKeyWindow == true
+            UIView.performWithoutAnimation {
+                dismissedWindow?.isHidden = true
+                dismissedWindow?.rootViewController = nil
+                if restoresKeyWindow, previousKeyWindow?.isHidden == false { previousKeyWindow?.makeKey() }
             }
+            previousKeyWindow = nil
+            window = nil
+            hostingController = nil
+            cascadedScenePhase = nil
+            dismissingPresentationID = nil
+            if let router { lifetime.completeDismissal(of: id, in: router) }
+            synchronize()
         }
 
         private func resolveScene() -> UIWindowScene? {

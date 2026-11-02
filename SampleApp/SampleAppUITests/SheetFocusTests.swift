@@ -23,6 +23,49 @@
 import XCTest
 
 final class SheetFocusTests: XCTestCase {
+    func testElevatedSheetSwipeDismissalAllowsRepeatedReopening() {
+        let app = launch(elevated: true)
+        defer { app.terminate() }
+        for _ in 0..<5 {
+            tap("sample.sheet-focus.present", in: app)
+            let number = app.staticTexts["sample.sheet-focus.number"]
+            XCTAssertTrue(number.waitForExistence(timeout: 5))
+            let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.14))
+            let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9))
+            start.press(forDuration: 0.05, thenDragTo: end)
+            XCTAssertTrue(number.waitForNonExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["sample.sheet-focus.present"].isHittable)
+        }
+    }
+
+    func testElevatedSheetReplacementAndProgrammaticDismissal() {
+        verifyElevatedReplacement()
+    }
+
+    func testElevatedSlideCoverReplacementAndProgrammaticDismissal() {
+        verifyElevatedReplacement(slide: true)
+    }
+
+    func testElevatedFadeCoverReplacementAndProgrammaticDismissal() {
+        verifyElevatedReplacement(fade: true)
+    }
+
+    private func verifyElevatedReplacement(fade: Bool = false, slide: Bool = false) {
+        let app = launch(fade: fade, elevated: true, slide: slide)
+        defer { app.terminate() }
+        for _ in 0..<3 {
+            tap("sample.sheet-focus.present", in: app)
+            XCTAssertTrue(app.staticTexts["sample.sheet-focus.number"].waitForExistence(timeout: 5))
+            tap("sample.sheet-focus.replace", in: app)
+            let number = app.staticTexts["sample.sheet-focus.number"]
+            let successor = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", "Sheet 2"), object: number)
+            XCTAssertEqual(XCTWaiter.wait(for: [successor], timeout: 8), .completed)
+            tap("sample.sheet-focus.unwind", in: app)
+            XCTAssertTrue(number.waitForNonExistence(timeout: 5))
+            XCTAssertTrue(app.buttons["sample.sheet-focus.present"].isHittable)
+        }
+    }
+
     func testRootReplacementBeforeFirstSheetAppearsShowsSuccessor() {
         let app = launch(root: true)
         defer { app.terminate() }
@@ -181,11 +224,12 @@ final class SheetFocusTests: XCTestCase {
         XCTAssertTrue(app.textFields["sample.sheet-focus.field"].waitForExistence(timeout: 5))
     }
 
-    private func launch(root: Bool = false, fade: Bool = false) -> XCUIApplication {
+    private func launch(root: Bool = false, fade: Bool = false, elevated: Bool = false, slide: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["--sheet-focus-probe"] + (root ? ["--sheet-focus-root"] : [])
             + (fade ? ["--sheet-focus-fade"] : [])
+            + (elevated ? ["--sheet-focus-elevated"] : []) + (slide ? ["--sheet-focus-slide"] : [])
         app.launch()
         return app
     }

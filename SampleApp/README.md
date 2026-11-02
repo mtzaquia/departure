@@ -121,6 +121,13 @@ sheet appears. The update variant yields once between requests. Both must displa
 and allow it to unwind normally. `SheetFocusTests` covers these cases alongside native
 focus retention, swipe dismissal, replacement of a visible sheet, and repeated reopening.
 
+Add `--sheet-focus-elevated` to exercise a high-priority sheet in its dedicated window.
+Combine it with `--sheet-focus-slide` or `--sheet-focus-fade` for elevated covers.
+Swipe the sheet down, reopen it, replace it, and use **Unwind sheet** to clear the route
+programmatically. The elevated `SheetFocusTests` repeat these interactions with Debug
+exclusivity checking enabled; dismissal must leave the underlying window usable and
+allow the next presentation to appear.
+
 The **Split-view lab** covers replacing selected content from a pushed child. Select a detail
 root, open its child, and choose **Replace from child**. The child must pop before the next
 selection appears, without adding a Back entry or clearing another column's navigation.
