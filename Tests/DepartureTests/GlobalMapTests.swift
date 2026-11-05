@@ -193,19 +193,29 @@ struct GlobalMapTests {
         #expect(engine.root.path.isEmpty)
     }
 
-    @Test func nativeAncestorWritebackCannotRemoveAnActiveProtectedDescendant() async {
+    @Test func nativeAncestorWritebackReconcilesAnActiveProtectedDescendant() async {
         let owner = fixture(), engine = owner.engine
         await owner.current.present(AppModal())
         let binding = engine.routePresentationBinding(from: engine.root, matching: .sheet)
         await owner.current.present(Lock())
-        let lock = engine.currentRouteScope
-        binding.wrappedValue = nil
-        #expect(engine.currentRouteScope === lock)
-        #expect(engine.protectsNativePresentation(engine.root.path.first!))
-        await owner.current.present(SecondFactor())
-        #expect(!engine.protectsNativePresentation(lock))
         binding.wrappedValue = nil
         #expect(engine.root.path.isEmpty)
+    }
+
+    @Test func nativeAncestorDismissalNotifiesBeforeRemovingProtectedDescendants() async throws {
+        let owner = fixture(), engine = owner.engine
+        var notified = false
+        engine.root.installHookDeclarations(hookDeclarations: [UnwindHandler(AppModal.self) { [weak engine] in
+            #expect(engine?.currentRouteScope.route is Lock)
+            notified = true
+        }.declaration])
+        await owner.current.present(AppModal())
+        let modal = engine.currentRouteScope
+        await owner.current.present(Lock())
+
+        engine.nativePresentationDidDismiss(modal)
+        try await waitUntil { engine.root.path.isEmpty && !engine.isNavigating }
+        #expect(notified)
     }
 
     @Test func equalActiveGlobalRequestRetainsTheExactInstance() async {
@@ -377,21 +387,17 @@ struct GlobalMapTests {
         #expect(engine.currentRouteScope.route is Outside)
     }
 
-    @Test func nativeLifetimeRejectsAncestorDismissalBeforeChangingRenderedState() async {
+    @Test func nativeLifetimeAcceptsAncestorDismissalDespiteProtectedDescendants() async {
         let owner = fixture(), engine = owner.engine
         await owner.current.present(AppModal())
         let modal = engine.currentRouteScope
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(.init(scope: modal)) { .init(route: $0) }
+        lifetime.synchronize(.init(scope: modal))
         lifetime.didAdmitPresentation(of: ObjectIdentifier(modal))
         await owner.current.present(Lock())
-        let lock = engine.currentRouteScope
-        lifetime.requestDismissal(of: ObjectIdentifier(modal), in: engine)
-        #expect(lifetime.isPresented)
-        #expect(engine.currentRouteScope === lock)
-        #expect(await owner.current.unwind(.current))
         lifetime.requestDismissal(of: ObjectIdentifier(modal), in: engine)
         #expect(!lifetime.isPresented)
+        #expect(engine.root.path.isEmpty)
         lifetime.completeDismissal(of: ObjectIdentifier(modal), in: engine)
     }
 

@@ -567,6 +567,7 @@ enum Destinations {
     static let passcodeRoute = RouteDestination(PasscodeRoute.self) { route, context in
         PasscodeView()
             .modifier(SampleRoutingContext())
+            .interactiveDismissDisabled()
     }
     static let passcodeOverlayRoute = RouteDestination(PasscodeOverlayRoute.self) { route, context in
         PasscodeOverlayView()

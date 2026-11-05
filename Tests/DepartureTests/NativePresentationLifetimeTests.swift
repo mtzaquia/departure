@@ -10,8 +10,8 @@ struct NativePresentationLifetimeTests {
         let first = PresentedRoute(scope: RouteScope(id: "first", route: nil))
         let next = PresentedRoute(scope: RouteScope(id: "next", route: nil))
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(first) { .init(route: $0) }
-        lifetime.synchronize(next) { .init(route: $0) }
+        lifetime.synchronize(first)
+        lifetime.synchronize(next)
 
         #expect(lifetime.isPresented)
         #expect(lifetime.presentation?.id == next.id)
@@ -24,11 +24,11 @@ struct NativePresentationLifetimeTests {
         let first = PresentedRoute(scope: RouteScope(id: "first", route: nil))
         let next = PresentedRoute(scope: RouteScope(id: "next", route: nil))
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(first) { .init(route: $0) }
+        lifetime.synchronize(first)
         // SwiftUI evaluates the modal content builder before making its native views.
         lifetime.didCreateDestination(of: first.id)
-        lifetime.synchronize(nil) { .init(route: $0) }
-        lifetime.synchronize(next) { .init(route: $0) }
+        lifetime.synchronize(nil)
+        lifetime.synchronize(next)
         #expect(lifetime.presentation?.id == first.id)
         #expect(first.scope.isAwaitingPresentationEnd)
         #expect(!lifetime.isPresented)
@@ -36,7 +36,7 @@ struct NativePresentationLifetimeTests {
 
         lifetime.completeDismissal(of: first.id, in: engine)
         #expect(!first.scope.isAwaitingPresentationEnd)
-        lifetime.synchronize(next) { .init(route: $0) }
+        lifetime.synchronize(next)
         #expect(try #require(lifetime.presentation).id == next.id)
         lifetime.completeDismissal(of: first.id, in: engine)
         #expect(lifetime.presentation?.id == next.id)
@@ -50,16 +50,16 @@ struct NativePresentationLifetimeTests {
         let origin = RouteRequestOrigin(scope: engine.root)
         let first = try #require(await engine.requestRouteWhenReady(NumberedRoute(number: 1), origin: origin))
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(.init(scope: first)) { .init(route: $0) }
+        lifetime.synchronize(.init(scope: first))
         lifetime.didCreateDestination(of: ObjectIdentifier(first))
         // updateUIView reports this event before the destination enters a window.
         lifetime.handleDestinationEvent(.updated(isInstalledInWindow: false), of: ObjectIdentifier(first))
         let replacement = Task { await engine.requestRouteWhenReady(NumberedRoute(number: 2), origin: origin) }
         await waitUntil { engine.isNavigating && engine.tree.rootPath.isEmpty }
-        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.synchronize(nil)
 
         #expect(first.isAwaitingPresentationEnd)
-        #expect(lifetime.presentation?.route.scope === first)
+        #expect(lifetime.presentation?.scope === first)
         lifetime.didDismantleDestination(of: ObjectIdentifier(first))
         #expect(!first.isAwaitingPresentationEnd)
         #expect(lifetime.presentation == nil)
@@ -69,9 +69,9 @@ struct NativePresentationLifetimeTests {
         #expect(next === engine.tree.rootPath.last)
         #expect((next.route as? NumberedRoute)?.number == 2)
         #expect(!engine.isNavigating)
-        lifetime.synchronize(.init(scope: next)) { .init(route: $0) }
+        lifetime.synchronize(.init(scope: next))
         lifetime.completeDismissal(of: ObjectIdentifier(first), in: engine)
-        #expect(lifetime.presentation?.route.scope === next)
+        #expect(lifetime.presentation?.scope === next)
     }
 
     @Test func windowArrivalDuringCancelledPreparationStillWaitsForNativeDismissal() async throws {
@@ -81,7 +81,7 @@ struct NativePresentationLifetimeTests {
         let origin = RouteRequestOrigin(scope: engine.root)
         let first = try #require(await engine.requestRouteWhenReady(NumberedRoute(number: 1), origin: origin))
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(.init(scope: first)) { .init(route: $0) }
+        lifetime.synchronize(.init(scope: first))
         lifetime.didCreateDestination(of: ObjectIdentifier(first))
         var returned = false
         let replacement = Task {
@@ -90,7 +90,7 @@ struct NativePresentationLifetimeTests {
             return destination
         }
         await waitUntil { engine.isNavigating && engine.tree.rootPath.isEmpty }
-        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.synchronize(nil)
         // UIKit may finish installing content after the request to dismiss it.
         lifetime.didAdmitPresentation(of: ObjectIdentifier(first))
         lifetime.didDismantleDestination(of: ObjectIdentifier(first))
@@ -106,11 +106,10 @@ struct NativePresentationLifetimeTests {
         let engine = RouterEngine()
         let routes = (1...3).map { PresentedRoute(scope: RouteScope(id: $0, route: nil)) }
         let lifetime = NativePresentationLifetime()
-        var builds = 0
         for route in routes {
-            lifetime.synchronize(route) { builds += 1; return .init(route: $0) }
+            lifetime.synchronize(route)
         }
-        #expect(builds == 3)
+
         #expect(lifetime.presentation?.id == routes[2].id)
         for old in routes.prefix(2) {
             #expect(!old.scope.isAwaitingPresentationEnd)
@@ -127,14 +126,12 @@ struct NativePresentationLifetimeTests {
         let first = PresentedRoute(scope: RouteScope(id: "first", route: nil))
         let next = PresentedRoute(scope: RouteScope(id: "next", route: nil))
         let lifetime = NativePresentationLifetime()
-        var builds = 0
-        let build: (PresentedRoute) -> RouteDestinationSnapshot = { builds += 1; return .init(route: $0) }
-        lifetime.synchronize(first, build: build)
+        lifetime.synchronize(first)
         lifetime.didAdmitPresentation(of: first.id)
-        lifetime.synchronize(first, build: build)
-        #expect(builds == 1)
+        lifetime.synchronize(first)
+
         #expect(lifetime.isPresented)
-        lifetime.synchronize(next, build: build)
+        lifetime.synchronize(next)
         #expect(!lifetime.isPresented)
         #expect(lifetime.presentation?.id == first.id)
         #expect(first.scope.isAwaitingPresentationEnd)
@@ -143,13 +140,12 @@ struct NativePresentationLifetimeTests {
         lifetime.completeDismissal(of: first.id, in: engine)
         #expect(!first.scope.isAwaitingPresentationEnd)
         // An asynchronous handler may not yet have removed the old desired route.
-        lifetime.synchronize(first, build: build)
+        lifetime.synchronize(first)
         #expect(lifetime.presentation == nil)
-        lifetime.synchronize(next, build: build)
+        lifetime.synchronize(next)
         lifetime.completeDismissal(of: first.id, in: engine)
         #expect(lifetime.presentation?.id == next.id)
         #expect(lifetime.isPresented)
-        #expect(builds == 2)
     }
 
     @Test func modalWaitUsesNativeCompletionEvenAfterDestinationHostDetaches() async throws {
@@ -157,7 +153,7 @@ struct NativePresentationLifetimeTests {
         await engine.present(SettingsRoute())
         let scope = try #require(engine.tree.rootPath.last)
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(.init(scope: scope)) { .init(route: $0) }
+        lifetime.synchronize(.init(scope: scope))
         engine.routeScopeDidInstallInView(scope)
         lifetime.didAdmitPresentation(of: ObjectIdentifier(scope))
         var returned = false
@@ -167,7 +163,7 @@ struct NativePresentationLifetimeTests {
         await Task.yield()
         #expect(!returned)
         #expect(engine.isNavigating)
-        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.synchronize(nil)
         #expect(scope.isAwaitingPresentationEnd)
         #expect(!returned)
         lifetime.completeDismissal(of: ObjectIdentifier(scope), in: engine)
@@ -180,7 +176,7 @@ struct NativePresentationLifetimeTests {
         await engine.present(SettingsRoute())
         let scope = try #require(engine.tree.rootPath.last)
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(.init(scope: scope)) { .init(route: $0) }
+        lifetime.synchronize(.init(scope: scope))
         engine.routeScopeDidInstallInView(scope)
         lifetime.didAdmitPresentation(of: ObjectIdentifier(scope))
         let unwind = Task { await engine.unwindPrevious(from: scope) }
@@ -192,10 +188,6 @@ struct NativePresentationLifetimeTests {
         engine.routeScopeDidLeaveView(scope)
     }
 
-    #if canImport(AppKit)
-
-
-    #endif
 
     @Test func childOnlyPopStillWaitsForItsOwnHost() async throws {
         let (engine, modal, child, lifetime) = try await pushedFlow()
@@ -233,7 +225,7 @@ struct NativePresentationLifetimeTests {
         await waitUntil { !engine.isNavigationEligible(modal) }
         #expect(childCompleted == nil)
         #expect(modalCompleted == nil)
-        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.synchronize(nil)
         lifetime.completeDismissal(of: ObjectIdentifier(modal), in: engine)
         await waitUntil { childCompleted != nil && modalCompleted != nil }
         #expect(childCompleted == true)
@@ -249,7 +241,7 @@ struct NativePresentationLifetimeTests {
         await engine.present(SettingsRoute())
         let scope = try #require(engine.tree.rootPath.last)
         let first = NativePresentationLifetime(), replacement = NativePresentationLifetime()
-        for owner in [first, replacement] { owner.synchronize(.init(scope: scope)) { .init(route: $0) } }
+        for owner in [first, replacement] { owner.synchronize(.init(scope: scope)) }
         first.completeDismissal(of: ObjectIdentifier(scope), in: engine)
         #expect(engine.tree.rootPath.last === scope)
         #expect(scope.isAwaitingPresentationEnd)
@@ -264,13 +256,13 @@ struct NativePresentationLifetimeTests {
         do {
             let scope = RouteScope(id: "temporary", route: nil)
             retained = scope
-            lifetime.synchronize(.init(scope: scope)) { .init(route: $0) }
+            lifetime.synchronize(.init(scope: scope))
             lifetime.completeDismissal(of: ObjectIdentifier(scope), in: engine)
         }
         #expect(retained == nil)
         let next = RouteScope(id: "temporary", route: nil)
-        lifetime.synchronize(.init(scope: next)) { .init(route: $0) }
-        #expect(lifetime.presentation?.route.scope === next)
+        lifetime.synchronize(.init(scope: next))
+        #expect(lifetime.presentation?.scope === next)
     }
 
     @Test func nativeCompletionDoesNotStartAnotherUnwindBeforeTheFirstCommits() async throws {
@@ -278,7 +270,7 @@ struct NativePresentationLifetimeTests {
         await engine.present(SettingsRoute())
         let scope = try #require(engine.tree.rootPath.last)
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(.init(scope: scope)) { .init(route: $0) }
+        lifetime.synchronize(.init(scope: scope))
         lifetime.didAdmitPresentation(of: ObjectIdentifier(scope))
         engine.root.installHookDeclarations(hookDeclarations: [UnwindHandler(SettingsRoute.self) {}.declaration])
 
@@ -292,9 +284,9 @@ struct NativePresentationLifetimeTests {
     @Test func cancellationBeforeNativeAdmissionDoesNotWaitForANonexistentDismissal() {
         let scope = RouteScope(id: "not mounted", route: nil)
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(.init(scope: scope)) { .init(route: $0) }
+        lifetime.synchronize(.init(scope: scope))
         #expect(scope.isAwaitingPresentationEnd)
-        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.synchronize(nil)
         #expect(!scope.isAwaitingPresentationEnd)
         #expect(lifetime.presentation == nil)
         lifetime.didAdmitPresentation(of: ObjectIdentifier(scope))
@@ -313,7 +305,7 @@ struct NativePresentationLifetimeTests {
         let tree = engine.tree
         let modal = try #require(tree.rootPath.last)
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(.init(scope: modal)) { .init(route: $0) }
+        lifetime.synchronize(.init(scope: modal))
         lifetime.didAdmitPresentation(of: ObjectIdentifier(modal))
         engine.routeScopeDidInstallInView(modal)
         await Router(engine: engine, scope: modal).present(HomeDetailRoute())

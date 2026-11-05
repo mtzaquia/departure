@@ -44,6 +44,7 @@ struct GlobalRoutesProbe: View {
             RouteDestination(GlobalDetailRoute.self) { _, _ in GlobalLabHome(detail: true) }
             RouteDestination(GlobalPasscodeRoute.self) { _, _ in
                 NavigationStack { GlobalPasscodeView(coveredRouter: coveredRouter, state: state).routing() }
+                    .interactiveDismissDisabled()
             }
             RouteDestination(GlobalSecondFactorRoute.self) { _, _ in
                 NavigationStack { GlobalLabOverlay(title: "Two-factor authentication", state: state).routing() }
@@ -53,6 +54,7 @@ struct GlobalRoutesProbe: View {
             }
             RouteDestination(GlobalProtectedSheetRoute.self) { _, _ in
                 NavigationStack { GlobalLabOverlay(title: "Protected sheet", state: state).routing() }
+                    .interactiveDismissDisabled()
             }
             RouteDestination(GlobalPasscodeChildRoute.self) { _, _ in
                 GlobalLabOverlay(title: "Unprotected child", state: state)

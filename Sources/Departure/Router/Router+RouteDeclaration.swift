@@ -23,13 +23,6 @@
 import Foundation
 
 extension RouterEngine {
-    // Preserve the exact reached destination across resolution, native staging
-    // and queued work. Action retries must not infer it from the foreground path.
-    @discardableResult
-    func requestRoute(_ route: some Route, origin: RouteRequestOrigin? = nil) async -> RouteScope? {
-        await requestRouteWhenReady(route, origin: origin)
-    }
-
     @discardableResult
     func requestAdmittedRoute(_ route: some Route, origin: RouteRequestOrigin) async -> RouteScope? {
         #if DEBUG
@@ -116,11 +109,10 @@ extension RouterEngine {
         enum LookupStrategy: Equatable {
             case currentPath
             case global
-            case defaultRootActiveBranchScope
-            case defaultRootDeclarations
+            case selectedBranch
+            case rootDeclarations
         }
 
-        let tree: RouteTree
         let presentingScope: RouteScope
         let declaringScope: RouteScope
         let declaration: AnyRouteDeclaration

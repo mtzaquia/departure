@@ -785,7 +785,7 @@ struct RouterTests {
         )
     }
 
-    @Test func defaultRootBranchLocalPushBehindModalPreservesActiveLocalScope() async throws {
+    @Test func rootBranchLocalPushBehindModalPreservesActiveLocalScope() async throws {
         let router = RouterEngine()
         let (selection, _) = tabSelection(.wallet)
         let walletScope = RouteScope(id: AnyHashable(AppTab.wallet), route: nil)
@@ -835,7 +835,7 @@ struct RouterTests {
         let match = try #require(router.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
         let unwindPlan = router.tree.presentationUnwindPlan(after: match)
 
-        #expect(match.lookupStrategy == .defaultRootActiveBranchScope)
+        #expect(match.lookupStrategy == .selectedBranch)
         #expect(match.declaration.presentationKind == .push)
         #expect(match.presentationPath === walletScope.path)
         #expect(match.presentingScope === walletRouteScope)
@@ -970,7 +970,7 @@ struct RouterTests {
         let match = try #require(router.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
         let unwindPlan = router.tree.presentationUnwindPlan(after: match)
 
-        #expect(match.lookupStrategy == .defaultRootDeclarations)
+        #expect(match.lookupStrategy == .rootDeclarations)
         #expect(match.declaration.presentationKind == .push)
         #expect(match.presentationPath === walletScope.path)
         #expect(match.presentingScope === walletScope)
@@ -1046,7 +1046,6 @@ struct RouterTests {
         router.routeScopeDidInstallInView(modalScope)
 
         let match = RouterEngine.ResolvedRouteTarget(
-            tree: router.tree,
             presentingScope: homeScope,
             declaringScope: landingScope,
             declaration: pushDeclaration,
@@ -2035,8 +2034,8 @@ struct RouterTests {
         await Task.yield()
 
         router.routeScopeDidInstallInView(scope)
-        await firstInstallWaiter.value
-        await secondInstallWaiter.value
+        #expect(await firstInstallWaiter.value)
+        #expect(await secondInstallWaiter.value)
         #expect(scope.isInstalledInView)
 
         let firstUninstallWaiter = Task {
@@ -2048,8 +2047,8 @@ struct RouterTests {
         await Task.yield()
 
         router.routeScopeDidLeaveView(scope)
-        await firstUninstallWaiter.value
-        await secondUninstallWaiter.value
+        #expect(await firstUninstallWaiter.value)
+        #expect(await secondUninstallWaiter.value)
         #expect(scope.isInstalledInView == false)
     }
 

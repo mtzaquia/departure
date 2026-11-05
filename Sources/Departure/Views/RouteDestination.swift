@@ -112,7 +112,8 @@ public struct RoutePresentation: Hashable, Sendable {
     public let style: Style
     /// Whether this occurrence was presented from the root global catalog.
     public let isGlobal: Bool
-    /// Whether the declaration requests protection while this destination is active.
+    /// Whether routing requests protect this destination while it is active.
+    /// Interactive dismissal is controlled by the destination view.
     public let isDismissalProtected: Bool
 
     init(style: Style, isGlobal: Bool = false, isDismissalProtected: Bool = false) {

@@ -46,6 +46,18 @@ Presenting an unprotected global, declared sheet, or pushed child makes Passcode
 
 `routePhase` follows participating path endpoints, including concurrent branches. It does not mean keyboard focus, physical visibility, or one scene-wide selected view. The modifier uses that same phase calculation.
 
+Interactive dismissal belongs to the destination implementation. Departure does not set `interactiveDismissDisabled` or reject native dismissal events. A passcode feature that must prevent swipe dismissal applies its own modifier:
+
+```swift
+NavigationStack {
+  PasscodeView()
+    .routing()
+}
+.interactiveDismissDisabled()
+```
+
+The same responsibility applies to any presenting ancestor whose dismissal would remove the protected flow. Departure reconciles the exact occurrence after native dismissal; `.dismissalProtection()` governs routing requests.
+
 ## Dismiss and continue a flow
 
 Use the ordinary captured dismissal action; no global-removal operation is required:

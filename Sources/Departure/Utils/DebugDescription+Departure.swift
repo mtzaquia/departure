@@ -102,14 +102,6 @@ extension RouteScope {
         return "rootScope#\(id.departureDebugDescription)\(branchDescription)"
     }
 
-    var branchDebugDescription: String? {
-        guard isFlatScope == false else {
-            return nil
-        }
-
-        return "[\(branchScopes.keys.map(\.departureDebugDescription).joined(separator: ", "))]"
-    }
-
     private var isFlatScope: Bool {
         branchContainer == nil
         || branchScopes.keys == [activeBranch]

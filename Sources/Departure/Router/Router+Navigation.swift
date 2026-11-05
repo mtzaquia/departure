@@ -126,7 +126,7 @@ extension RouterEngine {
 
     func appendPreparedRoute(_ operation: NavigationOperation) {
         guard let presentation = operation.presentation,
-              presentation.match.tree === tree, permitsPresentation(presentation.match) else { operation.discardPresentation(); return }
+              isNavigationEligible(presentation.match.presentingScope), permitsPresentation(presentation.match) else { operation.discardPresentation(); return }
         let match = presentation.match
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
         guard activateBranch(for: match) else { operation.discardPresentation(); return }
@@ -274,8 +274,7 @@ extension RouterEngine {
         }
 
         replacePendingRoute(nil)
-        guard match.tree === tree,
-              tree.routePath(containing: match.presentingScope) != nil,
+        guard isNavigationEligible(match.presentingScope),
               !match.presentingScope.hasConflictingPresentationHosts,
               permitsPresentation(match), declarationIsCurrent(match) else {
             operation.discardPresentation(); return
@@ -304,7 +303,7 @@ extension RouterEngine {
            (!branchScope.isAvailableForPresentation || !presentation.match.presentingScope.isAvailableForPresentation) { return }
 
         guard takePendingPresentation(operation) else { return }
-        guard presentation.match.tree === tree else { operation.discardPresentation(); return }
+        guard isNavigationEligible(presentation.match.presentingScope) else { operation.discardPresentation(); return }
         log.departureDebug(.pendingRouteResuming(route: presentation.route))
         let plan = tree.presentationUnwindPlan(after: presentation.match)
         guard permitsPresentation(presentation.match), permitsRemoval(plan) else { operation.discardPresentation(); return }
@@ -400,10 +399,13 @@ extension RouterEngine {
     enum UnwindAuthority {
         case scope(RouteScope), owner, nativeOwner
 
-        func permitsCommit(in router: RouterEngine) -> Bool {
+        func permitsCommit(of plan: RouteTree.UnwindPlan?, in router: RouterEngine) -> Bool {
             switch self {
-            case .scope(let scope): !Task.isCancelled && router.isNavigationEligible(scope)
-            case .owner: !Task.isCancelled
+            case .scope(let scope):
+                !Task.isCancelled && router.isNavigationEligible(scope)
+                    && (plan.map { router.permitsRemoval($0, explicitlyDismissing: scope) } ?? true)
+            case .owner:
+                !Task.isCancelled && (plan.map { router.permitsRemoval($0) } ?? true)
             case .nativeOwner: true
             }
         }
@@ -425,12 +427,7 @@ extension RouterEngine {
             for source in sources {
                 await deliverUnwindHandlers(for: source, payload: payload, in: targetScope, removing: operation.removedScopes)
             }
-            let explicitTarget: RouteScope?
-            if case .scope(let scope) = authority { explicitTarget = scope }
-            else if case .nativeOwner = authority { explicitTarget = sources.first }
-            else { explicitTarget = nil }
-            guard authority.permitsCommit(in: self),
-                  operation.plan.map({ permitsRemoval($0, explicitlyDismissing: explicitTarget) }) ?? true else { return false }
+            guard authority.permitsCommit(of: operation.plan, in: self) else { return false }
             commitNavigationOperation(operation)
         }
         await waitForNavigationOperation(operation)
@@ -489,7 +486,7 @@ extension RouterEngine {
                 let retainsBinding = containsDepartingModal && isDeparting(host)
                     && (!declaration.presentationKind.isModal || preservesModalPresentationBindings)
                 presentations[key] = .init(
-                    presentation: .init(scope: scope, sourceEnvironment: host.sourceEnvironment),
+                    presentation: .init(scope: scope),
                     retainsBinding: retainsBinding,
                     disablesAnimation: !containsDepartingModal && declaration.presentationKind == .push
                         && (!animatesFirstPush || scope !== path.scopes.first))
@@ -659,8 +656,7 @@ extension RouterEngine {
         }
     }
 
-    func performPresentationDismissalUnwind(for sourceScope: RouteScope, in targetScope: RouteScope?, plan: RouteTree.UnwindPlan, nativeOwner: Bool = false) {
-        guard permitsRemoval(plan, explicitlyDismissing: sourceScope) else { return }
+    func performPresentationDismissalUnwind(for sourceScope: RouteScope, in targetScope: RouteScope?, plan: RouteTree.UnwindPlan) {
         guard !plan.removedScopes.isEmpty else { applyUnwindPlan(plan); return }
         let operation = beginNavigationOperation(plan: plan)
         // Without a callback, native write-back can commit in this call stack.
@@ -669,8 +665,7 @@ extension RouterEngine {
         if !hasHandler { commitNavigationOperation(operation) }
         Task { @MainActor in
             await performPlannedUnwind(operation, notifying: [sourceScope], in: targetScope,
-                authority: nativeOwner ? .nativeOwner : .scope(sourceScope),
-                logsCompletion: hasHandler && !nativeOwner)
+                authority: .nativeOwner, logsCompletion: hasHandler)
         }
     }
 

@@ -182,7 +182,7 @@ struct MacOSPresentationTests {
         #expect(router.engine.root.definitions.routeBinding(for: MacOSPresentingRoute.self) != nil)
     }
 
-    @Test func replacementPreservesBranchSourceEnvironmentAndContextualDestination() async throws {
+    @Test func replacementPreservesBranchIdentityAndContextualDestination() async throws {
         let router = RootRouter()
         let engine = router.engine
         let recorder = MacOSScopeRecorder()
@@ -210,8 +210,6 @@ struct MacOSPresentationTests {
         try #require(await waitUntil { engine.root.branchScopes["detail"] != nil && recorder.scope != nil })
         let branch = try #require(engine.root.branchScopes["detail"])
         #expect(branch.parent === engine.root)
-        #expect(branch.sourceEnvironment.routeScope === branch)
-        #expect(branch.sourceEnvironment.router == Router(engine: engine, scope: branch))
         #expect(recorder.scope === branch)
         #expect(recorder.router == Router(engine: engine, scope: branch))
 
@@ -220,8 +218,6 @@ struct MacOSPresentationTests {
         try #require(await waitUntil { destinationRecorder.scope === selected && destinationRecorder.isVisible })
         #expect(destinationRecorder.router == Router(engine: engine, scope: selected))
         #expect(engine.root.branchScopes["detail"] === branch)
-        #expect(branch.sourceEnvironment.routeScope === branch)
-        #expect(branch.sourceEnvironment.router == Router(engine: engine, scope: branch))
         #expect(branch.routeAttachments.count == 1)
     }
 

@@ -35,9 +35,9 @@ import Testing
     @Test(arguments: [RoutePresentation.Style.sheet, .cover(.slide), .cover(.fade)], [false, true])
     func modalPushExplainsItsSelectedHostAndConditionalFix(ownerStyle: RoutePresentation.Style, explicit: Bool) async throws {
         let (engine, owner, match) = try await context(ownerStyle: ownerStyle)
-        owner.bindRoutingHost(RoutePresentationHostID(), automatic: true, environment: owner.sourceEnvironment)
+        owner.bindRoutingHost(RoutePresentationHostID(), automatic: true)
         if explicit {
-            owner.bindRoutingHost(RoutePresentationHostID(), automatic: false, environment: owner.sourceEnvironment)
+            owner.bindRoutingHost(RoutePresentationHostID(), automatic: false)
         }
         let route = HomeDetailRoute()
         await Router(engine: engine, scope: owner).present(route)
@@ -63,7 +63,7 @@ import Testing
     @Test(arguments: [RoutePresentation.Style.push, .replace])
     func automaticNonModalOwnersDoNotSuggestAMissingModalHost(ownerStyle: RoutePresentation.Style) async throws {
         let (_, owner, match) = try await context(ownerStyle: ownerStyle)
-        owner.bindRoutingHost(RoutePresentationHostID(), automatic: true, environment: owner.sourceEnvironment)
+        owner.bindRoutingHost(RoutePresentationHostID(), automatic: true)
         let message = DepartureLogEvent.routeAppended(route: HomeDetailRoute(), path: "path", match: match).message
         #expect(message.contains("style=push owner=SettingsRoute host=automatic"))
         #expect(!message.contains("hint:"))
@@ -72,7 +72,7 @@ import Testing
     @Test(arguments: [RoutePresentation.Style.sheet, .cover(.slide), .cover(.fade), .replace])
     func nonPushAppendsDoNotSuggestAMissingStack(childStyle: RoutePresentation.Style) async throws {
         let (_, owner, match) = try await context(ownerStyle: .sheet, childStyle: childStyle)
-        owner.bindRoutingHost(RoutePresentationHostID(), automatic: true, environment: owner.sourceEnvironment)
+        owner.bindRoutingHost(RoutePresentationHostID(), automatic: true)
         let message = DepartureLogEvent.routeAppended(route: HomeDetailRoute(), path: "path", match: match).message
         #expect(message.contains("owner=SettingsRoute host=automatic"))
         #expect(!message.contains("hint:"))
@@ -80,7 +80,7 @@ import Testing
 
     @Test func automaticRootPushDoesNotSuggestAMissingModalHost() throws {
         let engine = RouterEngine(routes: RootRouteMap { testPush(testDestination(HomeDetailRoute.self)) })
-        engine.root.bindRoutingHost(RoutePresentationHostID(), automatic: true, environment: engine.root.sourceEnvironment)
+        engine.root.bindRoutingHost(RoutePresentationHostID(), automatic: true)
         let match = try #require(engine.tree.firstDeclaration(including: HomeDetailRoute.self)?.declaration)
         let event = DepartureLogEvent.routeAppended(route: HomeDetailRoute(), path: "path", match: match)
         #expect(event.message.contains("style=push owner=root host=automatic"))
@@ -93,13 +93,13 @@ import Testing
         let event = DepartureLogEvent.routeAppended(route: HomeDetailRoute(), path: "path", match: match)
         #expect(event.message.contains("host=missing"))
         #expect(!event.message.contains("hint:"))
-        owner.bindRoutingHost(automatic, automatic: true, environment: owner.sourceEnvironment)
+        owner.bindRoutingHost(automatic, automatic: true)
         #expect(event.message.contains("host=automatic"))
         #expect(event.message.contains("hint:"))
-        owner.bindRoutingHost(first, automatic: false, environment: owner.sourceEnvironment)
+        owner.bindRoutingHost(first, automatic: false)
         #expect(event.message.contains("host=explicit"))
         #expect(!event.message.contains("hint:"))
-        owner.bindRoutingHost(second, automatic: false, environment: owner.sourceEnvironment)
+        owner.bindRoutingHost(second, automatic: false)
         #expect(owner.presentationHostKind == .conflict)
         #expect(event.message.contains("host=conflict"))
         #expect(!event.message.contains("hint:"))

@@ -7,7 +7,7 @@ import Testing
 struct UnwindPresentationPolicyTests {
 
 
-    @Test func outgoingBranchBindingsKeepTheirCapturedEnvironmentWithoutRoutingAuthority() async throws {
+    @Test func outgoingBranchBindingsRetainDestinationsWithoutRoutingAuthority() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
             testPush(testDestination(LoginRoute.self)) {
                 Branches(concurrent: true) {
@@ -23,13 +23,8 @@ struct UnwindPresentationPolicyTests {
         await owner.current.present(LoginRoute())
         let container = try #require(engine.tree.rootPath.last)
         let branch = try #require(container.branchScopes["modal"])
-        var environment = EnvironmentValues()
-        environment.locale = Locale(identifier: "nl_NL")
-        branch.updateSourceEnvironment(environment)
         await owner.current.branch("modal").present(SettingsRoute())
         let sheet = try #require(branch.path.last)
-        environment.locale = Locale(identifier: "de_DE")
-        sheet.updateSourceEnvironment(environment)
         await owner.current.present(HomeDetailRoute())
         let push = try #require(branch.path.last)
         for scope in [container, sheet, push] { engine.routeScopeDidInstallInView(scope) }
@@ -40,11 +35,6 @@ struct UnwindPresentationPolicyTests {
         #expect(engine.tree.rootPath.isEmpty)
         #expect(sheetBinding.wrappedValue?.scope === sheet)
         #expect(pushBinding.wrappedValue?.scope === push)
-        environment.locale = Locale(identifier: "fr_FR")
-        branch.updateSourceEnvironment(environment)
-        sheet.updateSourceEnvironment(environment)
-        #expect(sheetBinding.wrappedValue?.sourceEnvironment.locale.identifier == "nl_NL")
-        #expect(pushBinding.wrappedValue?.sourceEnvironment.locale.identifier == "de_DE")
         sheetBinding.wrappedValue = nil
         pushBinding.wrappedValue = nil
         #expect(engine.navigationOperations.count == 1)
@@ -106,5 +96,3 @@ struct UnwindPresentationPolicyTests {
 
 
 }
-
-@MainActor private final class PolicyNotifications { var count = 0 }

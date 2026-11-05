@@ -40,7 +40,7 @@ import Testing
         #expect(engine.routePhase(for: home.path.last!) == .inactive)
     }
 
-    @Test func aModalRestrictsPhaseToItsSubtreeButKeepsTopSpaceCommandsEligible() async throws {
+    @Test func aModalRestrictsPhaseToItsSubtreeWhileLiveScopesRemainEligible() async throws {
         let owner = RootRouter()
         _ = WithRouter(routes: RootRouteMap {
             Branches(concurrent: true) {

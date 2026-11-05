@@ -10,14 +10,6 @@ import Testing
         #expect(engine.root.definitions.routeBinding(for: HomeDetailRoute.self) != nil)
         #expect(!engine.root.isInstalledInView)
     }
-    @Test func environmentUpdatesDoNotReplaceDefinitions() {
-        let engine = RouterEngine(routes: RootRouteMap { testSheet(testDestination(SettingsRoute.self)) })
-        let identity = engine.root.routeAttachments.map(\.identity)
-        var environment = EnvironmentValues(); environment.locale = Locale(identifier: "nl_NL")
-        engine.root.updateSourceEnvironment(environment)
-        #expect(engine.root.routeAttachments.map(\.identity) == identity)
-        #expect(engine.root.sourceEnvironment.locale.identifier == "nl_NL")
-    }
     @Test func hookSourcesComposeAndDetachIndependently() {
         let engine = RouterEngine()
         let scope = engine.root

@@ -52,6 +52,9 @@ public struct Sheet: RouteDeclaration, Sendable {
     /// available. Protection stops while another destination is active above this one,
     /// and resumes if this exact instance becomes active again. Explicit dismissal
     /// through its captured unwind action remains available.
+    ///
+    /// This controls routing requests. The destination controls interactive dismissal
+    /// with SwiftUI modifiers such as `interactiveDismissDisabled(_:)`.
     public func dismissalProtection() -> Self {
         Self(declaration: declaration.protectingDismissal())
     }

@@ -23,14 +23,14 @@
 import SwiftUI
 @testable import Departure
 
-// Unit scenarios compile definitions before issuing routing operations. Selection and
-// environment are explicit test inputs instead of requiring a mounted platform view.
+// Unit scenarios compile definitions and bind selection before routing operations,
+// without requiring a mounted platform view.
 @MainActor
 extension RouteScope {
     static let testSelectionOwner = RoutePresentationHostID()
 
     func bindTestBranchSelection(_ selection: AnyRouteBranchSelection) {
-        bindRoutingHost(Self.testSelectionOwner, automatic: false, environment: sourceEnvironment, selection: selection)
+        bindRoutingHost(Self.testSelectionOwner, automatic: false, selection: selection)
         bindBranchSelection(selection)
     }
 
@@ -44,9 +44,8 @@ extension RouteScope {
         useDefinitions(RouteDefinitions(definitions))
     }
     @discardableResult
-    func defineTestMap(sourceID: AnyHashable = "fixture", id: AnyHashable? = nil, selection: AnyRouteBranchSelection? = nil, concurrent: Bool? = nil, definitions: [RouteScopeDeclaration], environment: EnvironmentValues? = nil) -> Bool {
+    func defineTestMap(sourceID: AnyHashable = "fixture", id: AnyHashable? = nil, selection: AnyRouteBranchSelection? = nil, concurrent: Bool? = nil, definitions: [RouteScopeDeclaration]) -> Bool {
         if let id { self.id = id }
-        if let environment { updateSourceEnvironment(environment) }
         define(definitions, concurrent: concurrent)
         if let selection {
             if branchContainer == nil { branchContainer = BranchContainerState(selectedBranch: selection.value()) }
@@ -55,7 +54,7 @@ extension RouteScope {
         return true
     }
     @discardableResult
-    func attachTestBranch(_ scope: RouteScope, for branch: AnyHashable, environment: EnvironmentValues? = nil, presentationHostID: RoutePresentationHostID? = nil) -> Bool {
+    func attachTestBranch(_ scope: RouteScope, for branch: AnyHashable, presentationHostID: RoutePresentationHostID? = nil) -> Bool {
         let didChange = branchScopes[branch] !== scope
         if didChange, let compiled = branchScopes[branch] {
             // These legacy scenarios supply an explicit branch map in place of
@@ -72,8 +71,7 @@ extension RouteScope {
         branchScopes[branch] = scope
         scope.parent = self
         scope.branchID = branch
-        if let presentationHostID { scope.bindRoutingHost(presentationHostID, automatic: false, environment: scope.sourceEnvironment) }
-        if let environment { scope.updateSourceEnvironment(environment) }
+        if let presentationHostID { scope.bindRoutingHost(presentationHostID, automatic: false) }
         return didChange
     }
     func detachTestBranch(_ scope: RouteScope, for branch: AnyHashable) {
@@ -87,7 +85,7 @@ extension RouteScope {
 @MainActor
 extension RouterEngine {
     func bindTestBranchSelection(_ selection: AnyRouteBranchSelection, in scope: RouteScope) {
-        scope.bindRoutingHost(RouteScope.testSelectionOwner, automatic: false, environment: scope.sourceEnvironment, selection: selection)
+        scope.bindRoutingHost(RouteScope.testSelectionOwner, automatic: false, selection: selection)
         synchronizeBranchSelection(ownedBy: RouteScope.testSelectionOwner, in: scope)
     }
     func routeScopeDidInstallInView(_ scope: RouteScope) { hostDidAttach(scope, view: nil, id: UUID()) }
@@ -102,5 +100,27 @@ extension RoutePath {
     func replaceTestPath(_ scopes: [RouteScope]) {
         if let owner { keepThrough(owner) }
         for scope in scopes { append(scope) }
+    }
+}
+
+@MainActor
+extension RouterEngine {
+    var hasOutgoingPresentations: Bool {
+        navigationOperations.contains { !$0.outgoing.isEmpty }
+    }
+
+    // Tests inspect the exact destination returned by the production readiness gate.
+    @discardableResult
+    func requestRoute(_ route: some Route, origin: RouteRequestOrigin? = nil) async -> RouteScope? {
+        await requestRouteWhenReady(route, origin: origin)
+    }
+}
+
+@MainActor
+extension RouteScope {
+    @discardableResult
+    func waitUntilUninstalled() async -> Bool {
+        // Committed teardown owns its lifetime even if the requesting task cancels.
+        await RouteScopeReadiness.wait(in: self, cancellable: false) { !self.isInstalledInView }
     }
 }

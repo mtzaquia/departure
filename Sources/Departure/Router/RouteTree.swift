@@ -65,9 +65,7 @@ final class RouteTree {
     let root: RouteScope
     var rootPath: RoutePath { root.path }
 
-    init(
-        root: RouteScope
-    ) {
+    init(root: RouteScope) {
         self.root = root
         precondition(root.anchorTree == nil, "A navigation tree owns its root.")
         root.anchorTree = self
@@ -79,8 +77,6 @@ final class RouteTree {
     }
     var currentRoutePath: RoutePath { currentRouteScope.routePath }
 
-    func contains(_ path: RoutePath) -> Bool { path.owner?.belongs(to: self) == true }
-
     func routePath(containing scope: RouteScope) -> RoutePath? {
         guard scope.belongs(to: self) else { return nil }
         return scope.routePath
@@ -90,12 +86,8 @@ final class RouteTree {
         root.branchPaths(includingInactive: false)
     }
 
-    func allBranchPaths() -> [RoutePath] {
-        root.branchPaths()
-    }
-
     var allRoutePaths: [RoutePath] {
-        [rootPath] + allBranchPaths()
+        [rootPath] + root.branchPaths()
     }
 
     var currentModalScope: RouteScope? {
@@ -129,10 +121,6 @@ final class RouteTree {
             lane = modal.lane
         }
         return UnwindPlan(retaining: retained)
-    }
-
-    func tree(containing path: RoutePath) -> RouteTree? {
-        contains(path) ? self : nil
     }
 
     func validateInvariants() {
@@ -225,11 +213,9 @@ extension RouteTree {
 
         // One ordered search reads definitions without constructing intermediate matches.
         // Explicit branch handles omit branch look-forward and sibling fallback.
-        func resolveDefinitions(at source: RouteScope, includingBranches: Bool,
-                                includingSelectedDestination: Bool = true) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
-            guard let tree = source.tree else { return nil }
+        func resolveDefinitions(at source: RouteScope, includingBranches: Bool) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
             let selectedRoot = source.branchScopes[source.activeBranch]
-            let selectedDestination = includingBranches && includingSelectedDestination ? selectedRoot?.activeLocalScope : nil
+            let selectedDestination = includingBranches ? selectedRoot?.activeLocalScope : nil
             let locations = [selectedDestination !== selectedRoot ? selectedDestination : nil, source].compactMap { $0 }
             for location in locations where location.tree != nil {
                 let owners = includingBranches && location.branchContainer != nil
@@ -241,9 +227,9 @@ extension RouteTree {
                     let looksForward = location !== source
                     let presentingScope = looksForward ? location : owner
                     let declaringScope = looksForward ? source : (owner.branchID == nil ? owner : owner.parent ?? owner)
-                    let strategy: RouterEngine.ResolvedRouteTarget.LookupStrategy = looksForward ? .defaultRootActiveBranchScope
-                        : source === root ? .defaultRootDeclarations : .currentPath
-                    return binding.map { .init(tree: tree, presentingScope: presentingScope,
+                    let strategy: RouterEngine.ResolvedRouteTarget.LookupStrategy = looksForward ? .selectedBranch
+                        : source === root ? .rootDeclarations : .currentPath
+                    return binding.map { .init(presentingScope: presentingScope,
                         declaringScope: declaringScope, declaration: $0, lookupStrategy: strategy) }
                 }
             }

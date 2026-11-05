@@ -35,7 +35,7 @@ final class RouterEngine: Identifiable, Equatable {
     @ObservationIgnored private(set) var hasTracedMapAdoption = false
 #endif
 
-    var tree: RouteTree
+    let tree: RouteTree
 
     @ObservationIgnored
     var pendingRoute: PendingNavigation?
@@ -47,10 +47,6 @@ final class RouterEngine: Identifiable, Equatable {
     var navigationOperations: [NavigationOperation] = []
 
     var isNavigating: Bool { !navigationOperations.isEmpty }
-
-    var hasOutgoingPresentations: Bool {
-        navigationOperations.contains { !$0.outgoing.isEmpty }
-    }
 
     @ObservationIgnored
     var routeGraphMutationDepth = 0

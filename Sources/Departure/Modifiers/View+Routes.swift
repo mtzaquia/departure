@@ -52,7 +52,6 @@ extension View {
 private struct RoutingModifier: ViewModifier {
     @RouterEnvironment private var router
     @Environment(\.routeScope) private var scope
-    @Environment(\.self) private var environment
     var automatic = false
     var selection: AnyRouteBranchSelection?
     weak var nativePresentation: NativePresentationLifetime?
@@ -84,7 +83,7 @@ private struct RoutingModifier: ViewModifier {
                 }
                 attachment.handle(event, id: id, target: scope, view: view,
                     apply: { scope in
-                        scope.bindRoutingHost(hostID, automatic: automatic, environment: environment, selection: selection)
+                        scope.bindRoutingHost(hostID, automatic: automatic, selection: selection)
                         reconcileSelection(in: scope)
                     }, remove: { scope in
                         scope.unbindRoutingHost(hostID)

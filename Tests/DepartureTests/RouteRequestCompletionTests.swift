@@ -93,11 +93,11 @@ struct RouteRequestCompletionTests {
         let inner = try #require(engine.root.branchScopes["second"])
         if duplicateOwners {
             for _ in 0..<2 {
-                inner.bindRoutingHost(RoutePresentationHostID(), automatic: false, environment: inner.sourceEnvironment,
+                inner.bindRoutingHost(RoutePresentationHostID(), automatic: false,
                     selection: AnyRouteBranchSelection(Binding.constant("inner-first")))
             }
         } else {
-            inner.bindRoutingHost(RoutePresentationHostID(), automatic: false, environment: inner.sourceEnvironment,
+            inner.bindRoutingHost(RoutePresentationHostID(), automatic: false,
                 selection: AnyRouteBranchSelection(Binding.constant(0)))
         }
         await Router(engine: engine, scope: engine.root).branch("second").branch("inner-second").present(SettingsRoute())
@@ -130,7 +130,7 @@ struct RouteRequestCompletionTests {
         let source = try #require(branch.path.last)
         #expect(engine.activateBranch("first", in: engine.root))
         for _ in 0..<2 {
-            inner.bindRoutingHost(RoutePresentationHostID(), automatic: false, environment: inner.sourceEnvironment,
+            inner.bindRoutingHost(RoutePresentationHostID(), automatic: false,
                 selection: AnyRouteBranchSelection(Binding.constant("inner-second")))
         }
         await Router(engine: engine, scope: source).present(SettingsRoute())
@@ -210,5 +210,3 @@ private struct AncestorRerouteAction: Action {
         record("ran")
     }
 }
-
-private struct CriticalEntry: Route, Equatable {}

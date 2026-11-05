@@ -28,8 +28,3 @@ struct UnwindExecutionTests {
         #expect(condition())
     }
 }
-
-@MainActor private final class CancellationProbe {
-    var notifications = 0
-    var task: Task<Bool, Never>?
-}

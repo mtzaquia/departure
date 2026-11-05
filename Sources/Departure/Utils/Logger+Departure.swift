@@ -481,9 +481,9 @@ private extension RouterEngine.ResolvedRouteTarget.LookupStrategy {
             "current route path, nearest scope first"
         case .global:
             "root global catalog, presented above the foreground"
-        case .defaultRootActiveBranchScope:
-            "active branch scope under application root"
-        case .defaultRootDeclarations:
+        case .selectedBranch:
+            "selected branch destination"
+        case .rootDeclarations:
             "application root declarations, active branch before local and inactive branches"
         }
     }

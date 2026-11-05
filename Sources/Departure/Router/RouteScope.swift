@@ -22,7 +22,6 @@
 
 import Foundation
 import Observation
-import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #else
@@ -55,7 +54,6 @@ final class RouteScope: Identifiable {
     }
     private struct RoutingHost {
         let automatic: Bool
-        let environment: EnvironmentValues
         let selection: AnyRouteBranchSelection?
     }
     private struct WeakAttachment { weak var value: RouteScopeAttachment? }
@@ -74,7 +72,6 @@ final class RouteScope: Identifiable {
     @ObservationIgnored private var attachments: [WeakAttachment] = []
     @ObservationIgnored private var readinessWaits: [WeakReadiness] = []
     @ObservationIgnored private(set) var hasEverInstalled = false
-    @ObservationIgnored let sourceEnvironmentReference = RouteSourceEnvironment()
 
     @ObservationIgnored lazy var path = RoutePath(owner: self)
     @ObservationIgnored private(set) weak var owningPath: RoutePath?
@@ -105,7 +102,7 @@ final class RouteScope: Identifiable {
     private var isAwaitingOwnPresentationEnd: Bool {
         switch presentationCompletion {
         case .host: isInstalledInView
-        case .native(let owner): owner.value?.presentation?.route.scope === self
+        case .native(let owner): owner.value?.presentation?.scope === self
         }
     }
 
@@ -132,7 +129,6 @@ final class RouteScope: Identifiable {
     }
 
     var hostID: UUID? { host?.id }
-    var sourceEnvironment: EnvironmentValues { sourceEnvironmentReference.values }
 
     var presentationOrigin: RouteScope? {
         presentation?.origin
@@ -192,14 +188,6 @@ extension RouteScope {
             origin: origin,
             declaration: declaration
         )
-    }
-}
-
-// MARK: - Presentation Environment
-
-extension RouteScope {
-    func updateSourceEnvironment(_ sourceEnvironment: EnvironmentValues) {
-        sourceEnvironmentReference.update(sourceEnvironment)
     }
 }
 
@@ -341,9 +329,9 @@ extension RouteScope {
         return false
     }
 
-    func bindRoutingHost(_ id: RoutePresentationHostID, automatic: Bool, environment: EnvironmentValues, selection: AnyRouteBranchSelection? = nil) {
+    func bindRoutingHost(_ id: RoutePresentationHostID, automatic: Bool, selection: AnyRouteBranchSelection? = nil) {
         var hosts = routingHosts
-        hosts[id] = RoutingHost(automatic: automatic, environment: environment, selection: selection)
+        hosts[id] = RoutingHost(automatic: automatic, selection: selection)
         updateRoutingHosts(hosts)
     }
 
@@ -360,9 +348,6 @@ extension RouteScope {
             withMutation(keyPath: \.presentationHostID) { routingHosts = hosts }
         } else {
             routingHosts = hosts
-        }
-        if let id = selectedHost(in: hosts), let host = hosts[id] {
-            sourceEnvironmentReference.update(host.environment)
         }
         if hasConflictingPresentationHosts && !presentationPreviouslyConflicted {
             log.departureWarning(
@@ -521,17 +506,6 @@ extension RouteScope {
         }
     }
 
-    @discardableResult
-    func waitUntilUninstalled() async -> Bool {
-        // Committed teardown owns its lifetime even if the requesting task cancels.
-        await RouteScopeReadiness.wait(in: self, cancellable: false) { !self.isInstalledInView }
-    }
-
-}
-
-final class RouteSourceEnvironment {
-    private(set) var values = EnvironmentValues()
-    func update(_ values: EnvironmentValues) { self.values = values }
 }
 
 #if canImport(UIKit)

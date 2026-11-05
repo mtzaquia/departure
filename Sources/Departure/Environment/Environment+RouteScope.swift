@@ -82,7 +82,7 @@ public struct UnwindRouteAction: Equatable {
 /// Whether a scope is a current endpoint of a participating path in the current modal subtree.
 ///
 /// Phase describes foreground navigation position, not command authority or host
-/// installation. Inactive live scopes in the current modal subtree may still issue commands.
+/// installation. Inactive live scopes may still issue commands, subject to dismissal protection.
 public enum RoutePhase: Equatable, Sendable {
     /// This scope is current within its participating branch and modal subtree.
     /// Concurrent branches may each have an active endpoint.
@@ -134,9 +134,9 @@ public extension EnvironmentValues {
     /// Concurrent branches can each be active. A modal makes scopes outside its subtree
     /// inactive; a scope outside the current modal subtree or removed from navigation is inactive.
     ///
-    /// Command authority requires live membership in the current modal subtree, rather than an
-    /// active phase. An inactive ancestor or unselected branch there can still navigate.
-    /// Neither phase nor command authority requires a mounted presentation host.
+    /// Live scopes can issue commands regardless of phase, subject to active dismissal
+    /// protection. Removed scopes cannot. Neither phase nor command eligibility requires
+    /// a mounted presentation host.
     @Entry var routePhase = RoutePhase.inactive
 }
 

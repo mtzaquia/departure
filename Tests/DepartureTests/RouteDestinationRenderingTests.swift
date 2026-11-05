@@ -66,9 +66,6 @@ struct RouteDestinationRenderingTests {
         try #require(await waitUntil { scope.branchSelection != nil && scope.activeBranch == AnyHashable("second") })
     }
 
-    #if canImport(AppKit)
-
-    #endif
 
     @Test func destinationUsesOneBridgeForHostRegistrationAndNativeAdmission() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
@@ -80,13 +77,13 @@ struct RouteDestinationRenderingTests {
         await engine.present(DomainOnlyRoute())
         let scope = try #require(engine.tree.rootPath.last)
         let lifetime = NativePresentationLifetime()
-        lifetime.synchronize(.init(scope: scope)) { .init(route: $0, nativePresentation: lifetime) }
+        lifetime.synchronize(.init(scope: scope))
         let snapshot = try #require(lifetime.presentation)
-        let window = mount(snapshot.destination.environment(\.routerEngine, engine))
+        let window = mount(RouteView(scope: snapshot.scope, nativePresentation: lifetime).environment(\.routerEngine, engine))
         defer { close(window) }
         try #require(await waitUntil { scope.isAvailableForPresentation && scope.presentationHostID != nil })
         #expect(lifecycleBridgeCount(in: try #require(window.contentViewForLifecycleTest)) == 1)
-        lifetime.synchronize(nil) { .init(route: $0) }
+        lifetime.synchronize(nil)
         lifetime.didDismantleDestination(of: snapshot.id)
         // Window admission must have reached the native owner through that same bridge.
         #expect(scope.isAwaitingPresentationEnd)
@@ -137,12 +134,6 @@ struct RouteDestinationRenderingTests {
         try #require(await waitUntil { completed != nil })
         #expect(completed == true)
         #expect(router.engine.tree.rootPath.isEmpty)
-    }
-
-    private func recorderDismiss(_ recorder: RenderedDestinationRecorder) {
-        recorder.context = nil
-        recorder.environment = nil
-        recorder.dismiss?()
     }
 
     #if canImport(UIKit)
@@ -220,9 +211,6 @@ struct RouteDestinationRenderingTests {
 }
 
 @MainActor @Observable
-private final class CustomizedDestinationControl { var showsRoute = true }
-
-@MainActor @Observable
 private final class SelectionReconciliationControl {
     var showsPrimary = true
     var showsDuplicate = false
@@ -240,15 +228,6 @@ private struct SelectionReconciliationSources: View {
     }
 }
 
-private struct ConditionalCustomizedDestination: View {
-    @Bindable var control: CustomizedDestinationControl
-    let destination: RouteView
-    var body: some View {
-        if control.showsRoute { destination }
-        else { Text("Preparing customized content") }
-    }
-}
-
 #if canImport(UIKit)
 private extension UIWindow {
     var contentViewForLifecycleTest: UIView? { rootViewController?.view }
@@ -260,43 +239,8 @@ private extension NSWindow {
 #endif
 
 @MainActor
-@Observable
-private final class DestinationEnvironmentControl { var value = "initial" }
-
-private struct DestinationEnvironmentHost: View {
-    @Bindable var control: DestinationEnvironmentControl
-    var body: some View {
-        Text("Root")
-            .routing()
-            .environment(\.destinationTestValue, control.value)
-    }
-}
-
-@MainActor
 private final class RenderedDestinationRecorder {
-    var context: RouteContext?
-    var environment: EnvironmentValues?
-    var values: [String] = []
-    var number: Int?
-    var dismiss: (() -> Void)?
     var unwindRoute: UnwindRouteAction?
-}
-
-private struct DestinationEnvironmentReader: View {
-    let recorder: RenderedDestinationRecorder
-    @Environment(\.self) private var environment
-    @Environment(\.dismiss) private var dismiss
-    @UnwindRoute private var unwindRoute
-    var body: some View {
-        Text("Destination")
-            .frame(width: 240, height: 160)
-            .onAppear { recorder.environment = environment; recorder.unwindRoute = unwindRoute; recorder.dismiss = { dismiss() } }
-            .onChange(of: environment.destinationTestValue) { _, _ in recorder.environment = environment }
-    }
-}
-
-private extension EnvironmentValues {
-    @Entry var destinationTestValue = "default"
 }
 
 private struct AncestorUnwindReader: View {

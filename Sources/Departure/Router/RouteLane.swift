@@ -39,8 +39,6 @@ final class RouteLane {
         return (owner.previousRouteScope?.lane.depth ?? 0) + 1
     }
 
-    var deepestModal: RouteScope? { modal?.lane.deepestModal ?? modal }
-
     func present(_ scope: RouteScope) {
         precondition(modal == nil, "A Y lane can own only one modal transition.")
         precondition(scope.previousRouteScope?.lane === self, "A modal advances from its presenting lane.")

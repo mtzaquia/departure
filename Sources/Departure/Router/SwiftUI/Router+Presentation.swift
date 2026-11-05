@@ -24,21 +24,12 @@ import SwiftUI
 
 struct PresentedRoute: Identifiable, Hashable {
     let scope: RouteScope
-    let sourceEnvironment: EnvironmentValues
-    init(scope: RouteScope, sourceEnvironment: EnvironmentValues = EnvironmentValues()) {
-        self.scope = scope
-        self.sourceEnvironment = sourceEnvironment
-    }
-    var id: AnyHashable { ObjectIdentifier(scope) }
+    var id: ObjectIdentifier { ObjectIdentifier(scope) }
     static func == (lhs: Self, rhs: Self) -> Bool { lhs.id == rhs.id }
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 extension RouterEngine {
-    enum PresentationTarget {
-        case local(RouteScope, RoutePresentationHostID?)
-    }
-
     struct PresentationKey: Hashable {
         let host: ObjectIdentifier
         let style: RoutePresentationKind
@@ -48,43 +39,37 @@ extension RouterEngine {
         }
     }
 
-    func presentationBinding(for target: PresentationTarget, matching style: RoutePresentationKind? = nil) -> Binding<PresentedRoute?> {
+    func routePresentationBinding(from scope: RouteScope?, matching style: RoutePresentationKind,
+                                  hostedBy host: RoutePresentationHostID? = nil) -> Binding<PresentedRoute?> {
+        let scope = scope ?? root
         // Establish observation before the binding closures are evaluated by SwiftUI.
-        switch target {
-        case let .local(scope, _):
-            _ = tree.routePath(containing: scope)?.scopes
-            if scope !== root { _ = scope.path.scopes }
-        }
-        let expectedID = resolvePresentation(for: target, matching: style)?.id
+        _ = tree.routePath(containing: scope)?.scopes
+        if scope !== root { _ = scope.path.scopes }
+        let expectedID = routePresentation(from: scope, matching: style, hostedBy: host)?.id
         return Binding(
-            get: { self.resolvePresentation(for: target, matching: style) },
+            get: { self.routePresentation(from: scope, matching: style, hostedBy: host) },
             set: { value in
                 guard value == nil, let expectedID,
-                      self.resolvePresentation(for: target, matching: style)?.id == expectedID else { return }
-                self.dismissPresentation(for: target, matching: style)
+                      let presentation = self.routePresentation(from: scope, matching: style, hostedBy: host),
+                      presentation.id == expectedID else { return }
+                self.dismissPresentation(presentation)
             }
         )
     }
 
-    func routePresentationBinding(from scope: RouteScope?, matching style: RoutePresentationKind, hostedBy host: RoutePresentationHostID? = nil) -> Binding<PresentedRoute?> {
-        presentationBinding(for: .local(scope ?? root, host), matching: style)
-    }
-    func routePresentation(from scope: RouteScope, matching style: RoutePresentationKind, hostedBy host: RoutePresentationHostID? = nil) -> PresentedRoute? {
-        resolvePresentation(for: .local(scope, host), matching: style)
-    }
-    private func resolvePresentation(for target: PresentationTarget, matching style: RoutePresentationKind?) -> PresentedRoute? {
-        switch target {
-        case let .local(host, hostID):
-            guard !host.hasConflictingPresentationHosts, let style, host.canDrivePresentation(matching: style),
-                  hostID == nil || host.presentationHostID == hostID else { return nil }
-            if let path = tree.routePath(containing: host),
-               let scope = path.scopes.first(where: { $0.attachedPresentationDeclaration(presentedBy: host, matching: style, hostedBy: hostID) != nil }) {
-                return PresentedRoute(scope: scope, sourceEnvironment: host.sourceEnvironment)
-            }
-            guard host !== root, let outgoing = outgoingPresentation(for: PresentationKey(host, style)),
-                  outgoing.retainsBinding else { return nil }
-            return outgoing.presentation
+    func routePresentation(from host: RouteScope, matching style: RoutePresentationKind,
+                           hostedBy hostID: RoutePresentationHostID? = nil) -> PresentedRoute? {
+        guard !host.hasConflictingPresentationHosts, host.canDrivePresentation(matching: style),
+              hostID == nil || host.presentationHostID == hostID else { return nil }
+        if let path = tree.routePath(containing: host),
+           let scope = path.scopes.first(where: {
+               $0.attachedPresentationDeclaration(presentedBy: host, matching: style, hostedBy: hostID) != nil
+           }) {
+            return PresentedRoute(scope: scope)
         }
+        guard host !== root, let outgoing = outgoingPresentation(for: PresentationKey(host, style)),
+              outgoing.retainsBinding else { return nil }
+        return outgoing.presentation
     }
 
     func pushPresentationDismissalDisablesAnimations(from scope: RouteScope?, hostedBy hostID: RoutePresentationHostID? = nil) -> Bool {
@@ -93,25 +78,22 @@ extension RouterEngine {
         return outgoingPresentation(for: PresentationKey(scope, .push))?.disablesAnimation == true
     }
 
-    /// A native owner ending an exact live occurrence is authoritative even when covered.
-    /// Generic destination-view teardown has no navigation authority.
+    /// Reconciles the exact occurrence removed by its native owner. Destination views
+    /// decide whether interactive dismissal is available; protection governs route commands.
     func nativePresentationDidDismiss(_ scope: RouteScope) {
-        guard tree.routePath(containing: scope) != nil, let tree = scope.tree,
-              scope.presentationDeclaration?.presentationKind.isModal == true else { return }
-        guard scope !== tree.root, let retained = scope.routePath.scope(before: scope) else { return }
-        let plan = RouteTree.UnwindPlan(retaining: [retained])
-        performPresentationDismissalUnwind(for: scope, in: retained, plan: plan, nativeOwner: true)
+        guard isNavigationEligible(scope), scope.presentationDeclaration?.presentationKind.isModal == true,
+              let retained = scope.routePath.scope(before: scope) else { return }
+        performPresentationDismissalUnwind(for: scope, in: retained,
+            plan: RouteTree.UnwindPlan(retaining: [retained]))
     }
 
-    private func dismissPresentation(for target: PresentationTarget, matching style: RoutePresentationKind?) {
-        guard let presentation = resolvePresentation(for: target, matching: style) else { return }
+    private func dismissPresentation(_ presentation: PresentedRoute) {
         let scope = presentation.scope
         guard isNavigationEligible(scope), let declaration = scope.presentationDeclaration else { return }
         if ios17NavigationStackPushWorkaround?.interceptDismissal(of: presentation,
             matching: declaration.presentationKind, in: self) == true { return }
         guard let retained = scope.routePath.scope(before: scope) else { return }
-        let plan = RouteTree.UnwindPlan(retaining: [retained])
-        guard permitsRemoval(plan, explicitlyDismissing: scope) else { return }
-        performPresentationDismissalUnwind(for: scope, in: retained, plan: plan)
+        performPresentationDismissalUnwind(for: scope, in: retained,
+            plan: RouteTree.UnwindPlan(retaining: [retained]))
     }
 }

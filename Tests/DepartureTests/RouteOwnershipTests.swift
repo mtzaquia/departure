@@ -16,11 +16,11 @@ struct RouteOwnershipTests {
     @Test func outgoingSnapshotRetainsObjectsWithoutOccupyingTheLiveLane() async throws {
         let engine: RouterEngine
         let probe: RoutingOwnershipProbe
-        var snapshot: RouteDestinationSnapshot?
+        var snapshot: PresentedRoute?
         (engine, snapshot, probe) = try await snapshotDetachedModalSubtree()
         #expect(probe.scope != nil)
-        #expect(snapshot!.route.scope.belongs(to: engine.tree) == false)
-        #expect(!engine.tree.rootPath.contains(snapshot!.route.scope))
+        #expect(snapshot!.scope.belongs(to: engine.tree) == false)
+        #expect(!engine.tree.rootPath.contains(snapshot!.scope))
         #expect(engine.root.lane.modal == nil)
 
         let root = Router(engine: engine, scope: engine.root)
@@ -34,7 +34,7 @@ struct RouteOwnershipTests {
         #expect(modal !== probe.scope)
 
         // The outgoing destination remains intact for its native exit.
-        #expect(snapshot!.route.scope.branchScopes["modal"]?.path.last === probe.scope)
+        #expect(snapshot!.scope.branchScopes["modal"]?.path.last === probe.scope)
         snapshot = nil
         #expect(probe.scope == nil)
     }
@@ -57,9 +57,9 @@ struct RouteOwnershipTests {
         let (probe, source, scoped, action) = storedRoutingEnvironment()
         #expect(probe.engine == nil)
         #expect(probe.scope == nil)
-        #expect(source.values.routeScope == nil)
-        #expect(source.values.router.engine == nil)
-        #expect(source.values.locale.identifier == "nl_NL")
+        #expect(source.routeScope == nil)
+        #expect(source.router.engine == nil)
+        #expect(source.locale.identifier == "nl_NL")
         #expect(await action() == false)
         await scoped.present(LoginRoute())
         #expect(await scoped.resetToRoot() == false)
@@ -104,16 +104,16 @@ private func detachModalSubtree() async throws -> (RouterEngine, RoutingOwnershi
 }
 
 @MainActor
-private func snapshotDetachedModalSubtree() async throws -> (RouterEngine, RouteDestinationSnapshot, RoutingOwnershipProbe) {
+private func snapshotDetachedModalSubtree() async throws -> (RouterEngine, PresentedRoute, RoutingOwnershipProbe) {
     let (engine, container, modal) = try await modalSubtree()
     let probe = RoutingOwnershipProbe(engine: engine, scope: modal)
-    let snapshot = RouteDestinationSnapshot(route: .init(scope: container))
+    let snapshot = PresentedRoute(scope: container)
     engine.tree.rootPath.keepThrough(engine.root)
     return (engine, snapshot, probe)
 }
 
 @MainActor
-private func storedRoutingEnvironment() -> (RoutingOwnershipProbe, RouteSourceEnvironment, Router, UnwindRouteAction) {
+private func storedRoutingEnvironment() -> (RoutingOwnershipProbe, EnvironmentValues, Router, UnwindRouteAction) {
     let engine = RouterEngine()
     let scope = engine.root
     let scoped = Router(engine: engine, scope: scope)
@@ -123,8 +123,7 @@ private func storedRoutingEnvironment() -> (RoutingOwnershipProbe, RouteSourceEn
     environment.routeScope = scope
     environment.router = scoped
     environment.locale = Locale(identifier: "nl_NL")
-    scope.bindRoutingHost(RoutePresentationHostID(), automatic: true, environment: environment)
-    return (RoutingOwnershipProbe(engine: engine, scope: scope), scope.sourceEnvironmentReference, scoped, action)
+    return (RoutingOwnershipProbe(engine: engine, scope: scope), environment, scoped, action)
 }
 
 @MainActor private final class OwnershipObservationCount { var value = 0 }

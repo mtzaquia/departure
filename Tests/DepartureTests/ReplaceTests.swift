@@ -310,7 +310,7 @@ struct ReplaceTests {
         container.defineTestMap(id: nil, selection: nil, definitions: [
             RouteScopeDeclaration(routes: testDeclaration(testDestination(SelectedRoute.self), presentation: .init(style: .replace))._routeDeclarations),
         ])
-        container.bindRoutingHost(hostID, automatic: false, environment: container.sourceEnvironment)
+        container.bindRoutingHost(hostID, automatic: false)
         await fixture.local(container).present(SelectedRoute(number: 1))
         await fixture.local(container).present(SelectedRoute(number: 2))
         #expect(fixture.sidebar.path.count == 2)
@@ -367,4 +367,3 @@ private struct SelectedRoute: Route, Equatable {
 private struct ChildRoute: Route { func destination() -> some View { Text("Child") } }
 private struct SiblingRoute: Route { func destination() -> some View { Text("Sibling") } }
 private struct OverlayRoute: Route { func destination() -> some View { Text("Overlay") } }
-private struct ElevatedRoute: Route { func destination() -> some View { Text("Elevated") } }

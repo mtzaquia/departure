@@ -325,7 +325,7 @@ struct IOS17NavigationStackPushWorkaroundTests {
         hostedBy presentationHostID: RoutePresentationHostID? = nil
     ) {
         if let presentationHostID {
-            router.root.bindRoutingHost(presentationHostID, automatic: false, environment: router.root.sourceEnvironment)
+            router.root.bindRoutingHost(presentationHostID, automatic: false)
         }
         let declarations = testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push))._routeDeclarations
         router.root.defineTestMap(

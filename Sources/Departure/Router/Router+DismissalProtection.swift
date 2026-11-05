@@ -62,7 +62,7 @@ extension RouterEngine {
             return global.map { declaration in
                 let foreground = currentRouteScope
                 @MainActor func target(at anchor: RouteScope) -> ResolvedRouteTarget {
-                    ResolvedRouteTarget(tree: tree, presentingScope: anchor, declaringScope: anchor,
+                    ResolvedRouteTarget(presentingScope: anchor, declaringScope: anchor,
                         declaration: declaration, lookupStrategy: .global)
                 }
                 // Reuse an equal occurrence in the foreground ancestry, just as
@@ -97,13 +97,4 @@ extension RouterEngine {
         return tree.firstDeclaration(including: type, origin: origin)
     }
 
-    func permitsNativeDismissal(of scope: RouteScope) -> Bool {
-        guard tree.routePath(containing: scope) != nil,
-              let retained = scope.routePath.scope(before: scope) else { return false }
-        return permitsRemoval(RouteTree.UnwindPlan(retaining: [retained]), explicitlyDismissing: scope)
-    }
-
-    func protectsNativePresentation(_ scope: RouteScope) -> Bool {
-        protectedScopes.contains { protected in protected.ancestry.contains { $0 === scope } }
-    }
 }

@@ -271,7 +271,7 @@ struct RouteScopeHostUIKitTests {
         let attachment = RouteScopeAttachment(kind: .routing)
         let hostID = RoutePresentationHostID()
         let apply: (RouteScope) -> Void = {
-            $0.bindRoutingHost(hostID, automatic: false, environment: EnvironmentValues())
+            $0.bindRoutingHost(hostID, automatic: false)
         }
         let remove: (RouteScope) -> Void = { $0.unbindRoutingHost(hostID) }
         attachment.update(target: first, view: attachmentView, apply: apply, remove: remove)

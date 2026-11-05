@@ -261,7 +261,7 @@ struct HookBindingTests {
         await root.present(LoginRoute())
         let source = try #require(engine.tree.rootPath.last)
         let branch = try #require(source.branchScopes["tab"])
-        let snapshot = RouteDestinationSnapshot(route: .init(scope: source))
+        let snapshot = PresentedRoute(scope: source)
         let sourceRouter = Router(engine: engine, scope: source)
         let hook = ActionInterceptor(HookBindingAction.self) { _ in probe.events.append("outgoing") }.declaration
         source.installHookDeclarations(hookDeclarations: [hook])
@@ -272,7 +272,7 @@ struct HookBindingTests {
         for _ in 0..<1000 where source.belongs(to: engine.tree) { await Task.yield() }
         #expect(!source.belongs(to: engine.tree))
         #expect(source.isInstalledInView)
-        #expect(snapshot.route.scope === source)
+        #expect(snapshot.scope === source)
         #expect(source.branchScopes["tab"] === branch)
         let key = HookDeclarationIdentity.actionInterceptor(ObjectIdentifier(HookBindingAction.self))
         #expect(source.hookBinding(for: key, in: engine.tree) == nil)

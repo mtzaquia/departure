@@ -72,7 +72,7 @@ Each read captures the resolved boundary. Newly pushed descendants are included 
 
 A missing match returns `false` and emits a warning when invoked, including in Release builds and when debug logging is disabled. A removed capture returns `false`. Neither case falls back to dismissing another destination.
 
-Active dismissal protection is checked when an action runs. A captured ancestor action is blocked if its removal would include another active protected instance. Once that instance becomes inactive, its modifier adds no restriction. Typed payload delivery and native teardown completion are identical for local and ancestor actions.
+Active dismissal protection is checked when a routing action runs. Destination views control interactive dismissal; native dismissal events reconcile navigation without a protection veto. A captured ancestor action is blocked if its removal would include another active protected instance. Once that instance becomes inactive, its modifier adds no restriction. Typed payload delivery and native teardown completion are identical for local and ancestor actions.
 
 ## Reset navigation to the application root
 

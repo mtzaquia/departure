@@ -71,4 +71,4 @@ A route declared in a global map and available throughout a routing owner's navi
 A root-declared collection of globally available route declarations. Its entries have individual presentation styles and may individually declare dismissal protection.
 
 **Dismissal protection**:
-A declaration's restriction against incidental removal of its route instance while that instance is active. It stops applying while the route is inactive and resumes if the same instance becomes active again.
+A declaration's restriction against routing requests that incidentally remove its active route instance. It stops applying while the route is inactive and resumes if that instance becomes active again. The destination owns its interactive dismissal behavior; native dismissal is reconciled with navigation state.

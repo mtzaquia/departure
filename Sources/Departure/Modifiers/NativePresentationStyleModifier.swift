@@ -132,7 +132,7 @@ struct SystemModalPresentationModifier: ViewModifier {
     }
 
     @ViewBuilder
-    private func systemPresentation(_ content: Content, presented: Binding<Bool>, rendered: RouteDestinationSnapshot?) -> some View {
+    private func systemPresentation(_ content: Content, presented: Binding<Bool>, rendered: PresentedRoute?) -> some View {
         #if canImport(UIKit)
         if fades {
             content.fullScreenCover(isPresented: presented, onDismiss: { complete(rendered) }) {
@@ -156,11 +156,10 @@ struct SystemModalPresentationModifier: ViewModifier {
     }
 
     @ViewBuilder
-    private func destination(_ rendered: RouteDestinationSnapshot) -> some View {
+    private func destination(_ rendered: PresentedRoute) -> some View {
         if fades {
             let _ = prepareFadeDestination(rendered.id)
-            rendered.destination.id(rendered.id)
-                .interactiveDismissDisabled(router.protectsNativePresentation(rendered.route.scope))
+            RouteView(scope: rendered.scope, nativePresentation: lifetime).id(rendered.id)
                 .environment(\.routerEngine, router)
                 .environment(\.scenePhase, scenePhase)
                 .transaction { transaction in
@@ -172,8 +171,7 @@ struct SystemModalPresentationModifier: ViewModifier {
                     content.opacity(fade.opacity)
                 }
         } else {
-            rendered.destination.id(rendered.id)
-                .interactiveDismissDisabled(router.protectsNativePresentation(rendered.route.scope))
+            RouteView(scope: rendered.scope, nativePresentation: lifetime).id(rendered.id)
         }
     }
 
@@ -196,12 +194,10 @@ struct SystemModalPresentationModifier: ViewModifier {
 
     private func synchronize() {
         let previousID = lifetime.presentation?.id
-        lifetime.synchronize(route) {
-            RouteDestinationSnapshot(route: $0, nativePresentation: lifetime)
-        }
+        lifetime.synchronize(route)
         if previousID != lifetime.presentation?.id { fade = .hidden }
     }
-    private func complete(_ rendered: RouteDestinationSnapshot?) {
+    private func complete(_ rendered: PresentedRoute?) {
         guard let rendered else { return }
         lifetime.completeDismissal(of: rendered.id, in: router)
         synchronize()

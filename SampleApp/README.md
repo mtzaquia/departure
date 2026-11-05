@@ -124,7 +124,7 @@ Choose **Global routes and passcode** on the start screen, or launch directly wi
 | Protection suspension and restoration | Crawl back from an unprotected overlay, or dismiss it | Crawlback can remove inactive lock; returning restores its protection | Package and UI tests |
 | Another protected global | Present the protected sheet over Passcode | The new route protects itself; Done returns to protected Passcode | Package and UI tests |
 
-The Unlock toolbar action uses the ordinary captured unwind action. No unlock queue, per-route covered-request policy, detached environment forwarding, or separate window exists. The main route lab retains global authentication and passcode examples too. Toolbars and presentation appearance use native automatic behavior; no device-specific policy or preference forwarding is installed.
+The sample destination builders apply `.interactiveDismissDisabled()` to Passcode and the protected sheet; the library does not own gesture policy. The Unlock toolbar action uses the ordinary captured unwind action. No unlock queue, per-route covered-request policy, detached environment forwarding, or separate window exists. The main route lab retains global authentication and passcode examples too. Toolbars and presentation appearance use native automatic behavior; no device-specific policy or preference forwarding is installed.
 
 ## Presentation replacement regressions
 

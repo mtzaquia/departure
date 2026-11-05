@@ -11,12 +11,13 @@ Status: implemented and verified in the working tree, 2026-11-05. This contract 
 - Presenting an unprotected destination above a protected route makes the underlying route inactive, so its protection stops applying. Ordinary navigation may then remove it incidentally.
 - There is no separate covered-request policy, deferred-until-unlock queue, or protected priority tier.
 - Use the existing window and ordinary SwiftUI modal adapters for globals and fade covers, without detached destination configuration.
+- Destination implementations own interactive dismissal. Departure protects routing requests and reconciles authoritative native dismissal events, including removal through a presenting ancestor.
 
 ## Separate availability from dismissal protection
 
 Global availability answers **where a declaration can be found**. Dismissal protection restricts navigation only while that declaration's route instance is active. No additional policy controls requests from underneath.
 
-This revises the original passcode requirement: explicit dismissal is required while the lock itself is active. Protection is suspended when an admitted destination takes over. It resumes automatically if the same lock instance becomes active again.
+This revises the original passcode requirement: routing requests require explicit dismissal while the lock itself is active. Protection is suspended when an admitted destination takes over. It resumes automatically if the same lock instance becomes active again.
 
 Keep domain values conforming to `Route`. Make `GlobalMap` a root-only group of route declarations, consistent with the existing separation between route data, placement, and `RouteDestination`. Apply `.dismissalProtection()` to a `Sheet` or `Cover` declaration inside that group. Neither feature requires a new domain-route protocol or a wrapper around each route.
 
@@ -132,11 +133,9 @@ Existing scene window
 
 Departure should install the required modal adapters automatically at routing hosts, including scopes with no local modal declarations. Consumers should not add a host for each global. An allowed global must be able to present above the active protected route; there is no always-topmost critical lock tier.
 
-While a protected route is active, prevent incidental teardown of its native presenting ancestry as well as its logical removal. Once it becomes inactive, release that restriction. Native and model behavior must agree with the phase-based rule rather than preserving a hidden lifetime barrier after another destination takes over.
+Dismissal protection applies to routing requests. Native dismissal policy belongs to the destination implementation, including any presenting ancestor whose dismissal would remove the flow. Departure installs no `interactiveDismissDisabled` modifier and does not veto native binding write-back or owner callbacks because of protected descendants.
 
-Apple documents that dismissing a controller lower in a modal stack also dismisses the controllers above its child. See [`dismiss(animated:completion:)`](https://developer.apple.com/documentation/uikit/uiviewcontroller/dismiss(animated:completion:)). For an inactive protected route, such removal can be permitted by this contract. For an active protected route, the adapter must prevent unauthorized ancestor dismissal. A root-only SwiftUI overlay is not sufficient for drawing above a separately presented sheet.
-
-Likewise, [`interactiveDismissDisabled(_:)`](https://developer.apple.com/documentation/swiftui/view/interactivedismissdisabled(_:)) prevents interactive dismissal but not programmatic dismissal. Apply native dismissal restrictions consistently with effective protection and reconcile explicit native dismissal against the exact instance. Disappearance, scene inactivity, or destination-view teardown must not independently authorize removal of an active protected route. If native dismissal happens unexpectedly, retain the logical restriction and reconcile; recovery alone cannot prove that covered content was never exposed.
+Native callbacks identify the exact occurrence being dismissed. Reconcile that removal, notify matching unwind handlers before the logical commit, and complete ordinary native teardown. A stale callback cannot remove a replacement. Generic destination disappearance and scene inactivity remain lifecycle facts rather than dismissal commands.
 
 Global and fade destinations use the existing SwiftUI sheet/cover adapter. Departure no longer allocates an elevated `UIWindow` or constructs a separate hosting controller for them.
 
@@ -149,6 +148,14 @@ UIKit fade covers use `fullScreenCover`, a clear presentation background, and st
 The elevated window bridge, elevated fade presenter, pass-through window/controllers, `WindowDestinationBuilder`, and `WithRouter(windowDestination:)` overload have been removed. So have `HighPriority`, `CriticalPriority`, `RoutePriority`, presentation priority metadata, and space removal operations. `RootRouter.root` replaces the external-entry role formerly served by `RootRouter.default`.
 
 Keep the general modal lifetime adapter, native dismissal reconciliation, push-host placement safeguards, outgoing destination snapshots, and the single transition coordinator. These address native lifetime and sequencing even in one window. Inventory references before deleting any shared helper.
+
+## Single-tree cleanup
+
+The routing owner retains one immutable tree. Captured targets hold their presenting and declaring scopes, with live membership checked before delayed insertion. They no longer store a second tree reference or select a tree during unwind.
+
+Native presentation binds directly to its scope and style. The single-case `PresentationTarget`, cached source environments, and cached destination-view wrapper have been removed. The native lifetime retains only the exact `PresentedRoute`; SwiftUI builds its ordinary `RouteView` at the presentation boundary. Outgoing occurrences, instance checks, fade completion, and iOS 17 push reconciliation remain necessary.
+
+Unused UIKit dismissal forwarding, debug projections, detached-host fixtures, and empty platform branches have been deleted. Test-only readiness and request helpers now live in test support.
 
 ## Regression coverage
 
@@ -169,7 +176,7 @@ The table defines the model and native regression coverage required for this imp
 | Equality reuse, ancestor unwind, reset, branch changes, and owning-container replacement | Active protection blocks incidental removal; inactive modifiers do not add special restrictions. |
 | Concurrent branches and a global owning a branch container | Effective protection follows each scope's actual phase, without protecting an inactive parent. |
 | Resolution reroutes, suspended requests, and host staging across phase changes | Final admission uses current phase and matched declaration, with source/cancellation checks preserved. |
-| Explicit close, native `dismiss()`, swipe/keyboard dismissal, and unexpected host loss | Dismissal intent, phase, instance identity, and native lifetime agree. |
+| Explicit close, native `dismiss()`, swipe/keyboard dismissal, and unexpected host loss | Routing commands honor protection; the destination owns native dismissal policy; exact native callbacks reconcile removal and stale callbacks remain inert. |
 | Environment and shared appearance configuration in 2FA and fade lock | Custom environment values, toolbar behavior, orientation, safe areas, color scheme, and `RouteContext` agree without `windowDestination`. |
 | Fade entrance, exit, immediate child push, and successor presentation | No slide, flash, premature teardown, or misplaced navigation destination; retain existing iOS 17 timing coverage. |
 | Unmanaged modal or alert already visible | Establish the supported integration/ordering behavior before claiming the lock covers it. |
@@ -182,7 +189,7 @@ The sample now includes global 2FA, active Passcode protection, allowed global a
 | Check | Result |
 | --- | --- |
 | macOS package and mounted presentation tests | 406 tests passed in 36 suites. |
-| Scene-hosted package tests on iOS 17 | 392 tests passed. The fake-host fixture controls its own exit timing; production watchdog coverage remains separate. |
+| Scene-hosted package tests on iOS 17 | 393 tests passed after the single-tree cleanup, including authoritative native dismissal with protected descendants. The fake-host fixture controls its own exit timing; production watchdog coverage remains separate. |
 | Scene-hosted package tests on iPadOS 27.2 | 392 tests passed. |
 | Final targeted iOS 27.2 sample UI run | 13 checks passed, covering the six global/protection flows, global replacement and retained nested stacks, alert dismissal, and destination context. The two former priority-specific nested-stack cases were identical after migration and have since been consolidated into one global case. |
 | iOS 17 sample regressions | Nine applicable tests passed: six global/protection flows and three global replacement styles. |
@@ -190,10 +197,13 @@ The sample now includes global 2FA, active Passcode protection, allowed global a
 | Native automatic toolbar behavior on Duo | Catalog text fits; the lab opens and closes; Passcode → 2FA → Done restores protection; Unlock returns to the app. Window identity and inherited configuration agree. No device-specific toolbar policy is installed. |
 | Repeated fade entrance on Duo | The reported toolbar movement and second-entrance resizing were reproduced. After scoping the animation to opacity, frame-by-frame native recordings of three consecutive entrances show a stable toolbar and full destination bounds throughout. |
 | Fade lifecycle follow-up on iOS 17 | Four mounted tests passed, including repeated fade presentation, destination-owned animations, and waiting for the visible exit before teardown. |
+| Single-tree cleanup on macOS | All 406 tests passed with direct destination rendering and no cached source environment. |
+| Cleanup sample regressions on iPadOS 27.2 | Nine tests passed: six global/protection flows and all three global sheet/cover replacement and focus cases. |
+| Destination-owned gesture policy on iOS 27.2 | A native swipe dismisses unprotected 2FA; the identical swipe leaves the sample-protected sheet visible. Done, protection restoration, repeated fade/Unlock, window identity, and inherited configuration all pass. |
 | Release builds | Library and final sample app succeeded; final sample Debug build also succeeded. |
 
 The earlier complete 74-case sample plan produced 66 passes, two platform skips, and six failures. Those failures exposed an outdated alert expectation and global reuse/replacement defects; all six affected cases passed in the final targeted run after correction. The complete plan was not rerun as one final batch. The older-system and iPad runs each skipped a device-specific test that has now been removed; their applicable cases all passed.
 
 ## Native ownership boundary
 
-Protection governs Departure-managed navigation. Unmanaged native presentations, arbitrary programmatic dismissal by external controllers, and macOS window closure remain owned by their respective native controllers. No platform-wide interception or additional window is installed.
+Protection governs Departure routing requests. Destination implementations own interactive dismissal, and native controllers own programmatic dismissal and window closure. Native owner callbacks reconcile removal even when active protected descendants were included. No platform-wide interception or additional window is installed.
