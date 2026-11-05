@@ -6,6 +6,80 @@ import UIKit
 
 @MainActor @Suite(.serialized, .timeLimit(.minutes(1)))
 struct WindowPresentationLifetimeUIKitTests {
+    @Test func windowPreferencesFollowLiveCoveredPresenterAndContainerDelegation() {
+        let window = UIWindow()
+        let presenter = WindowPolicyController()
+        window.rootViewController = presenter
+        let host = WindowRootHostingController(rootView: EmptyView())
+        host.coveredWindow = window
+        expectMatchingPolicy(host, presenter)
+
+        let modal = WindowPolicyController()
+        modal.mask = .landscape
+        modal.orientation = .landscapeRight
+        modal.hidden = false
+        modal.style = .darkContent
+        modal.animation = .fade
+        modal.homeHidden = false
+        modal.edges = .bottom
+        modal.verticalDisabled = false
+        presenter.presented = modal
+        expectMatchingPolicy(host, modal)
+
+        // Each appearance preference can be delegated independently by a container.
+        let child = WindowPolicyController()
+        modal.addChild(child)
+        modal.preferenceChild = child
+        #expect(host.supportedInterfaceOrientations == modal.supportedInterfaceOrientations)
+        #expect(host.prefersStatusBarHidden == child.prefersStatusBarHidden)
+        #expect(host.preferredStatusBarStyle == child.preferredStatusBarStyle)
+        #expect(host.preferredStatusBarUpdateAnimation == child.preferredStatusBarUpdateAnimation)
+        #expect(host.prefersHomeIndicatorAutoHidden == child.prefersHomeIndicatorAutoHidden)
+        #expect(host.preferredScreenEdgesDeferringSystemGestures == child.preferredScreenEdgesDeferringSystemGestures)
+        if #available(iOS 27.1, *) {
+            #expect(host.preferredVerticalBarBehavior == .disabled)
+            #expect(host.childForPreferredVerticalBarBehavior == nil)
+            child.verticalDisabled = false
+            #expect(host.preferredVerticalBarBehavior == .automatic)
+            child.verticalDisabled = true
+        }
+        #expect(host.childForStatusBarHidden == nil)
+        #expect(host.childForStatusBarStyle == nil)
+        #expect(host.childForHomeIndicatorAutoHidden == nil)
+        #expect(host.childForScreenEdgesDeferringSystemGestures == nil)
+
+        // A new root and subsequent changes are read without rebuilding the host.
+        window.rootViewController = child
+        child.mask = .portraitUpsideDown
+        expectMatchingPolicy(host, child)
+    }
+
+    @Test func coveredWindowIsWeakAndMissingSourceUsesHostingDefaults() {
+        let host = WindowRootHostingController(rootView: EmptyView())
+        let defaults = WindowRootHostingController(rootView: EmptyView())
+        var window: UIWindow? = UIWindow()
+        window?.rootViewController = WindowPolicyController()
+        host.coveredWindow = window
+        weak let covered = window
+        window = nil
+        #expect(covered == nil)
+        #expect(host.coveredWindow == nil)
+        expectMatchingPolicy(host, defaults)
+    }
+
+    private func expectMatchingPolicy(_ host: UIViewController, _ source: UIViewController) {
+        #expect(host.supportedInterfaceOrientations == source.supportedInterfaceOrientations)
+        #expect(host.preferredInterfaceOrientationForPresentation == source.preferredInterfaceOrientationForPresentation)
+        #expect(host.prefersStatusBarHidden == source.prefersStatusBarHidden)
+        #expect(host.preferredStatusBarStyle == source.preferredStatusBarStyle)
+        #expect(host.preferredStatusBarUpdateAnimation == source.preferredStatusBarUpdateAnimation)
+        #expect(host.prefersHomeIndicatorAutoHidden == source.prefersHomeIndicatorAutoHidden)
+        #expect(host.preferredScreenEdgesDeferringSystemGestures == source.preferredScreenEdgesDeferringSystemGestures)
+        if #available(iOS 27.1, *) {
+            #expect(host.preferredVerticalBarBehavior == source.preferredVerticalBarBehavior)
+        }
+    }
+
     @Test(arguments: [false, true])
     func nativeDismissCallbackDefersWindowAndRouterTeardown(fromViewDidDisappear: Bool) async throws {
         let probe = try await DismissalProbe.make()
@@ -116,6 +190,16 @@ struct WindowPresentationLifetimeUIKitTests {
         defer { NotificationCenter.default.removeObserver(notification) }
 
         // Substitute a controlled native renderer to test the window's completion contract.
+        let scene = try #require(UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)
+        let originalKeyWindow = scene.windows.first(where: \.isKeyWindow)
+        let coveredWindow = UIWindow(windowScene: scene)
+        let presenter = WindowPolicyController()
+        coveredWindow.rootViewController = presenter
+        coveredWindow.makeKeyAndVisible()
+        defer {
+            coveredWindow.isHidden = true
+            originalKeyWindow?.makeKey()
+        }
         let controller = ElevatedPriorityPresentationWindowBridge<EmptyView>.Controller { _, _ in EmptyView() }
         func synchronize() {
             controller.update(priority: priority,
@@ -127,6 +211,7 @@ struct WindowPresentationLifetimeUIKitTests {
         #expect(!window.isHidden)
         #expect(facts.insertionAnimations == false)
         #expect(window.rootViewController?.presentedViewController == nil)
+        expectMatchingPolicy(try #require(window.rootViewController), presenter)
         defer { controller.detach() }
 
         let root = ProbeRoot(facts: facts)
@@ -246,5 +331,34 @@ private struct WindowLifetimeRoute: Route {}
         context?.completeTransition(true)
         context = nil
     }
+}
+@MainActor private final class WindowPolicyController: UIViewController {
+    var mask: UIInterfaceOrientationMask = .portrait
+    var orientation: UIInterfaceOrientation = .portrait
+    var hidden = true
+    var style: UIStatusBarStyle = .lightContent
+    var animation: UIStatusBarAnimation = .slide
+    var homeHidden = true
+    var edges: UIRectEdge = [.left, .right]
+    var verticalDisabled = true
+    var presented: UIViewController?
+    var preferenceChild: UIViewController?
+
+    override var presentedViewController: UIViewController? { presented ?? super.presentedViewController }
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { mask }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { orientation }
+    override var prefersStatusBarHidden: Bool { hidden }
+    override var preferredStatusBarStyle: UIStatusBarStyle { style }
+    override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation { animation }
+    override var prefersHomeIndicatorAutoHidden: Bool { homeHidden }
+    override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { edges }
+    override var childForStatusBarHidden: UIViewController? { preferenceChild }
+    override var childForStatusBarStyle: UIViewController? { preferenceChild }
+    override var childForHomeIndicatorAutoHidden: UIViewController? { preferenceChild }
+    override var childForScreenEdgesDeferringSystemGestures: UIViewController? { preferenceChild }
+    @available(iOS 27.1, *)
+    override var preferredVerticalBarBehavior: UIVerticalBarBehavior { verticalDisabled ? .disabled : .automatic }
+    @available(iOS 27.1, *)
+    override var childForPreferredVerticalBarBehavior: UIViewController? { preferenceChild }
 }
 #endif

@@ -88,7 +88,9 @@ struct DepartureSampleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--push-host-probe=") }) {
+            if ProcessInfo.processInfo.arguments.contains("--detached-window-probe") {
+                DetachedWindowProbe()
+            } else if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--push-host-probe=") }) {
                 PushHostProbe(scenario: String(argument.dropFirst("--push-host-probe=".count)))
             } else if ProcessInfo.processInfo.arguments.contains("--sheet-focus-probe") {
                 WithRouter(routes: SheetFocusProbeRoot.routes) { SheetFocusProbeRoot() }

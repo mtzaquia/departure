@@ -111,6 +111,10 @@ The start screen's **About this sample** sheet binds a domain-only route using
 scoped unwind action. All flows use type-only map declarations and typed builders in
 `destinations:` closures. High and critical entries use root-only priority groups.
 
+## Detached window preferences
+
+Launch with `--detached-window-probe` to exercise high and critical sheets with vertical toolbars disabled. The fixture applies one shared modifier to the main hierarchy and through `WithRouter`'s `windowDestination` closure. **Read preferences** reports actual native orientation/status-bar agreement and the resolved toolbar behavior of both the elevated root and its sheet. Present the critical sheet above high, dismiss each, and reopen. On iPhone Duo, fold/unfold while a sheet is visible, send the app Home and return, and confirm the controls remain responsive. `DetachedWindowTests` covers stacking, reopening, rotation, and background/foreground snapshots; fold/unfold also needs direct simulator or device inspection.
+
 ## Presentation replacement regressions
 
 Launch with `--sheet-focus-probe` for a branch-owned sheet, add `--sheet-focus-root`

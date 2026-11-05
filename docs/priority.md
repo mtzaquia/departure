@@ -53,15 +53,33 @@ Dismissing the elevated entry's outer sheet or cover dismantles that entire spac
 
 Pending requests, transactions, and outgoing snapshots share one owner-level pipeline. After removal commits, the surviving top space becomes eligible immediately; its next presentation waits for required native teardown. A matched lower-space unwind handler runs before commit and can buffer that follow-up. A stored router from the removed space remains inactive.
 
-## Forward detached environment values
+## Configure detached hosts
 
-High and critical presentations use detached hosts, as do fade covers. Forward custom values with `windowDestination`:
+High and critical presentations use detached hosts, as do fade covers. Use `WithRouter`'s `windowDestination` closure to forward custom environment values and reapply hierarchy-wide SwiftUI modifiers. Modifiers applied to the main hierarchy do not cross into a separate hosting controller.
+
+On UIKit, an elevated window root automatically reads supported and preferred interface orientations, status-bar visibility/style/animation, home-indicator visibility, and deferred system-gesture edges from the covered window's current presenter. Appearance preferences follow the presenter's respective `childFor…` delegation. On iOS 27.1+, this also includes UIKit's [`preferredVerticalBarBehavior`](https://developer.apple.com/documentation/uikit/uiviewcontroller/preferredverticalbarbehavior). These values are queried live, and UIKit is asked to update them when the elevated root appears. The covered window is held weakly.
+
+SwiftUI has no public `EnvironmentValues` accessor for `toolbarVerticalBehavior`. UIKit exposes the resolved controller preference, but that does not install a SwiftUI modifier inside a detached sheet or cover. If the app disables vertical toolbars, explicitly use the same stable modifier for both hierarchies:
 
 ```swift
 WithRouter(routes: routes) {
   AppRoot()
+    .modifier(AppToolbarPolicy())
 } windowDestination: { destination, environment in
-  destination.environment(\.myCustomKey, environment.myCustomKey)
+  destination
+    .environment(\.myCustomKey, environment.myCustomKey)
+    .modifier(AppToolbarPolicy())
+}
+
+struct AppToolbarPolicy: ViewModifier {
+  @ViewBuilder
+  func body(content: Content) -> some View {
+    if #available(iOS 27.1, macOS 27.1, *) {
+      content.toolbarVerticalBehavior(.disabled)
+    } else {
+      content
+    }
+  }
 }
 ```
 

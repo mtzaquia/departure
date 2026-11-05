@@ -64,7 +64,8 @@ private enum MissingWindowDestinationWarning {
         wasEmitted = true
         log.departureWarning(
             "Detached route presentation is missing a `windowDestination` closure on `WithRouter`. "
-                + "Add one to forward custom environment values."
+                + "Add one to forward custom environment values and reapply hierarchy-wide modifiers "
+                + "such as `toolbarVerticalBehavior` consistently with the app hierarchy."
         )
     }
 }

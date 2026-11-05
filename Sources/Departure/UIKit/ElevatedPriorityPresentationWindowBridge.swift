@@ -163,6 +163,7 @@ struct ElevatedPriorityPresentationWindowBridge<HostedContent: View>: UIViewCont
             let hostingController = WindowRootHostingController(
                 rootView: makeHost(for: presentation, scenePhase: cascadedScenePhase)
             )
+            hostingController.coveredWindow = previousKeyWindow
             hostingController.view.backgroundColor = .clear
             hostingController.onDismiss = { [weak self] in
                 self?.dismissFromPresentedHost(id: presentation.id)

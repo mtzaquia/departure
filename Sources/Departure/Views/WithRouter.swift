@@ -63,7 +63,14 @@ public struct WithRouter<Content: View>: View {
     ///
     /// `windowDestination` customizes destinations that Departure renders in a detached
     /// SwiftUI host, including elevated-priority presentations and default-priority fade
-    /// covers. Use it to explicitly forward environment values those destinations need.
+    /// covers. Use it to explicitly forward environment values and reapply hierarchy-wide
+    /// modifiers those destinations need. View modifiers do not cross hosting-controller
+    /// boundaries; for example, apply the same `toolbarVerticalBehavior(.disabled)` to
+    /// both the app hierarchy and `destination` on iOS 27.1 and later.
+    ///
+    /// On UIKit, elevated window roots automatically read orientation, status-bar,
+    /// home-indicator, gesture-edge, and vertical-bar preferences from the covered
+    /// window. The closure configures the destination inside its own presentation.
     public init<WindowContent: View>(
         routes: RootRouteMap,
         router: RootRouter? = nil,

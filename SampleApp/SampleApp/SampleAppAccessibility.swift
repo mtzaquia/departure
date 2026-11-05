@@ -21,6 +21,12 @@
 //
 
 enum SampleAppAccessibility {
+    static let detachedPresent = "sample.detached-window.present"
+    static let detachedReport = "sample.detached-window.report"
+    static let detachedInspect = "sample.detached-window.inspect"
+    static let detachedCritical = "sample.detached-window.critical"
+    static let detachedDismiss = "sample.detached-window.dismiss"
+
     static let splitSelectDetail = "sample.split.select-detail"
     static let splitSelection = "sample.split.selection"
     static let splitSelectNext = "sample.split.select-next"

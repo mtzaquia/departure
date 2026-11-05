@@ -87,6 +87,8 @@ The map owns definitions independently of mounted views. `WithRouter` and destin
 
 Route maps separate type-only declarations from [composable destination bindings](docs/routing.md#compose-destination-bindings) and use root-only `HighPriority` and `CriticalPriority` groups. For changes from version 2, see the [v3.0.0 migration notes](https://github.com/mtzaquia/departure/releases/tag/v3.0.0#migration-notes).
 
+High and critical routes use a separate window on UIKit. Its root mirrors the covered window's orientation and system-bar preferences. SwiftUI modifiers do not cross detached hosting boundaries: use `WithRouter(..., windowDestination:)` to forward custom environment values and reapply hierarchy-wide modifiers, including the same `toolbarVerticalBehavior` on iOS 27.1+. See [detached-host configuration](docs/priority.md#configure-detached-hosts); this also applies to fade covers.
+
 ## Documentation
 
 - [Getting started](docs/getting-started.md) — maps, destinations, and view bindings.
