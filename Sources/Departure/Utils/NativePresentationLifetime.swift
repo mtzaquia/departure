@@ -122,7 +122,7 @@ final class NativePresentationLifetime {
     }
 
     func requestDismissal(of id: PresentedRoute.ID, in router: RouterEngine) {
-        guard let scope = presentation?.route.scope, beginDismissal(of: id),
+        guard let scope = presentation?.route.scope, router.permitsNativeDismissal(of: scope), beginDismissal(of: id),
               scope.isNativePresentationOwned(by: self) else { return }
         router.nativePresentationDidDismiss(scope)
     }

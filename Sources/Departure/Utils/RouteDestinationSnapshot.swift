@@ -31,23 +31,7 @@ struct RouteDestinationSnapshot {
         self.destination = AnyView(RouteView(scope: route.scope, nativePresentation: nativePresentation))
     }
 
-    init(route: PresentedRoute, destinationBuilder: WindowDestinationBuilder, nativePresentation: NativePresentationLifetime? = nil) {
-        self.route = route
-        let destination = destinationBuilder.build(
-            RouteView(scope: route.scope, nativePresentation: nativePresentation),
-            route.sourceEnvironment
-        )
-        if destinationBuilder.hasWindowDestination, let nativePresentation {
-            // A custom wrapper may conditionally omit RouteView, or retain itself after
-            // RouteView tears down. Both sources feed the same monotonic admission state;
-            // native dismissal still belongs to the modal adapter.
-            self.destination = AnyView(destination.onLifecycleEvent { [weak nativePresentation] _, _, event in
-                nativePresentation?.handleDestinationEvent(event, of: route.id)
-            })
-        } else {
-            self.destination = destination
-        }
-    }
+
 }
 
 extension RouteDestinationSnapshot: Identifiable {

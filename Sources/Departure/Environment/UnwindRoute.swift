@@ -31,7 +31,7 @@ import SwiftUI
 /// ```
 ///
 /// Lookup includes the current destination and follows its ancestry within the
-/// receiving priority space. Sibling branches and other spaces are never searched.
+/// receiving navigation ancestry. Sibling branches are never searched.
 /// Each read captures the destination it will dismiss. A retained action never
 /// retargets a replacement instance. It remains usable while that destination is
 /// live, even after the child that read it has popped.
@@ -54,7 +54,7 @@ public struct UnwindRoute: DynamicProperty {
 
     /// The action captured from this view's scope and the resolved policy boundary.
     ///
-    /// Calling the action observes live-scope authority, covered-space restrictions,
+    /// Calling the action observes live-scope authority, covered-tree restrictions,
     /// payload delivery, and native teardown completion in the shared unwind engine.
     public var wrappedValue: UnwindRouteAction {
         guard let engine else {

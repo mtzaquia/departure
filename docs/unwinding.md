@@ -15,9 +15,9 @@ await router.unwind(.nearestModal)
 | `.current` | Dismisses the current destination and its descendants. This is the reader's default. |
 | `.nearestModal` | Dismisses the nearest sheet or cover and all its descendants, regardless of push depth. Includes the current destination. |
 
-Lookup starts at the captured source scope and stays within its priority space. Covered spaces reject ordinary unwinds.
+Lookup starts at the captured source and follows its navigation ancestry. An unwind cannot incidentally remove an active destination with dismissal protection.
 
-A default local action at an elevated root removes that entire space; the permanent default root cannot be dismissed. `router.dismissSpace()` removes the receiving top elevated space from any descendant. `RootRouter.dismissSpace(_:)` and `dismissSpaces()` coordinate removal explicitly, including covered spaces, and finish after native teardown.
+A global route uses ordinary captured dismissal. Its own `@UnwindRoute` action can explicitly close it while protected. A stored ancestor action cannot remove a different active protected route incidentally. The permanent application root cannot be dismissed.
 
 `unwind` returns whether the request was accepted and finishes after native teardown. Await it before continuing a flow. If the unwind removes the requesting destination, obtain a fresh router from the owning `RootRouter` for the next presentation:
 
@@ -66,28 +66,28 @@ await router.unwind(from: CheckoutRoute.self)
 await router.unwind(from: CheckoutRoute.self, payload: CheckoutResult.completed)
 ```
 
-The action dismisses the matched `CheckoutRoute` and all its descendants. No publication modifier or custom environment key is needed. Lookup includes the current destination, crosses push and ordinary modal boundaries within its priority space, and never searches sibling branches or other priority spaces. If the route type appears more than once, the nearest occurrence wins.
+The action dismisses the matched `CheckoutRoute` and all its descendants. No publication modifier or custom environment key is needed. Lookup includes the current destination, crosses push and modal boundaries, and never searches sibling branches. If the route type appears more than once, the nearest occurrence wins.
 
 Each read captures the resolved boundary. Newly pushed descendants are included when the action runs. A stored action never searches again or switches to a replacement route instance. Dismissal actions remain usable while that destination is live, even after the child that read them has popped.
 
 A missing match returns `false` and emits a warning when invoked, including in Release builds and when debug logging is disabled. A removed capture returns `false`. Neither case falls back to dismissing another destination.
 
-The existing covered-space restrictions apply when an action is invoked. Lookup can capture a live covered ancestor, but that action cannot unwind until its space is eligible again. Typed payload delivery and native teardown completion are identical for local and ancestor actions.
+Active dismissal protection is checked when an action runs. A captured ancestor action is blocked if its removal would include another active protected instance. Once that instance becomes inactive, its modifier adds no restriction. Typed payload delivery and native teardown completion are identical for local and ancestor actions.
 
-## Reset a space to its root
+## Reset navigation to the application root
 
-Use a reset to clear navigation while retaining the priority-space root and its outer presentation:
+Use a reset to clear navigation while retaining the application root:
 
 ```swift
 await router.resetToRoot()
 await router.resetToRoot(payload: SaveResult.saved)
 ```
 
-A reset keeps an elevated entry visible. Use `router.dismissSpace()` to dismiss that entire elevated flow. Reset is a router command; it is not an `@UnwindRoute` policy.
+A reset includes global presentations. It is blocked if it would remove an active protected destination. Reset is a router command; it is not an `@UnwindRoute` policy.
 
-The captured source must be live in the top space. Empty navigation, removed sources, and covered spaces return `false`. Accepted resets use the requesting source route for unwind-handler matching and finish after native teardown.
+The captured source must be live. Empty navigation, removed sources, and active protection preventing removal return `false`. Accepted resets use the requesting source route for unwind-handler matching and finish after native teardown.
 
-Reset removes every branch owned by a removed container. Inactive pushes survive only in branches owned by the retained space root.
+Reset removes every branch owned by a removed container. Inactive pushes survive only in branches owned by the retained application root.
 
 ## Return a value
 
@@ -105,13 +105,13 @@ await unwindRoute(payload: SaveResult.saved)
 
 SwiftUI’s `dismiss()` follows the same payload-free unwind path and triggers a matching handler.
 
-Handlers report explicit unwind or dismissal requests, including native Back and explicit whole-space removal. Presenting a route does not notify handlers, even when finding its declaration, reusing an equal destination, or replacing a presentation removes existing destinations.
+Handlers report explicit unwind or dismissal requests, including native Back. Presenting a route does not notify handlers, even when finding its declaration, reusing an equal destination, or replacing a presentation removes existing destinations.
 
-Native and explicit unwinds enter the matching handler before committing the path change, while the outgoing source is still live. The handler may start asynchronous work; the unwind continues once it suspends and does not wait for that work to finish. A presentation requested by the handler waits for unwind completion and then rechecks its captured source and routing rules. A default-flow presentation proceeds after the higher space is removed; it is dropped if a reset or partial unwind leaves that space covering its source.
+Native and explicit unwinds enter the matching handler before committing the path change, while the outgoing source is still live. The handler may start asynchronous work; the unwind continues once it suspends and does not wait for that work to finish. A presentation requested by the handler waits for unwind completion and then rechecks its captured source and routing rules. A follow-up presentation proceeds only if the resulting phase and protection rules permit it.
 
-Handlers are found from the surviving landing scope toward its space root, then from each surviving lower space's current scope toward its root, nearest priority first. Only the first matching handler receives the notification and payload. Whole-space removal starts directly with lower spaces; a combined removal skips spaces being removed by that operation. Covered scopes can receive this notification without gaining navigation authority.
+Handlers are found from the surviving landing scope toward the application root. Only the first matching handler receives the notification and payload. A surviving inactive scope may receive notification; a follow-up request still checks protection.
 
-An outgoing scope stops participating when it leaves navigation, even if its view is retained for dismissal. Multiple `.hooks` modifiers compose handlers keyed by route and expected payload type. A `String` handler and an `Int` handler for the same route coexist; duplicating the `String` key warns and disables only that key until one declaration remains. A conflicting applicable key stops lookup, including fallback to ancestors and lower spaces. A different payload key does not shadow a matching ancestor handler.
+An outgoing scope stops participating when it leaves navigation, even if its view is retained for dismissal. Multiple `.hooks` modifiers compose handlers keyed by route and expected payload type. A `String` handler and an `Int` handler for the same route coexist; duplicating the `String` key warns and disables only that key until one declaration remains. A conflicting applicable key stops lookup, including fallback to ancestors. A different payload key does not shadow a matching ancestor handler.
 
 For a provided payload, a handler for its exact type takes precedence in the receiving scope. Otherwise, one compatible typed handler may receive it through the same cast used by the typed builder. Multiple compatible types without an exact match warn and stop lookup instead of selecting by installation order.
 

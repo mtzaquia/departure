@@ -64,12 +64,6 @@ struct NestedModalProbeRoot: View {
     @Environment(\.router) private var router
     @State private var probe = NestedModalProbeState.shared
 
-    private var priority: RoutePriority {
-        if ProcessInfo.processInfo.arguments.contains("--nested-modal-critical") { return .critical }
-        if ProcessInfo.processInfo.arguments.contains("--nested-modal-high") { return .high }
-        return .default
-    }
-
     var body: some View {
         VStack {
             Button("Present sheet A") {
@@ -262,19 +256,10 @@ enum NestedModalProbeMap {
     static var root: RootRouteMap {
         let arguments = ProcessInfo.processInfo.arguments
         return RootRouteMap {
-            if !arguments.contains("--nested-modal-high") && !arguments.contains("--nested-modal-critical") {
+            if arguments.contains("--nested-modal-global") {
+                GlobalMap { Sheet(NestedModalProbeSheetARoute.self) { nested } }
+            } else {
                 Sheet(NestedModalProbeSheetARoute.self) { nested }
-            }
-
-            HighPriority {
-                if arguments.contains("--nested-modal-high") {
-                    Sheet(NestedModalProbeSheetARoute.self) { nested }
-                }
-            }
-            CriticalPriority {
-                if arguments.contains("--nested-modal-critical") {
-                    Sheet(NestedModalProbeSheetARoute.self) { nested }
-                }
             }
         } destinations: {
             NestedModalDestinations.nestedModalProbeSheetARoute

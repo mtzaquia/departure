@@ -41,11 +41,11 @@ import Testing
         }
         let route = HomeDetailRoute()
         await Router(engine: engine, scope: owner).present(route)
-        let appended = try #require(engine.defaultSpace.rootPath.last)
+        let appended = try #require(engine.tree.rootPath.last)
         #expect(appended.route is HomeDetailRoute)
         #expect(!appended.isInstalledInView)
 
-        let path = engine.defaultSpace.rootPath.departureDebugPathDescription
+        let path = engine.tree.rootPath.departureDebugPathDescription
         let event = DepartureLogEvent.routeAppended(route: route, path: path, match: match)
         let host = explicit ? "explicit" : "automatic"
         var expected = "[route][r:12345678] ✓ appended \(route.departureDebugDescription) to path"
@@ -81,7 +81,7 @@ import Testing
     @Test func automaticRootPushDoesNotSuggestAMissingModalHost() throws {
         let engine = RouterEngine(routes: RootRouteMap { testPush(testDestination(HomeDetailRoute.self)) })
         engine.root.bindRoutingHost(RoutePresentationHostID(), automatic: true, environment: engine.root.sourceEnvironment)
-        let match = try #require(engine.spaces.firstDeclaration(including: HomeDetailRoute.self)?.declaration)
+        let match = try #require(engine.tree.firstDeclaration(including: HomeDetailRoute.self)?.declaration)
         let event = DepartureLogEvent.routeAppended(route: HomeDetailRoute(), path: "path", match: match)
         #expect(event.message.contains("style=push owner=root host=automatic"))
         #expect(!event.message.contains("hint:"))
@@ -116,9 +116,9 @@ import Testing
     private func context(ownerStyle: RoutePresentation.Style, childStyle: RoutePresentation.Style = .push) async throws
         -> (RouterEngine, RouteScope, RouterEngine.ResolvedRouteTarget) {
         let engine = RouterEngine(routes: RootRouteMap {
-            AnyRouteDeclaration(SettingsRoute.self, presentation: .init(style: ownerStyle, priority: .default), children: [
+            AnyRouteDeclaration(SettingsRoute.self, presentation: .init(style: ownerStyle), children: [
                 RouteScopeDeclaration(routes: [
-                    AnyRouteDeclaration(HomeDetailRoute.self, presentation: .init(style: childStyle, priority: .default))
+                    AnyRouteDeclaration(HomeDetailRoute.self, presentation: .init(style: childStyle))
                 ])
             ])
         } destinations: {
@@ -126,8 +126,8 @@ import Testing
             testDestination(HomeDetailRoute.self)
         })
         await engine.present(SettingsRoute())
-        let owner = try #require(engine.defaultSpace.rootPath.last)
-        let match = try #require(engine.spaces.firstDeclaration(including: HomeDetailRoute.self,
+        let owner = try #require(engine.tree.rootPath.last)
+        let match = try #require(engine.tree.firstDeclaration(including: HomeDetailRoute.self,
             origin: RouteRequestOrigin(scope: owner))?.declaration)
         return (engine, owner, match)
     }

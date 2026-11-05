@@ -37,7 +37,6 @@ struct PresentedRoute: Identifiable, Hashable {
 extension RouterEngine {
     enum PresentationTarget {
         case local(RouteScope, RoutePresentationHostID?)
-        case priority(RoutePriority)
     }
 
     struct PresentationKey: Hashable {
@@ -53,10 +52,8 @@ extension RouterEngine {
         // Establish observation before the binding closures are evaluated by SwiftUI.
         switch target {
         case let .local(scope, _):
-            _ = spaces.routePath(containing: scope)?.scopes
+            _ = tree.routePath(containing: scope)?.scopes
             if scope !== root { _ = scope.path.scopes }
-        case let .priority(priority):
-            _ = spaces.space(for: priority)?.rootPath.scopes
         }
         let expectedID = resolvePresentation(for: target, matching: style)?.id
         return Binding(
@@ -72,30 +69,16 @@ extension RouterEngine {
     func routePresentationBinding(from scope: RouteScope?, matching style: RoutePresentationKind, hostedBy host: RoutePresentationHostID? = nil) -> Binding<PresentedRoute?> {
         presentationBinding(for: .local(scope ?? root, host), matching: style)
     }
-    func elevatedRoutePresentationBinding(priority: RoutePriority, matching style: RoutePresentationKind) -> Binding<PresentedRoute?> {
-        presentationBinding(for: .priority(priority), matching: style)
-    }
     func routePresentation(from scope: RouteScope, matching style: RoutePresentationKind, hostedBy host: RoutePresentationHostID? = nil) -> PresentedRoute? {
         resolvePresentation(for: .local(scope, host), matching: style)
     }
-    func elevatedRoutePresentation(priority: RoutePriority, matching style: RoutePresentationKind) -> PresentedRoute? {
-        resolvePresentation(for: .priority(priority), matching: style)
-    }
-
     private func resolvePresentation(for target: PresentationTarget, matching style: RoutePresentationKind?) -> PresentedRoute? {
         switch target {
-        case let .priority(priority):
-            guard let space = spaces.space(for: priority),
-                  priority != .default, let metadata = space.root.presentation,
-                  style == nil || metadata.declaration.presentationKind == style else { return nil }
-            return PresentedRoute(scope: space.root, sourceEnvironment: metadata.sourceEnvironment.values)
-
         case let .local(host, hostID):
             guard !host.hasConflictingPresentationHosts, let style, host.canDrivePresentation(matching: style),
                   hostID == nil || host.presentationHostID == hostID else { return nil }
-            if let path = spaces.routePath(containing: host),
-               let scope = path.scopes.first(where: { $0.attachedPresentationDeclaration(presentedBy: host, matching: style, hostedBy: hostID) != nil }),
-               shouldHostLocally(scope) {
+            if let path = tree.routePath(containing: host),
+               let scope = path.scopes.first(where: { $0.attachedPresentationDeclaration(presentedBy: host, matching: style, hostedBy: hostID) != nil }) {
                 return PresentedRoute(scope: scope, sourceEnvironment: host.sourceEnvironment)
             }
             guard host !== root, let outgoing = outgoingPresentation(for: PresentationKey(host, style)),
@@ -110,27 +93,13 @@ extension RouterEngine {
         return outgoingPresentation(for: PresentationKey(scope, .push))?.disablesAnimation == true
     }
 
-    func shouldHostLocally(_ scope: RouteScope) -> Bool {
-        guard let declaration = scope.presentationDeclaration, let space = scope.space else { return false }
-        return declaration.priority <= space.priority
-    }
-
     /// A native owner ending an exact live occurrence is authoritative even when covered.
     /// Generic destination-view teardown has no navigation authority.
     func nativePresentationDidDismiss(_ scope: RouteScope) {
-        guard spaces.routePath(containing: scope) != nil, let space = scope.space,
+        guard tree.routePath(containing: scope) != nil, let tree = scope.tree,
               scope.presentationDeclaration?.presentationKind.isModal == true else { return }
-        let plan: RouteSpaces.UnwindPlan
-        let retained: RouteScope?
-        if scope === space.root {
-            guard space.priority != .default else { return }
-            plan = RouteSpaces.UnwindPlan(removing: [space])
-            retained = nil
-        } else {
-            guard let previous = scope.routePath.scope(before: scope) else { return }
-            plan = RouteSpaces.UnwindPlan(retaining: [previous])
-            retained = previous
-        }
+        guard scope !== tree.root, let retained = scope.routePath.scope(before: scope) else { return }
+        let plan = RouteTree.UnwindPlan(retaining: [retained])
         performPresentationDismissalUnwind(for: scope, in: retained, plan: plan, nativeOwner: true)
     }
 
@@ -140,18 +109,9 @@ extension RouterEngine {
         guard isNavigationEligible(scope), let declaration = scope.presentationDeclaration else { return }
         if ios17NavigationStackPushWorkaround?.interceptDismissal(of: presentation,
             matching: declaration.presentationKind, in: self) == true { return }
-        let plan: RouteSpaces.UnwindPlan
-        let retained: RouteScope?
-        switch target {
-        case .local:
-            guard let previous = scope.routePath.scope(before: scope) else { return }
-            plan = RouteSpaces.UnwindPlan(retaining: [previous])
-            retained = previous
-        case let .priority(priority):
-            guard let space = spaces.space(for: priority) else { return }
-            plan = RouteSpaces.UnwindPlan(removing: [space])
-            retained = nil
-        }
+        guard let retained = scope.routePath.scope(before: scope) else { return }
+        let plan = RouteTree.UnwindPlan(retaining: [retained])
+        guard permitsRemoval(plan, explicitlyDismissing: scope) else { return }
         performPresentationDismissalUnwind(for: scope, in: retained, plan: plan)
     }
 }

@@ -29,13 +29,13 @@ final class RouteLane {
 
     var modal: RouteScope? {
         access(keyPath: \.modal)
-        guard let occupant, let space = owner?.space, occupant.belongs(to: space) else { return nil }
+        guard let occupant, let tree = owner?.tree, occupant.belongs(to: tree) else { return nil }
         return occupant
     }
 
     init(owner: RouteScope) { self.owner = owner }
     var depth: Int {
-        guard let owner, owner.anchorSpace == nil, owner.presentationDeclaration?.presentationKind.isModal == true else { return 0 }
+        guard let owner, owner.anchorTree == nil, owner.presentationDeclaration?.presentationKind.isModal == true else { return 0 }
         return (owner.previousRouteScope?.lane.depth ?? 0) + 1
     }
 

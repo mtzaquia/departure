@@ -70,12 +70,12 @@ struct HomeView: View {
                     action("Nested sheets", symbol: "square.stack.3d.up.fill", id: SampleAppAccessibility.homeShowDismissProbeButton) { await router.present(DismissProbeRoute()) }
                     action("Fade navigation", symbol: "menubar.rectangle", id: SampleAppAccessibility.homeShowNavigationBarFadeButton) { await router.present(NavigationBarFadeOcclusionRoute()) }
                     action("Lifecycle teardown", symbol: "arrow.triangle.2.circlepath", color: LabPalette.mint, id: SampleAppAccessibility.homeShowLifecycleTeardownButton) { await router.present(LifecycleTeardownRoute()) }
-                    action("Priority race", symbol: "flag.checkered", color: LabPalette.coral, id: SampleAppAccessibility.homePresentPendingPriorityRaceButton) {
-                        await router.branch(LandingView.TabItem.settings).present(PendingPriorityRoute())
+                    action("Global request race", symbol: "flag.checkered", color: LabPalette.coral, id: SampleAppAccessibility.homePresentPendingGlobalRaceButton) {
+                        await router.branch(LandingView.TabItem.settings).present(PendingGlobalRoute())
                         await router.present(TopLevelSheetRoute())
                     }
-                    action("Passthrough sheet", symbol: "hand.tap", color: LabPalette.blue, id: SampleAppAccessibility.homePresentHighPriorityPassthroughSheetButton) { await router.present(HighPriorityPassthroughSheetRoute()) }
-                    action("Blocking sheet", symbol: "hand.raised.fill", color: LabPalette.amber, id: SampleAppAccessibility.homePresentHighPriorityBlockingSheetButton) { await router.present(HighPriorityBlockingSheetRoute()) }
+                    action("Passthrough sheet", symbol: "hand.tap", color: LabPalette.blue, id: SampleAppAccessibility.homePresentGlobalPassthroughSheetButton) { await router.present(GlobalPassthroughSheetRoute()) }
+                    action("Blocking sheet", symbol: "hand.raised.fill", color: LabPalette.amber, id: SampleAppAccessibility.homePresentGlobalScrimSheetButton) { await router.present(GlobalScrimSheetRoute()) }
                 }
             }
 

@@ -28,57 +28,7 @@ import Testing
 
 #if DEBUG
     @MainActor @Suite(.serialized) struct RouteMapTraceTests {
-        @Test func adoptedTreeShowsStableDestinationMatchesWithoutBuildingViews() {
-            var builds = 0
-            let number = RouteDestination(NumberedRoute.self) { _, _ in
-                builds += 1
-                return EmptyView()
-            }
-            let feature = RouteMap {
-                Push(NumberedRoute.self)
-            } destinations: {
-                number
-            }
-            let engine = RouterEngine(
-                routes: RootRouteMap {
-                    Sheet(DomainOnlyRoute.self)
-                    Branches(concurrent: true) {
-                        Branch("private-first") { feature }
-                        Branch("private-second") { feature }
-                    }
-                    HighPriority {
-                        Cover(HomeDetailRoute.self, transition: .fade) { Sheet(DomainOnlyRoute.self) }
-                    }
-                } destinations: {
-                    RouteDestination(DomainOnlyRoute.self) { _, _ in
-                        builds += 1
-                        return EmptyView()
-                    }
-                    RouteDestination(HomeDetailRoute.self) { _, _ in
-                        builds += 1
-                        return EmptyView()
-                    }
-                })
-            let expected = """
-                root
-                ├─ default
-                │  ├─ sheet DomainOnlyRoute → destination #1
-                │  └─ branches (concurrent)
-                │     ├─ branch #1 (String)
-                │     │  └─ push NumberedRoute → destination #2
-                │     └─ branch #2 (String)
-                │        └─ push NumberedRoute → destination #2
-                └─ high
-                   └─ cover.fade HomeDetailRoute → destination #3
-                      └─ sheet DomainOnlyRoute → destination #1
-                """
-            let event = DepartureLogEvent.mapAdopted(definitions: engine.root.definitions, ownerID: engine.id)
-            #expect(event.logLevel == .trace)
-            #expect(event.renderedMessage == "[map] ✓ adopted routing map owner=\(engine.id.uuidString.prefix(8))\n\(expected)")
-            #expect(event.standardOutputDump == event.renderedMessage)
-            #expect(engine.root.definitions.departureMapTrace == expected)
-            #expect(builds == 0)
-        }
+
 
         @Test func largeAdoptedTreeUsesOneCompleteStandardOutputDumpWithoutBuildingViews() {
             var builds = 0
@@ -99,10 +49,10 @@ import Testing
             let lines = event.renderedMessage.components(separatedBy: "\n")
             let dump = event.standardOutputDump
 
-            #expect(lines.count == 1_204)
+            #expect(lines.count == 1_203)
             #expect(event.renderedMessage.utf8.count > 32_768)
             #expect(dump == event.renderedMessage)
-            #expect(dump?.hasSuffix("      └─ branch #600 (Int)\n         └─ push NumberedRoute → destination #1") == true)
+            #expect(dump?.hasSuffix("   └─ branch #600 (Int)\n      └─ push NumberedRoute → destination #1") == true)
             #expect(builds == 0)
         }
 

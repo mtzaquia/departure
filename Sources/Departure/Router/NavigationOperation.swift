@@ -41,10 +41,10 @@ extension RouterEngine {
         }
 
         enum Stage {
-            case preparingUnwind(RouteSpaces.UnwindPlan)
-            case preparingPresentation(RouteSpaces.UnwindPlan, Presentation)
-            case unwinding(RouteSpaces.UnwindPlan, destination: RouteScope?)
-            case unwindingForPresentation(RouteSpaces.UnwindPlan, Presentation)
+            case preparingUnwind(RouteTree.UnwindPlan)
+            case preparingPresentation(RouteTree.UnwindPlan, Presentation)
+            case unwinding(RouteTree.UnwindPlan, destination: RouteScope?)
+            case unwindingForPresentation(RouteTree.UnwindPlan, Presentation)
             case awaitingHost(Presentation)
             case finished(RouteScope?)
         }
@@ -53,7 +53,7 @@ extension RouterEngine {
         @ObservationIgnored private var completion: CheckedContinuation<RouteScope?, Never>?
         var outgoing: [PresentationKey: Outgoing] = [:]
 
-        var plan: RouteSpaces.UnwindPlan? {
+        var plan: RouteTree.UnwindPlan? {
             switch stage {
             case .preparingUnwind(let plan), .preparingPresentation(let plan, _),
                  .unwinding(let plan, _), .unwindingForPresentation(let plan, _): plan
@@ -78,7 +78,7 @@ extension RouterEngine {
             }
         }
 
-        init(plan: RouteSpaces.UnwindPlan, presentation: Presentation? = nil) {
+        init(plan: RouteTree.UnwindPlan, presentation: Presentation? = nil) {
             if let presentation { stage = .preparingPresentation(plan, presentation) }
             else { stage = .preparingUnwind(plan) }
         }
@@ -86,7 +86,7 @@ extension RouterEngine {
         init(awaitingHost presentation: Presentation) { stage = .awaitingHost(presentation) }
 
         /// Committing twice must not reapply a captured plan to a changed tree.
-        func commit() -> RouteSpaces.UnwindPlan? {
+        func commit() -> RouteTree.UnwindPlan? {
             switch stage {
             case .preparingUnwind(let plan):
                 stage = .unwinding(plan, destination: nil)

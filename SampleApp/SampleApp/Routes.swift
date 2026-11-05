@@ -128,15 +128,15 @@ struct TopLevelReplacementCoverRoute: SampleDeepLinkRoute {
 
 }
 
-struct HighPriorityPassthroughSheetRoute: SampleDeepLinkRoute {
+struct GlobalPassthroughSheetRoute: SampleDeepLinkRoute {
 
 }
 
-struct HighPriorityBlockingSheetRoute: SampleDeepLinkRoute {
+struct GlobalScrimSheetRoute: SampleDeepLinkRoute {
 
 }
 
-struct PendingPriorityRoute: SampleDeepLinkRoute {
+struct PendingGlobalRoute: SampleDeepLinkRoute {
 
 }
 
@@ -148,16 +148,16 @@ struct LifecycleTeardownRoute: SampleDeepLinkRoute {
 
 }
 
-struct PendingPriorityView: View {
+struct PendingGlobalView: View {
     @UnwindRoute var unwindRoute
 
     var body: some View {
         ZStack {
             LabBackground()
-            LabModalCard("Priority won", subtitle: "The pending elevated request blocked the default sheet before its window started.", symbol: "flag.checkered", color: LabPalette.coral) {
-                Text("Pending high-priority route")
+            LabModalCard("Global destination", subtitle: "Global routes are available from every live routing scope.", symbol: "flag.checkered", color: LabPalette.coral) {
+                Text("Pending global route")
                     .font(.caption.weight(.semibold))
-                    .accessibilityIdentifier(SampleAppAccessibility.pendingPriorityText)
+                    .accessibilityIdentifier(SampleAppAccessibility.pendingGlobalText)
 
                 Button("Dismiss") { Task { await unwindRoute() } }
                     .labPrimaryButton(color: LabPalette.coral)
@@ -234,24 +234,24 @@ struct TopLevelReplacementCoverView: View {
     }
 }
 
-struct HighPriorityPassthroughSheetView: View {
+struct GlobalPassthroughSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.isPresented) private var isPresented
     @Environment(\.routePhase) private var routePhase
 
     var body: some View {
-        LabModalCard("Passthrough sheet", subtitle: "Background interaction is enabled while this high-priority route stays active.", symbol: "hand.tap.fill", color: LabPalette.blue) {
-            Text("High-priority passthrough sheet · SwiftUI isPresented: \(String(isPresented))")
+        LabModalCard("Passthrough sheet", subtitle: "Background interaction is enabled while this global route stays active.", symbol: "hand.tap.fill", color: LabPalette.blue) {
+            Text("Global passthrough sheet · SwiftUI isPresented: \(String(isPresented))")
                 .font(.caption.weight(.semibold))
-                .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetText)
+                .accessibilityIdentifier(SampleAppAccessibility.globalPassthroughSheetText)
 
             Text("Route phase: \(routePhaseLabel)")
                 .font(.caption)
-                .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetRoutePhase)
+                .accessibilityIdentifier(SampleAppAccessibility.globalPassthroughSheetRoutePhase)
 
             Button("Dismiss") { dismiss() }
             .labPrimaryButton(color: LabPalette.blue)
-            .accessibilityIdentifier(SampleAppAccessibility.highPriorityPassthroughSheetDismissButton)
+            .accessibilityIdentifier(SampleAppAccessibility.globalPassthroughSheetDismissButton)
         }
         .frame(maxWidth: .infinity)
         .presentationDetents([.height(310)])
@@ -271,19 +271,19 @@ struct HighPriorityPassthroughSheetView: View {
 
 }
 
-struct HighPriorityBlockingSheetView: View {
+struct GlobalScrimSheetView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.isPresented) private var isPresented
 
     var body: some View {
         LabModalCard("Blocking sheet", subtitle: "The scrim deliberately intercepts interaction with the route underneath.", symbol: "hand.raised.fill", color: LabPalette.amber) {
-            Text("High-priority blocking sheet · SwiftUI isPresented: \(String(isPresented))")
+            Text("Global blocking sheet · SwiftUI isPresented: \(String(isPresented))")
                 .font(.caption.weight(.semibold))
-                .accessibilityIdentifier(SampleAppAccessibility.highPriorityBlockingSheetText)
+                .accessibilityIdentifier(SampleAppAccessibility.globalScrimSheetText)
 
             Button("Dismiss") { dismiss() }
             .labPrimaryButton(color: LabPalette.amber)
-            .accessibilityIdentifier(SampleAppAccessibility.highPriorityBlockingSheetDismissButton)
+            .accessibilityIdentifier(SampleAppAccessibility.globalScrimSheetDismissButton)
         }
         .frame(maxWidth: .infinity)
         .presentationDetents([.height(310)])
@@ -297,7 +297,7 @@ struct NavigationBarFadeOcclusionView: View {
 
     var body: some View {
         LabScreen("Fade chrome", eyebrow: "Navigation host", symbol: "menubar.rectangle") {
-            LabPanel("Detached cover diagnostics") {
+            LabPanel("Fade cover diagnostics") {
                 Text("Navigation bar fade probe")
                     .font(.headline)
                     .accessibilityIdentifier(SampleAppAccessibility.navigationBarFadeText)
@@ -341,11 +341,11 @@ struct AlertRoute: SampleDeepLinkRoute {
 
 }
 
-struct CriticalRoute: SampleDeepLinkRoute {
+struct PasscodeRoute: SampleDeepLinkRoute {
 
 }
 
-struct CriticalReplacementRoute: SampleDeepLinkRoute {
+struct PasscodeOverlayRoute: SampleDeepLinkRoute {
 
 }
 
@@ -532,16 +532,16 @@ enum Destinations {
         TopLevelReplacementCoverView()
             .modifier(SampleRoutingContext())
     }
-    static let highPriorityPassthroughSheetRoute = RouteDestination(HighPriorityPassthroughSheetRoute.self) { route, context in
-        HighPriorityPassthroughSheetView()
+    static let globalPassthroughSheetRoute = RouteDestination(GlobalPassthroughSheetRoute.self) { route, context in
+        GlobalPassthroughSheetView()
             .modifier(SampleRoutingContext())
     }
-    static let highPriorityBlockingSheetRoute = RouteDestination(HighPriorityBlockingSheetRoute.self) { route, context in
-        HighPriorityBlockingSheetView()
+    static let globalScrimSheetRoute = RouteDestination(GlobalScrimSheetRoute.self) { route, context in
+        GlobalScrimSheetView()
             .modifier(SampleRoutingContext())
     }
-    static let pendingPriorityRoute = RouteDestination(PendingPriorityRoute.self) { route, context in
-        PendingPriorityView()
+    static let pendingGlobalRoute = RouteDestination(PendingGlobalRoute.self) { route, context in
+        PendingGlobalView()
             .modifier(SampleRoutingContext())
     }
     static let navigationBarFadeOcclusionRoute = RouteDestination(NavigationBarFadeOcclusionRoute.self) { route, context in
@@ -564,12 +564,12 @@ enum Destinations {
         AlertView()
             .modifier(SampleRoutingContext())
     }
-    static let criticalRoute = RouteDestination(CriticalRoute.self) { route, context in
-        CriticalView()
+    static let passcodeRoute = RouteDestination(PasscodeRoute.self) { route, context in
+        PasscodeView()
             .modifier(SampleRoutingContext())
     }
-    static let criticalReplacementRoute = RouteDestination(CriticalReplacementRoute.self) { route, context in
-        CriticalReplacementView()
+    static let passcodeOverlayRoute = RouteDestination(PasscodeOverlayRoute.self) { route, context in
+        PasscodeOverlayView()
             .modifier(SampleRoutingContext())
     }
     static let messageRoute = RouteDestination(MessageRoute.self) { route, context in
@@ -658,26 +658,26 @@ enum AppRouteMaps {
         Destinations.rerouteChainFinalRoute
     }
     static let root = RootRouteMap(id: SampleAppAccessibility.startScopeID) {
+        Cover(GlobalRoutesLabRoute.self)
         Cover(LandingRoute.self) { landing }
         Cover(SplitBranchesRoute.self) { SplitBranchMap.routes }
         Sheet(StartInfoRoute.self)
 
-        HighPriority {
+        GlobalMap {
             Cover(LoginRoute.self) {
                 Push(LoginDetailRoute.self)
                 Sheet(LoginNoticeRoute.self)
             }
             Cover(LoginReplacementRoute.self)
             Cover(AlertRoute.self, transition: .fade)
-            Sheet(HighPriorityPassthroughSheetRoute.self)
-            Sheet(HighPriorityBlockingSheetRoute.self)
-            Cover(PendingPriorityRoute.self)
-        }
-        CriticalPriority {
-            Cover(CriticalRoute.self, transition: .fade)
-            Cover(CriticalReplacementRoute.self, transition: .fade)
+            Sheet(GlobalPassthroughSheetRoute.self)
+            Sheet(GlobalScrimSheetRoute.self)
+            Cover(PendingGlobalRoute.self)
+            Cover(PasscodeRoute.self, transition: .fade).dismissalProtection()
+            Cover(PasscodeOverlayRoute.self, transition: .fade)
         }
     } destinations: {
+        RouteDestination(GlobalRoutesLabRoute.self) { _, context in GlobalRoutesProbe(closeLab: context.unwindRoute) }
         Destinations.landingRoute
         SplitBranchMap.destination
         Destinations.startInfoRoute
@@ -686,10 +686,10 @@ enum AppRouteMaps {
         Destinations.loginNoticeRoute
         Destinations.loginReplacementRoute
         Destinations.alertRoute
-        Destinations.highPriorityPassthroughSheetRoute
-        Destinations.highPriorityBlockingSheetRoute
-        Destinations.pendingPriorityRoute
-        Destinations.criticalRoute
-        Destinations.criticalReplacementRoute
+        Destinations.globalPassthroughSheetRoute
+        Destinations.globalScrimSheetRoute
+        Destinations.pendingGlobalRoute
+        Destinations.passcodeRoute
+        Destinations.passcodeOverlayRoute
     }
 }

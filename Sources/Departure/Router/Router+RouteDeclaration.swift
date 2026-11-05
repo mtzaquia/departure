@@ -57,9 +57,9 @@ extension RouterEngine {
         let routeType = type(of: resolvedRoute)
         log.departureDebug(.routeLookupStarted(
             routeType: routeType,
-            activePath: spaces.activeSpace.currentRoutePath.departureDebugPathDescription
+            activePath: tree.currentRoutePath.departureDebugPathDescription
         ))
-        guard let binding = spaces.firstDeclaration(including: routeType, origin: origin) else {
+        guard let binding = declaration(for: resolvedRoute, origin: origin) else {
             log.departureWarning(.routeDroppedNoDeclaration(routeType: routeType))
             return nil
         }
@@ -72,37 +72,21 @@ extension RouterEngine {
             return nil
         }
 
-        let priority = match.declaration.priority
-        if priority == .default, let currentRoute = source.route, currentRoute._isEqual(to: resolvedRoute),
+        guard permitsPresentation(match) else {
+            log.departureDebug(.routeBlockedByDismissalProtection(route: resolvedRoute))
+            return nil
+        }
+        if let currentRoute = source.route, currentRoute._isEqual(to: resolvedRoute),
            source.attachedPresentationDeclaration(presentedBy: match.presentingScope,
                 matching: match.declaration.presentationKind, hostedBy: match.presentationHostID) != nil {
-            guard activateOrigin(origin) else { return nil }
+            guard match.declaration.isGlobal || activateOrigin(origin) else { return nil }
             log.departureDebug(.routeNoOpEquivalent(route: resolvedRoute, currentRoute: currentRoute))
             return source
         }
-
-        guard priority == .default
-            ? match.space === spaces.activeSpace
-            : priority >= spaces.activeSpace.priority else {
-            log.departureDebug(.routeMatched(route: resolvedRoute, match: match))
-            log.departureDebug(.routeBlockedByElevatedPriority(route: resolvedRoute))
-            return nil
-        }
-
-        if priority == .default {
-            guard activatePresentationOwner(match) else { return nil }
-            log.departureDebug(.routeMatched(route: resolvedRoute, match: match))
-            log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
-            return await appendRoute(resolvedRoute, after: match, origin: origin)
-        }
-
+        guard activatePresentationOwner(match) else { return nil }
         log.departureDebug(.routeMatched(route: resolvedRoute, match: match))
-        if let space = spaces.space(for: priority), space.root.route?._isEqual(to: resolvedRoute) == true {
-            return await reuseEquivalentRoute(resolvedRoute, at: space.root,
-                plan: spaces.rootUnwindPlan(in: space))
-        }
-        log.departureDebug(.routeAcceptedReplaceElevatedPriority(route: resolvedRoute))
-        return await replaceElevatedSpace(priority, with: resolvedRoute, after: match, origin: origin)
+        log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
+        return await appendRoute(resolvedRoute, after: match, origin: origin)
     }
 
     private func resolveRouteChain(startingWith route: any Route) async -> (any Route)? {
@@ -130,12 +114,13 @@ extension RouterEngine {
 extension RouterEngine {
     struct ResolvedRouteTarget {
         enum LookupStrategy: Equatable {
-            case currentPath(spacePriority: RoutePriority)
+            case currentPath
+            case global
             case defaultRootActiveBranchScope
             case defaultRootDeclarations
         }
 
-        let space: RouteSpace
+        let tree: RouteTree
         let presentingScope: RouteScope
         let declaringScope: RouteScope
         let declaration: AnyRouteDeclaration
@@ -154,13 +139,14 @@ extension RouterEngine {
     /// Selects enclosing branches without altering their independent paths.
     func activateOrigin(_ origin: RouteRequestOrigin?) -> Bool {
         guard let origin else { return true }
-        guard let source = origin.resolve(in: spaces) else { return false }
+        guard let source = origin.resolve(in: tree) else { return false }
         return activateScopeAncestors(source)
     }
 
     /// A reroute to a common ancestor activates that destination's owner, rather
     /// than revealing the originally requested branch underneath it.
     private func activatePresentationOwner(_ match: ResolvedRouteTarget) -> Bool {
+        if match.declaration.isGlobal { return true }
         if let branch = match.branchID, !canActivateBranch(branch, in: match.declaringScope) { return false }
         let source = match.branchID == nil
             ? match.presentingScope
@@ -170,7 +156,7 @@ extension RouterEngine {
 
     private func activateScopeAncestors(_ scope: RouteScope) -> Bool {
         let ancestry: [(RouteScope, AnyHashable)] = scope.ancestry.compactMap { source in
-            guard let branch = source.branchID, let previous = source.previousScopeInSpace else { return nil }
+            guard let branch = source.branchID, let previous = source.previousScopeInTree else { return nil }
             return (previous, branch)
         }
         // Validate all bindings before writing any enclosing selection. Keep the

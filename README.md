@@ -15,7 +15,7 @@ Declare the navigation tree once. Feature modules supply typed destination build
 - Keep domain routes independent of feature views.
 - Preserve independent paths in tabs and concurrent split columns.
 - Resolve guarded routes, intercept actions, and return unwind payloads.
-- Declare high and critical presentations at the root.
+- Share global sheets and covers, with optional active-only dismissal protection.
 
 ```swift
 let routes = RootRouteMap {
@@ -85,9 +85,9 @@ struct HomeView: View {
 
 The map owns definitions independently of mounted views. `WithRouter` and destinations bind their scopes automatically. When a scope declares pushes, explicitly supply `NavigationStack { content.routing() }`, placing `.routing()` on the root content inside the stack. Destinations choose their containers explicitly.
 
-Route maps separate type-only declarations from [composable destination bindings](docs/routing.md#compose-destination-bindings) and use root-only `HighPriority` and `CriticalPriority` groups. For changes from version 2, see the [v3.0.0 migration notes](https://github.com/mtzaquia/departure/releases/tag/v3.0.0#migration-notes).
+Route maps separate type-only declarations from [composable destination bindings](docs/routing.md#compose-destination-bindings). A root-only `GlobalMap` makes shared destinations available from every live scope. Apply `.dismissalProtection()` to an individual sheet or cover to block unrelated navigation while that route is active. See [global routes](docs/global-routes.md) for the 2FA and passcode example.
 
-High and critical routes use a separate window on UIKit. Its root mirrors the covered window's orientation and system-bar preferences. SwiftUI modifiers do not cross detached hosting boundaries: use `WithRouter(..., windowDestination:)` to forward custom environment values and reapply hierarchy-wide modifiers, including the same `toolbarVerticalBehavior` on iOS 27.1+. See [detached-host configuration](docs/priority.md#configure-detached-hosts); this also applies to fade covers.
+All routes, including fade covers, use ordinary presentation in the existing window. There is no detached destination customizer. The global-map API is unreleased; the tagged 3.0.1 release uses the earlier priority-space API.
 
 ## Documentation
 
@@ -96,13 +96,13 @@ High and critical routes use a separate window on UIKit. Its root mirrors the co
 - [Actions](docs/actions.md) — route-aware work and interception.
 - [Unwinding](docs/unwinding.md) — dismissing flows and returning values.
 - [Branches](docs/branches.md) — tabs, concurrent columns, and replacement selections.
-- [Priority](docs/priority.md) — high and critical root presentations.
+- [Global routes](docs/global-routes.md) — shared declarations and active-only dismissal protection.
 - [Diagnostics](docs/diagnostics.md) — trace the adopted map and routing decisions.
 - [Rewrite specifications](docs/specs/README.md) — agreed contracts and implementation inventory.
 
 ## Sample app
 
-Open `SampleApp/SampleApp.xcodeproj`. The app exercises tabs, concurrent split columns, replacements, actions, payloads, elevated windows, and nested-modal unwind snapshots.
+Open `SampleApp/SampleApp.xcodeproj`. The app exercises tabs, concurrent split columns, replacements, actions, payloads, global 2FA, passcode protection, and nested-modal unwind snapshots.
 
 ## License
 

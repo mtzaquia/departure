@@ -56,17 +56,17 @@ import Testing
         let scope = engine.root
         scope.bindRoutingHost(automatic, automatic: true, environment: scope.sourceEnvironment)
         await engine.present(NumberedRoute(number: 1))
-        let pushed = try #require(engine.defaultSpace.rootPath.last)
+        let pushed = try #require(engine.tree.rootPath.last)
         engine.routeScopeDidInstallInView(pushed)
         let old = engine.routePresentationBinding(from: scope, matching: .push, hostedBy: automatic)
         scope.bindRoutingHost(explicit, automatic: false, environment: scope.sourceEnvironment)
         old.wrappedValue = nil
-        #expect(engine.defaultSpace.rootPath.last === pushed)
+        #expect(engine.tree.rootPath.last === pushed)
         let explicitBinding = engine.routePresentationBinding(from: scope, matching: .push, hostedBy: explicit)
         #expect(explicitBinding.wrappedValue?.scope === pushed)
         scope.unbindRoutingHost(explicit)
         explicitBinding.wrappedValue = nil
-        #expect(engine.defaultSpace.rootPath.last === pushed)
+        #expect(engine.tree.rootPath.last === pushed)
         #expect(engine.routePresentationBinding(from: scope, matching: .push, hostedBy: automatic).wrappedValue?.scope === pushed)
     }
 
@@ -81,13 +81,13 @@ import Testing
         #expect(scope.hasConflictingPresentationHosts)
         #expect(scope.presentationHostID == nil)
         await engine.present(SettingsRoute())
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
         #expect(engine.routePresentationBinding(from: scope, matching: .sheet).wrappedValue == nil)
         scope.unbindRoutingHost(removeFirst ? first : second)
         #expect(!scope.hasConflictingPresentationHosts)
         #expect(scope.presentationHostID == (removeFirst ? second : first))
         await engine.present(SettingsRoute())
-        #expect(engine.routePresentationBinding(from: scope, matching: .sheet, hostedBy: scope.presentationHostID).wrappedValue?.scope === engine.defaultSpace.rootPath.last)
+        #expect(engine.routePresentationBinding(from: scope, matching: .sheet, hostedBy: scope.presentationHostID).wrappedValue?.scope === engine.tree.rootPath.last)
     }
 
     @Test func ambiguousAutomaticHostsRequireAnExplicitOwner() {
@@ -125,12 +125,12 @@ import Testing
     func bindingWriteBackIsAcceptedOnlyFromOwningHost(style: RoutePresentation.Style) async throws {
         let destination = testDestination(NumberedRoute.self)
         let engine = RouterEngine(routes: RootRouteMap {
-            testDeclaration(destination, presentation: .init(style: style, priority: .default))
+            testDeclaration(destination, presentation: .init(style: style))
         })
         let owner = RoutePresentationHostID(), stranger = RoutePresentationHostID()
         engine.root.bindRoutingHost(owner, automatic: false, environment: engine.root.sourceEnvironment)
         await engine.present(NumberedRoute(number: 1))
-        let scope = try #require(engine.defaultSpace.rootPath.last)
+        let scope = try #require(engine.tree.rootPath.last)
         // An unseen iOS 17 push rejects nil intentionally. Model an actual
         // destination that has appeared and is now leaving its native host.
         engine.routeScopeDidInstallInView(scope)
@@ -138,39 +138,22 @@ import Testing
         let foreign = engine.routePresentationBinding(from: engine.root, matching: style, hostedBy: stranger)
         #expect(foreign.wrappedValue == nil)
         foreign.wrappedValue = nil
-        #expect(engine.defaultSpace.rootPath.last === scope)
+        #expect(engine.tree.rootPath.last === scope)
         let binding = engine.routePresentationBinding(from: engine.root, matching: style, hostedBy: owner)
         #expect(binding.wrappedValue?.scope === scope)
         binding.wrappedValue = nil
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
     }
     @Test func staleDefaultDismissalCannotClearReplacement() async throws {
         let engine = RouterEngine(routes: RootRouteMap { testSheet(testDestination(NumberedRoute.self)) })
         await engine.present(NumberedRoute(number: 1))
         let oldBinding = engine.routePresentationBinding(from: engine.root, matching: .sheet)
         await engine.present(NumberedRoute(number: 2))
-        let replacement = try #require(engine.defaultSpace.rootPath.last)
+        let replacement = try #require(engine.tree.rootPath.last)
         oldBinding.wrappedValue = nil
-        #expect(engine.defaultSpace.rootPath.last === replacement)
+        #expect(engine.tree.rootPath.last === replacement)
     }
-    @Test(arguments: [RoutePriority.high, .critical])
-    func staleElevatedDismissalCannotClearReplacement(priority: RoutePriority) async throws {
-        let destination = testDestination(NumberedRoute.self)
-        let engine = RouterEngine(routes: RootRouteMap {
-            HighPriority {
-                if priority == .high { testSheet(destination) }
-            }
-            CriticalPriority {
-                if priority == .critical { testSheet(destination) }
-            }
-        })
-        await engine.present(NumberedRoute(number: 1))
-        let old = engine.elevatedRoutePresentationBinding(priority: priority, matching: .sheet)
-        await engine.present(NumberedRoute(number: 2))
-        let replacement = try #require(engine.spaces.space(for: priority)?.root)
-        old.wrappedValue = nil
-        #expect(engine.spaces.space(for: priority)?.root === replacement)
-    }
+
     @Test func branchDeclarationsUseTheBranchBindingHost() async throws {
         let engine = RouterEngine(routes: RootRouteMap { Branches { Branch(AppTab.home) {
             testSheet(testDestination(SettingsRoute.self))

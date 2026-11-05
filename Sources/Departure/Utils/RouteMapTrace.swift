@@ -45,20 +45,7 @@
         }
 
         mutating func render(_ declarations: [RouteScopeDeclaration]) -> String {
-            let counts = routeCounts(declarations)
-            var roots: [Node] = []
-            for priority in [RoutePriority.default, .high, .critical] {
-                let selected = declarations.compactMap { declaration -> RouteScopeDeclaration? in
-                    if case .routes(let routes) = declaration.content {
-                        let routes = routes.filter { $0.priority == priority }
-                        return routes.isEmpty ? nil : .init(routes: routes)
-                    }
-                    return priority == .default ? declaration : nil
-                }
-                let children = nodes(selected, counts: counts)
-                if !children.isEmpty { roots.append(Node(label: String(describing: priority), children: children)) }
-            }
-            return (["root"] + lines(roots)).joined(separator: "\n")
+            return (["root"] + lines(nodes(declarations))).joined(separator: "\n")
         }
 
         private mutating func nodes(_ declarations: [RouteScopeDeclaration], counts: [ObjectIdentifier: Int]? = nil) -> [Node] {
@@ -73,6 +60,7 @@
                 case .routes(let routes):
                     for route in routes {
                         var label = "\(style(route.presentation.style)) \(departureDebugName(for: route.routeType)) → \(binding(route.routeType))"
+                        if route.isDismissalProtected { label += " [dismissal protection]" }
                         if counts[ObjectIdentifier(route.routeType), default: 0] > 1 { label += " [declaration conflict]" }
                         result.append(Node(label: label, children: nodes(route.children)))
                     }
@@ -88,6 +76,8 @@
                     }
                     let suffix = branchGroups > 1 ? " [container conflict]" : ""
                     result.append(Node(label: "branches\(concurrent ? " (concurrent)" : "")\(suffix)", children: branches))
+                case .globals(let declarations):
+                    result.append(Node(label: "global", children: nodes(declarations)))
                 case .scopeID, .destinations:
                     break
                 case .branch:

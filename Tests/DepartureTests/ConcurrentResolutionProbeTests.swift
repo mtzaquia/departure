@@ -25,13 +25,13 @@ struct ConcurrentResolutionProbeTests {
             await Task.yield()
         }
         #expect(!latestFinished)
-        #expect(engine.defaultSpace.rootPath.count == 0)
+        #expect(engine.tree.rootPath.count == 0)
 
         gate.release()
         await first.value
         await latest.value
-        #expect(engine.defaultSpace.rootPath.count == 1)
-        #expect(engine.defaultSpace.rootPath.last?.route is SettingsRoute)
+        #expect(engine.tree.rootPath.count == 1)
+        #expect(engine.tree.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func latestWaitingRequestSupersedesWithoutResolvingAndReturnsTheExactScope() async throws {
@@ -47,13 +47,13 @@ struct ConcurrentResolutionProbeTests {
         try await waitUntil { engine.bufferedPresentationRequest?.route is SettingsRoute }
         #expect(await middle.value == nil)
         #expect(recorder.names.isEmpty)
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
         #expect(!engine.isNavigating)
         gate.release()
         let firstScope = try #require(await first.value)
         #expect(firstScope.route is SlowProbeRoute)
         let latestScope = try #require(await latest.value)
-        #expect(latestScope === engine.defaultSpace.rootPath.last)
+        #expect(latestScope === engine.tree.rootPath.last)
         #expect(latestScope !== firstScope)
         #expect(latestScope.route is SettingsRoute)
         #expect(!engine.isPresentationRequestInProgress)
@@ -85,7 +85,7 @@ struct ConcurrentResolutionProbeTests {
         #expect(recorder.names == (cancelActive ? ["next"] : []))
         #expect(!engine.isPresentationRequestInProgress)
         #expect(engine.bufferedPresentationRequest == nil)
-        #expect(await engine.requestRouteWhenReady(SettingsRoute(), origin: origin) === engine.defaultSpace.rootPath.last)
+        #expect(await engine.requestRouteWhenReady(SettingsRoute(), origin: origin) === engine.tree.rootPath.last)
     }
 
     @Test func reroutingKeepsAdmissionForTheWholeResolutionChain() async throws {
@@ -100,10 +100,10 @@ struct ConcurrentResolutionProbeTests {
         firstGate.release()
         await finalGate.waitForStart()
         #expect(recorder.names.isEmpty)
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
         finalGate.release()
         #expect(await first.value?.route is SlowProbeRoute)
-        #expect(await next.value === engine.defaultSpace.rootPath.last)
+        #expect(await next.value === engine.tree.rootPath.last)
         #expect(recorder.names == ["next"])
         #expect(firstGate.resolutionCount == 1)
         #expect(finalGate.resolutionCount == 1)
@@ -119,7 +119,7 @@ struct ConcurrentResolutionProbeTests {
         #expect(await first.value == nil)
         #expect(finalGate.resolutionCount == 0)
         #expect(!engine.isPresentationRequestInProgress)
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
     }
 
     @Test func bufferedResolutionKeepsTheWaitingCallersTaskContext() async throws {
@@ -138,7 +138,7 @@ struct ConcurrentResolutionProbeTests {
         try await waitUntil { engine.bufferedPresentationRequest != nil }
         gate.release()
         _ = await first.value
-        #expect(await next.value === engine.defaultSpace.rootPath.last)
+        #expect(await next.value === engine.tree.rootPath.last)
         #expect(recorder.contexts == ["waiting"])
     }
 
@@ -151,8 +151,8 @@ struct ConcurrentResolutionProbeTests {
         try await waitUntil { engine.bufferedPresentationRequest != nil }
         gate.release()
         #expect(await first.value == nil)
-        #expect(await latest.value === engine.defaultSpace.rootPath.last)
-        #expect(engine.defaultSpace.rootPath.last?.route is SettingsRoute)
+        #expect(await latest.value === engine.tree.rootPath.last)
+        #expect(engine.tree.rootPath.last?.route is SettingsRoute)
         #expect(!engine.isPresentationRequestInProgress)
     }
 
@@ -178,7 +178,7 @@ struct ConcurrentResolutionProbeTests {
         let grantedResult = await waiting?.value
         #expect((grantedResult == nil) == cancelGranted)
         let latest = try #require(newest)
-        #expect(await latest.value === engine.defaultSpace.rootPath.last)
+        #expect(await latest.value === engine.tree.rootPath.last)
         #expect(recorder.names == (cancelGranted ? ["newest"] : ["granted", "newest"]))
         #expect(!engine.isPresentationRequestInProgress)
     }
@@ -187,7 +187,7 @@ struct ConcurrentResolutionProbeTests {
         let engine = fixture()
         let root = Router(engine: engine, scope: engine.root)
         await root.present(HomeDetailRoute())
-        let old = try #require(engine.defaultSpace.rootPath.last)
+        let old = try #require(engine.tree.rootPath.last)
         let gate = ProbeResolutionGate()
         let recorder = ResolutionRecorder()
         let first = Task { await engine.requestRouteWhenReady(SlowProbeRoute(gate: gate), origin: RouteRequestOrigin(scope: engine.root)) }
@@ -202,101 +202,18 @@ struct ConcurrentResolutionProbeTests {
         #expect(!engine.isPresentationRequestInProgress)
     }
 
-    @Test func waitingRequestRechecksCoverageAfterAnElevatedPresentation() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {
-            HighPriority {
-                testSheet(testDestination(LoginRoute.self)) {
-                    testSheet(testDestination(CountingProbeRoute.self))
-                }
-            }
-            CriticalPriority { testSheet(testDestination(SlowProbeRoute.self)) }
-        })
-        await engine.present(LoginRoute())
-        let high = try #require(engine.spaces.highSpace?.root)
-        let gate = ProbeResolutionGate()
-        let recorder = ResolutionRecorder()
-        let first = Task { await engine.requestRouteWhenReady(SlowProbeRoute(gate: gate), origin: RouteRequestOrigin(scope: high)) }
-        await gate.waitForStart()
-        let next = Task { await engine.requestRouteWhenReady(CountingProbeRoute(name: "covered", recorder: recorder), origin: RouteRequestOrigin(scope: high)) }
-        try await waitUntil { engine.bufferedPresentationRequest != nil }
-        gate.release()
-        #expect(await first.value === engine.spaces.criticalSpace?.root)
-        #expect(await next.value == nil)
-        #expect(recorder.names.isEmpty)
-        #expect(high.path.isEmpty)
-    }
-
-    @Test func coveredCallerCannotReplaceAnEligibleAdmissionWaiter() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {
- testSheet(testDestination(SettingsRoute.self))
-            HighPriority {
-                testSheet(testDestination(LoginRoute.self)) {
-                    testSheet(testDestination(SlowProbeRoute.self))
-                    testSheet(testDestination(CountingProbeRoute.self))
-                }
-            }
-        })
-        await engine.present(LoginRoute())
-        let high = try #require(engine.spaces.highSpace?.root)
-        let origin = RouteRequestOrigin(scope: high)
-        let gate = ProbeResolutionGate()
-        let recorder = ResolutionRecorder()
-        let first = Task { await engine.requestRouteWhenReady(SlowProbeRoute(gate: gate), origin: origin) }
-        await gate.waitForStart()
-        let next = Task { await engine.requestRouteWhenReady(CountingProbeRoute(name: "eligible", recorder: recorder), origin: origin) }
-        try await waitUntil { engine.bufferedPresentationRequest != nil }
-        let waiting = engine.bufferedPresentationRequest
-        #expect(await engine.requestRouteWhenReady(SettingsRoute(), origin: RouteRequestOrigin(scope: engine.root)) == nil)
-        #expect(engine.bufferedPresentationRequest === waiting)
-        gate.release()
-        _ = await first.value
-        #expect(await next.value === high.path.last)
-        #expect(recorder.names == ["eligible"])
-    }
-
-    @Test(arguments: [RoutePriority.high, .critical])
-    func higherPriorityAttemptAlsoWaitsForTheActiveResolver(priority: RoutePriority) async throws {
-        let engine = RouterEngine(routes: RootRouteMap {
-            testSheet(testDestination(SlowProbeRoute.self))
-
-            HighPriority {
-                testSheet(testDestination(LoginRoute.self))
-            }
-            CriticalPriority {
-                testCover(testDestination(LockRoute.self))
-            }
-        })
-        let router = Router(engine: engine, scope: engine.root)
-        let gate = ProbeResolutionGate()
-        let first = Task { await router.present(SlowProbeRoute(gate: gate)) }
-        await gate.waitForStart()
-        let next = Task {
-            if priority == .high { await router.present(LoginRoute()) }
-            else { await router.present(LockRoute()) }
-        }
-        try await waitUntil { engine.bufferedPresentationRequest != nil }
-        #expect(engine.spaces.space(for: priority) == nil)
-        #expect(engine.defaultSpace.rootPath.isEmpty)
-        gate.release()
-        await first.value
-        await next.value
-        #expect(engine.defaultSpace.rootPath.last?.route is SlowProbeRoute)
-        #expect(engine.spaces.activeSpace.priority == priority)
-        #expect(engine.routePhase(for: engine.defaultSpace.rootPath.last!) == .inactive)
-    }
-
     @Test func latestRequestsDuringUnwindSupersedeWithoutResolvingOrDelayingUnwind() async throws {
         let engine = fixture()
         let origin = RouteRequestOrigin(scope: engine.root)
         await engine.present(SettingsRoute())
-        let old = try #require(engine.defaultSpace.rootPath.last)
+        let old = try #require(engine.tree.rootPath.last)
         engine.routeScopeDidInstallInView(old)
         let gate = ProbeResolutionGate()
         let recorder = ResolutionRecorder()
         let first = Task { await engine.requestRouteWhenReady(SlowProbeRoute(gate: gate), origin: origin) }
         await gate.waitForStart()
         let unwind = Task { await Router(engine: engine, scope: old).resetToRoot() }
-        try await waitUntil { engine.defaultSpace.rootPath.isEmpty }
+        try await waitUntil { engine.tree.rootPath.isEmpty }
         let middle = Task { await engine.requestRouteWhenReady(CountingProbeRoute(name: "middle", recorder: recorder), origin: origin) }
         try await waitUntil { engine.bufferedPresentationRequest != nil }
         gate.release()
@@ -313,7 +230,7 @@ struct ConcurrentResolutionProbeTests {
         #expect(await unwind.value)
         #expect(!engine.isNavigating)
         latestGate.release()
-        #expect(await latest.value === engine.defaultSpace.rootPath.last)
+        #expect(await latest.value === engine.tree.rootPath.last)
         #expect(engine.pendingRoute == nil)
         #expect(engine.bufferedPresentationRequest == nil)
     }
@@ -338,7 +255,7 @@ struct ConcurrentResolutionProbeTests {
         if supersede {
             let latest = await engine.requestRouteWhenReady(SettingsRoute(), origin: origin)
             #expect(await first.value == nil)
-            #expect(latest === engine.defaultSpace.rootPath.last)
+            #expect(latest === engine.tree.rootPath.last)
             engine.routeScopeDidInstallInView(branch)
             #expect(branch.path.isEmpty)
         } else {

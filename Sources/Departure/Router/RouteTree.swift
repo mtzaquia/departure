@@ -20,7 +20,7 @@
 //  SOFTWARE.
 //
 
-struct RouteSpaces {
+final class RouteTree {
     struct PreservedRoutePath {
         let routePath: RoutePath
         let scopes: [RouteScope]
@@ -30,11 +30,10 @@ struct RouteSpaces {
         let removedScopes: [RouteScope]
         let retainedScopes: [RouteScope]
         let preservedPaths: [PreservedRoutePath]
-        let spacesToRemove: [RouteSpace]
 
-        init(retaining scopes: [RouteScope] = [], removing spaces: [RouteSpace] = []) {
+        init(retaining scopes: [RouteScope] = []) {
             var retained: [RouteScope] = []
-            for scope in scopes where !spaces.contains(where: { scope.routePath.owner?.belongs(to: $0) == true }) {
+            for scope in scopes {
                 if let index = retained.firstIndex(where: { $0.routePath === scope.routePath }) {
                     if scope.pathDepth < retained[index].pathDepth { retained[index] = scope }
                 } else {
@@ -57,55 +56,70 @@ struct RouteSpaces {
                     + removed.flatMap { $0.branchPaths() }.map {
                         PreservedRoutePath(routePath: $0, scopes: $0.scopes)
                     }
-            } + spaces.flatMap { space in
-                space.allRoutePaths.map { PreservedRoutePath(routePath: $0, scopes: $0.scopes) }
             }
             self.preservedPaths = outgoingPaths.filter { !$0.scopes.isEmpty }
-            self.removedScopes = spaces.map(\.root) + self.preservedPaths.flatMap(\.scopes)
-            self.spacesToRemove = spaces
+            self.removedScopes = self.preservedPaths.flatMap(\.scopes)
         }
     }
 
-    let defaultSpace: RouteSpace
-    var highSpace: RouteSpace?
-    var criticalSpace: RouteSpace?
+    let root: RouteScope
+    var rootPath: RoutePath { root.path }
 
-    var activeSpace: RouteSpace {
-        criticalSpace ?? highSpace ?? defaultSpace
+    init(
+        root: RouteScope
+    ) {
+        self.root = root
+        precondition(root.anchorTree == nil, "A navigation tree owns its root.")
+        root.anchorTree = self
     }
 
-    var allSpaces: [RouteSpace] {
-        [defaultSpace, highSpace, criticalSpace].compactMap { $0 }
+    var currentRouteScope: RouteScope {
+        guard let modal = currentModalScope else { return root.activeLocalScope }
+        return (modal.routePath.last ?? modal).activeLocalScope
+    }
+    var currentRoutePath: RoutePath { currentRouteScope.routePath }
+
+    func contains(_ path: RoutePath) -> Bool { path.owner?.belongs(to: self) == true }
+
+    func routePath(containing scope: RouteScope) -> RoutePath? {
+        guard scope.belongs(to: self) else { return nil }
+        return scope.routePath
     }
 
-    func space(for priority: RoutePriority) -> RouteSpace? {
-        switch priority {
-        case .default:
-            defaultSpace
+    func activeBranchPaths() -> [RoutePath] {
+        root.branchPaths(includingInactive: false)
+    }
 
-        case .high:
-            highSpace
+    func allBranchPaths() -> [RoutePath] {
+        root.branchPaths()
+    }
 
-        case .critical:
-            criticalSpace
+    var allRoutePaths: [RoutePath] {
+        [rootPath] + allBranchPaths()
+    }
+
+    var currentModalScope: RouteScope? {
+        var lane = root.lane
+        var foreground: RouteScope?
+        while let modal = lane.modal {
+            // A deselected branch may retain its outgoing native modal until
+            // teardown. Its lane slot remains occupied, but it is no longer a
+            // foreground anchor for a new global request or route-phase lookup.
+            guard modal.ancestry.allSatisfy({ scope in
+                guard let branch = scope.branchID, let owner = scope.previousScopeInTree else { return true }
+                return owner.participates(inBranch: branch)
+            }) else { break }
+            foreground = modal
+            lane = modal.lane
         }
+        return foreground
     }
 
-    func space(containing routePath: RoutePath) -> RouteSpace? {
-        guard let space = routePath.owner?.space, self.space(for: space.priority) === space, space.contains(routePath) else { return nil }
-        return space
-    }
-
-    func routePath(containing routeScope: RouteScope) -> RoutePath? {
-        guard let space = routeScope.space, self.space(for: space.priority) === space else { return nil }
-        return space.routePath(containing: routeScope)
-    }
-
-    func rootUnwindPlan(in space: RouteSpace) -> UnwindPlan {
-        let paths = space.activeBranchPaths()
-        var retained = [space.root] + paths.compactMap(\.owner)
+    func rootUnwindPlan() -> UnwindPlan {
+        let paths = activeBranchPaths()
+        var retained = [root] + paths.compactMap(\.owner)
         var handledPaths = Set(paths.map(ObjectIdentifier.init))
-        var lane = space.root.lane
+        var lane = root.lane
         while let modal = lane.modal {
             if let path = modal.owningPath, path.owner?.branchID != nil,
                handledPaths.insert(ObjectIdentifier(path)).inserted,
@@ -117,85 +131,72 @@ struct RouteSpaces {
         return UnwindPlan(retaining: retained)
     }
 
-    mutating func setElevatedSpace(_ space: RouteSpace?, for priority: RoutePriority) {
-        switch priority {
-        case .default:
-            return
-
-        case .high:
-            highSpace = space
-
-        case .critical:
-            criticalSpace = space
-        }
+    func tree(containing path: RoutePath) -> RouteTree? {
+        contains(path) ? self : nil
     }
 
-    #if DEBUG
     func validateInvariants() {
         var globallyLocatedScopes = Set<ObjectIdentifier>()
 
-        for space in allSpaces {
-            precondition(
-                space.rootPath.owner === space.root,
-                "A route space's root path must be owned by that space's root scope."
-            )
-            precondition(
-                globallyLocatedScopes.insert(ObjectIdentifier(space.root)).inserted,
-                "A route space root cannot occupy another structural location."
-            )
+        precondition(
+            rootPath.owner === root,
+            "A navigation tree's root path must be owned by that tree's root scope."
+        )
+        precondition(
+            globallyLocatedScopes.insert(ObjectIdentifier(root)).inserted,
+            "A navigation tree root cannot occupy another structural location."
+        )
 
-            for path in space.allRoutePaths {
-                if path !== space.rootPath {
-                    guard let branchScope = path.owner,
-                          let branchID = branchScope.branchID,
-                          let parent = branchScope.parent
-                    else {
-                        preconditionFailure("Every non-root path must be owned by a registered branch scope.")
-                    }
-
-                    precondition(
-                        path === branchScope.path,
-                        "A branch path must be the path owned by its branch scope."
-                    )
-                    precondition(
-                        parent.branchScopes[branchID] === branchScope,
-                        "A branch scope's parent registration must match its branch identity."
-                    )
-                    precondition(
-                        globallyLocatedScopes.insert(ObjectIdentifier(branchScope)).inserted,
-                        "A branch scope cannot occupy another structural location."
-                    )
+        for path in allRoutePaths {
+            if path !== rootPath {
+                guard let branchScope = path.owner,
+                      let branchID = branchScope.branchID,
+                      let parent = branchScope.parent
+                else {
+                    preconditionFailure("Every non-root path must be owned by a registered branch scope.")
                 }
 
-                for scope in path.scopes {
-                    let scopeID = ObjectIdentifier(scope)
-                    precondition(
-                        globallyLocatedScopes.insert(scopeID).inserted,
-                        "A route scope cannot belong to multiple structural locations."
-                    )
-                    precondition(
-                        scope.owningPath === path,
-                        "A route scope's owning path must match the path that contains it."
-                    )
+                precondition(
+                    path === branchScope.path,
+                    "A branch path must be the path owned by its branch scope."
+                )
+                precondition(
+                    parent.branchScopes[branchID] === branchScope,
+                    "A branch scope's parent registration must match its branch identity."
+                )
+                precondition(
+                    globallyLocatedScopes.insert(ObjectIdentifier(branchScope)).inserted,
+                    "A branch scope cannot occupy another structural location."
+                )
+            }
 
-                    guard let declaration = scope.presentationDeclaration,
-                          declaration.presentationKind.isModal
-                    else {
-                        continue
-                    }
+            for scope in path.scopes {
+                let scopeID = ObjectIdentifier(scope)
+                precondition(
+                    globallyLocatedScopes.insert(scopeID).inserted,
+                    "A route scope cannot belong to multiple structural locations."
+                )
+                precondition(
+                    scope.owningPath === path,
+                    "A route scope's owning path must match the path that contains it."
+                )
 
-                    precondition(
-                        scope.previousRouteScope?.lane.modal === scope && scope.lane !== scope.previousRouteScope?.lane,
-                        "A modal occupies its presenting lane's slot and opens a child lane."
-                    )
+                guard let declaration = scope.presentationDeclaration,
+                      declaration.presentationKind.isModal
+                else {
+                    continue
                 }
+
+                precondition(
+                    scope.previousRouteScope?.lane.modal === scope && scope.lane !== scope.previousRouteScope?.lane,
+                    "A modal occupies its presenting lane's slot and opens a child lane."
+                )
             }
         }
     }
-    #endif
 }
 
-extension RouteSpaces {
+extension RouteTree {
     func presentationUnwindPlan(
         after match: RouterEngine.ResolvedRouteTarget,
         retaining equivalent: RouteScope? = nil
@@ -213,29 +214,24 @@ extension RouteSpaces {
     }
 
     func firstDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin? = nil) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
-        let origin = origin ?? RouteRequestOrigin(scope: activeSpace.currentRouteScope)
+        let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         if let originScope = origin.resolve(in: self) {
             for source in originScope.ancestry {
                 guard routePath(containing: source) != nil else { break }
                 if let binding = resolveDefinitions(at: source, includingBranches: origin.branches.isEmpty) { return binding }
             }
         }
-        // The owner's entry catalog is independent of every live navigation tree.
-        // Only elevated definitions are visible across the space boundary.
-        guard let binding = resolveDefinitions(at: defaultSpace.root, includingBranches: true, includingSelectedDestination: false) else { return nil }
-        guard let attachment = binding.declaration else { return .conflict }
-        guard attachment.declaration.priority != .default else { return nil }
-        return binding
+        return nil
 
         // One ordered search reads definitions without constructing intermediate matches.
         // Explicit branch handles omit branch look-forward and sibling fallback.
         func resolveDefinitions(at source: RouteScope, includingBranches: Bool,
                                 includingSelectedDestination: Bool = true) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
-            guard let space = source.space else { return nil }
+            guard let tree = source.tree else { return nil }
             let selectedRoot = source.branchScopes[source.activeBranch]
             let selectedDestination = includingBranches && includingSelectedDestination ? selectedRoot?.activeLocalScope : nil
             let locations = [selectedDestination !== selectedRoot ? selectedDestination : nil, source].compactMap { $0 }
-            for location in locations where location.space != nil {
+            for location in locations where location.tree != nil {
                 let owners = includingBranches && location.branchContainer != nil
                     ? [location.branchScopes[location.activeBranch], location].compactMap { $0 }
                         + location.branchScopes.keys.filter { $0 != location.activeBranch }.compactMap { location.branchScopes[$0] }
@@ -246,8 +242,8 @@ extension RouteSpaces {
                     let presentingScope = looksForward ? location : owner
                     let declaringScope = looksForward ? source : (owner.branchID == nil ? owner : owner.parent ?? owner)
                     let strategy: RouterEngine.ResolvedRouteTarget.LookupStrategy = looksForward ? .defaultRootActiveBranchScope
-                        : source === defaultSpace.root ? .defaultRootDeclarations : .currentPath(spacePriority: space.priority)
-                    return binding.map { .init(space: space, presentingScope: presentingScope,
+                        : source === root ? .defaultRootDeclarations : .currentPath
+                    return binding.map { .init(tree: tree, presentingScope: presentingScope,
                         declaringScope: declaringScope, declaration: $0, lookupStrategy: strategy) }
                 }
             }

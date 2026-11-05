@@ -79,7 +79,7 @@ final class RouteScope: Identifiable {
     @ObservationIgnored lazy var path = RoutePath(owner: self)
     @ObservationIgnored private(set) weak var owningPath: RoutePath?
     @ObservationIgnored private(set) weak var previousRouteScope: RouteScope?
-    @ObservationIgnored weak var anchorSpace: RouteSpace?
+    @ObservationIgnored weak var anchorTree: RouteTree?
     @ObservationIgnored private lazy var ownedLane = RouteLane(owner: self)
     private(set) var continuation: RouteScope?
 
@@ -179,20 +179,18 @@ extension RouteScope {
     }
 
     var routePresentation: RoutePresentation? {
-        presentation.map { RoutePresentation(style: $0.declaration.presentationKind, priority: $0.priority) }
+        presentation.map { RoutePresentation(style: $0.declaration.presentationKind, isGlobal: $0.declaration.isGlobal, isDismissalProtected: $0.declaration.isDismissalProtected) }
     }
 
     func attachPresentation(
         to origin: RouteScope,
-        declaration: AnyRouteDeclaration,
-        priority: RoutePriority? = nil
+        declaration: AnyRouteDeclaration
     ) {
         precondition(presentation == nil && owningPath == nil,
                      "A destination's presentation is fixed before it enters navigation state.")
         presentation = RouteScopePresentation(
             origin: origin,
-            declaration: declaration,
-            priority: priority ?? declaration.priority
+            declaration: declaration
         )
     }
 }
@@ -213,23 +211,23 @@ extension RouteScope {
         return previousRouteScope?.lane ?? parent?.lane ?? ownedLane
     }
 
-    var space: RouteSpace? { anchorSpace ?? previousRouteScope?.space ?? parent?.space }
+    var tree: RouteTree? { anchorTree ?? previousRouteScope?.tree ?? parent?.tree }
     var routePath: RoutePath { owningPath ?? path }
     var pathDepth: Int { previousRouteScope.map { $0.pathDepth + 1 } ?? parent?.pathDepth ?? 0 }
-    var previousScopeInSpace: RouteScope? { previousRouteScope ?? parent }
+    var previousScopeInTree: RouteScope? { previousRouteScope ?? parent }
 
-    // Includes this scope and follows X/Z ancestry within its space, including outgoing trees.
+    // Includes this scope and follows X/Z ancestry within its tree, including outgoing trees.
     var ancestry: some Sequence<RouteScope> {
-        sequence(first: self) { $0.previousScopeInSpace }
+        sequence(first: self) { $0.previousScopeInTree }
     }
 
-    func belongs(to space: RouteSpace) -> Bool {
-        if self === space.root { return anchorSpace === space }
+    func belongs(to tree: RouteTree) -> Bool {
+        if self === tree.root { return anchorTree === tree }
         if let branchID, let parent {
-            return parent.branchScopes[branchID] === self && parent.belongs(to: space)
+            return parent.branchScopes[branchID] === self && parent.belongs(to: tree)
         }
         guard owningPath != nil, let previousRouteScope,
-              previousRouteScope.belongs(to: space) else { return false }
+              previousRouteScope.belongs(to: tree) else { return false }
         return previousRouteScope.continuation === self
     }
 
@@ -240,7 +238,7 @@ extension RouteScope {
 
     func append(_ scope: RouteScope, in path: RoutePath) {
         precondition(path === path.owner?.path, "Each root or branch has one canonical X path.")
-        precondition(scope !== self && scope.anchorSpace == nil && scope.branchID == nil,
+        precondition(scope !== self && scope.anchorTree == nil && scope.branchID == nil,
                      "Only a destination instance can extend an X path.")
         precondition(scope.owningPath == nil, "A route instance has exactly one owning path.")
         precondition(next(in: path) == nil, "Append begins at the end of its X path.")
@@ -305,7 +303,7 @@ extension RouteScope {
 
     func presentationStyles(hostedBy id: RoutePresentationHostID, automaticPushIsReady: Bool) -> Set<RoutePresentationKind> {
         guard presentationHostID == id else { return [] }
-        var styles = definitions.presentationStyles
+        var styles = definitions.presentationStyles.union(tree?.root.definitions.globals?.presentationStyles ?? [])
         if routingHosts[id]?.automatic == true && !automaticPushIsReady { styles.remove(.push) }
         return styles
     }
@@ -424,8 +422,8 @@ extension RouteScope {
         return bindings
     }
 
-    func hookBinding(for identity: HookDeclarationIdentity, in spaces: RouteSpaces) -> DeclarationBinding<AnyHookDeclaration>? {
-        guard spaces.routePath(containing: self) != nil else { return nil }
+    func hookBinding(for identity: HookDeclarationIdentity, in tree: RouteTree) -> DeclarationBinding<AnyHookDeclaration>? {
+        guard tree.routePath(containing: self) != nil else { return nil }
         return hookBindings[identity]
     }
 
@@ -446,8 +444,8 @@ extension RouteScope {
 
     func uninstallHookDeclarations(sourceID: AnyHashable) { hookSources[sourceID] = nil }
 
-    func unwindHandlerBinding(for routeType: any Route.Type, payload: Any?, in spaces: RouteSpaces) -> DeclarationBinding<AnyHookDeclaration>? {
-        guard spaces.routePath(containing: self) != nil else { return nil }
+    func unwindHandlerBinding(for routeType: any Route.Type, payload: Any?, in tree: RouteTree) -> DeclarationBinding<AnyHookDeclaration>? {
+        guard tree.routePath(containing: self) != nil else { return nil }
         let bindings = hookBindings
         let exact = HookDeclarationIdentity.unwindHandler(ObjectIdentifier(routeType),
             payload: payload.map { ObjectIdentifier(type(of: $0)) })

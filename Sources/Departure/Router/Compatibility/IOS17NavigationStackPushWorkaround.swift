@@ -62,7 +62,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         let scope: RouteScope
         let retainedScope: RouteScope
         var routePath: RoutePath { scope.routePath }
-        let unwindPlan: RouteSpaces.UnwindPlan
+        let unwindPlan: RouteTree.UnwindPlan
         let presentationOriginID: ObjectIdentifier?
     }
 
@@ -200,7 +200,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         in router: RouterEngine
     ) -> PendingDismissal? {
         guard
-            let routePath = router.spaces.routePath(containing: presentationScope),
+            let routePath = router.tree.routePath(containing: presentationScope),
             routePath.scopes.contains(where: { $0 === presentationScope }),
             let retained = routePath.scope(before: presentationScope),
             presentationScope.presentationDeclaration?.presentationKind == .push,
@@ -212,14 +212,14 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
         return PendingDismissal(
             scope: presentationScope,
             retainedScope: retained,
-            unwindPlan: RouteSpaces.UnwindPlan(retaining: [retained]),
+            unwindPlan: RouteTree.UnwindPlan(retaining: [retained]),
             presentationOriginID: presentationScope.presentationOrigin.map(ObjectIdentifier.init)
         )
     }
 
     private func isValid(_ dismissal: PendingDismissal, in router: RouterEngine) -> Bool {
         let scope = dismissal.scope
-        guard router.spaces.routePath(containing: scope) === dismissal.routePath,
+        guard router.tree.routePath(containing: scope) === dismissal.routePath,
               dismissal.routePath.scopes.contains(where: { $0 === scope }),
               dismissal.routePath.scope(before: scope) === dismissal.retainedScope,
               scope.presentationDeclaration?.presentationKind == .push,
@@ -229,7 +229,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
             return false
         }
 
-        let currentPlan = RouteSpaces.UnwindPlan(retaining: [dismissal.retainedScope])
+        let currentPlan = RouteTree.UnwindPlan(retaining: [dismissal.retainedScope])
         return hasSameStructure(dismissal.unwindPlan, currentPlan)
     }
 
@@ -254,12 +254,12 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
     }
 
     private func isActivePresentationPath(_ routePath: RoutePath, in router: RouterEngine) -> Bool {
-        guard let space = router.spaces.space(containing: routePath) else {
+        guard let tree = router.tree.tree(containing: routePath) else {
             return false
         }
 
-        return routePath === space.rootPath
-            || space.activeBranchPaths().contains(where: { $0 === routePath })
+        return routePath === tree.rootPath
+            || tree.activeBranchPaths().contains(where: { $0 === routePath })
     }
 
     private func complete(_ dismissal: PendingDismissal, in router: RouterEngine) {
@@ -275,11 +275,10 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
     }
 
     private func hasSameStructure(
-        _ first: RouteSpaces.UnwindPlan,
-        _ second: RouteSpaces.UnwindPlan
+        _ first: RouteTree.UnwindPlan,
+        _ second: RouteTree.UnwindPlan
     ) -> Bool {
-        guard first.spacesToRemove.elementsEqual(second.spacesToRemove, by: { $0 === $1 }),
-              first.retainedScopes.count == second.retainedScopes.count,
+        guard first.retainedScopes.count == second.retainedScopes.count,
               first.preservedPaths.count == second.preservedPaths.count,
               first.removedScopes.elementsEqual(second.removedScopes, by: { $0 === $1 })
         else {

@@ -91,8 +91,8 @@ public struct AnyRouteDestination: Sendable, Hashable {
 
 /// Presentation metadata for the particular destination being rendered.
 ///
-/// Style describes this destination; priority describes its enclosing priority space.
-/// A push inside a high-priority cover has ``Style/push`` style and ``RoutePriority/high`` priority.
+/// Metadata reflects the matched declaration; effective protection additionally
+/// requires this destination's route phase to be active.
 public struct RoutePresentation: Hashable, Sendable {
     /// The presentation style used for this destination.
     public enum Style: Hashable, Sendable {
@@ -110,8 +110,16 @@ public struct RoutePresentation: Hashable, Sendable {
     }
     /// The matched presentation style, including a cover's transition.
     public let style: Style
-    /// The effective priority, including priority inherited from an enclosing flow.
-    public let priority: RoutePriority
+    /// Whether this occurrence was presented from the root global catalog.
+    public let isGlobal: Bool
+    /// Whether the declaration requests protection while this destination is active.
+    public let isDismissalProtected: Bool
+
+    init(style: Style, isGlobal: Bool = false, isDismissalProtected: Bool = false) {
+        self.style = style
+        self.isGlobal = isGlobal
+        self.isDismissalProtected = isDismissalProtected
+    }
 }
 
 /// Values supplied by Departure for a destination's own scope during view construction.
@@ -127,7 +135,7 @@ public struct RouteContext {
     public let router: Router
     /// Unwinds this exact scope, optionally delivering a payload.
     public let unwindRoute: UnwindRouteAction
-    /// The destination's actual style and effective priority after route resolution.
+    /// The destination's matched style and declaration metadata.
     public let presentation: RoutePresentation
     /// The environment visible to this destination during the current builder evaluation.
     public let environment: EnvironmentValues

@@ -25,20 +25,19 @@
 /// Unwinds can be requested with ``UnwindRouteAction`` from ``UnwindRoute`` for
 /// captured route-scope dismissal, or with ``Router/unwind(_:)`` and
 /// ``Router/unwind(_:payload:)`` for explicit router-level targets.
-/// Root resets, explicit whole-space removal, and native Back or dismissal also notify handlers.
+/// Root resets and native Back or dismissal also notify handlers.
 /// Presenting a route never notifies them: ancestor crawlback, equality reuse,
 /// and replacement can remove destinations without being an unwind request.
 ///
-/// Lookup starts at the surviving landing scope and climbs to its space root.
-/// If no handler matches there, lookup continues from each surviving lower
-/// priority space's current scope, nearest priority first. A conflicting handler
-/// stops lookup. Covered scopes can receive notification without gaining routing authority.
+/// Lookup starts at the surviving landing scope and climbs to its tree root.
+/// A conflicting handler stops lookup. A surviving inactive scope may receive
+/// notification; a follow-up presentation still checks active dismissal protection.
 ///
 /// Native and explicit unwinds enter the handler after acceptance and before the
 /// path changes. The router continues once the handler suspends; it does not wait
 /// for the asynchronous body to finish. A presentation requested by the handler
 /// waits until the active navigation has finished, then rechecks source membership
-/// and priority coverage. It is dropped if a higher space still covers its source.
+/// and active dismissal protection.
 ///
 /// Handlers in one scope compose by route and expected payload type. Duplicate keys
 /// report a warning and are disabled until only one declaration remains.

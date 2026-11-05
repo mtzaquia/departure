@@ -41,7 +41,7 @@ public struct Replace: RouteDeclaration, Sendable {
         id: AnyHashable? = nil,
         @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        declaration = AnyRouteDeclaration(route, presentation: .init(style: .replace, priority: .default), id: id, children: children())
+        declaration = AnyRouteDeclaration(route, presentation: .init(style: .replace), id: id, children: children())
     }
 
     public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }

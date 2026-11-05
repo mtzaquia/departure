@@ -62,11 +62,11 @@ import Testing
             })
         #expect(engine.root.branchScopes.keys.isEmpty)
         await engine.present(DomainOnlyRoute())
-        let parent = try #require(engine.defaultSpace.rootPath.last)
+        let parent = try #require(engine.tree.rootPath.last)
         #expect(parent.id == AnyHashable("domain-sheet"))
         var builds = 0
         await engine.present(FeatureProvidedRoute { builds += 1 })
-        let child = try #require(engine.defaultSpace.rootPath.last)
+        let child = try #require(engine.tree.rootPath.last)
         #expect(child !== parent)
         #expect(builds == 0)
         try render(child, in: engine)
@@ -100,9 +100,9 @@ import Testing
         #expect(rendered.isEmpty)
         await engine.present(HomeDetailRoute())
         await engine.present(NumberedRoute(number: 42))
-        try render(#require(engine.defaultSpace.rootPath.last), in: engine)
+        try render(#require(engine.tree.rootPath.last), in: engine)
         await engine.present(SettingsRoute())
-        try render(#require(engine.defaultSpace.rootPath.last), in: engine)
+        try render(#require(engine.tree.rootPath.last), in: engine)
         #expect(rendered == ["feature:42", "settings"])
     }
 
@@ -169,10 +169,10 @@ import Testing
             })
         await engine.present(HomeDetailRoute())
         await engine.present(NumberedRoute(number: 42))
-        let retained = try #require(engine.defaultSpace.rootPath.last)
+        let retained = try #require(engine.tree.rootPath.last)
         #expect(await engine.requestRoute(DomainOnlyRoute()) == nil)
-        #expect(engine.defaultSpace.rootPath.last === retained)
-        #expect(engine.defaultSpace.rootPath.scopes.count == 2)
+        #expect(engine.tree.rootPath.last === retained)
+        #expect(engine.tree.rootPath.scopes.count == 2)
         #expect(engine.navigationOperations.isEmpty)
     }
 
@@ -226,7 +226,7 @@ import Testing
         #expect(builds == 0)
         #expect(engine.pendingRoute == nil)
         await engine.present(SettingsRoute())
-        #expect(engine.defaultSpace.rootPath.last?.route is SettingsRoute)
+        #expect(engine.tree.rootPath.last?.route is SettingsRoute)
     }
 
     @Test func aConflictInAnUnpresentedChildDisablesAncestorBindings() async throws {
@@ -250,10 +250,10 @@ import Testing
         #expect(await engine.requestRoute(DomainOnlyRoute()) == nil)
         await engine.present(HomeDetailRoute())
         await engine.present(NumberedRoute(number: 42))
-        let retained = try #require(engine.defaultSpace.rootPath.last)
+        let retained = try #require(engine.tree.rootPath.last)
         #expect(await engine.requestRoute(DomainOnlyRoute()) == nil)
-        #expect(engine.defaultSpace.rootPath.last === retained)
-        #expect(engine.defaultSpace.rootPath.scopes.count == 2)
+        #expect(engine.tree.rootPath.last === retained)
+        #expect(engine.tree.rootPath.scopes.count == 2)
         #expect(engine.navigationOperations.isEmpty)
     }
 
@@ -275,7 +275,7 @@ import Testing
             })
         #expect(builds == 0)
         await engine.present(DomainOnlyRoute())
-        try render(#require(engine.defaultSpace.rootPath.last), in: engine)
+        try render(#require(engine.tree.rootPath.last), in: engine)
         #expect(builds == 1)
     }
 
@@ -287,7 +287,7 @@ import Testing
             })
         #expect(engine.root.definitions.routeBinding(for: DomainOnlyRoute.self) == nil)
         #expect(await engine.requestRoute(DomainOnlyRoute()) == nil)
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
     }
 
     @Test(arguments: [false, true])
@@ -324,55 +324,8 @@ import Testing
             })
         #expect(builds == 0)
         await engine.present(DomainOnlyRoute())
-        try render(#require(engine.defaultSpace.rootPath.last), in: engine)
+        try render(#require(engine.tree.rootPath.last), in: engine)
         #expect(builds == 1)
-    }
-
-    @Test(arguments: [RoutePriority.high, .critical])
-    func reusedMapsShareOneDestinationAcrossBranchesAndPrioritySpaces(priority: RoutePriority) async throws {
-        var rendered: [String] = []
-        let number = RouteDestination(NumberedRoute.self) { route, _ in
-            rendered.append("parent:\(route.number)")
-            return EmptyView()
-        }
-        let child = RouteDestination(DomainOnlyRoute.self) { _, _ in
-            rendered.append("child")
-            return EmptyView()
-        }
-        let reusable = RouteMap {
-            Push(NumberedRoute.self) { Sheet(DomainOnlyRoute.self) }
-        } destinations: {
-            number
-            child
-        }
-        let branches = RouteMap {
-            Branches(concurrent: true) {
-                Branch("first") { reusable }
-                Branch("second") { reusable }
-            }
-        }
-        let engine = RouterEngine(
-            routes: RootRouteMap {
-                if priority == .high {
-                    HighPriority { Sheet(HomeDetailRoute.self) { branches } }
-                } else {
-                    CriticalPriority { Cover(HomeDetailRoute.self) { branches } }
-                }
-            } destinations: {
-                number
-                child
-                RouteDestination(HomeDetailRoute.self) { _, _ in EmptyView() }
-            })
-        await engine.present(HomeDetailRoute())
-        let entry = try #require(engine.spaces.space(for: priority)?.root)
-        let router = Router(engine: engine, scope: entry)
-        for (name, value) in [("first", 1), ("second", 2)] {
-            await router.branch(name).present(NumberedRoute(number: value))
-            try render(#require(entry.branchScopes[name]?.path.last), in: engine)
-            await router.branch(name).present(DomainOnlyRoute())
-            try render(#require(entry.branchScopes[name]?.path.last), in: engine)
-        }
-        #expect(rendered == ["parent:1", "child", "parent:2", "child"])
     }
 
     @Test func differentRoutingOwnersCanUseDifferentDestinationValues() async throws {
@@ -391,30 +344,9 @@ import Testing
         for name in ["first", "second"] {
             let engine = owner(name)
             await engine.present(DomainOnlyRoute())
-            try render(#require(engine.defaultSpace.rootPath.last), in: engine)
+            try render(#require(engine.tree.rootPath.last), in: engine)
         }
         #expect(rendered == ["first", "second"])
-    }
-
-    @Test(arguments: [RoutePriority.high, .critical])
-    func rootPriorityGroupsUseSharedBuildersAndKeepChildPriorityLocal(priority: RoutePriority) async throws {
-        let engine = RouterEngine(
-            routes: RootRouteMap {
-                if priority == .high {
-                    HighPriority { Sheet(DomainOnlyRoute.self) { Push(NumberedRoute.self) } }
-                } else {
-                    CriticalPriority { Cover(DomainOnlyRoute.self, transition: .fade) { Push(NumberedRoute.self) } }
-                }
-            } destinations: {
-                RouteDestination(DomainOnlyRoute.self) { _, _ in EmptyView() }
-                RouteDestination(NumberedRoute.self) { _, _ in EmptyView() }
-            })
-        let entry = try #require(engine.root.definitions.routeBinding(for: DomainOnlyRoute.self)?.declaration)
-        #expect(entry.priority == priority)
-        #expect(entry.childScope?.routeBinding(for: NumberedRoute.self)?.declaration?.priority == .default)
-        await engine.present(DomainOnlyRoute())
-        await engine.present(NumberedRoute(number: 1))
-        #expect(engine.spaces.space(for: priority)?.rootPath.last?.routePresentation?.priority == priority)
     }
 
     private func render(_ scope: RouteScope, in engine: RouterEngine) throws {

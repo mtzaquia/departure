@@ -48,6 +48,7 @@ final class RouteDefinitions: Sendable {
     let scopeID: DeclarationBinding<AnyHashable>?
     private let routesByType: OrderedStorage<ObjectIdentifier, DeclarationBinding<AnyRouteDeclaration>>
     let branchContainer: DeclarationBinding<BranchContainer>?
+    let globals: RouteDefinitions?
     let presentationStyles: Set<RoutePresentationKind>
 #if DEBUG
     let traceDeclarations: [RouteScopeDeclaration]
@@ -60,12 +61,17 @@ final class RouteDefinitions: Sendable {
         traceDeclarations = declarations
         traceDestinations = destinations
 #endif
+        let globalDeclarations = declarations.flatMap { declaration -> [RouteScopeDeclaration] in
+            if case .globals(let children) = declaration.content { return children }
+            return []
+        }
+        globals = globalDeclarations.isEmpty ? nil : RouteDefinitions(globalDeclarations, destinations: destinations)
         var scopeID = id.map { DeclarationBinding.declared($0) }
         var routes = OrderedStorage<ObjectIdentifier, DeclarationBinding<AnyRouteDeclaration>>()
         var branchContainer: DeclarationBinding<BranchContainer>?
         for declaration in declarations {
             switch declaration.content {
-            case .destinations:
+            case .destinations, .globals:
                 break
             case .scopeID(let id):
                 if scopeID == nil {

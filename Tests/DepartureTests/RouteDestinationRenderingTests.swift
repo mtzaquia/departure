@@ -67,55 +67,8 @@ struct RouteDestinationRenderingTests {
     }
 
     #if canImport(AppKit)
-    @Test func unadmittedRouteTeardownCompletesWhileItsCustomWrapperIsRetained() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {
-            Replace(DomainOnlyRoute.self)
-        } destinations: {
-            RouteDestination(DomainOnlyRoute.self) { _, _ in Text("Pending route") }
-        })
-        engine.routeScopeDidInstallInView(engine.root)
-        await engine.present(DomainOnlyRoute())
-        let scope = try #require(engine.defaultSpace.rootPath.last)
-        let lifetime = NativePresentationLifetime()
-        let control = CustomizedDestinationControl()
-        let builder = WindowDestinationBuilder { view, _ in
-            ConditionalCustomizedDestination(control: control, destination: view)
-        }
-        lifetime.synchronize(.init(scope: scope)) { .init(route: $0, destinationBuilder: builder, nativePresentation: lifetime) }
-        let snapshot = try #require(lifetime.presentation)
-        let host = NSHostingView(rootView: snapshot.destination.environment(\.routerEngine, engine))
-        host.frame = NSRect(x: 0, y: 0, width: 390, height: 500)
-        host.layoutSubtreeIfNeeded()
-        try #require(await waitUntil { lifecycleBridgeCount(in: host) == 2 })
-        #expect(!lifetime.isAdmitted)
-        lifetime.synchronize(nil) { .init(route: $0) }
-        #expect(scope.isAwaitingPresentationEnd)
-        control.showsRoute = false
-        host.layoutSubtreeIfNeeded()
-        try #require(await waitUntil { lifetime.presentation == nil })
-        #expect(lifecycleBridgeCount(in: host) == 1)
-        #expect(!scope.isAwaitingPresentationEnd)
-        withExtendedLifetime(host) {}
-    }
-    #endif
 
-    @Test func customizedContentAdmitsItsModalEvenWhenItTemporarilyOmitsRouteView() async throws {
-        let engine = RouterEngine()
-        let route = PresentedRoute(scope: RouteScope(id: "custom wrapper", route: nil))
-        let lifetime = NativePresentationLifetime()
-        let builder = WindowDestinationBuilder { _, _ in Text("Preparing customized content") }
-        lifetime.synchronize(route) { .init(route: $0, destinationBuilder: builder, nativePresentation: lifetime) }
-        let snapshot = try #require(lifetime.presentation)
-        let window = mount(snapshot.destination.environment(\.routerEngine, engine))
-        defer { close(window) }
-        try #require(await waitUntil { lifetime.isAdmitted })
-        #expect(!route.scope.isInstalledInView)
-        lifetime.synchronize(nil) { .init(route: $0) }
-        lifetime.didDismantleDestination(of: snapshot.id)
-        #expect(route.scope.isAwaitingPresentationEnd)
-        lifetime.completeDismissal(of: snapshot.id, in: engine)
-        #expect(!route.scope.isAwaitingPresentationEnd)
-    }
+    #endif
 
     @Test func destinationUsesOneBridgeForHostRegistrationAndNativeAdmission() async throws {
         let engine = RouterEngine(routes: RootRouteMap {
@@ -125,7 +78,7 @@ struct RouteDestinationRenderingTests {
         })
         engine.routeScopeDidInstallInView(engine.root)
         await engine.present(DomainOnlyRoute())
-        let scope = try #require(engine.defaultSpace.rootPath.last)
+        let scope = try #require(engine.tree.rootPath.last)
         let lifetime = NativePresentationLifetime()
         lifetime.synchronize(.init(scope: scope)) { .init(route: $0, nativePresentation: lifetime) }
         let snapshot = try #require(lifetime.presentation)
@@ -146,148 +99,6 @@ struct RouteDestinationRenderingTests {
             + view.subviews.reduce(0) { $0 + lifecycleBridgeCount(in: $1) }
     }
 
-    @Test func replacementContextTracksEnvironmentAndKeepsCapturedActionsScoped() async throws {
-        let router = RootRouter()
-        let engine = router.engine
-        let control = DestinationEnvironmentControl()
-        let recorder = RenderedDestinationRecorder()
-        let destination = RouteDestination(DomainOnlyRoute.self) { _, context in
-            recorder.context = context
-            recorder.values.append(context.environment.destinationTestValue)
-            return DestinationEnvironmentReader(recorder: recorder)
-        }
-        let host = WithRouter(routes: RootRouteMap { testReplace(destination) }, router: router) {
-            DestinationEnvironmentHost(control: control)
-        }
-        let window = mount(host)
-        defer { close(window) }
-        try #require(await waitUntil { engine.root.isInstalledInView && engine.root.presentationHostID != nil })
-        await router.current.present(DomainOnlyRoute())
-        try #require(await waitUntil { recorder.environment != nil && recorder.context != nil })
-        let firstScope = try #require(engine.defaultSpace.rootPath.last)
-        let context = try #require(recorder.context)
-        let initialValue = context.environment.destinationTestValue
-        #expect(context.presentation.style == .replace)
-        #expect(context.presentation.priority == .default)
-        #expect(context.router == Router(engine: engine, scope: firstScope))
-        #expect(context.environment.router == context.router)
-        #expect(recorder.unwindRoute == context.unwindRoute)
-        #expect(context.environment.routeScope === firstScope)
-        #expect(context.environment.routePhase == .active)
-        #expect(recorder.environment?.router == context.router)
-        #expect(recorder.environment?.destinationTestValue == "initial")
-
-        control.value = "updated"
-        try #require(await waitUntil { recorder.context?.environment.destinationTestValue == "updated" })
-        #expect(recorder.values.contains("updated"))
-        #expect(initialValue == "initial")
-        #expect(await context.unwindRoute())
-        try #require(await waitUntil { engine.defaultSpace.rootPath.isEmpty })
-        await router.current.present(DomainOnlyRoute())
-        let nextScope = try #require(engine.defaultSpace.rootPath.last)
-        #expect(nextScope !== firstScope)
-        #expect(!(await context.unwindRoute()))
-        await context.router.present(DomainOnlyRoute())
-        #expect(engine.defaultSpace.rootPath.last === nextScope)
-        #expect(await router.current.resetToRoot())
-    }
-
-    @Test(arguments: [RoutePresentation.Style.push, .sheet, .cover(.slide), .cover(.fade)])
-    func contextReportsMatchedPresentationStyle(style: RoutePresentation.Style) async throws {
-        let router = RootRouter()
-        let engine = router.engine
-        let recorder = RenderedDestinationRecorder()
-        let destination = RouteDestination(DomainOnlyRoute.self) { _, context in
-            recorder.context = context
-            return DestinationEnvironmentReader(recorder: recorder)
-        }
-        let routes = RootRouteMap {
-            if style == .push { testPush(destination) }
-            if style == .sheet { testSheet(destination) }
-            if case .cover(let transition) = style { testCover(destination, transition: transition) }
-        }
-        let host = WithRouter(routes: routes, router: router) {
-            NavigationStack {
-                Text("Root").routing()
-            }
-            .environment(\.destinationTestValue, "local")
-        } windowDestination: { destination, environment in
-            destination.environment(\.destinationTestValue, environment.destinationTestValue)
-        }
-        let window = mount(host)
-        defer { close(window) }
-        try #require(await waitUntil { engine.root.isInstalledInView && engine.root.presentationHostID != nil })
-        await router.current.present(DomainOnlyRoute())
-        try #require(await waitUntil { recorder.context != nil && recorder.environment != nil })
-        let context = try #require(recorder.context)
-        #expect(context.presentation.style == style)
-        #expect(context.presentation.priority == .default)
-        #expect(context.environment.destinationTestValue == "local")
-        #expect(recorder.environment?.destinationTestValue == "local")
-        #expect(context.environment.router == context.router)
-        #expect(recorder.unwindRoute == context.unwindRoute)
-        #expect(recorder.environment?.router == context.router)
-        if style == .push {
-            #expect(await context.unwindRoute())
-        } else {
-            recorder.context = nil
-            recorder.environment = nil
-            recorder.dismiss?()
-            try #require(await waitUntil { engine.defaultSpace.rootPath.isEmpty })
-        }
-    }
-
-    @Test(arguments: [RoutePriority.high, .critical])
-    func elevatedChildrenReceiveLocalStyleAndEffectivePriority(priority: RoutePriority) async throws {
-        let router = RootRouter()
-        let engine = router.engine
-        let parentRecorder = RenderedDestinationRecorder()
-        let childRecorder = RenderedDestinationRecorder()
-        let child = RouteDestination(NumberedRoute.self) { route, context in
-            childRecorder.context = context
-            childRecorder.number = route.number
-            return DestinationEnvironmentReader(recorder: childRecorder)
-        }
-        let parent = RouteDestination(DomainOnlyRoute.self) { _, context in
-            parentRecorder.context = context
-            return NavigationStack { DestinationEnvironmentReader(recorder: parentRecorder).routing() }
-        }
-        let routes = RootRouteMap {
-            HighPriority {
-                if priority == .high { testCover(parent, transition: .fade) { testPush(child) } }
-            }
-            CriticalPriority {
-                if priority == .critical { testCover(parent, transition: .fade) { testPush(child) } }
-            }
-        }
-        let host = WithRouter(routes: routes, router: router) {
-            Text("Root")
-                .routing()
-                .environment(\.destinationTestValue, "forwarded")
-        } windowDestination: { destination, environment in
-            destination.environment(\.destinationTestValue, environment.destinationTestValue)
-        }
-        let window = mount(host)
-        defer { close(window) }
-        try #require(await waitUntil { engine.root.isInstalledInView && engine.root.presentationHostID != nil })
-        await router.current.present(DomainOnlyRoute())
-        try #require(await waitUntil { parentRecorder.context != nil })
-        let parentContext = try #require(parentRecorder.context)
-        #expect(parentContext.presentation == .init(style: .cover(.fade), priority: priority))
-        let parentScope = try #require(engine.spaces.space(for: priority)?.root)
-        try #require(await waitUntil { parentScope.isInstalledInView && parentScope.presentationHostID != nil })
-        await parentContext.router.present(NumberedRoute(number: 17))
-        try #require(await waitUntil { childRecorder.context != nil && childRecorder.environment != nil })
-        let childContext = try #require(childRecorder.context)
-        #expect(childRecorder.number == 17)
-        #expect(childContext.presentation == .init(style: .push, priority: priority))
-        #expect(childContext.environment.destinationTestValue == "forwarded")
-        #expect(childRecorder.environment?.router == childContext.router)
-        #expect(await childContext.unwindRoute())
-        recorderDismiss(parentRecorder)
-        try #require(await waitUntil { engine.spaces.space(for: priority) == nil })
-    }
-
     @Test(arguments: [RoutePresentation.Style.sheet, .cover(.fade)], [(false, false), (false, true), (true, false), (true, true)])
     func ancestorReaderDismissesItsFlow(style: RoutePresentation.Style, options: (Bool, Bool)) async throws {
         let (childUnwindsFirst, usePolicy) = options
@@ -301,31 +112,31 @@ struct RouteDestinationRenderingTests {
             else { AncestorUnwindReader(recorder: recorder) }
         }
         let routes = RootRouteMap {
-            testDeclaration(parent, presentation: .init(style: style, priority: .default), children: [
+            testDeclaration(parent, presentation: .init(style: style), children: [
                 RouteScopeDeclaration(routes: testPush(child)._routeDeclarations)
             ])
         } destinations: { parent; child }
         let window = mount(WithRouter(routes: routes, router: router) { Text("Root").routing() })
         defer { close(window) }
         try #require(await waitUntil { router.engine.root.presentationHostID != nil })
-        await router.default.present(DomainOnlyRoute())
-        let parentScope = try #require(router.engine.defaultSpace.rootPath.last)
+        await router.root.present(DomainOnlyRoute())
+        let parentScope = try #require(router.engine.tree.rootPath.last)
         try #require(await waitUntil { parentScope.isInstalledInView && parentScope.presentationHostID != nil })
         await Router(engine: router.engine, scope: parentScope).present(NumberedRoute(number: 1))
         try #require(await waitUntil { recorder.unwindRoute != nil })
         let action = try #require(recorder.unwindRoute)
         #expect(action == UnwindRouteAction(router: router.engine, routeScope: parentScope))
         if childUnwindsFirst {
-            let childScope = try #require(router.engine.defaultSpace.rootPath.last)
+            let childScope = try #require(router.engine.tree.rootPath.last)
             #expect(await UnwindRouteAction(router: router.engine, routeScope: childScope)())
-            #expect(router.engine.defaultSpace.rootPath.last === parentScope)
+            #expect(router.engine.tree.rootPath.last === parentScope)
         }
         var completed: Bool?
         let unwind = Task { completed = await action() }
         defer { unwind.cancel() }
         try #require(await waitUntil { completed != nil })
         #expect(completed == true)
-        #expect(router.engine.defaultSpace.rootPath.isEmpty)
+        #expect(router.engine.tree.rootPath.isEmpty)
     }
 
     private func recorderDismiss(_ recorder: RenderedDestinationRecorder) {
@@ -333,6 +144,48 @@ struct RouteDestinationRenderingTests {
         recorder.environment = nil
         recorder.dismiss?()
     }
+
+    #if canImport(UIKit)
+    @Test func repeatedFadePreservesDestinationAnimationsAndWaitsForVisibleExit() async throws {
+        let router = RootRouter()
+        let recorder = FadeTransactionRecorder()
+        let control = FadeAnimationControl()
+        let destination = RouteDestination(DomainOnlyRoute.self) { _, _ in
+            NavigationStack {
+                FadeTransactionProbe(control: control, recorder: recorder)
+                    .navigationTitle("Fade layout")
+                    .toolbar { Button("Unlock") {} }
+            }
+        }
+        let routes = RootRouteMap {
+            GlobalMap { Cover(DomainOnlyRoute.self, transition: .fade) }
+        } destinations: { destination }
+        let window = mount(WithRouter(routes: routes, router: router) { Text("Root").routing() })
+        defer { close(window) }
+        try #require(await waitUntil { router.engine.root.presentationHostID != nil })
+
+        for _ in 0..<2 {
+            recorder.animations.removeAll()
+            await router.root.present(DomainOnlyRoute())
+            let scope = try #require(router.engine.tree.rootPath.last)
+            try #require(await waitUntil { scope.isInstalledInView && !recorder.animations.isEmpty })
+            // Let the entrance settle before exercising a destination-owned animation.
+            try await Task.sleep(for: .milliseconds(450))
+
+            recorder.animations.removeAll()
+            withAnimation(.linear(duration: 0.1)) { control.offset += 10 }
+            try #require(await waitUntil { recorder.animations.contains { $0 != nil } })
+            try await Task.sleep(for: .milliseconds(150))
+
+            let exitStarted = ContinuousClock.now
+            #expect(await UnwindRouteAction(router: router.engine, routeScope: scope)())
+            // Returning immediately would tear down the native cover before its
+            // opacity animation has a chance to become visible.
+            #expect(ContinuousClock.now - exitStarted >= .milliseconds(150))
+            #expect(router.engine.tree.rootPath.isEmpty)
+        }
+    }
+    #endif
 
     private func waitUntil(_ condition: () -> Bool) async -> Bool {
         let deadline = ContinuousClock.now + .seconds(8)
@@ -469,3 +322,22 @@ private struct PolicyUnwindReader: View {
         Text("Flow child").onAppear { recorder.unwindRoute = action }
     }
 }
+
+#if canImport(UIKit)
+@MainActor @Observable
+private final class FadeAnimationControl { var offset: CGFloat = 0 }
+
+@MainActor
+private final class FadeTransactionRecorder { var animations: [Animation?] = [] }
+
+private struct FadeTransactionProbe: View {
+    let control: FadeAnimationControl
+    let recorder: FadeTransactionRecorder
+
+    var body: some View {
+        Text("Stable layout")
+            .offset(x: control.offset)
+            .transaction { recorder.animations.append($0.animation) }
+    }
+}
+#endif

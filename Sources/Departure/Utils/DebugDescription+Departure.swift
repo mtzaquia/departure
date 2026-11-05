@@ -75,9 +75,9 @@ extension AnyRouteDeclaration {
         case .replace:
             presentationDescription = "replace"
         case .sheet:
-            presentationDescription = "sheet@\(priority)"
+            presentationDescription = "sheet"
         case let .cover(transition):
-            presentationDescription = "cover.\(transition)@\(priority)"
+            presentationDescription = "cover.\(transition)"
         }
 
         return "\(departureDebugName(for: routeType))[\(presentationDescription)]"

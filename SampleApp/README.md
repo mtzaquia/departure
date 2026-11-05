@@ -42,25 +42,25 @@ let route = MessageRoute(url: url)
 | --- | --- | --- |
 | `LandingRoute` | `departure-sample://route/landing` | Start |
 | `StartInfoRoute` | `departure-sample://route/start-info` | Start |
-| `LoginRoute` | `departure-sample://route/login` | Router root; high-priority cover |
-| `LoginReplacementRoute` | `departure-sample://route/login-replacement` | Router root; high-priority replacement cover |
+| `LoginRoute` | `departure-sample://route/login` | Router root; global cover |
+| `LoginReplacementRoute` | `departure-sample://route/login-replacement` | Router root; global cover above the current flow |
 | `LoginDetailRoute` | `departure-sample://route/login-detail` | Login; push |
-| `LoginNoticeRoute` | `departure-sample://route/login-notice` | Login; local sheet in the high-priority flow |
+| `LoginNoticeRoute` | `departure-sample://route/login-notice` | Login; local sheet in the global flow |
 | `ProfileRoute` | `departure-sample://route/profile` | Home branch; reroutes to Login while signed out |
 | `AuthenticationSettingsRoute` | `departure-sample://route/authentication-settings` | Settings branch; push |
 | `LocalDetailRoute` | `departure-sample://route/local-detail` | Settings branch; local push that shares its scope with inherited push hosts |
 | `TopLevelSheetRoute` | `departure-sample://route/top-level-sheet` | Nearest eligible mapped declaration; normally Landing |
 | `TopLevelCoverRoute` | `departure-sample://route/top-level-cover` | Landing; cover |
 | `TopLevelReplacementCoverRoute` | `departure-sample://route/top-level-replacement-cover` | Landing; replacement cover |
-| `HighPriorityPassthroughSheetRoute` | `departure-sample://route/high-priority-passthrough-sheet` | Router root; high-priority sheet with background interaction |
-| `HighPriorityBlockingSheetRoute` | `departure-sample://route/high-priority-blocking-sheet` | Router root; blocking high-priority sheet |
-| `PendingPriorityRoute` | `departure-sample://route/pending-priority` | Router root; high-priority cover |
+| `GlobalPassthroughSheetRoute` | `departure-sample://route/global-passthrough-sheet` | Router root; global sheet with background interaction |
+| `GlobalScrimSheetRoute` | `departure-sample://route/global-scrim-sheet` | Router root; blocking global sheet |
+| `PendingGlobalRoute` | `departure-sample://route/pending-global` | Router root; global cover |
 | `NavigationBarFadeOcclusionRoute` | `departure-sample://route/navigation-bar-fade-occlusion` | Home branch; fade cover |
 | `LifecycleTeardownRoute` | `departure-sample://route/lifecycle-teardown` | Home branch; routed `ScrollView` lifecycle regression fixture |
 | `AppearanceSettingsRoute` | `departure-sample://route/appearance-settings` | Settings branch; push |
-| `AlertRoute` | `departure-sample://route/alert` | Router root; high-priority fade cover |
-| `CriticalRoute` | `departure-sample://route/critical` | Router root; critical fade cover |
-| `CriticalReplacementRoute` | `departure-sample://route/critical-replacement` | Router root; critical replacement cover |
+| `AlertRoute` | `departure-sample://route/alert` | Router root; global fade cover |
+| `PasscodeRoute` | `departure-sample://route/passcode` | Router root; fade cover with active-only dismissal protection |
+| `PasscodeOverlayRoute` | `departure-sample://route/passcode-overlay` | Router root; unprotected global overlay |
 | `MessageRoute` | `departure-sample://route/message` | Home branch; fade cover |
 | `DismissProbeRoute` | `departure-sample://route/dismiss-probe` | Home branch; sheet |
 | `NestedModalRoute` | `departure-sample://route/nested-modal` | Dismiss Probe; nested sheet |
@@ -109,11 +109,22 @@ rather than relying on a globally current routing scope.
 The start screen's **About this sample** sheet binds a domain-only route using
 `RouteDestination`. It displays `context.presentation` and dismisses using the supplied
 scoped unwind action. All flows use type-only map declarations and typed builders in
-`destinations:` closures. High and critical entries use root-only priority groups.
+`destinations:` closures. Shared entries use a root-only `GlobalMap`; individual modal declarations may opt into `.dismissalProtection()`.
 
-## Detached window preferences
+## Global routes and active-only passcode protection
 
-Launch with `--detached-window-probe` to exercise high and critical sheets with vertical toolbars disabled. The fixture applies one shared modifier to the main hierarchy and through `WithRouter`'s `windowDestination` closure. **Read preferences** reports actual native orientation/status-bar agreement and the resolved toolbar behavior of both the elevated root and its sheet. Present the critical sheet above high, dismiss each, and reopen. On iPhone Duo, fold/unfold while a sheet is visible, send the app Home and return, and confirm the controls remain responsive. `DetachedWindowTests` covers stacking, reopening, rotation, and background/foreground snapshots; fold/unfold also needs direct simulator or device inspection.
+Choose **Global routes and passcode** on the start screen, or launch directly with `--scenario=global-routes`. The lab uses one global map for 2FA, a fade passcode cover, and another protected sheet. It is available from app root and detail views without duplicate declarations.
+
+| Promise | Interaction | Visible evidence | Proof |
+| --- | --- | --- | --- |
+| Shared global declarations | Present 2FA from root and detail | Return to the invoking screen and retained state | Package and UI tests |
+| Existing window and inherited configuration | Open fade lock or 2FA | `Same window: true` and inherited configuration | Native UI test |
+| Protection while active | Request app detail from covered root while locked | Lock remains visible | Package and UI tests |
+| Global and local exceptions | Present global 2FA, declared Help, or a pushed child | New destination takes over without removing the lock | Package and UI tests |
+| Protection suspension and restoration | Crawl back from an unprotected overlay, or dismiss it | Crawlback can remove inactive lock; returning restores its protection | Package and UI tests |
+| Another protected global | Present the protected sheet over Passcode | The new route protects itself; Done returns to protected Passcode | Package and UI tests |
+
+The Unlock toolbar action uses the ordinary captured unwind action. No unlock queue, per-route covered-request policy, detached environment forwarding, or separate window exists. The main route lab retains global authentication and passcode examples too. Toolbars and presentation appearance use native automatic behavior; no device-specific policy or preference forwarding is installed.
 
 ## Presentation replacement regressions
 
@@ -125,11 +136,11 @@ sheet appears. The update variant yields once between requests. Both must displa
 and allow it to unwind normally. `SheetFocusTests` covers these cases alongside native
 focus retention, swipe dismissal, replacement of a visible sheet, and repeated reopening.
 
-Add `--sheet-focus-elevated` to exercise a high-priority sheet in its dedicated window.
-Combine it with `--sheet-focus-slide` or `--sheet-focus-fade` for elevated covers.
+Add `--sheet-focus-global` to exercise a globally declared sheet in the existing window.
+Combine it with `--sheet-focus-slide` or `--sheet-focus-fade` for global covers.
 Swipe the sheet down, reopen it, replace it, and use **Unwind sheet** to clear the route
-programmatically. The elevated `SheetFocusTests` repeat these interactions with Debug
-exclusivity checking enabled; dismissal must leave the underlying window usable and
+programmatically. The global `SheetFocusTests` repeat these interactions with Debug
+exclusivity checking enabled; dismissal must leave the underlying hierarchy usable and
 allow the next presentation to appear.
 
 The **Split-view lab** covers replacing selected content from a pushed child. Select a detail

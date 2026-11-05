@@ -52,15 +52,15 @@ struct SampleDeepLink {
         "top-level-sheet",
         "top-level-cover",
         "top-level-replacement-cover",
-        "high-priority-passthrough-sheet",
-        "high-priority-blocking-sheet",
-        "pending-priority",
+        "global-passthrough-sheet",
+        "global-scrim-sheet",
+        "pending-global",
         "navigation-bar-fade-occlusion",
         "lifecycle-teardown",
         "appearance-settings",
         "alert",
-        "critical",
-        "critical-replacement",
+        "passcode",
+        "passcode-overlay",
         "message",
         "dismiss-probe",
         "nested-modal",
@@ -104,7 +104,7 @@ struct SampleDeepLink {
              is NavigationBarFadeOcclusionRoute, is LifecycleTeardownRoute:
             router.branch(LandingView.TabItem.home)
         case is AuthenticationSettingsRoute, is AppearanceSettingsRoute,
-             is PendingPriorityRoute, is SettingsModalRoute, is RerouteChainStartRoute,
+             is PendingGlobalRoute, is SettingsModalRoute, is RerouteChainStartRoute,
              is RerouteChainIntermediateRoute, is RerouteChainFinalRoute, is LocalDetailRoute:
             router.branch(LandingView.TabItem.settings)
         default:
@@ -141,12 +141,12 @@ struct SampleDeepLink {
             TopLevelCoverRoute()
         case "top-level-replacement-cover":
             TopLevelReplacementCoverRoute()
-        case "high-priority-passthrough-sheet":
-            HighPriorityPassthroughSheetRoute()
-        case "high-priority-blocking-sheet":
-            HighPriorityBlockingSheetRoute()
-        case "pending-priority":
-            PendingPriorityRoute()
+        case "global-passthrough-sheet":
+            GlobalPassthroughSheetRoute()
+        case "global-scrim-sheet":
+            GlobalScrimSheetRoute()
+        case "pending-global":
+            PendingGlobalRoute()
         case "navigation-bar-fade-occlusion":
             NavigationBarFadeOcclusionRoute()
         case "lifecycle-teardown":
@@ -155,10 +155,10 @@ struct SampleDeepLink {
             appearanceSettingsRoute(from: components)
         case "alert":
             AlertRoute()
-        case "critical":
-            CriticalRoute()
-        case "critical-replacement":
-            CriticalReplacementRoute()
+        case "passcode":
+            PasscodeRoute()
+        case "passcode-overlay":
+            PasscodeOverlayRoute()
         case "message":
             MessageRoute()
         case "dismiss-probe":

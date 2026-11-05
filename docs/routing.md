@@ -94,9 +94,9 @@ RootRouteMap {
 | `Sheet` | Presents a sheet. |
 | `Cover` | Presents a cover, using `.slide` by default or `.fade`. |
 
-All four declarations accept route types and optional child declarations. View builders belong in `destinations:`. Destinations explicitly construct stacks when needed. A replacement clears its descendants and keeps other branch paths. Fade covers use detached hosts; forward custom environment values through `WithRouter`'s `windowDestination` as described in [Priority](priority.md).
+All four declarations accept route types and optional child declarations. View builders belong in `destinations:`. Destinations explicitly construct stacks when needed. A replacement clears its descendants and keeps other branch paths. Fade covers use the presenting SwiftUI hierarchy in the existing window, with staged native completion.
 
-Reusable `RouteMap` values compose in ordinary builders. `ModalRouteMap` composes sheets and covers and can supply destination builders. Root-only `HighPriority` and `CriticalPriority` groups accept modal declarations and modal maps; their entries' children accept ordinary declarations and maps.
+Reusable `RouteMap` values compose in ordinary builders. `ModalRouteMap` composes sheets and covers and can supply destination builders. A root-only `GlobalMap` accepts modal declarations and modal maps; its entries' children accept ordinary declarations and maps. Global entries are available from every live scope. See [global routes and dismissal protection](global-routes.md).
 
 ## Connect pushes to a navigation stack
 
@@ -131,11 +131,11 @@ RouteDestination(EditorRoute.self) { route, context in
 }
 ```
 
-`context.router` and `context.unwindRoute` belong to this destination's scope. `context.presentation.style` reports push, replace, sheet, or cover; `.priority` reports its effective priority. `context.environment` contains the values supplied to the destination and refreshes when they change. The builder can choose wrapping content directly using that context.
+`context.router` and `context.unwindRoute` belong to this destination's scope. `context.presentation.style` reports push, replace, sheet, or cover; `.isGlobal` identifies a global occurrence and `.isDismissalProtected` reports declaration metadata. Effective protection additionally requires the destination to be active. `context.environment` contains the values supplied to the destination and refreshes when they change. The builder can choose wrapping content directly using that context.
 
 ## Find the nearest eligible declaration
 
-A scoped request searches its own branch and enclosing scopes. The same type may occur in several scopes; the nearest eligible owner wins. Duplicate route types at one scope report a diagnostic and disable that key, just like duplicate hooks. A conflict stops lookup; it cannot fall back to an ancestor or sibling declaration. Duplicate branch values disable that branch. Distinct declarations remain available.
+A global request uses the root catalog and presents above the foreground flow. Other scoped requests search their branch and enclosing scopes, subject to active dismissal protection. The same type may occur in several scopes; the nearest eligible owner wins. Duplicate route types at one scope report a diagnostic and disable that key, just like duplicate hooks. A conflict stops lookup; it cannot fall back to an ancestor or sibling declaration. Duplicate branch values disable that branch. Distinct declarations remain available.
 
 When no local match exists, discovery can select another mapped branch before that branch's view is built. It does not search arbitrary destination scopes in sibling stacks. `router.branch(...)` chooses a branch explicitly and never falls back to siblings. Knowing a nested definition does not make it available before its parent destination exists.
 
@@ -164,8 +164,8 @@ Removal performed to present a route does not invoke unwind handlers. This inclu
 
 ## Observe route phase
 
-Read `@Environment(\.routePhase)` to determine whether a scope is a current endpoint of a participating path in the top space. Concurrent branches may each have an active endpoint. A shared modal makes scopes outside its subtree inactive; covered and removed scopes are always inactive.
+Read `@Environment(\.routePhase)` to determine whether a scope is a current endpoint of a participating path in the current modal subtree. Concurrent branches may each have an active endpoint. A shared modal makes scopes outside its subtree inactive; scopes outside that subtree and removed scopes are inactive.
 
-Live membership and phase answer different questions. Any live scope in the top space may issue commands, including inactive ancestors and unselected branches. Covered and removed scopes cannot. Neither command eligibility nor phase requires a mounted host, and phase does not imply focus or physical visibility.
+Live membership and phase answer different questions. Live scopes may issue commands, including inactive ancestors and unselected branches, subject to active dismissal protection. Removed scopes cannot. Neither command eligibility nor phase requires a mounted host, and phase does not imply focus or physical visibility.
 
 Next: [Actions](actions.md) · [Unwinding](unwinding.md)

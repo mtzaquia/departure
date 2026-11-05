@@ -5,26 +5,26 @@ import Testing
 
 @MainActor
 @Suite(.timeLimit(.minutes(1)))
-struct RouteSpaceTests {
+struct RouteTreeTests {
     @Test func scopeAnchorsCaptureAnOutgoingSubtreeWithoutRedundantBranchCuts() async throws {
         let (engine, _, container) = try await nestedBranchFixture(rootIsBranched: false)
         let active = try #require(container.branchScopes["active"])
         let inactive = try #require(container.branchScopes["inactive"])
         let activePush = try #require(active.path.last)
         let inactivePush = try #require(inactive.path.last)
-        let plan = RouteSpaces.UnwindPlan(retaining: [active, engine.root, inactive])
+        let plan = RouteTree.UnwindPlan(retaining: [active, engine.root, inactive])
         #expect(plan.retainedScopes.count == 1)
         #expect(plan.retainedScopes.first === engine.root)
         #expect(plan.removedScopes.count == 3)
         engine.applyUnwindPlan(plan)
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
         #expect(plan.removedScopes.contains { $0 === container })
         #expect(plan.preservedPaths.first { $0.routePath === active.path }?.scopes.first === activePush)
         #expect(plan.preservedPaths.first { $0.routePath === inactive.path }?.scopes.first === inactivePush)
         #expect(active.path.last === activePush)
         #expect(inactive.path.last === inactivePush)
-        #expect(!activePush.belongs(to: engine.defaultSpace))
-        #expect(!inactivePush.belongs(to: engine.defaultSpace))
+        #expect(!activePush.belongs(to: engine.tree))
+        #expect(!inactivePush.belongs(to: engine.tree))
     }
 
     @Test(arguments: [false, true])
@@ -35,27 +35,27 @@ struct RouteSpaceTests {
         let activePush = try #require(active.path.last)
         let inactivePush = try #require(inactive.path.last)
         let captured = Router(engine: engine, scope: inactivePush)
-        let plan = engine.spaces.rootUnwindPlan(in: engine.defaultSpace)
+        let plan = engine.tree.rootUnwindPlan()
         #expect(plan.removedScopes.contains { $0 === activePush })
         #expect(plan.removedScopes.contains { $0 === inactivePush })
         #expect(plan.preservedPaths.contains { $0.routePath === inactive.path })
         #expect(!plan.retainedScopes.contains { $0 === active || $0 === inactive })
         #expect(await Router(engine: engine, scope: container).resetToRoot())
-        #expect(!container.belongs(to: engine.defaultSpace))
-        #expect(!activePush.belongs(to: engine.defaultSpace))
-        #expect(!inactivePush.belongs(to: engine.defaultSpace))
+        #expect(!container.belongs(to: engine.tree))
+        #expect(!activePush.belongs(to: engine.tree))
+        #expect(!inactivePush.belongs(to: engine.tree))
         #expect(active.path.last === activePush)
         #expect(inactive.path.last === inactivePush)
-        #expect(engine.spaces.routePath(containing: active) == nil)
-        #expect(engine.spaces.routePath(containing: inactive) == nil)
+        #expect(engine.tree.routePath(containing: active) == nil)
+        #expect(engine.tree.routePath(containing: inactive) == nil)
 
         if rootIsBranched {
             let other = try #require(engine.root.branchScopes["other"])
             #expect(other.path.last?.route is TransactionRoute)
-            #expect(other.belongs(to: engine.defaultSpace))
+            #expect(other.belongs(to: engine.tree))
             #expect(engine.root.branchScopes["main"]?.path.isEmpty == true)
         } else {
-            #expect(engine.defaultSpace.rootPath.isEmpty)
+            #expect(engine.tree.rootPath.isEmpty)
         }
 
         let inactivePathBefore = inactive.path.scopes.map(ObjectIdentifier.init)
@@ -73,10 +73,10 @@ struct RouteSpaceTests {
 
         #expect(active.path.last?.route is HomeDetailRoute)
         #expect(inactive.path.last?.route is MessageRoute)
-        #expect(!active.belongs(to: engine.defaultSpace))
-        #expect(!inactive.belongs(to: engine.defaultSpace))
-        #expect(engine.spaces.routePath(containing: active) == nil)
-        #expect(engine.spaces.routePath(containing: inactive) == nil)
+        #expect(!active.belongs(to: engine.tree))
+        #expect(!inactive.belongs(to: engine.tree))
+        #expect(engine.tree.routePath(containing: active) == nil)
+        #expect(engine.tree.routePath(containing: inactive) == nil)
         await Router(engine: engine, scope: engine.root).present(LoginRoute())
         let replacement = try #require(outerPath.last)
         #expect(replacement !== container)
@@ -87,7 +87,7 @@ struct RouteSpaceTests {
     @Test func detachedBranchesAreReleasedByARCWhenOutgoingOwnersAreReleased() async throws {
         let (engine, probe) = try await detachBranchSubtree()
         #expect(probe.isReleased)
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
     }
 
     @Test func activePositionObservesCanonicalBranchStateWithoutEngineReconciliation() throws {
@@ -105,8 +105,8 @@ struct RouteSpaceTests {
         let changes = ObservationCount()
         withObservationTracking {
             #expect(engine.activeRouteScopeID == ObjectIdentifier(home))
-            #expect(engine.defaultSpace.currentRouteScope === home)
-            #expect(engine.defaultSpace.currentRoutePath === home.path)
+            #expect(engine.tree.currentRouteScope === home)
+            #expect(engine.tree.currentRoutePath === home.path)
         } onChange: {
             MainActor.assumeIsolated { changes.value += 1 }
         }
@@ -116,8 +116,8 @@ struct RouteSpaceTests {
         #expect(engine.root.setActiveBranch(AppTab.wallet))
         #expect(changes.value == 1)
         #expect(engine.activeRouteScopeID == ObjectIdentifier(wallet))
-        #expect(engine.defaultSpace.currentRouteScope === wallet)
-        #expect(engine.defaultSpace.currentRoutePath === wallet.path)
+        #expect(engine.tree.currentRouteScope === wallet)
+        #expect(engine.tree.currentRoutePath === wallet.path)
         #expect(engine.routePhase(for: wallet) == .active)
         #expect(engine.routePhase(for: home) == .active)
     }
@@ -139,7 +139,7 @@ struct RouteSpaceTests {
         await engine.present(LoginRoute())
         await engine.present(HomeDetailRoute())
         await engine.present(AlertRoute())
-        let path = engine.defaultSpace.rootPath
+        let path = engine.tree.rootPath
         let scopes = path.scopes
         #expect(scopes.count == 4)
         #expect(scopes.map(\.pathDepth) == [1, 2, 3, 4])
@@ -149,26 +149,26 @@ struct RouteSpaceTests {
         let detail = try #require(scopes.first { $0.route is HomeDetailRoute })
         let cover = try #require(scopes.first { $0.route is AlertRoute })
         let inner = try #require(sheet.branchScopes["inner"])
-        #expect(engine.defaultSpace.currentRouteScope === cover)
-        #expect(engine.defaultSpace.currentRoutePath === path)
+        #expect(engine.tree.currentRouteScope === cover)
+        #expect(engine.tree.currentRoutePath === path)
         #expect(engine.root.continuation === push)
         #expect(engine.root.lane.modal === sheet)
         #expect(sheet.continuation === detail)
         #expect(sheet.lane.modal === cover)
         #expect(inner.lane === sheet.lane)
         #expect(inner.pathDepth == sheet.pathDepth)
-        #expect(scopes.allSatisfy { $0.owningPath === path && $0.belongs(to: engine.defaultSpace) })
+        #expect(scopes.allSatisfy { $0.owningPath === path && $0.belongs(to: engine.tree) })
         let stale = Router(engine: engine, scope: detail)
         #expect(await Router(engine: engine, scope: sheet).unwind(.current))
         #expect(path.scopes.count == 1)
         #expect(path.last === push)
-        #expect(engine.defaultSpace.currentRouteScope === push)
-        #expect(engine.defaultSpace.currentRoutePath === path)
+        #expect(engine.tree.currentRouteScope === push)
+        #expect(engine.tree.currentRoutePath === path)
         #expect(engine.root.lane.modal == nil)
         #expect(sheet.lane.modal == nil)
         #expect(sheet.continuation === detail)
-        #expect(!inner.belongs(to: engine.defaultSpace))
-        #expect(!detail.belongs(to: engine.defaultSpace))
+        #expect(!inner.belongs(to: engine.tree))
+        #expect(!detail.belongs(to: engine.tree))
         await stale.present(AlertRoute())
         #expect(path.last === push)
     }
@@ -220,63 +220,15 @@ struct RouteSpaceTests {
         #expect(wallet.path.scopes.count == 2)
         #expect(wallet.path.first === walletPush)
         #expect(sheet.lane.modal == nil)
-        #expect(!sheet.belongs(to: engine.defaultSpace))
-        #expect(!nested.belongs(to: engine.defaultSpace))
+        #expect(!sheet.belongs(to: engine.tree))
+        #expect(!nested.belongs(to: engine.tree))
         #expect(await Router(engine: engine, scope: walletPush).unwind(.current))
         #expect(wallet.path.isEmpty)
         #expect(home.path.last === homePush)
         #expect(engine.root.lane.modal == nil)
     }
 
-    @Test func prioritiesOwnIndependentSpacesAndLocalRoutesKeepTheirPriority() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {
-            testSheet(testDestination(SettingsRoute.self)) {
-                testPush(testDestination(NumberedRoute.self))
-            }
 
-            HighPriority {
-                testSheet(testDestination(LoginRoute.self)) {
-                    testPush(testDestination(HomeDetailRoute.self))
-                }
-            }
-            CriticalPriority {
-                testCover(testDestination(AlertRoute.self)) {
-                    testSheet(testDestination(MessageRoute.self))
-                }
-            }
-        })
-        await engine.present(SettingsRoute())
-        await engine.present(NumberedRoute(number: 1))
-        await engine.present(LoginRoute())
-        await engine.present(HomeDetailRoute())
-        await engine.present(AlertRoute())
-        await engine.present(MessageRoute())
-        let defaultSpace = engine.defaultSpace
-        let high = try #require(engine.spaces.highSpace)
-        let critical = try #require(engine.spaces.criticalSpace)
-        let alert = critical.root
-        let criticalModal = try #require(critical.rootPath.last)
-        #expect(defaultSpace.root.lane !== high.root.lane)
-        #expect(high.root.lane !== critical.root.lane)
-        #expect(defaultSpace.root.lane !== critical.root.lane)
-        #expect(defaultSpace.rootPath.scopes.map(\.pathDepth) == [1, 2])
-        #expect(high.rootPath.scopes.map(\.pathDepth) == [1])
-        #expect(critical.rootPath.scopes.map(\.pathDepth) == [1])
-        #expect(high.rootPath.scopes.allSatisfy { $0.space === high && $0.routePresentation?.priority == .high })
-        #expect(criticalModal.routePresentation?.priority == .critical)
-        #expect(critical.root.lane.depth == 0)
-        #expect(alert.lane.modal === criticalModal)
-        #expect(await Router(engine: engine, scope: alert).unwind(.current))
-        #expect(engine.spaces.criticalSpace == nil)
-        #expect(engine.spaces.highSpace === high)
-        #expect(high.rootPath.count == 1)
-        #expect(defaultSpace.rootPath.count == 2)
-        let login = high.root
-        #expect(await Router(engine: engine, scope: login).unwind(.current))
-        #expect(engine.spaces.highSpace == nil)
-        #expect(defaultSpace.root.lane.modal === defaultSpace.rootPath.first)
-        #expect(defaultSpace.rootPath.count == 2)
-    }
 }
 
 @MainActor
@@ -315,7 +267,7 @@ private func nestedBranchFixture(rootIsBranched: Bool) async throws -> (RouterEn
         outerPath = try #require(engine.root.branchScopes["main"]?.path)
     } else {
         source = root
-        outerPath = engine.defaultSpace.rootPath
+        outerPath = engine.tree.rootPath
     }
     await present(LoginRoute(), using: source)
     let container = try #require(outerPath.last)

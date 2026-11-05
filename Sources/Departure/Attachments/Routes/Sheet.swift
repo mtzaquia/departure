@@ -41,7 +41,19 @@ public struct Sheet: RouteDeclaration, Sendable {
         id: AnyHashable? = nil,
         @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        declaration = AnyRouteDeclaration(route, presentation: .init(style: .sheet, priority: .default), id: id, children: children())
+        declaration = AnyRouteDeclaration(route, presentation: .init(style: .sheet), id: id, children: children())
+    }
+
+    private init(declaration: AnyRouteDeclaration) { self.declaration = declaration }
+
+    /// Protects this destination against incidental dismissal while its route phase is active.
+    ///
+    /// Global requests and presentations declared by the protected destination remain
+    /// available. Protection stops while another destination is active above this one,
+    /// and resumes if this exact instance becomes active again. Explicit dismissal
+    /// through its captured unwind action remains available.
+    public func dismissalProtection() -> Self {
+        Self(declaration: declaration.protectingDismissal())
     }
 
     public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }

@@ -95,7 +95,7 @@ import Testing
             }
         })
         await engine.present(LoginRoute())
-        let outgoing = try #require(engine.defaultSpace.rootPath.last)
+        let outgoing = try #require(engine.tree.rootPath.last)
         let selection = Selection("first"), duplicate = Selection("first")
         let owner = RoutePresentationHostID()
         bind(selection, owner: owner, in: engine, scope: outgoing)
@@ -108,7 +108,7 @@ import Testing
         #expect(selection.value == "second")
         #expect(duplicate.value == "second")
         #expect(outgoing.activeBranch == AnyHashable("first"))
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
     }
 
     private func fixture() -> RouterEngine {

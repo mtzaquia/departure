@@ -23,14 +23,13 @@ At `.trace`, `WithRouter` emits one tree when its adopted root first appears. Re
 ```text
 [map] ✓ adopted routing map owner=12345678
 root
-├─ default
-│  └─ branches (concurrent)
-│     ├─ branch #1 (AppTab)
-│     │  └─ push ProfileRoute → destination #1
-│     └─ branch #2 (AppTab)
-│        └─ sheet ProfileRoute → destination #1
-└─ high
-   └─ cover.slide LoginRoute → destination #2
+├─ branches (concurrent)
+│  ├─ branch #1 (AppTab)
+│  │  └─ push ProfileRoute → destination #1
+│  └─ branch #2 (AppTab)
+│     └─ sheet ProfileRoute → destination #1
+└─ global
+   └─ cover.fade PasscodeRoute → destination #2 [dismissal protection]
 ```
 
 The complete tree is printed as one standard-output block, preserving its indentation. Unified logging truncates large interpolated strings by encoded size, so the tree uses standard output rather than multiple log records. It remains limited to `.trace` in Debug builds and is emitted once per routing owner.
@@ -65,7 +64,7 @@ The hint describes the registered host and suggests a placement to check; it doe
 
 Invoking `@UnwindRoute` or `router.unwind` with a missing route type or modal emits a warning identifying the requested boundary, including in Release builds and with `Departure.debug = .off`. The request returns `false` and does not dismiss a different destination.
 
-`router.resetToRoot()` logs “requested reset to priority-space root” before the existing removal and completion events. Its trace identifier correlates handler delivery and native teardown with that reset.
+`router.resetToRoot()` logs “requested reset to application root” before the existing removal and completion events. Its trace identifier correlates handler delivery and native teardown with that reset.
 
 ## Logging and privacy
 

@@ -72,16 +72,16 @@ Sheets, covers, and replacements require a stack only when their content needs o
 
 An environment router captures the view's scope. Stored copies retain that origin and become inactive when it leaves the graph. Outside `WithRouter`, commands do nothing.
 
-For deep links and notifications, keep an explicit owner and capture the default flow when issuing navigation:
+For deep links and notifications, keep an explicit owner and capture the application root when issuing navigation:
 
 ```swift
 @State private var rootRouter = RootRouter()
 WithRouter(routes: appRoutes, router: rootRouter) { HomeView() }
-await rootRouter.default.present(ProfileRoute(userID: "42"))
+await rootRouter.root.present(ProfileRoute(userID: "42"))
 ```
 
 `RootRouter` owns the container. `Router` is a weak scope-bound handle; a saved copy does not retarget itself after suspension or removal.
 
-`default` captures the default flow even while a high or critical space covers it. That captured router rejects navigation and action dispatch while covered, protecting a lockscreen from external navigation. `current` captures the top space and carries that space's local authority.
+`root` captures the permanent application root. `current` captures the foreground scope. Both may request [global routes](global-routes.md), and both respect dismissal protection while the protected destination is active.
 
 Next: [Routing](routing.md)

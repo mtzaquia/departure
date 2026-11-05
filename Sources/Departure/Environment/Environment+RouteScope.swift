@@ -79,10 +79,10 @@ public struct UnwindRouteAction: Equatable {
     }
 }
 
-/// Whether a scope is a current endpoint of a participating path in the top space.
+/// Whether a scope is a current endpoint of a participating path in the current modal subtree.
 ///
 /// Phase describes foreground navigation position, not command authority or host
-/// installation. Inactive live scopes in the top space may still issue commands.
+/// installation. Inactive live scopes in the current modal subtree may still issue commands.
 public enum RoutePhase: Equatable, Sendable {
     /// This scope is current within its participating branch and modal subtree.
     /// Concurrent branches may each have an active endpoint.
@@ -130,11 +130,11 @@ public extension EnvironmentValues {
 
     /// The current routing phase for this view's local route scope.
     ///
-    /// Current endpoints in participating paths of the top space read ``RoutePhase/active``.
+    /// Current endpoints in participating paths of the navigation tree read ``RoutePhase/active``.
     /// Concurrent branches can each be active. A modal makes scopes outside its subtree
-    /// inactive; a covered or removed scope is always inactive.
+    /// inactive; a scope outside the current modal subtree or removed from navigation is inactive.
     ///
-    /// Command authority requires live membership in the top space, rather than an
+    /// Command authority requires live membership in the current modal subtree, rather than an
     /// active phase. An inactive ancestor or unselected branch there can still navigate.
     /// Neither phase nor command authority requires a mounted presentation host.
     @Entry var routePhase = RoutePhase.inactive
@@ -156,16 +156,15 @@ extension View {
 extension RouterEngine {
     func routePhase(for routeScope: RouteScope) -> RoutePhase {
         _ = activeRouteScopeID
-        guard let path = spaces.routePath(containing: routeScope),
-              let space = spaces.space(containing: path), space === spaces.activeSpace else { return .inactive }
+        guard let path = tree.routePath(containing: routeScope) else { return .inactive }
         // A modal suspends scopes outside its subtree. Concurrent columns hosted
         // inside that modal still participate together.
-        if let deepestModal = space.currentModalScope,
+        if let deepestModal = tree.currentModalScope,
            !routeScope.ancestry.contains(where: { $0 === deepestModal }) {
             return .inactive
         }
         for scope in routeScope.ancestry {
-            if let branch = scope.branchID, let previous = scope.previousScopeInSpace,
+            if let branch = scope.branchID, let previous = scope.previousScopeInTree,
                previous.participates(inBranch: branch) == false { return .inactive }
         }
         return path.owner?.activeLocalScope === routeScope ? .active : .inactive

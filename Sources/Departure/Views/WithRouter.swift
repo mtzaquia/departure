@@ -30,59 +30,25 @@ import SwiftUI
 /// }
 /// ```
 public struct WithRouter<Content: View>: View {
-    @State var router: RouterEngine
-    @ViewBuilder let content: Content
-    let windowDestinationBuilder: WindowDestinationBuilder
+    @State private var router: RouterEngine
+    @ViewBuilder private let content: Content
 
     public var body: some View {
         content
-            .routingAutomatically(windowDestinationBuilder: windowDestinationBuilder)
+            .routingAutomatically()
             .routeScopeEnvironment(router.root, router: router)
-            .background {
-                ElevatedPriorityHost(priority: .high, windowDestinationBuilder: windowDestinationBuilder)
-                ElevatedPriorityHost(priority: .critical, windowDestinationBuilder: windowDestinationBuilder)
-            }
             .environment(\.routerEngine, router)
     }
 
-    /// Creates a router host.
-    ///
-    /// Pass a ``RootRouter`` when app code needs to keep an explicit reference.
+    /// Creates the application's routing host with local and global declarations.
+    /// - Parameters:
+    ///   - routes: Definitions shared by this routing owner.
+    ///   - router: An optional owner handle for app-level navigation.
+    ///   - content: The application's root content.
     public init(routes: RootRouteMap, router: RootRouter? = nil, @ViewBuilder content: () -> Content) {
-        let router = router?.engine ?? RouterEngine(routes: routes)
-        router.configureMap(routes)
-        router.windowDestinationBuilder = .passthrough
-        self._router = State(wrappedValue: router)
+        let engine = router?.engine ?? RouterEngine(routes: routes)
+        engine.configureMap(routes)
+        self._router = State(wrappedValue: engine)
         self.content = content()
-        self.windowDestinationBuilder = .passthrough
-    }
-
-    /// Creates a router host with a detached presentation customizer.
-    ///
-    /// Pass a ``RootRouter`` when app code needs to keep an explicit reference.
-    ///
-    /// `windowDestination` customizes destinations that Departure renders in a detached
-    /// SwiftUI host, including elevated-priority presentations and default-priority fade
-    /// covers. Use it to explicitly forward environment values and reapply hierarchy-wide
-    /// modifiers those destinations need. View modifiers do not cross hosting-controller
-    /// boundaries; for example, apply the same `toolbarVerticalBehavior(.disabled)` to
-    /// both the app hierarchy and `destination` on iOS 27.1 and later.
-    ///
-    /// On UIKit, elevated window roots automatically read orientation, status-bar,
-    /// home-indicator, gesture-edge, and vertical-bar preferences from the covered
-    /// window. The closure configures the destination inside its own presentation.
-    public init<WindowContent: View>(
-        routes: RootRouteMap,
-        router: RootRouter? = nil,
-        @ViewBuilder _ content: () -> Content,
-        @ViewBuilder windowDestination: @escaping (RouteView, EnvironmentValues) -> WindowContent
-    ) {
-        let router = router?.engine ?? RouterEngine(routes: routes)
-        router.configureMap(routes)
-        let windowDestinationBuilder = WindowDestinationBuilder(windowDestination)
-        router.windowDestinationBuilder = windowDestinationBuilder
-        self._router = State(wrappedValue: router)
-        self.content = content()
-        self.windowDestinationBuilder = windowDestinationBuilder
     }
 }

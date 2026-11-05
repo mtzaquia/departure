@@ -20,7 +20,7 @@ struct HookBindingTests {
         }
         for payload in ["done", 42, nil, true] as [Any?] {
             await router.present(LoginRoute())
-            let source = try #require(engine.defaultSpace.rootPath.last)
+            let source = try #require(engine.tree.rootPath.last)
             let scoped = Router(engine: engine, scope: source)
             if let payload { #expect(await scoped.unwind(.current, payload: payload)) }
             else { #expect(await scoped.unwind(.current)) }
@@ -40,10 +40,10 @@ struct HookBindingTests {
             UnwindHandler(LoginRoute.self) { probe.events.append("payload-free") }.declaration,
         ])
         await root.present(LoginRoute())
-        var source = try #require(engine.defaultSpace.rootPath.last)
+        var source = try #require(engine.tree.rootPath.last)
         #expect(await Router(engine: engine, scope: source).unwind(.current, payload: Optional<String>.none))
         await root.present(LoginRoute())
-        source = try #require(engine.defaultSpace.rootPath.last)
+        source = try #require(engine.tree.rootPath.last)
         #expect(await Router(engine: engine, scope: source).unwind(.current))
         #expect(probe.events == ["optional", "payload-free"])
     }
@@ -62,19 +62,19 @@ struct HookBindingTests {
             ])
         }
         let key = HookDeclarationIdentity.unwindHandler(ObjectIdentifier(LoginRoute.self), payload: ObjectIdentifier(String.self))
-        guard case .conflict? = engine.root.hookBinding(for: key, in: engine.spaces) else {
+        guard case .conflict? = engine.root.hookBinding(for: key, in: engine.tree) else {
             Issue.record("Only the duplicate route/payload pair should conflict")
             return
         }
         for payload in ["blocked", 7] as [Any] {
             await root.present(LoginRoute())
-            let source = try #require(engine.defaultSpace.rootPath.last)
+            let source = try #require(engine.tree.rootPath.last)
             #expect(await Router(engine: engine, scope: source).unwind(.current, payload: payload))
         }
         #expect(probe.events == ["int:7"])
         engine.root.uninstallHookDeclarations(sourceID: "second")
         await root.present(LoginRoute())
-        let source = try #require(engine.defaultSpace.rootPath.last)
+        let source = try #require(engine.tree.rootPath.last)
         #expect(await Router(engine: engine, scope: source).unwind(.current, payload: "restored"))
         #expect(probe.events == ["int:7", "first:restored"])
     }
@@ -91,19 +91,19 @@ struct HookBindingTests {
             UnwindHandler(SettingsRoute.self, expecting: String.self) { probe.events.append("ancestor:\($0)") }.declaration,
         ])
         await root.present(LoginRoute())
-        let landing = try #require(engine.defaultSpace.rootPath.last)
+        let landing = try #require(engine.tree.rootPath.last)
         landing.installHookDeclarations(sourceID: "int", hookDeclarations: [
             UnwindHandler(SettingsRoute.self, expecting: Int.self) { probe.events.append("int:\($0)") }.declaration,
         ])
         let landingRouter = Router(engine: engine, scope: landing)
         await landingRouter.present(SettingsRoute())
-        var source = try #require(engine.defaultSpace.rootPath.last)
+        var source = try #require(engine.tree.rootPath.last)
         #expect(await Router(engine: engine, scope: source).unwind(.current, payload: "found"))
         #expect(probe.events == ["ancestor:found"])
         let string = UnwindHandler(SettingsRoute.self, expecting: String.self) { probe.events.append("local:\($0)") }.declaration
         landing.installHookDeclarations(sourceID: "duplicate", hookDeclarations: [string, string])
         await landingRouter.present(SettingsRoute())
-        source = try #require(engine.defaultSpace.rootPath.last)
+        source = try #require(engine.tree.rootPath.last)
         #expect(await Router(engine: engine, scope: source).unwind(.current, payload: "blocked"))
         #expect(probe.events == ["ancestor:found"])
     }
@@ -115,22 +115,22 @@ struct HookBindingTests {
         let tagged = UnwindHandler(LoginRoute.self, expecting: (any HookPayloadTag).self) { _ in probe.events.append("tagged") }.declaration
         let payload = HookPayloadChild()
         engine.root.installHookDeclarations(sourceID: "base", hookDeclarations: [base])
-        let compatible = try #require(engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: payload, in: engine.spaces)?.declaration)
+        let compatible = try #require(engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: payload, in: engine.tree)?.declaration)
         let baseHandler = try #require(compatible.unwindHandler(for: LoginRoute.self))
         await baseHandler.invoke(LoginRoute(), payload, engine.root.id)
         #expect(probe.events == ["base"])
         engine.root.installHookDeclarations(sourceID: "tagged", hookDeclarations: [tagged])
-        guard case .conflict? = engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: payload, in: engine.spaces) else {
+        guard case .conflict? = engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: payload, in: engine.tree) else {
             Issue.record("Overlapping casts must not choose a mount-order winner")
             return
         }
         let exact = UnwindHandler(LoginRoute.self, expecting: HookPayloadChild.self) { _ in probe.events.append("exact") }.declaration
         engine.root.installHookDeclarations(sourceID: "exact", hookDeclarations: [exact])
-        let selected = try #require(engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: payload, in: engine.spaces)?.declaration)
+        let selected = try #require(engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: payload, in: engine.tree)?.declaration)
         let exactHandler = try #require(selected.unwindHandler(for: LoginRoute.self))
         await exactHandler.invoke(LoginRoute(), payload, engine.root.id)
         #expect(probe.events == ["base", "exact"])
-        #expect(engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: nil, in: engine.spaces) == nil)
+        #expect(engine.root.unwindHandlerBinding(for: LoginRoute.self, payload: nil, in: engine.tree) == nil)
     }
 
     @Test func separateSourcesHandleActionsAndUnwindsTogether() async throws {
@@ -148,7 +148,7 @@ struct HookBindingTests {
 
         await router.perform(HookBindingAction(probe: probe))
         await router.present(LoginRoute())
-        let source = try #require(engine.defaultSpace.rootPath.last)
+        let source = try #require(engine.tree.rootPath.last)
         #expect(await Router(engine: engine, scope: source).unwind(.current))
         #expect(probe.events == ["action", "unwind"])
 
@@ -159,7 +159,7 @@ struct HookBindingTests {
         engine.root.uninstallHookDeclarations(sourceID: "actions")
         await router.perform(HookBindingAction(probe: probe))
         await router.present(LoginRoute())
-        let second = try #require(engine.defaultSpace.rootPath.last)
+        let second = try #require(engine.tree.rootPath.last)
         #expect(await Router(engine: engine, scope: second).unwind(.current))
         #expect(probe.events == ["action", "unwind", "updated", "body", "unwind"])
     }
@@ -228,7 +228,7 @@ struct HookBindingTests {
             UnwindHandler(SettingsRoute.self) { probe.events.append("ancestor") }.declaration,
         ])
         await root.present(LoginRoute())
-        let receiver = try #require(engine.defaultSpace.rootPath.last)
+        let receiver = try #require(engine.tree.rootPath.last)
         let receiverRouter = Router(engine: engine, scope: receiver)
         for source in ["first", "second"] {
             receiver.installHookDeclarations(sourceID: AnyHashable(source), hookDeclarations: [
@@ -236,13 +236,13 @@ struct HookBindingTests {
             ])
         }
         await receiverRouter.present(SettingsRoute())
-        let source = try #require(engine.defaultSpace.rootPath.last)
+        let source = try #require(engine.tree.rootPath.last)
         #expect(await Router(engine: engine, scope: source).unwind(.current))
         #expect(probe.events.isEmpty)
 
         receiver.uninstallHookDeclarations(sourceID: "second")
         await receiverRouter.present(SettingsRoute())
-        let second = try #require(engine.defaultSpace.rootPath.last)
+        let second = try #require(engine.tree.rootPath.last)
         #expect(await Router(engine: engine, scope: second).unwind(.current))
         #expect(probe.events == ["first"])
     }
@@ -259,7 +259,7 @@ struct HookBindingTests {
             UnwindHandler(LoginRoute.self) { probe.events.append("surviving") }.declaration,
         ])
         await root.present(LoginRoute())
-        let source = try #require(engine.defaultSpace.rootPath.last)
+        let source = try #require(engine.tree.rootPath.last)
         let branch = try #require(source.branchScopes["tab"])
         let snapshot = RouteDestinationSnapshot(route: .init(scope: source))
         let sourceRouter = Router(engine: engine, scope: source)
@@ -269,14 +269,14 @@ struct HookBindingTests {
         engine.routeScopeDidInstallInView(source)
 
         let unwind = Task { await sourceRouter.unwind(.current) }
-        for _ in 0..<1000 where source.belongs(to: engine.defaultSpace) { await Task.yield() }
-        #expect(!source.belongs(to: engine.defaultSpace))
+        for _ in 0..<1000 where source.belongs(to: engine.tree) { await Task.yield() }
+        #expect(!source.belongs(to: engine.tree))
         #expect(source.isInstalledInView)
         #expect(snapshot.route.scope === source)
         #expect(source.branchScopes["tab"] === branch)
         let key = HookDeclarationIdentity.actionInterceptor(ObjectIdentifier(HookBindingAction.self))
-        #expect(source.hookBinding(for: key, in: engine.spaces) == nil)
-        #expect(branch.hookBinding(for: key, in: engine.spaces) == nil)
+        #expect(source.hookBinding(for: key, in: engine.tree) == nil)
+        #expect(branch.hookBinding(for: key, in: engine.tree) == nil)
 
         // A late update from the retained outgoing view cannot restore eligibility.
         source.installHookDeclarations(hookDeclarations: [hook])
@@ -284,34 +284,6 @@ struct HookBindingTests {
         #expect(probe.events == ["surviving"])
         engine.routeScopeDidLeaveView(source)
         #expect(await unwind.value)
-    }
-
-    @Test func removingAnElevatedSpaceInvalidatesHooksWhileItsObjectsRemainAlive() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {
-            HighPriority {
-                testSheet(testDestination(LoginRoute.self))
-            }
-        })
-        await Router(engine: engine, scope: engine.root).present(LoginRoute())
-        let space = try #require(engine.spaces.highSpace)
-        let source = space.root
-        let router = Router(engine: engine, scope: source)
-        let probe = HookBindingProbe()
-        source.installHookDeclarations(hookDeclarations: [
-            ActionInterceptor(HookBindingAction.self) { _ in probe.events.append("outgoing") }.declaration,
-        ])
-        engine.routeScopeDidInstallInView(source)
-        let dismissal = Task { await router.dismissSpace() }
-        for _ in 0..<1000 where engine.spaces.highSpace != nil { await Task.yield() }
-        #expect(engine.spaces.highSpace == nil)
-        #expect(source.isInstalledInView)
-        #expect(source.belongs(to: space))
-        let key = HookDeclarationIdentity.actionInterceptor(ObjectIdentifier(HookBindingAction.self))
-        #expect(source.hookBinding(for: key, in: engine.spaces) == nil)
-        await router.perform(HookBindingAction(probe: probe))
-        #expect(probe.events.isEmpty)
-        engine.routeScopeDidLeaveView(source)
-        #expect(await dismissal.value)
     }
 
     @Test func deferredInvocationCannotRetargetASurvivingBranch() async throws {
@@ -355,8 +327,8 @@ struct HookBindingTests {
             }.declaration,
         ])
         await Router(engine: engine, scope: engine.root).perform(HookReroutingAction(probe: probe))
-        for _ in 0..<1000 where engine.defaultSpace.rootPath.last == nil { await Task.yield() }
-        let destination = try #require(engine.defaultSpace.rootPath.last)
+        for _ in 0..<1000 where engine.tree.rootPath.last == nil { await Task.yield() }
+        let destination = try #require(engine.tree.rootPath.last)
         #expect(probe.events == ["source", "reroute"])
         destination.installHookDeclarations(hookDeclarations: [
             ActionInterceptor(HookReroutingAction.self) { invocation in

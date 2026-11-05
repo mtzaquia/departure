@@ -31,7 +31,7 @@ struct SheetReplacementTests {
             source = try #require(engine.root.branchScopes["home"])
         } else if host == "pushed" {
             await Router(engine: engine, scope: engine.root).present(SettingsRoute())
-            source = try #require(engine.defaultSpace.rootPath.last)
+            source = try #require(engine.tree.rootPath.last)
             engine.routeScopeDidInstallInView(source)
         } else {
             source = engine.root
@@ -40,11 +40,11 @@ struct SheetReplacementTests {
         let first = try #require(await engine.requestRouteWhenReady(NumberedRoute(number: 1), origin: origin))
         let next = try #require(await engine.requestRouteWhenReady(NumberedRoute(number: 2), origin: origin))
 
-        let path = try #require(engine.spaces.routePath(containing: next))
+        let path = try #require(engine.tree.routePath(containing: next))
         #expect(path.scopes.compactMap { ($0.route as? NumberedRoute)?.number } == [2])
         #expect(path.last === next)
-        #expect(engine.spaces.routePath(containing: first) == nil)
-        #expect(engine.spaces.routePath(containing: source) != nil)
+        #expect(engine.tree.routePath(containing: first) == nil)
+        #expect(engine.tree.routePath(containing: source) != nil)
         #expect(!engine.isNavigating)
         #expect(engine.pendingRoute == nil)
     }
