@@ -108,7 +108,11 @@ rather than relying on a globally current routing scope.
 
 The start screen's **About this sample** sheet binds a domain-only route using
 `RouteDestination`. It displays `context.presentation` and dismisses using the supplied
-scoped unwind action. All flows use type-only map declarations and typed builders in
+scoped unwind action. Its single `Sheet(StartInfoRoute.self, compactAdaptation: .cover)`
+declaration remains a sheet on regular iPad layouts and slides up as a full-screen cover
+in compact layouts. The declaration and child tree remain fixed; the displayed metadata
+continues to identify a sheet and shows the compact-adaptation option. Other sheets use
+the default `.none`. All flows use type-only map declarations and typed builders in
 `destinations:` closures. Shared entries use a root-only `GlobalMap`; individual modal declarations may opt into `.dismissalProtection()`.
 
 ## Global routes and active-only passcode protection

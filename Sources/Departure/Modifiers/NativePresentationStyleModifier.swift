@@ -170,6 +170,10 @@ struct SystemModalPresentationModifier: ViewModifier {
                 } body: { content in
                     content.opacity(fade.opacity)
                 }
+        } else if style == .sheet {
+            RouteView(scope: rendered.scope, nativePresentation: lifetime).id(rendered.id)
+                .presentationCompactAdaptation(
+                    rendered.scope.routePresentation?.compactAdaptation == .cover ? .fullScreenCover : .none)
         } else {
             RouteView(scope: rendered.scope, nativePresentation: lifetime).id(rendered.id)
         }

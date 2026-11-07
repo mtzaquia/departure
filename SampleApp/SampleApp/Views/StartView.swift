@@ -141,6 +141,9 @@ struct StartInfoView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier(SampleAppAccessibility.startInfoPresentation)
 
+                Text("Compact adaptation: \(String(describing: presentation.compactAdaptation))")
+                    .font(.caption)
+
                 Button("Done") { Task { await unwindRoute() } }
                     .frame(maxWidth: .infinity)
                     .labPrimaryButton()

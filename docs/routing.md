@@ -91,10 +91,20 @@ RootRouteMap {
 | --- | --- |
 | `Push` | Pushes in an explicitly supplied navigation stack. |
 | `Replace` | Changes the declaring scope's selected content without a Back entry. |
-| `Sheet` | Presents a sheet. |
+| `Sheet` | Presents a sheet, optionally adapting to a cover in compact size classes. |
 | `Cover` | Presents a cover, using `.slide` by default or `.fade`. |
 
 All four declarations accept route types and optional child declarations. View builders belong in `destinations:`. Destinations explicitly construct stacks when needed. A replacement clears its descendants and keeps other branch paths. Fade covers use the presenting SwiftUI hierarchy in the existing window, with staged native completion.
+
+Use `compactAdaptation: .cover` when the same sheet should fill a compact presentation, such as an iPhone, and remain a sheet in a regular presentation, such as an iPad:
+
+```swift
+Sheet(SettingsRoute.self, compactAdaptation: .cover) {
+  Push(AdvancedSettingsRoute.self)
+}
+```
+
+The default is `.none`, keeping sheet presentation in compact size classes. `.cover` uses the system's slide-up presentation with no transition parameter. Adaptation follows either compact size class, including compact iPad windows; it does not inspect the device type or change the route tree. `context.presentation.style` remains `.sheet`, and `context.presentation.compactAdaptation` reports the declared option. Local and global sheets use the same behavior.
 
 Reusable `RouteMap` values compose in ordinary builders. `ModalRouteMap` composes sheets and covers and can supply destination builders. A root-only `GlobalMap` accepts modal declarations and modal maps; its entries' children accept ordinary declarations and maps. Global entries are available from every live scope. See [global routes and dismissal protection](global-routes.md).
 

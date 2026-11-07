@@ -137,6 +137,45 @@ struct RouteDestinationRenderingTests {
     }
 
     #if canImport(UIKit)
+    @Test(arguments: Sheet.CompactAdaptation.allCases)
+    func sheetCompactAdaptationChangesOnlyNativePresentation(adaptation: Sheet.CompactAdaptation) async throws {
+        let router = RootRouter()
+        let routes = RootRouteMap {
+            Sheet(DomainOnlyRoute.self, compactAdaptation: adaptation)
+        } destinations: {
+            RouteDestination(DomainOnlyRoute.self) { _, context in
+                NavigationStack {
+                    Text("Adaptive sheet").navigationTitle("Adaptation")
+                }
+                .onAppear {
+                    #expect(context.presentation.style == .sheet)
+                    #expect(context.presentation.compactAdaptation == adaptation)
+                }
+            }
+        }
+        let window = mount(WithRouter(routes: routes, router: router) { Text("Root").routing() })
+        defer { close(window) }
+        try #require(await waitUntil { router.engine.root.presentationHostID != nil })
+        await router.root.present(DomainOnlyRoute())
+        let scope = try #require(router.engine.tree.rootPath.last)
+        try #require(await waitUntil {
+            scope.isInstalledInView && window.rootViewController?.presentedViewController?.isBeingPresented == false
+        })
+        let controller = try #require(window.rootViewController?.presentedViewController)
+        let frame = controller.view.convert(controller.view.bounds, to: window)
+        let compact = window.traitCollection.horizontalSizeClass == .compact
+            || window.traitCollection.verticalSizeClass == .compact
+        if adaptation == .cover && compact {
+            #expect(abs(frame.minY - window.bounds.minY) < 1)
+            #expect(abs(frame.height - window.bounds.height) < 1)
+        } else {
+            #expect(frame.height < window.bounds.height - 1)
+        }
+        #expect(scope.routePresentation?.style == .sheet)
+        #expect(await UnwindRouteAction(router: router.engine, routeScope: scope)())
+        #expect(router.engine.tree.rootPath.isEmpty)
+    }
+
     @Test func repeatedFadePreservesDestinationAnimationsAndWaitsForVisibleExit() async throws {
         let router = RootRouter()
         let recorder = FadeTransactionRecorder()

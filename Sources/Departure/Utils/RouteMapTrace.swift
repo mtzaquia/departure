@@ -60,6 +60,7 @@
                 case .routes(let routes):
                     for route in routes {
                         var label = "\(style(route.presentation.style)) \(departureDebugName(for: route.routeType)) → \(binding(route.routeType))"
+                        if route.presentation.compactAdaptation == .cover { label += " [compact adaptation: cover]" }
                         if route.isDismissalProtected { label += " [dismissal protection]" }
                         if counts[ObjectIdentifier(route.routeType), default: 0] > 1 { label += " [declaration conflict]" }
                         result.append(Node(label: label, children: nodes(route.children)))

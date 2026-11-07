@@ -110,14 +110,19 @@ public struct RoutePresentation: Hashable, Sendable {
     }
     /// The matched presentation style, including a cover's transition.
     public let style: Style
+    /// The declared sheet's compact adaptation. Other presentation styles use `.none`.
+    /// The declared ``style`` remains `.sheet` when native presentation adapts to a cover.
+    public let compactAdaptation: Sheet.CompactAdaptation
     /// Whether this occurrence was presented from the root global catalog.
     public let isGlobal: Bool
     /// Whether routing requests protect this destination while it is active.
     /// Interactive dismissal is controlled by the destination view.
     public let isDismissalProtected: Bool
 
-    init(style: Style, isGlobal: Bool = false, isDismissalProtected: Bool = false) {
+    init(style: Style, compactAdaptation: Sheet.CompactAdaptation = .none,
+         isGlobal: Bool = false, isDismissalProtected: Bool = false) {
         self.style = style
+        self.compactAdaptation = compactAdaptation
         self.isGlobal = isGlobal
         self.isDismissalProtected = isDismissalProtected
     }

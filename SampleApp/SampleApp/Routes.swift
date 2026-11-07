@@ -662,7 +662,7 @@ enum AppRouteMaps {
         Cover(GlobalRoutesLabRoute.self)
         Cover(LandingRoute.self) { landing }
         Cover(SplitBranchesRoute.self) { SplitBranchMap.routes }
-        Sheet(StartInfoRoute.self)
+        Sheet(StartInfoRoute.self, compactAdaptation: .cover)
 
         GlobalMap {
             Cover(LoginRoute.self) {

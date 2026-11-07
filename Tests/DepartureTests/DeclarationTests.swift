@@ -30,6 +30,38 @@ import Testing
     let login = testDestination(LoginRoute.self)
     let alert = testDestination(AlertRoute.self)
 
+    @Test func sheetsKeepTheirPresentationByDefault() {
+        let sheet = Sheet(SettingsRoute.self)
+        #expect(sheet.declaration.presentation.style == .sheet)
+        #expect(sheet.declaration.presentation.compactAdaptation == .none)
+    }
+
+    @Test(arguments: Sheet.CompactAdaptation.allCases, [false, true])
+    func sheetAdaptationSurvivesCompilationAndRouting(adaptation: Sheet.CompactAdaptation, global: Bool) async throws {
+        let declaration = Sheet(SettingsRoute.self, compactAdaptation: adaptation, id: "settings") {
+            Push(HomeDetailRoute.self)
+        }.dismissalProtection()
+        let engine = RouterEngine(routes: RootRouteMap {
+            if global { GlobalMap { declaration } }
+            else { declaration }
+        } destinations: { settings; detail })
+        await engine.present(SettingsRoute())
+        let scope = try #require(engine.tree.rootPath.last)
+        let presentation = try #require(scope.routePresentation)
+        #expect(scope.id == AnyHashable("settings"))
+        #expect(presentation.style == .sheet)
+        #expect(presentation.compactAdaptation == adaptation)
+        #expect(presentation.isGlobal == global)
+        #expect(presentation.isDismissalProtected)
+        #expect(scope.routeAttachments.count == 1)
+        #expect(scope.routeAttachments.first?.routeType == HomeDetailRoute.self)
+        #if DEBUG
+        #expect(engine.root.definitions.departureMapTrace.contains("[compact adaptation: cover]") == (adaptation == .cover))
+        #endif
+        #expect(await UnwindRouteAction(router: engine, routeScope: scope)())
+        #expect(engine.tree.rootPath.isEmpty)
+    }
+
     @Test func composedMapsDoNotIntroduceScopes() {
         let feature = RouteMap { testPush(detail); testSheet(settings) }
         let engine = RouterEngine(routes: RootRouteMap { feature })
