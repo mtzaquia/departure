@@ -7,7 +7,7 @@ private struct GlobalDetailRoute: Route, Equatable {}
 private struct GlobalPasscodeRoute: Route, Equatable {}
 private struct GlobalSecondFactorRoute: Route, Equatable {}
 private struct GlobalHelpRoute: Route, Equatable {}
-private struct GlobalProtectedSheetRoute: Route, Equatable {}
+private struct GlobalConfirmationRoute: Route, Equatable {}
 private struct GlobalPasscodeChildRoute: Route, Equatable {}
 
 private extension EnvironmentValues {
@@ -19,7 +19,7 @@ private final class GlobalLabState {
     @ObservationIgnored weak var sourceWindow: UIWindow?
 }
 
-/// A single-window showcase for shared declarations and active-only protection.
+/// A single-window showcase for shared declarations and consumer-owned dismissal rules.
 struct GlobalRoutesProbe: View {
     @State private var owner = RootRouter()
     @State private var state = GlobalLabState()
@@ -37,8 +37,8 @@ struct GlobalRoutesProbe: View {
                 Cover(GlobalPasscodeRoute.self, transition: .fade) {
                     Sheet(GlobalHelpRoute.self)
                     Push(GlobalPasscodeChildRoute.self)
-                }.dismissalProtection()
-                Sheet(GlobalProtectedSheetRoute.self).dismissalProtection()
+                }
+                Sheet(GlobalConfirmationRoute.self)
             }
         } destinations: {
             RouteDestination(GlobalDetailRoute.self) { _, _ in GlobalLabHome(detail: true) }
@@ -52,12 +52,12 @@ struct GlobalRoutesProbe: View {
             RouteDestination(GlobalHelpRoute.self) { _, _ in
                 NavigationStack { GlobalLabOverlay(title: "Passcode help", state: state).routing() }
             }
-            RouteDestination(GlobalProtectedSheetRoute.self) { _, _ in
-                NavigationStack { GlobalLabOverlay(title: "Protected sheet", state: state).routing() }
+            RouteDestination(GlobalConfirmationRoute.self) { _, _ in
+                NavigationStack { GlobalLabOverlay(title: "Confirmation sheet", state: state).routing() }
                     .interactiveDismissDisabled()
             }
             RouteDestination(GlobalPasscodeChildRoute.self) { _, _ in
-                GlobalLabOverlay(title: "Unprotected child", state: state)
+                GlobalLabOverlay(title: "Pushed child", state: state)
             }
         }
     }
@@ -91,7 +91,7 @@ private struct GlobalLabHome: View {
     var body: some View {
         Form {
             Section {
-                Text("One GlobalMap supplies 2FA and passcode from either screen. Protection applies only to the active route.")
+                Text("One GlobalMap supplies 2FA and passcode from either screen. Consumers own navigation and dismissal rules.")
                 Text(detail ? "App detail" : "App root")
                     .accessibilityIdentifier("sample.globals.location")
                 TextField("Retained app note", text: $note)
@@ -121,32 +121,28 @@ private struct GlobalPasscodeView: View {
     @Environment(\.router) private var router
     @Environment(\.routePhase) private var phase
     @UnwindRoute private var unwind
-    @State private var attempted = false
 
     var body: some View {
         Form {
             Section {
                 Text("Passcode lock").accessibilityIdentifier("sample.globals.passcode")
-                Text(phase == .active ? "Protection active" : "Protection inactive")
-                    .accessibilityIdentifier("sample.globals.protection")
-                Text("Unrelated app navigation is blocked here. A global or a declared child may present above the lock, suspending its protection.")
+                Text(phase == .active ? "Route phase: active" : "Route phase: inactive")
+                    .accessibilityIdentifier("sample.globals.phase")
+                Text("This destination disables swipe dismissal. Routing requests still follow ordinary navigation; consumers decide which requests to send.")
                 GlobalWindowStatus(state: state)
             }
-            Section("Try the admission rules") {
+            Section("Navigate from this global") {
                 Button("Request app detail from covered root") {
-                    Task { await coveredRouter.present(GlobalDetailRoute()); attempted = true }
+                    Task { await coveredRouter.present(GlobalDetailRoute()) }
                 }.accessibilityIdentifier("sample.globals.covered-request")
-                if attempted {
-                    Text("Covered request attempted").accessibilityIdentifier("sample.globals.attempted")
-                }
                 Button("Present global 2FA") { Task { await router.present(GlobalSecondFactorRoute()) } }
                     .accessibilityIdentifier("sample.globals.over-lock")
                 Button("Present declared help") { Task { await router.present(GlobalHelpRoute()) } }
                     .accessibilityIdentifier("sample.globals.help")
-                Button("Push unprotected child") { Task { await router.present(GlobalPasscodeChildRoute()) } }
+                Button("Push child") { Task { await router.present(GlobalPasscodeChildRoute()) } }
                     .accessibilityIdentifier("sample.globals.child")
-                Button("Present another protected global") { Task { await router.present(GlobalProtectedSheetRoute()) } }
-                    .accessibilityIdentifier("sample.globals.protected-overlay")
+                Button("Present confirmation sheet") { Task { await router.present(GlobalConfirmationRoute()) } }
+                    .accessibilityIdentifier("sample.globals.confirmation")
             }
         }
         .navigationTitle("Passcode")

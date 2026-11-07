@@ -65,10 +65,6 @@ extension RouterEngine {
             return nil
         }
 
-        guard permitsPresentation(match) else {
-            log.departureDebug(.routeBlockedByDismissalProtection(route: resolvedRoute))
-            return nil
-        }
         if let currentRoute = source.route, currentRoute._isEqual(to: resolvedRoute),
            source.attachedPresentationDeclaration(presentedBy: match.presentingScope,
                 matching: match.declaration.presentationKind, hostedBy: match.presentationHostID) != nil {
@@ -80,6 +76,30 @@ extension RouterEngine {
         log.departureDebug(.routeMatched(route: resolvedRoute, match: match))
         log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
         return await appendRoute(resolvedRoute, after: match, origin: origin)
+    }
+
+    func declarationIsCurrent(_ match: ResolvedRouteTarget) -> Bool {
+        let definitions = match.declaration.isGlobal ? root.definitions.globals : match.presentingScope.definitions
+        return definitions?.routeBinding(for: match.declaration.routeType)?.declaration == match.declaration
+    }
+
+    func declaration(for route: any Route, origin: RouteRequestOrigin) -> DeclarationBinding<ResolvedRouteTarget>? {
+        guard let global = root.definitions.globals?.routeBinding(for: type(of: route)) else {
+            return tree.firstDeclaration(including: type(of: route), origin: origin)
+        }
+        return global.map { declaration in
+            let foreground = currentRouteScope
+            // Global availability does not make the catalog root the presentation anchor.
+            // Reuse an equal ancestor or replace the current occurrence in its existing slot.
+            let equal = foreground.ancestry.first {
+                $0.presentationDeclaration == declaration && $0.route?._isEqual(to: route) == true
+            }
+            let anchor = equal?.presentationOrigin
+                ?? (foreground.presentationDeclaration == declaration ? foreground.presentationOrigin : nil)
+                ?? foreground
+            return ResolvedRouteTarget(presentingScope: anchor, declaringScope: anchor,
+                declaration: declaration, lookupStrategy: .global)
+        }
     }
 
     private func resolveRouteChain(startingWith route: any Route) async -> (any Route)? {

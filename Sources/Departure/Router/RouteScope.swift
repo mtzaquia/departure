@@ -177,7 +177,7 @@ extension RouteScope {
     var routePresentation: RoutePresentation? {
         presentation.map { RoutePresentation(style: $0.declaration.presentationKind,
             compactAdaptation: $0.declaration.presentation.compactAdaptation,
-            isGlobal: $0.declaration.isGlobal, isDismissalProtected: $0.declaration.isDismissalProtected) }
+            isGlobal: $0.declaration.isGlobal) }
     }
 
     func attachPresentation(

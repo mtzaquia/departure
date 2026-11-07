@@ -82,6 +82,6 @@ await rootRouter.root.present(ProfileRoute(userID: "42"))
 
 `RootRouter` owns the container. `Router` is a weak scope-bound handle; a saved copy does not retarget itself after suspension or removal.
 
-`root` captures the permanent application root. `current` captures the foreground scope. Both may request [global routes](global-routes.md), and both respect dismissal protection while the protected destination is active.
+`root` captures the permanent application root. `current` captures the foreground scope. Both may request [global routes](global-routes.md). Consumers control their navigation and dismissal rules.
 
 Next: [Routing](routing.md)

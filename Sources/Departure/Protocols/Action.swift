@@ -39,7 +39,7 @@ import Foundation
 /// ```
 ///
 /// - Important: Actions start from the requesting router's captured scope, which
-///   must be live and respect active dismissal protection. They do not crawl backward for hooks.
+///   must be live. They do not crawl backward for hooks.
 public protocol Action: Identifiable where ID == ObjectIdentifier {
     /// The value returned when an ``ActionInterceptor`` calls ``ActionInvocation/callAsFunction()``.
     associatedtype Output = Void

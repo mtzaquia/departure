@@ -89,7 +89,6 @@ extension RouterEngine {
         guard let source = navigationSource(origin) else { return false }
         let target = root
         let plan = tree.rootUnwindPlan()
-        guard permitsRemoval(plan) else { return false }
         guard !plan.removedScopes.isEmpty else {
             log.departureDebug(.unwindSkippedNoRoute)
             return false

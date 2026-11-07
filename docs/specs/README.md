@@ -27,4 +27,4 @@ Keep each specification focused on one major part of the design. Record agreed c
 
 ## Current global-route contract
 
-[Global maps and dismissal protection](011-global-routes.md) replaces high/critical spaces with a root-declared `GlobalMap`, individual `.dismissalProtection()` modifiers effective only while the route is active, and presentation in the existing window. Protected routes admit globals and their own declared presentations without a separate covered-request policy.
+[Global maps](011-global-routes.md) replaces high/critical spaces with root-declared shared sheets and covers in the existing window. Consumers own navigation and dismissal rules; global availability grants no special protection from ordinary navigation.

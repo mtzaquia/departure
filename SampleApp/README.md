@@ -59,8 +59,8 @@ let route = MessageRoute(url: url)
 | `LifecycleTeardownRoute` | `departure-sample://route/lifecycle-teardown` | Home branch; routed `ScrollView` lifecycle regression fixture |
 | `AppearanceSettingsRoute` | `departure-sample://route/appearance-settings` | Settings branch; push |
 | `AlertRoute` | `departure-sample://route/alert` | Router root; global fade cover |
-| `PasscodeRoute` | `departure-sample://route/passcode` | Router root; fade cover with active-only dismissal protection |
-| `PasscodeOverlayRoute` | `departure-sample://route/passcode-overlay` | Router root; unprotected global overlay |
+| `PasscodeRoute` | `departure-sample://route/passcode` | Router root; fade cover whose gestures are controlled by the sample |
+| `PasscodeOverlayRoute` | `departure-sample://route/passcode-overlay` | Router root; ordinary global overlay |
 | `MessageRoute` | `departure-sample://route/message` | Home branch; fade cover |
 | `DismissProbeRoute` | `departure-sample://route/dismiss-probe` | Home branch; sheet |
 | `NestedModalRoute` | `departure-sample://route/nested-modal` | Dismiss Probe; nested sheet |
@@ -113,22 +113,22 @@ declaration remains a sheet on regular iPad layouts and slides up as a full-scre
 in compact layouts. The declaration and child tree remain fixed; the displayed metadata
 continues to identify a sheet and shows the compact-adaptation option. Other sheets use
 the default `.none`. All flows use type-only map declarations and typed builders in
-`destinations:` closures. Shared entries use a root-only `GlobalMap`; individual modal declarations may opt into `.dismissalProtection()`.
+`destinations:` closures. Shared entries use a root-only `GlobalMap`; destination implementations and app state own dismissal rules.
 
-## Global routes and active-only passcode protection
+## Global routes and consumer-owned dismissal
 
-Choose **Global routes and passcode** on the start screen, or launch directly with `--scenario=global-routes`. The lab uses one global map for 2FA, a fade passcode cover, and another protected sheet. It is available from app root and detail views without duplicate declarations.
+Choose **Global routes and passcode** on the start screen, or launch directly with `--scenario=global-routes`. The lab declares 2FA, a fade passcode cover, and a confirmation sheet once in a global map. Root and detail views can request them without duplicate declarations.
 
 | Promise | Interaction | Visible evidence | Proof |
 | --- | --- | --- | --- |
-| Shared global declarations | Present 2FA from root and detail | Return to the invoking screen and retained state | Package and UI tests |
-| Existing window and inherited configuration | Open fade lock or 2FA | `Same window: true` and inherited configuration | Native UI test |
-| Protection while active | Request app detail from covered root while locked | Lock remains visible | Package and UI tests |
-| Global and local exceptions | Present global 2FA, declared Help, or a pushed child | New destination takes over without removing the lock | Package and UI tests |
-| Protection suspension and restoration | Crawl back from an unprotected overlay, or dismiss it | Crawlback can remove inactive lock; returning restores its protection | Package and UI tests |
-| Another protected global | Present the protected sheet over Passcode | The new route protects itself; Done returns to protected Passcode | Package and UI tests |
+| Shared declarations | Present 2FA from root and detail | Return to the invoking screen and retained input | Package and UI tests |
+| Existing window and inherited configuration | Open fade Passcode or 2FA | `Same window: true` and inherited configuration | Native UI test |
+| Ordinary covered-source navigation | Request app detail from the covered root | Passcode leaves and app detail appears | Package and UI tests |
+| Child and global presentations | Present 2FA, declared Help, or a pushed child | A new destination takes over; Done can return to the same Passcode instance | Package and UI tests |
+| Ancestor navigation | Crawl back to app detail from an overlay | Ordinary crawlback removes the global flow | Package and UI tests |
+| Consumer-owned gesture policy | Open the confirmation sheet | The sample disables swipe dismissal; Done dismisses it | Native verification |
 
-The sample destination builders apply `.interactiveDismissDisabled()` to Passcode and the protected sheet; the library does not own gesture policy. The Unlock toolbar action uses the ordinary captured unwind action. No unlock queue, per-route covered-request policy, detached environment forwarding, or separate window exists. The main route lab retains global authentication and passcode examples too. Toolbars and presentation appearance use native automatic behavior; no device-specific policy or preference forwarding is installed.
+The sample's destination builders apply `.interactiveDismissDisabled()` to Passcode and the confirmation sheet. This does not restrict router commands. Consumers decide which presentation, unwind, reset, and action requests their app sends; Departure adds no dismissal policy. Unlock uses the ordinary captured unwind action. Toolbars and presentation appearance use native automatic behavior without device-specific overrides or preference forwarding.
 
 ## Presentation replacement regressions
 

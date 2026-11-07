@@ -15,9 +15,9 @@ await router.unwind(.nearestModal)
 | `.current` | Dismisses the current destination and its descendants. This is the reader's default. |
 | `.nearestModal` | Dismisses the nearest sheet or cover and all its descendants, regardless of push depth. Includes the current destination. |
 
-Lookup starts at the captured source and follows its navigation ancestry. An unwind cannot incidentally remove an active destination with dismissal protection.
+Lookup starts at the captured source and follows its navigation ancestry.
 
-A global route uses ordinary captured dismissal. Its own `@UnwindRoute` action can explicitly close it while protected. A stored ancestor action cannot remove a different active protected route incidentally. The permanent application root cannot be dismissed.
+A global route uses ordinary captured dismissal. A captured ancestor action can remove the global and its descendants. The permanent application root cannot be dismissed.
 
 `unwind` returns whether the request was accepted and finishes after native teardown. Await it before continuing a flow. If the unwind removes the requesting destination, obtain a fresh router from the owning `RootRouter` for the next presentation:
 
@@ -72,7 +72,7 @@ Each read captures the resolved boundary. Newly pushed descendants are included 
 
 A missing match returns `false` and emits a warning when invoked, including in Release builds and when debug logging is disabled. A removed capture returns `false`. Neither case falls back to dismissing another destination.
 
-Active dismissal protection is checked when a routing action runs. Destination views control interactive dismissal; native dismissal events reconcile navigation without a protection veto. A captured ancestor action is blocked if its removal would include another active protected instance. Once that instance becomes inactive, its modifier adds no restriction. Typed payload delivery and native teardown completion are identical for local and ancestor actions.
+Consumers control whether to request dismissal and whether gestures are enabled in their destination views. Departure applies ordinary ancestor removal and reconciles native dismissal events. Typed payload delivery and native teardown completion are identical for local and ancestor actions.
 
 ## Reset navigation to the application root
 
@@ -83,9 +83,9 @@ await router.resetToRoot()
 await router.resetToRoot(payload: SaveResult.saved)
 ```
 
-A reset includes global presentations. It is blocked if it would remove an active protected destination. Reset is a router command; it is not an `@UnwindRoute` policy.
+A reset includes global presentations. Reset is a router command; it is not an `@UnwindRoute` policy.
 
-The captured source must be live. Empty navigation, removed sources, and active protection preventing removal return `false`. Accepted resets use the requesting source route for unwind-handler matching and finish after native teardown.
+The captured source must be live. Empty navigation and removed sources return `false`. Accepted resets use the requesting source route for unwind-handler matching and finish after native teardown.
 
 Reset removes every branch owned by a removed container. Inactive pushes survive only in branches owned by the retained application root.
 

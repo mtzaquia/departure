@@ -1,6 +1,6 @@
 # Departure navigation
 
-Departure describes one navigation tree through path depth, modal lanes, and branches. Global declarations share destinations across that tree; dismissal protection applies only to active route instances.
+Departure describes one navigation tree through path depth, modal lanes, and branches. Global declarations share destinations across that tree. Consumers own navigation and dismissal policy.
 
 ## Language
 
@@ -11,7 +11,7 @@ The complete navigation state owned by one routing owner, including its applicat
 The permanent starting content of a navigation tree. Resetting navigation retains this root.
 
 **Unwind notification**:
-A before-commit callback for an explicit unwind or native dismissal, found through surviving navigation ancestry. Removal caused by presenting a route does not notify; follow-up requests recheck current dismissal protection.
+A before-commit callback for an explicit unwind or native dismissal, found through surviving navigation ancestry. Removal caused by presenting a route does not notify; follow-up requests recheck their captured source lifetime.
 
 **Path (X)**:
 The ordered progression of destinations leading from an owner to the current position. Each accepted forward destination advances that progression by one, including a modal destination.
@@ -62,13 +62,10 @@ One accepted navigation change and its completion. Logical navigation changes wh
 Owns one navigation tree and its transition pipeline. `root` captures the permanent application root; `current` captures the foreground scope.
 
 **Scoped router (`Router`)**:
-A weak handle to one live scope. It keeps that source identity across suspension; requests respect effective dismissal protection.
+A weak handle to one live scope. It keeps that source identity across suspension. Removed scopes cannot issue commands.
 
 **Global route**:
-A route declared in a global map and available throughout a routing owner's navigation, including while another route has effective dismissal protection.
+A route declared in a global map and available throughout a routing owner's navigation.
 
 **Global map**:
-A root-declared collection of globally available route declarations. Its entries have individual presentation styles and may individually declare dismissal protection.
-
-**Dismissal protection**:
-A declaration's restriction against routing requests that incidentally remove its active route instance. It stops applying while the route is inactive and resumes if that instance becomes active again. The destination owns its interactive dismissal behavior; native dismissal is reconciled with navigation state.
+A root-declared collection of globally available route declarations. Its entries have individual presentation styles and child definitions.

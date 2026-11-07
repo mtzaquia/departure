@@ -52,7 +52,7 @@ public struct UnwindRouteAction: Equatable {
     }
 
     /// Dismisses the captured destination and awaits its native teardown.
-    /// - Returns: Whether the captured request was accepted. Removed or covered scopes return `false`.
+    /// - Returns: Whether the captured request was accepted. Removed scopes and the permanent application root return `false`.
     @discardableResult
     public func callAsFunction() async -> Bool {
         guard !reportMissingTargetIfNeeded() else { return false }
@@ -82,7 +82,7 @@ public struct UnwindRouteAction: Equatable {
 /// Whether a scope is a current endpoint of a participating path in the current modal subtree.
 ///
 /// Phase describes foreground navigation position, not command authority or host
-/// installation. Inactive live scopes may still issue commands, subject to dismissal protection.
+/// installation. Inactive live scopes may still issue commands.
 public enum RoutePhase: Equatable, Sendable {
     /// This scope is current within its participating branch and modal subtree.
     /// Concurrent branches may each have an active endpoint.
@@ -134,9 +134,8 @@ public extension EnvironmentValues {
     /// Concurrent branches can each be active. A modal makes scopes outside its subtree
     /// inactive; a scope outside the current modal subtree or removed from navigation is inactive.
     ///
-    /// Live scopes can issue commands regardless of phase, subject to active dismissal
-    /// protection. Removed scopes cannot. Neither phase nor command eligibility requires
-    /// a mounted presentation host.
+    /// Live scopes can issue commands regardless of phase. Removed scopes cannot.
+    /// Neither phase nor command eligibility requires a mounted presentation host.
     @Entry var routePhase = RoutePhase.inactive
 }
 

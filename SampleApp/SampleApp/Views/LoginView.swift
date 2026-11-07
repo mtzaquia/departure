@@ -155,7 +155,7 @@ struct PasscodeView: View {
     @UnwindRoute private var unwindRoute
 
     var body: some View {
-        LabModalCard("Passcode lock", subtitle: "Dismissal protection applies while this route is active.", symbol: "exclamationmark.triangle.fill", color: LabPalette.coral) {
+        LabModalCard("Passcode lock", subtitle: "This feature controls its own dismissal actions and gestures.", symbol: "exclamationmark.triangle.fill", color: LabPalette.coral) {
             Text("SwiftUI isPresented: \(String(isPresented))")
                 .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.passcodeText)
@@ -180,7 +180,7 @@ struct PasscodeOverlayView: View {
     @UnwindRoute private var unwindRoute
 
     var body: some View {
-        LabModalCard("Unprotected overlay", subtitle: "The passcode underneath is inactive and its protection is suspended.", symbol: "bolt.shield.fill", color: LabPalette.coral) {
+        LabModalCard("Global overlay", subtitle: "An ordinary global presentation above the passcode.", symbol: "bolt.shield.fill", color: LabPalette.coral) {
             Text("SwiftUI isPresented: \(String(isPresented))")
                 .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.passcodeOverlayText)

@@ -91,8 +91,7 @@ public struct AnyRouteDestination: Sendable, Hashable {
 
 /// Presentation metadata for the particular destination being rendered.
 ///
-/// Metadata reflects the matched declaration; effective protection additionally
-/// requires this destination's route phase to be active.
+/// Metadata reflects the matched declaration and its configured presentation.
 public struct RoutePresentation: Hashable, Sendable {
     /// The presentation style used for this destination.
     public enum Style: Hashable, Sendable {
@@ -115,16 +114,12 @@ public struct RoutePresentation: Hashable, Sendable {
     public let compactAdaptation: Sheet.CompactAdaptation
     /// Whether this occurrence was presented from the root global catalog.
     public let isGlobal: Bool
-    /// Whether routing requests protect this destination while it is active.
-    /// Interactive dismissal is controlled by the destination view.
-    public let isDismissalProtected: Bool
 
     init(style: Style, compactAdaptation: Sheet.CompactAdaptation = .none,
-         isGlobal: Bool = false, isDismissalProtected: Bool = false) {
+         isGlobal: Bool = false) {
         self.style = style
         self.compactAdaptation = compactAdaptation
         self.isGlobal = isGlobal
-        self.isDismissalProtected = isDismissalProtected
     }
 }
 

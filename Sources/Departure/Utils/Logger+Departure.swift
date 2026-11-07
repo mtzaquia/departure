@@ -122,7 +122,6 @@ enum DepartureLogEvent {
     case ios17PushDismissalDropped(scope: RouteScope)
     case ios17PushDismissalResumed(scope: RouteScope)
     case routeAcceptedAppend(route: any Route)
-    case routeBlockedByDismissalProtection(route: any Route)
     case routeAppendSuperseded(route: any Route)
     case routeAppendPreparing(route: any Route, match: RouterEngine.ResolvedRouteTarget)
     case routeAppended(route: any Route, path: String, match: RouterEngine.ResolvedRouteTarget)
@@ -336,7 +335,6 @@ extension DepartureLogEvent {
              .branchActivationRejected,
              .branchActivationSkipped,
 
-             .routeBlockedByDismissalProtection,
              .routeAppendSuperseded,
              .routeDroppedBranchActivationFailed,
              .routeDroppedResolution,
@@ -395,8 +393,6 @@ extension DepartureLogEvent {
             "iOS 17 push dismissal write-back dropped | reason=pending plan invalidated | scope=\(scope.departureDebugDescription)"
         case let .ios17PushDismissalResumed(scope):
             "iOS 17 push dismissal resumed after view exit | scope=\(scope.departureDebugDescription)"
-        case let .routeBlockedByDismissalProtection(route):
-            "blocked \(route.departureDebugDescription) — an active route has dismissal protection"
         case let .routeAcceptedAppend(route):
             "will append \(route.departureDebugDescription)"
         case let .routeAppendSuperseded(route):

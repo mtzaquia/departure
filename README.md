@@ -15,7 +15,7 @@ Declare the navigation tree once. Feature modules supply typed destination build
 - Keep domain routes independent of feature views.
 - Preserve independent paths in tabs and concurrent split columns.
 - Resolve guarded routes, intercept actions, and return unwind payloads.
-- Share global sheets and covers, with optional active-only dismissal protection.
+- Share global sheets and covers through one root declaration.
 
 ```swift
 let routes = RootRouteMap {
@@ -85,7 +85,7 @@ struct HomeView: View {
 
 The map owns definitions independently of mounted views. `WithRouter` and destinations bind their scopes automatically. When a scope declares pushes, explicitly supply `NavigationStack { content.routing() }`, placing `.routing()` on the root content inside the stack. Destinations choose their containers explicitly.
 
-Route maps separate type-only declarations from [composable destination bindings](docs/routing.md#compose-destination-bindings). A root-only `GlobalMap` makes shared destinations available from every live scope. Apply `.dismissalProtection()` to an individual sheet or cover to block unrelated navigation while that route is active. See [global routes](docs/global-routes.md) for the 2FA and passcode example.
+Route maps separate type-only declarations from [composable destination bindings](docs/routing.md#compose-destination-bindings). A root-only `GlobalMap` makes shared destinations available from every live scope. See [global routes](docs/global-routes.md) for the 2FA and passcode example.
 
 All routes, including fade covers, use ordinary presentation in the existing window. There is no detached destination customizer. The global-map API is unreleased; the tagged 3.0.1 release uses the earlier priority-space API.
 
@@ -96,7 +96,7 @@ All routes, including fade covers, use ordinary presentation in the existing win
 - [Actions](docs/actions.md) — route-aware work and interception.
 - [Unwinding](docs/unwinding.md) — dismissing flows and returning values.
 - [Branches](docs/branches.md) — tabs, concurrent columns, and replacement selections.
-- [Global routes](docs/global-routes.md) — shared declarations and active-only dismissal protection.
+- [Global routes](docs/global-routes.md) — shared declarations and consumer-owned dismissal rules.
 - [Diagnostics](docs/diagnostics.md) — trace the adopted map and routing decisions.
 - [Rewrite specifications](docs/specs/README.md) — agreed contracts and implementation inventory.
 

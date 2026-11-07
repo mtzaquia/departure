@@ -160,10 +160,6 @@ extension RouterEngine {
             scope.restoreBranchSelection()
             return
         }
-        guard isNavigationEligible(scope), permitsLocalCommand(from: scope) else {
-            _ = selection.setValue(scope.activeBranch)
-            return
-        }
         scope.bindBranchSelection(selection)
     }
 

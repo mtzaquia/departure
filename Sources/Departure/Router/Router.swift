@@ -25,8 +25,8 @@ import SwiftUI
 /// A weak, scope-bound navigation handle supplied by the environment or RouteContext.
 /// Captured routers keep their source identity and become inactive when it leaves
 /// navigation. Read ``RootRouter/root`` for external entry points or
-/// ``RootRouter/current`` to capture the foreground. Active dismissal protection
-/// admits global routes and that protected destination's own declared presentations.
+/// ``RootRouter/current`` to capture the foreground. Consumers control which
+/// navigation requests and dismissals their app permits.
 public struct Router: Equatable {
     /// A policy shared by ``Router/unwind(_:)`` and ``UnwindRoute``.
     public enum UnwindTarget: Equatable {
@@ -91,8 +91,8 @@ public struct Router: Equatable {
     /// is retained; callers superseded before admission return without resolving.
     /// Resolution continues in each caller's own task.
     /// During an unfinished navigation operation, the latest presentation attempt
-    /// from a live scope waits for completion. Current dismissal protection and
-    /// declaration eligibility are checked again when the request resumes.
+    /// from a live scope waits for completion. Source lifetime and declaration
+    /// eligibility are checked again when the request resumes.
     /// - Parameter route: The route to resolve and present.
     public func present(_ route: any Route) async {
         guard let engine else { return }
@@ -103,7 +103,7 @@ public struct Router: Equatable {
     ///
     /// Waits for this unwind's native teardown. A buffered presentation waits for all
     /// ongoing unwinds, then continues in its own caller without delaying this return.
-    /// - Returns: Whether the request was accepted for a live scope whose requested removal respects active protection.
+    /// - Returns: Whether the request was accepted for a live scope.
     @discardableResult
     public func unwind(_ target: UnwindTarget) async -> Bool {
         guard let engine else { return false }
@@ -112,7 +112,7 @@ public struct Router: Equatable {
 
     /// Unwinds from this router's scope, and delivers a payload to a matching handler.
     /// Waits for this unwind's native teardown, independently of any buffered presentation.
-    /// - Returns: Whether the request was accepted for a live scope whose requested removal respects active protection.
+    /// - Returns: Whether the request was accepted for a live scope.
     @discardableResult
     public func unwind<Payload>(_ target: UnwindTarget, payload: Payload) async -> Bool {
         guard let engine else { return false }
@@ -144,8 +144,7 @@ public struct Router: Equatable {
     ///
     /// The captured source must be live. Waits for native teardown
     /// and uses the source route for matching unwind-handler delivery.
-    /// - Returns: Whether the reset was accepted. An empty tree, removed source,
-    ///   or active protection preventing removal returns `false`.
+    /// - Returns: Whether the reset was accepted. An empty tree or removed source returns `false`.
     @discardableResult
     public func resetToRoot() async -> Bool {
         guard let engine else { return false }
@@ -157,7 +156,7 @@ public struct Router: Equatable {
     /// Retains the application root, and waits for native teardown.
     /// The captured source must remain live until commit.
     /// - Parameter payload: The value delivered for the requesting source route.
-    /// - Returns: Whether the reset was accepted. An empty tree, removed source, or active protection preventing removal returns `false`.
+    /// - Returns: Whether the reset was accepted. An empty tree or removed source returns `false`.
     @discardableResult
     public func resetToRoot<Payload>(payload: Payload) async -> Bool {
         guard let engine else { return false }
@@ -165,8 +164,7 @@ public struct Router: Equatable {
     }
 
     /// Performs an action from this router's scope, within the navigation tree.
-    /// Removed scopes and scopes outside effective protection reject dispatch,
-    /// including their interceptors.
+    /// Removed scopes reject dispatch, including their interceptors.
     public func perform(_ action: any Action) async {
         guard let engine else { return }
         await engine.performAction(action, origin: origin)

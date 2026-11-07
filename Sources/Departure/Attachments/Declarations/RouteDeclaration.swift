@@ -38,7 +38,6 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
     let childScope: RouteDefinitions?
     let destination: AnyRouteDestination?
     let isGlobal: Bool
-    let isDismissalProtected: Bool
 
     init(_ route: any Route.Type, presentation: RoutePresentation, id: AnyHashable? = nil, children: [RouteScopeDeclaration] = []) {
         identity = UUID()
@@ -49,10 +48,9 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
         childScope = nil
         destination = nil
         isGlobal = false
-        isDismissalProtected = false
     }
 
-    private init(copy: Self, destination: AnyRouteDestination?, presentation: RoutePresentation? = nil, identity: UUID? = nil, childScope: RouteDefinitions? = nil, isGlobal: Bool? = nil, isDismissalProtected: Bool? = nil) {
+    private init(copy: Self, destination: AnyRouteDestination?, presentation: RoutePresentation? = nil, identity: UUID? = nil, childScope: RouteDefinitions? = nil, isGlobal: Bool? = nil) {
         self.identity = identity ?? copy.identity
         routeType = copy.routeType
         self.presentation = presentation ?? copy.presentation
@@ -61,7 +59,6 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
         self.childScope = childScope ?? copy.childScope
         self.destination = destination
         self.isGlobal = isGlobal ?? copy.isGlobal
-        self.isDismissalProtected = isDismissalProtected ?? copy.isDismissalProtected
     }
 
     func compiled(destinations: RouteDestinationBindings) -> Self {
@@ -71,10 +68,6 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
 
     func globallyAvailable() -> Self {
         Self(copy: self, destination: destination, isGlobal: true)
-    }
-
-    func protectingDismissal() -> Self {
-        Self(copy: self, destination: destination, isDismissalProtected: true)
     }
 
     public var _routeDeclarations: [AnyRouteDeclaration] { [self] }

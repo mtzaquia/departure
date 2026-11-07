@@ -29,7 +29,7 @@ struct RouteDestinationBindings: Sendable {
         destinations.forEach(include)
         collect(declarations)
         // A route type cannot be both global and local: contextual shadowing
-        // would change its protection or physical presentation unexpectedly.
+        // would change its availability or physical presentation unexpectedly.
         var localTypes = Set<ObjectIdentifier>()
         var globalTypes = Set<ObjectIdentifier>()
         collectTypes(declarations)

@@ -31,8 +31,5 @@ public struct RootRouter {
     public var current: Router { Router(engine: engine, scope: engine.currentRouteScope) }
 
     /// Captures the permanent application root for external navigation.
-    ///
-    /// Global requests remain available while a protected route is active. Other
-    /// requests must match that protected destination's own declarations.
     public var root: Router { Router(engine: engine, scope: engine.root) }
 }

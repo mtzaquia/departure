@@ -38,7 +38,6 @@ extension RouterEngine {
         }
 
         let plan = RouteTree.UnwindPlan(retaining: [retained])
-        guard permitsRemoval(plan, explicitlyDismissing: sourceScope) else { return false }
         guard plan.removedScopes.isEmpty == false else {
             log.departureDebug(.unwindSkippedNoRoute)
             return false
@@ -58,9 +57,6 @@ extension RouterEngine {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         guard navigationSource(origin) != nil, !match.presentingScope.hasConflictingPresentationHosts,
               !Task.isCancelled else { return nil }
-        let equivalent = equivalentRouteMatch(to: route, after: match)
-        guard permitsPresentation(match),
-              permitsRemoval(tree.presentationUnwindPlan(after: match, retaining: equivalent)) else { return nil }
         if await prepareReplacement(after: match) { return nil }
 
         // Preparation may remove the requesting child. Its captured presentation anchor
@@ -126,7 +122,7 @@ extension RouterEngine {
 
     func appendPreparedRoute(_ operation: NavigationOperation) {
         guard let presentation = operation.presentation,
-              isNavigationEligible(presentation.match.presentingScope), permitsPresentation(presentation.match) else { operation.discardPresentation(); return }
+              isNavigationEligible(presentation.match.presentingScope) else { operation.discardPresentation(); return }
         let match = presentation.match
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
         guard activateBranch(for: match) else { operation.discardPresentation(); return }
@@ -134,7 +130,7 @@ extension RouterEngine {
     }
 
     func reuseEquivalentRoute(_ route: any Route, at destination: RouteScope, plan: RouteTree.UnwindPlan) async -> RouteScope? {
-        guard !Task.isCancelled, permitsRemoval(plan) else { return nil }
+        guard !Task.isCancelled else { return nil }
         if plan.removedScopes.isEmpty {
             if let current = destination.route { log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: current)) }
         } else {
@@ -232,7 +228,7 @@ extension RouterEngine {
     }
 
     func canActivateBranch(_ branchID: AnyHashable, in scope: RouteScope) -> Bool {
-        isNavigationEligible(scope) && (scope.activeBranch == branchID || permitsLocalCommand(from: scope))
+        isNavigationEligible(scope)
             && !scope.hasConflictingBranchSelection
             && (scope.activeBranch == branchID || scope.branchSelection?.acceptsValue(branchID) != false)
     }
@@ -276,7 +272,7 @@ extension RouterEngine {
         replacePendingRoute(nil)
         guard isNavigationEligible(match.presentingScope),
               !match.presentingScope.hasConflictingPresentationHosts,
-              permitsPresentation(match), declarationIsCurrent(match) else {
+              declarationIsCurrent(match) else {
             operation.discardPresentation(); return
         }
         let appendedPath = match.presentationPath
@@ -306,7 +302,6 @@ extension RouterEngine {
         guard isNavigationEligible(presentation.match.presentingScope) else { operation.discardPresentation(); return }
         log.departureDebug(.pendingRouteResuming(route: presentation.route))
         let plan = tree.presentationUnwindPlan(after: presentation.match)
-        guard permitsPresentation(presentation.match), permitsRemoval(plan) else { operation.discardPresentation(); return }
         applyUnwindPlan(plan)
         appendOrPendRoute(operation)
     }
@@ -399,13 +394,12 @@ extension RouterEngine {
     enum UnwindAuthority {
         case scope(RouteScope), owner, nativeOwner
 
-        func permitsCommit(of plan: RouteTree.UnwindPlan?, in router: RouterEngine) -> Bool {
+        func permitsCommit(in router: RouterEngine) -> Bool {
             switch self {
             case .scope(let scope):
                 !Task.isCancelled && router.isNavigationEligible(scope)
-                    && (plan.map { router.permitsRemoval($0, explicitlyDismissing: scope) } ?? true)
             case .owner:
-                !Task.isCancelled && (plan.map { router.permitsRemoval($0) } ?? true)
+                !Task.isCancelled
             case .nativeOwner: true
             }
         }
@@ -427,7 +421,7 @@ extension RouterEngine {
             for source in sources {
                 await deliverUnwindHandlers(for: source, payload: payload, in: targetScope, removing: operation.removedScopes)
             }
-            guard authority.permitsCommit(of: operation.plan, in: self) else { return false }
+            guard authority.permitsCommit(in: self) else { return false }
             commitNavigationOperation(operation)
         }
         await waitForNavigationOperation(operation)
@@ -596,7 +590,7 @@ extension RouterEngine {
     ) async -> RouteScope? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         // A surviving ancestor's handler can request follow-up before unwind commits.
-        // Protection is checked again after the shared operation completes.
+        // Source lifetime and declaration eligibility are rechecked after the operation completes.
         guard Task.isCancelled == false, resolveRequestOrigin(origin) != nil else { return nil }
         if case .resolve = stage, isPresentationRequestInProgress || !isNavigating {
             // Live callers may wait through an unwind; source membership is

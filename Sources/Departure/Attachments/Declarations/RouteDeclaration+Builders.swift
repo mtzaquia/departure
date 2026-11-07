@@ -184,7 +184,7 @@ public enum RootRouteDeclarationBuilder {
 ///
 /// Declare this map in ``RootRouteMap``. Global requests present above the current
 /// modal flow without crawling back to the map root. Entries have independent
-/// lifetimes, child definitions, and optional dismissal protection.
+/// lifetimes and child definitions.
 public struct GlobalMap: Sendable {
     let scopeDeclarations: [RouteScopeDeclaration]
 

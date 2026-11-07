@@ -40,7 +40,7 @@ import Testing
     func sheetAdaptationSurvivesCompilationAndRouting(adaptation: Sheet.CompactAdaptation, global: Bool) async throws {
         let declaration = Sheet(SettingsRoute.self, compactAdaptation: adaptation, id: "settings") {
             Push(HomeDetailRoute.self)
-        }.dismissalProtection()
+        }
         let engine = RouterEngine(routes: RootRouteMap {
             if global { GlobalMap { declaration } }
             else { declaration }
@@ -52,7 +52,6 @@ import Testing
         #expect(presentation.style == .sheet)
         #expect(presentation.compactAdaptation == adaptation)
         #expect(presentation.isGlobal == global)
-        #expect(presentation.isDismissalProtected)
         #expect(scope.routeAttachments.count == 1)
         #expect(scope.routeAttachments.first?.routeType == HomeDetailRoute.self)
         #if DEBUG

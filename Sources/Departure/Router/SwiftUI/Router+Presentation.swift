@@ -79,7 +79,7 @@ extension RouterEngine {
     }
 
     /// Reconciles the exact occurrence removed by its native owner. Destination views
-    /// decide whether interactive dismissal is available; protection governs route commands.
+    /// decide whether interactive dismissal is available and which routing commands to issue.
     func nativePresentationDidDismiss(_ scope: RouteScope) {
         guard isNavigationEligible(scope), scope.presentationDeclaration?.presentationKind.isModal == true,
               let retained = scope.routePath.scope(before: scope) else { return }

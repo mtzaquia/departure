@@ -44,7 +44,7 @@ extension RouterEngine {
         logsStart: Bool = true,
         origin: RouteRequestOrigin? = nil
     ) async throws -> A.Output {
-        guard let source = navigationSource(origin), permitsLocalCommand(from: source) else { throw CancellationError() }
+        guard let source = navigationSource(origin) else { throw CancellationError() }
         do {
             let currentRoute: (any Route.Type)? = source.currentRoute.map { type(of: $0) }
             if logsStart {
@@ -85,7 +85,7 @@ extension RouterEngine {
 
 private extension RouterEngine {
     func performAction<A: Action>(_ action: A, hasRerouted: Bool, origin: RouteRequestOrigin? = nil) async {
-        guard let source = navigationSource(origin), permitsLocalCommand(from: source) else { return }
+        guard let source = navigationSource(origin) else { return }
         if let binding = source.hookBinding(for: .actionInterceptor(ObjectIdentifier(A.self)), in: tree) {
             guard let interceptor = binding.declaration?.interceptor(for: A.self) else { return }
             log.departureDebug(.actionIntercepted(action: action, scope: source))

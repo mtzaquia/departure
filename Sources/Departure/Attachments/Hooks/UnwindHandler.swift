@@ -31,13 +31,13 @@
 ///
 /// Lookup starts at the surviving landing scope and climbs to its tree root.
 /// A conflicting handler stops lookup. A surviving inactive scope may receive
-/// notification; a follow-up presentation still checks active dismissal protection.
+/// notification; a follow-up presentation still checks its captured source lifetime.
 ///
 /// Native and explicit unwinds enter the handler after acceptance and before the
 /// path changes. The router continues once the handler suspends; it does not wait
 /// for the asynchronous body to finish. A presentation requested by the handler
 /// waits until the active navigation has finished, then rechecks source membership
-/// and active dismissal protection.
+/// and declaration eligibility.
 ///
 /// Handlers in one scope compose by route and expected payload type. Duplicate keys
 /// report a warning and are disabled until only one declaration remains.

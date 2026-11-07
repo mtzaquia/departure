@@ -15,21 +15,18 @@ final class GlobalRoutesTests: XCTestCase {
         XCTAssertEqual(app.staticTexts["sample.globals.location"].label, "App detail")
     }
 
-    func testFadeLockBlocksCoveredNavigationAndUnlocksExplicitly() {
+    func testFadeGlobalUsesItsCapturedDismissal() {
         let app = launch()
         tap("lock", app)
-        assertProtection(app)
+        assertPasscode(app)
         assertEnvironment(app)
-        tap("covered-request", app)
-        XCTAssertTrue(app.staticTexts["sample.globals.attempted"].waitForExistence(timeout: 5))
-        assertProtection(app)
         tap("unlock", app)
         XCTAssertTrue(app.buttons["sample.globals.lock"].waitForExistence(timeout: 5))
         tap("2fa", app)
         assertEnvironment(app)
     }
 
-    func testUnprotectedGlobalSuspendsProtectionAndAllowsCrawlback() {
+    func testGlobalOverlayCanCrawlBackToAppDetail() {
         let app = launch()
         tap("lock", app)
         tap("over-lock", app)
@@ -41,33 +38,39 @@ final class GlobalRoutesTests: XCTestCase {
         XCTAssertFalse(app.staticTexts["sample.globals.passcode"].exists)
     }
 
-    func testDeclaredChildSuspendsProtectionAndRestoresItOnReturn() {
+    func testDeclaredChildrenReturnToTheirInvokingGlobal() {
         let app = launch()
         tap("lock", app)
         tap("help", app)
         XCTAssertTrue(app.staticTexts["sample.globals.overlay-title"].waitForExistence(timeout: 5))
         assertEnvironment(app)
         tap("done", app)
-        assertProtection(app)
-        tap("covered-request", app)
-        assertProtection(app)
+        assertPasscode(app)
         tap("child", app)
         XCTAssertTrue(app.staticTexts["sample.globals.overlay-title"].waitForExistence(timeout: 5))
         tap("crawlback", app)
         XCTAssertTrue(app.buttons["sample.globals.back"].waitForExistence(timeout: 5))
     }
 
-    func testProtectedGlobalCanCoverAnotherProtectedGlobal() {
+    func testConsumerControlledSheetReturnsToItsInvokingGlobal() {
         let app = launch()
         tap("lock", app)
-        tap("protected-overlay", app)
+        tap("confirmation", app)
         assertEnvironment(app)
-        tap("crawlback", app)
-        XCTAssertTrue(app.staticTexts["sample.globals.overlay-title"].exists)
         tap("done", app)
-        assertProtection(app)
+        assertPasscode(app)
         tap("unlock", app)
         XCTAssertTrue(app.buttons["sample.globals.lock"].waitForExistence(timeout: 5))
+    }
+
+    func testCoveredRootCanNavigateAwayFromAGlobal() {
+        let app = launch()
+        tap("lock", app)
+        assertPasscode(app)
+        tap("covered-request", app)
+        XCTAssertTrue(app.buttons["sample.globals.back"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["sample.globals.passcode"].exists)
+        XCTAssertEqual(app.staticTexts["sample.globals.location"].label, "App detail")
     }
 
     func testLockPreservesAppTextAndGlobalAuthenticationInput() {
@@ -96,10 +99,10 @@ final class GlobalRoutesTests: XCTestCase {
         return app
     }
 
-    private func assertProtection(_ app: XCUIApplication) {
-        let status = app.staticTexts["sample.globals.protection"]
+    private func assertPasscode(_ app: XCUIApplication) {
+        let status = app.staticTexts["sample.globals.phase"]
         XCTAssertTrue(status.waitForExistence(timeout: 5))
-        XCTAssertEqual(status.label, "Protection active")
+        XCTAssertEqual(status.label, "Route phase: active")
     }
 
     private func assertEnvironment(_ app: XCUIApplication) {

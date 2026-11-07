@@ -674,7 +674,7 @@ enum AppRouteMaps {
             Sheet(GlobalPassthroughSheetRoute.self)
             Sheet(GlobalScrimSheetRoute.self)
             Cover(PendingGlobalRoute.self)
-            Cover(PasscodeRoute.self, transition: .fade).dismissalProtection()
+            Cover(PasscodeRoute.self, transition: .fade)
             Cover(PasscodeOverlayRoute.self, transition: .fade)
         }
     } destinations: {

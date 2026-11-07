@@ -29,7 +29,7 @@ root
 │  └─ branch #2 (AppTab)
 │     └─ sheet ProfileRoute → destination #1
 └─ global
-   └─ cover.fade PasscodeRoute → destination #2 [dismissal protection]
+   └─ cover.fade PasscodeRoute → destination #2
 ```
 
 The complete tree is printed as one standard-output block, preserving its indentation. Unified logging truncates large interpolated strings by encoded size, so the tree uses standard output rather than multiple log records. It remains limited to `.trace` in Debug builds and is emitted once per routing owner.
