@@ -29,6 +29,31 @@ An equal global already in foreground ancestry is reused and its descendants are
 
 Global route types cannot also be declared locally in the composed tree. Such collisions, duplicate global declarations, and conflicting destination builders report diagnostics and disable the ambiguous type. Registering a destination builder alone does not make a route global.
 
+## Keep existing priority declarations
+
+`HighPriority` and `CriticalPriority` are deprecated compatibility type aliases for `GlobalMap`. Existing declarations keep compiling with deprecation warnings, including composed `ModalRouteMap` values and each entry's local child definitions. Both aliases are accepted only at the root and use the same global behavior:
+
+```swift
+RootRouteMap {
+  HighPriority { Sheet(SecondFactorRoute.self) }
+  CriticalPriority { Cover(PasscodeRoute.self, transition: .fade) }
+}
+```
+
+The names no longer establish a priority order or create separate windows. Either group can present above the foreground flow, including another global route. Use `GlobalMap` for new declarations, and let the app control when navigation is allowed.
+
+The remaining legacy APIs also compile with deprecation warnings. Their compatibility behavior is deliberately limited:
+
+| Legacy API | Compatibility behavior | Replacement |
+| --- | --- | --- |
+| `RoutePriority` | Retains its cases, raw values, and comparison; has no routing effect. | Declare shared routes in `GlobalMap`. |
+| `RoutePresentation.priority` | Always returns `.default`, including for globals. | Read `isGlobal` when checking global availability. |
+| `RootRouter.default` | Returns `current`, with no priority filtering. | Use `root` for the permanent app root or `current` for the foreground scope. |
+| `Router.dismissSpace()`, `RootRouter.dismissSpace(_:)`, `RootRouter.dismissSpaces()` | Emit a runtime warning, return `false`, and leave navigation unchanged. | Use scoped unwinds, `unwindRoute`, or `resetToRoot()` for the intended dismissal. |
+| `WithRouter(..., windowDestination:)` | Creates the routing host; ignores the customizer without storing or evaluating it. | Configure the presenting hierarchy or individual destination builders. |
+
+Space-dismissal warnings remain available in Release builds and with `Departure.debug = .off`. Move app policy and any required cleanup to the replacement operations before relying on those legacy calls.
+
 ## Own navigation and dismissal rules
 
 Consumers decide which navigation requests their app may send. Any live scope can issue presentations, actions, unwinds, and resets, including while another route covers it. A local request follows its requesting scope's ordinary lookup; it does not search a foreground global's child declarations on behalf of a covered caller. Use the destination's own router to request its declared children.
@@ -65,7 +90,7 @@ For notifications or deep links, keep a `RootRouter`. `rootRouter.root` captures
 
 ## Inherit presentation configuration
 
-Sheets, slide covers, and fade covers use the presenting SwiftUI hierarchy in the current window. Set shared environment values above `WithRouter` or at the intended presenting scope. `RouteContext.environment` reads the destination's actual rendering environment. There is no `windowDestination` closure or separate window preference forwarding.
+Sheets, slide covers, and fade covers use the presenting SwiftUI hierarchy in the current window. Set shared environment values above `WithRouter` or at the intended presenting scope. `RouteContext.environment` reads the destination's actual rendering environment. The deprecated `windowDestination` closure is ignored; there is no separate window preference forwarding.
 
 Presentation-scoped modifiers follow native SwiftUI rules. Departure leaves toolbar decisions to the system and does not copy window preferences or install device-specific overrides.
 

@@ -53,7 +53,9 @@ The routing owner retains one immutable tree. Captured targets hold presenting a
 
 Global sheets and covers use the existing SwiftUI modal adapters in the same window. UIKit fade covers use `fullScreenCover`, a clear presentation background, and opacity-scoped animation. Native lifetime, outgoing occurrences, instance checks, fade completion, push-host placement, and the iOS 17 push workaround remain necessary.
 
-The elevated window bridge and fade presenter, pass-through windows/controllers, cached source environments, cached destination-view wrapper, and detached `windowDestination` customization have been removed. So have high/critical priority spaces and space removal operations. `RootRouter.root` is the permanent external entry point; `current` captures the foreground scope.
+The elevated window bridge and fade presenter, pass-through windows/controllers, cached source environments, cached destination-view wrapper, and detached customization have been removed. So have high/critical priority spaces and space removal operations. `RootRouter.root` is the permanent external entry point; `current` captures the foreground scope.
+
+For 3.1.0 source compatibility, `Compatibility/LegacyPriority.swift` retains the old public surface with deprecation warnings. `HighPriority` and `CriticalPriority` alias `GlobalMap`; `RoutePriority` retains its inert values, `RoutePresentation.priority` always returns `.default`, and `RootRouter.default` returns `current`. The old space-dismissal methods emit unconditional runtime warnings and return `false` without changing navigation. The `WithRouter(..., windowDestination:)` overload delegates to the ordinary host and ignores its customizer without storing or evaluating it. These shims do not restore priority policy or detached presentation.
 
 Sheet compact adaptation is declaration metadata and native presentation preference. It changes neither the route tree nor the declared `.sheet` style.
 
