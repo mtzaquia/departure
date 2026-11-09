@@ -87,7 +87,7 @@ The map owns definitions independently of mounted views. `WithRouter` and destin
 
 Route maps separate type-only declarations from [composable destination bindings](docs/routing.md#compose-destination-bindings). A root-only `GlobalMap` makes shared destinations available from every live scope. See [global routes](docs/global-routes.md) for the 2FA and passcode example.
 
-All routes, including fade covers, use ordinary presentation in the existing window. `HighPriority` and `CriticalPriority` remain available as deprecated compatibility aliases for `GlobalMap`, with the same global behavior. See [legacy API compatibility](docs/global-routes.md#keep-existing-priority-declarations) for the deprecated APIs' behavior. This branch prepares 3.1.0; the tagged 3.0.1 release uses the earlier priority-space API.
+All routes, including fade covers, use ordinary presentation in the existing window and inherit the presenting SwiftUI hierarchy.
 
 ## Documentation
 

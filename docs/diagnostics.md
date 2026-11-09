@@ -64,8 +64,6 @@ The hint describes the registered host and suggests a placement to check; it doe
 
 Invoking `@UnwindRoute` or `router.unwind` with a missing route type or modal emits a warning identifying the requested boundary, including in Release builds and with `Departure.debug = .off`. The request returns `false` and does not dismiss a different destination.
 
-The deprecated `Router.dismissSpace()`, `RootRouter.dismissSpace(_:)`, and `RootRouter.dismissSpaces()` methods also emit warnings in every build, independently of `Departure.debug`. Their `[compatibility]` warning names the obsolete API, explains that priority spaces no longer exist, and points to scoped unwinds or `resetToRoot()`. These calls return `false` and leave navigation unchanged. See [legacy API compatibility](global-routes.md#keep-existing-priority-declarations).
-
 `router.resetToRoot()` logs “requested reset to application root” before the existing removal and completion events. Its trace identifier correlates handler delivery and native teardown with that reset.
 
 ## Logging and privacy
