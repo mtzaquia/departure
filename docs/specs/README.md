@@ -1,6 +1,6 @@
 # Departure design specifications
 
-These specifications record the map rewrite implemented on `zaquia/predefined-route-maps`. The usage guides in `docs/` and the sample use this API. Specification 4 records the simplification inventory and validation evidence, including the implemented X/Y/Z entities and canonical host lifecycle. [The domain glossary](../../CONTEXT.md) defines the navigation terms.
+These specifications record the map rewrite and its subsequent changes. The usage guides in `docs/` and the sample describe the current API. Specification 11 supersedes the earlier priority-space and detached-host contracts; specifications 1–10 retain their historical context. Specification 4 records the simplification inventory and validation evidence, including the implemented X/Y/Z entities and canonical host lifecycle. [The domain glossary](../../CONTEXT.md) defines the navigation terms.
 
 [Specification 5](005-independent-priority-spaces.md) records independent space roots and explicit owner coordination. The implementation and combined native validation are complete; its validation section records the final checks.
 
@@ -24,3 +24,7 @@ Keep each specification focused on one major part of the design. Record agreed c
 6. [Navigation operations](006-navigation-operations.md) — one owner for each transition's plan, outgoing projections, native waits, and pending presentation, with global request sequencing.
 7. [Behavioral audit](007-behavioral-audit.md) — discovery, equality, command authority, branches, priorities, unwinds, resolution, buffering, hooks, actions, configuration errors, and native hosting, with open decisions separated from current behavior.
 8. [Branch discovery and reveal](008-branch-discovery-and-reveal.md) — investigation of automatic tab selection, ambiguous branch matches, nested branch roots, and a proposed bounded matching rule.
+
+## Current global-route contract
+
+[Global maps](011-global-routes.md) replaces high/critical spaces with root-declared shared sheets and covers in the existing window. Consumers own navigation and dismissal rules; global availability grants no special protection from ordinary navigation.

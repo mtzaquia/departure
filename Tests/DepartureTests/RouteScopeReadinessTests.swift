@@ -3,53 +3,6 @@ import Testing
 @testable import Departure
 
 @MainActor @Suite struct RouteScopeReadinessTests {
-    @Test(arguments: [false, true])
-    func destinationWaitEndsWhenItsScopeLeavesTheLiveTree(elevated: Bool) async throws {
-        let engine = RouterEngine(routes: RootRouteMap {
-            testPush(destination(SettingsRoute.self))
-
-            HighPriority {
-                testSheet(destination(LoginRoute.self))
-            }
-        })
-        if elevated { await engine.present(LoginRoute()) }
-        else { await engine.present(SettingsRoute()) }
-        let scope = engine.currentRouteScope
-        var started = false
-        let installation = Task {
-            started = true
-            return await scope.waitUntilInstalled(in: engine)
-        }
-        for _ in 0..<1000 where !started { await Task.yield() }
-        #expect(!scope.isInstalledInView)
-        if elevated { #expect(await engine.dismissSpace(engine.spaces.activeSpace)) }
-        else { #expect(await engine.resetToRoot()) }
-        #expect(!(await installation.value))
-        // Outgoing references cannot make a removed destination ready again.
-        engine.routeScopeDidInstallInView(scope)
-        #expect(!(await scope.waitUntilInstalled(in: engine)))
-    }
-
-    @Test func coveringADestinationEndsItsInstallationWait() async {
-        let engine = RouterEngine(routes: RootRouteMap {
-            testPush(destination(SettingsRoute.self))
-
-            HighPriority {
-                testSheet(destination(LoginRoute.self))
-            }
-        })
-        await engine.present(SettingsRoute())
-        let scope = engine.currentRouteScope
-        var started = false
-        let installation = Task {
-            started = true
-            return await scope.waitUntilInstalled(in: engine)
-        }
-        for _ in 0..<1000 where !started { await Task.yield() }
-        await engine.present(LoginRoute())
-        #expect(!(await installation.value))
-        #expect(engine.spaces.routePath(containing: scope) != nil)
-    }
 
     @Test func cancellingAnInstallationWaitCompletesWithoutAHostEvent() async {
         let engine = RouterEngine()
@@ -78,8 +31,8 @@ import Testing
             await engine.performAction(UninstalledRerouteAction(lifetime: lifetime) { retried = true })
         }
         await start()
-        for _ in 0..<1000 where engine.defaultSpace.rootPath.isEmpty { await Task.yield() }
-        let destinationScope = try #require(engine.defaultSpace.rootPath.last)
+        for _ in 0..<1000 where engine.tree.rootPath.isEmpty { await Task.yield() }
+        let destinationScope = try #require(engine.tree.rootPath.last)
         #expect(retained != nil)
         #expect(!destinationScope.isInstalledInView)
         #expect(await engine.resetToRoot())

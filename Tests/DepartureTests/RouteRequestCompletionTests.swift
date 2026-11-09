@@ -65,35 +65,16 @@ struct RouteRequestCompletionTests {
             testPush(destination(HomeDetailRoute.self)) { testSheet(destination(SettingsRoute.self)) }
         })
         await engine.present(HomeDetailRoute())
-        let reused = try #require(engine.defaultSpace.rootPath.last)
+        let reused = try #require(engine.tree.rootPath.last)
         await engine.present(SettingsRoute())
-        let outgoing = try #require(engine.defaultSpace.rootPath.last)
+        let outgoing = try #require(engine.tree.rootPath.last)
         engine.routeScopeDidInstallInView(outgoing)
         let request = Task { await engine.requestRouteWhenReady(HomeDetailRoute()) }
         for _ in 0..<1000 where !engine.isNavigating { await Task.yield() }
-        #expect(engine.defaultSpace.rootPath.last === reused)
+        #expect(engine.tree.rootPath.last === reused)
         engine.routeScopeDidLeaveView(outgoing)
         #expect(await request.value === reused)
         #expect(!engine.isNavigating)
-    }
-
-    @Test(arguments: [RoutePriority.high, .critical])
-    func elevatedPresentationAndReuseReturnTheSpaceRoot(priority: RoutePriority) async throws {
-        let engine = RouterEngine(routes: RootRouteMap {
-            HighPriority {
-                testSheet(destination(LoginRoute.self)) { testPush(destination(HomeDetailRoute.self)) }
-            }
-            CriticalPriority {
-                testSheet(destination(CriticalEntry.self)) { testPush(destination(HomeDetailRoute.self)) }
-            }
-        })
-        let route: any Route = priority == .high ? LoginRoute() : CriticalEntry()
-        let result = await engine.requestRouteWhenReady(route)
-        let root = try #require(engine.spaces.space(for: priority)?.root)
-        #expect(result === root)
-        await engine.present(HomeDetailRoute())
-        #expect(await engine.requestRouteWhenReady(route) === root)
-        #expect(root.path.isEmpty)
     }
 
     @Test(arguments: [false, true])
@@ -112,11 +93,11 @@ struct RouteRequestCompletionTests {
         let inner = try #require(engine.root.branchScopes["second"])
         if duplicateOwners {
             for _ in 0..<2 {
-                inner.bindRoutingHost(RoutePresentationHostID(), automatic: false, environment: inner.sourceEnvironment,
+                inner.bindRoutingHost(RoutePresentationHostID(), automatic: false,
                     selection: AnyRouteBranchSelection(Binding.constant("inner-first")))
             }
         } else {
-            inner.bindRoutingHost(RoutePresentationHostID(), automatic: false, environment: inner.sourceEnvironment,
+            inner.bindRoutingHost(RoutePresentationHostID(), automatic: false,
                 selection: AnyRouteBranchSelection(Binding.constant(0)))
         }
         await Router(engine: engine, scope: engine.root).branch("second").branch("inner-second").present(SettingsRoute())
@@ -149,7 +130,7 @@ struct RouteRequestCompletionTests {
         let source = try #require(branch.path.last)
         #expect(engine.activateBranch("first", in: engine.root))
         for _ in 0..<2 {
-            inner.bindRoutingHost(RoutePresentationHostID(), automatic: false, environment: inner.sourceEnvironment,
+            inner.bindRoutingHost(RoutePresentationHostID(), automatic: false,
                 selection: AnyRouteBranchSelection(Binding.constant("inner-second")))
         }
         await Router(engine: engine, scope: source).present(SettingsRoute())
@@ -174,8 +155,8 @@ struct RouteRequestCompletionTests {
         var events: [String] = []
         let action = AncestorRerouteAction { events.append($0) }
         await Router(engine: owner.engine, scope: source).perform(action)
-        for _ in 0..<1000 where owner.engine.defaultSpace.rootPath.isEmpty { await Task.yield() }
-        let target = try #require(owner.engine.defaultSpace.rootPath.last)
+        for _ in 0..<1000 where owner.engine.tree.rootPath.isEmpty { await Task.yield() }
+        let target = try #require(owner.engine.tree.rootPath.last)
         target.installHookDeclarations(hookDeclarations: [
             ActionInterceptor(AncestorRerouteAction.self) { invocation in
                 events.append("destination interceptor")
@@ -197,7 +178,7 @@ struct RouteRequestCompletionTests {
         }, router: owner) { EmptyView() }
         let origin = RouteRequestOrigin(scope: owner.engine.root)
         await owner.current.present(SettingsRoute())
-        let outgoing = try #require(owner.engine.defaultSpace.rootPath.last)
+        let outgoing = try #require(owner.engine.tree.rootPath.last)
         owner.engine.routeScopeDidInstallInView(outgoing)
         let unwind = Task { await owner.current.resetToRoot() }
         for _ in 0..<1000 where !owner.engine.isNavigating { await Task.yield() }
@@ -208,8 +189,8 @@ struct RouteRequestCompletionTests {
         #expect(await first.value == nil)
         owner.engine.routeScopeDidLeaveView(outgoing)
         #expect(await unwind.value)
-        #expect(await latest.value === owner.engine.defaultSpace.rootPath.last)
-        #expect(owner.engine.defaultSpace.rootPath.last?.route is HomeDetailRoute)
+        #expect(await latest.value === owner.engine.tree.rootPath.last)
+        #expect(owner.engine.tree.rootPath.last?.route is HomeDetailRoute)
         #expect(owner.engine.pendingRoute == nil)
     }
 
@@ -229,5 +210,3 @@ private struct AncestorRerouteAction: Action {
         record("ran")
     }
 }
-
-private struct CriticalEntry: Route, Equatable {}

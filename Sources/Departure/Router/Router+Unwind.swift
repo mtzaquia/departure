@@ -37,10 +37,8 @@ extension RouterEngine {
     }
 
     func resolveUnwind(_ selection: UnwindSelection, from source: RouteScope) -> RouteScope? {
-        guard let path = spaces.routePath(containing: source), let space = spaces.space(containing: path) else { return nil }
-        let ancestry = source.ancestry.prefix {
-            $0.space === space && spaces.routePath(containing: $0) != nil
-        }
+        guard isNavigationEligible(source) else { return nil }
+        let ancestry = source.ancestry
         switch selection {
         case .policy(.current):
             return source
@@ -88,9 +86,9 @@ extension RouterEngine {
         }
         #endif
         log.departureDebug(.resetToRootRequested)
-        guard let source = navigationSource(origin), let space = source.space else { return false }
-        let target = space.root
-        let plan = spaces.rootUnwindPlan(in: space)
+        guard let source = navigationSource(origin) else { return false }
+        let target = root
+        let plan = tree.rootUnwindPlan()
         guard !plan.removedScopes.isEmpty else {
             log.departureDebug(.unwindSkippedNoRoute)
             return false

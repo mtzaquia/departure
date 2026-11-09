@@ -16,7 +16,7 @@ struct ScopedRouterTests {
     @Test func ownerCurrentSearchesItsCapturedCurrentScope() async {
         let fixture = Fixture(concurrent: true)
         fixture.sidebar.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push))._routeDeclarations),
         ])
 
         #expect(fixture.root.origin?.scope === fixture.sidebar)
@@ -31,9 +31,9 @@ struct ScopedRouterTests {
     @Test func ownerCurrentCapturesScopeAtAccess() async throws {
         let owner = RootRouter()
         let captured = owner.current
-        owner.engine.root.define([RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations)])
+        owner.engine.root.define([RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push))._routeDeclarations)])
         await captured.present(SettingsRoute())
-        let destination = try #require(owner.engine.defaultSpace.rootPath.last)
+        let destination = try #require(owner.engine.tree.rootPath.last)
         #expect(captured.origin?.scope === owner.engine.root)
         #expect(owner.current.origin?.scope === destination)
     }
@@ -42,11 +42,11 @@ struct ScopedRouterTests {
         let fixture = Fixture(concurrent: true)
         let deeper = RouteScope(id: "deeper", route: NumberedRoute(number: 1))
         deeper.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet))._routeDeclarations),
         ])
         fixture.engine.mutateRouteGraph { fixture.detail.path.append(deeper) }
         fixture.content.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push))._routeDeclarations),
         ])
         await fixture.local(fixture.content).present(SettingsRoute())
         let selected = try #require(fixture.content.path.last)
@@ -65,14 +65,14 @@ struct ScopedRouterTests {
         #expect(fixture.selection.value == "detail")
         #expect(fixture.detail.path.last?.route is SettingsRoute)
         #expect(fixture.content.path.last === sibling)
-        #expect(fixture.engine.defaultSpace.activeBranchPaths().count == 3)
+        #expect(fixture.engine.tree.activeBranchPaths().count == 3)
     }
 
     @Test func exclusiveTargetSelectsOnlyOneParticipatingBranch() async {
         let fixture = Fixture(concurrent: false)
         await fixture.root.branch("detail").present(SettingsRoute())
         #expect(fixture.selection.value == "detail")
-        #expect(fixture.engine.defaultSpace.activeBranchPaths().count == 1)
+        #expect(fixture.engine.tree.activeBranchPaths().count == 1)
         #expect(fixture.engine.routePhase(for: fixture.sidebar) == .inactive)
     }
 
@@ -121,7 +121,7 @@ struct ScopedRouterTests {
     @Test func enclosingLocalDeclarationWinsBeforeSiblingDiscovery() async {
         let fixture = Fixture(concurrent: true)
         fixture.sidebar.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .sheet))._routeDeclarations),
         ])
         let pushed = RouteScope(id: "pushed", route: NumberedRoute(number: 1))
         fixture.engine.mutateRouteGraph { fixture.sidebar.path.append(pushed) }
@@ -144,7 +144,7 @@ struct ScopedRouterTests {
         #expect(fixture.selection.value == "sidebar")
         #expect(fixture.content.path.isEmpty)
         #expect(fixture.detail.path.isEmpty)
-        #expect(fixture.engine.defaultSpace.rootPath.isEmpty)
+        #expect(fixture.engine.tree.rootPath.isEmpty)
         #expect(fixture.engine.pendingRoute == nil)
     }
 
@@ -152,7 +152,7 @@ struct ScopedRouterTests {
         let fixture = Fixture(concurrent: true)
         let pushed = RouteScope(id: "sibling-destination", route: NumberedRoute(number: 1))
         pushed.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(NonEquatableRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(NonEquatableRoute.self), presentation: .init(style: .push))._routeDeclarations),
         ])
         fixture.engine.mutateRouteGraph { fixture.detail.path.append(pushed) }
         await fixture.local(fixture.sidebar).present(NonEquatableRoute(value: 1))
@@ -169,9 +169,9 @@ struct ScopedRouterTests {
         @Bindable var selection = PaneSelection()
         engine.root.defineTestMap(id: nil,
             selection: AnyRouteBranchSelection($selection.value), concurrent: true,
-            definitions: [RouteScopeDeclaration(routes: testDeclaration(testDestination(ScopedLoginRoute.self), presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations)]
-                + Branch("sidebar") { testDeclaration(testDestination(NumberedRoute.self), presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations
-                + Branch("detail") { testDeclaration(testDestination(ScopedGuardedRoute.self), presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations)
+            definitions: [RouteScopeDeclaration(routes: testDeclaration(testDestination(ScopedLoginRoute.self), presentation: .init(style: .cover(.slide)))._routeDeclarations)]
+                + Branch("sidebar") { testDeclaration(testDestination(NumberedRoute.self), presentation: .init(style: .push)) }.routeScopeDeclarations
+                + Branch("detail") { testDeclaration(testDestination(ScopedGuardedRoute.self), presentation: .init(style: .push)) }.routeScopeDeclarations)
         let sidebar = RouteScope(id: "sidebar", route: nil)
         let detail = RouteScope(id: "detail", route: nil)
         engine.mutateRouteGraph {
@@ -258,7 +258,7 @@ struct ScopedRouterTests {
         })
         let root = Router(engine: engine, scope: engine.root)
         await root.present(SettingsRoute())
-        let destination = try #require(engine.defaultSpace.rootPath.last)
+        let destination = try #require(engine.tree.rootPath.last)
         let stored = Router(engine: engine, scope: destination).branch("content")
         #expect(await root.resetToRoot())
         await stored.present(HomeDetailRoute())
@@ -287,14 +287,14 @@ struct ScopedRouterTests {
         engine.resumePendingRoute(for: "detail", in: engine.root)
         #expect(engine.pendingRoute == nil)
         #expect(detail.path.last?.route is SettingsRoute)
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
     }
 
     @Test func nestedTargetActivatesEnclosingExclusiveBranches() async {
         let fixture = Fixture(concurrent: false)
         let nested = RouteScope(id: "nested", route: nil)
         fixture.detail.defineTestMap(id: nil, selection: nil,
-            definitions: Branch("nested") { testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations)
+            definitions: Branch("nested") { testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push)) }.routeScopeDeclarations)
         fixture.engine.mutateRouteGraph { fixture.detail.attachTestBranch(nested, for: "nested") }
         await fixture.root.branch("detail").branch("nested").present(SettingsRoute())
         #expect(fixture.selection.value == "detail")
@@ -363,7 +363,7 @@ struct ScopedRouterTests {
         await fixture.root.branch("detail").present(SettingsRoute())
         let destination = try #require(fixture.detail.path.last)
         destination.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(NumberedRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(NumberedRoute.self), presentation: .init(style: .push))._routeDeclarations),
         ])
         let local = fixture.local(destination)
         await local.present(NumberedRoute(number: 2))
@@ -376,7 +376,7 @@ struct ScopedRouterTests {
         let fixture = Fixture(concurrent: true)
         let gate = ScopedResolutionGate()
         fixture.content.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(ScopedDelayedRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(ScopedDelayedRoute.self), presentation: .init(style: .push))._routeDeclarations),
         ])
         let request = Task { await fixture.local(fixture.content).present(ScopedDelayedRoute(gate: gate)) }
         await gate.waitForStart()
@@ -395,7 +395,7 @@ struct ScopedRouterTests {
         let destination = try #require(fixture.detail.path.last)
         let gate = ScopedResolutionGate()
         destination.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(ScopedDelayedRoute.self), presentation: .init(style: .push, priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(ScopedDelayedRoute.self), presentation: .init(style: .push))._routeDeclarations),
         ])
         let request = Task { await fixture.local(destination).present(ScopedDelayedRoute(gate: gate)) }
         await gate.waitForStart()
@@ -406,34 +406,19 @@ struct ScopedRouterTests {
         #expect(fixture.engine.pendingRoute == nil)
     }
 
-    @Test func detachedModalRouterFindsItsDeclaringAncestor() async throws {
-        let fixture = Fixture(concurrent: true)
-        fixture.engine.root.defineTestMap(id: nil,
-            selection: AnyRouteBranchSelection(Binding.constant("sidebar")), concurrent: true,
-            definitions: [RouteScopeDeclaration(routes: testDeclaration(testDestination(LockRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations)])
-        await fixture.root.present(LockRoute())
-        let modal = try #require(fixture.engine.currentRouteScope.route is LockRoute ? fixture.engine.currentRouteScope : nil)
-        fixture.engine.root.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(LockRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(ChallengeRoute.self), presentation: .init(style: .cover(.slide), priority: .high))._routeDeclarations),
-        ])
-        await fixture.local(modal).present(ChallengeRoute())
-        #expect(fixture.engine.currentRouteScope.route is ChallengeRoute)
-    }
-
     @Test func concurrentBranchesInsideAModalRemainIndependentlyActive() async throws {
         let owner = RootRouter()
         let root = owner.current
         let engine = try #require(root.engine)
         engine.root.defineTestMap(id: nil, selection: nil, definitions: [
-            RouteScopeDeclaration(routes: testDeclaration(testDestination(RootRoute.self), presentation: .init(style: .cover(.slide), priority: .default))._routeDeclarations),
+            RouteScopeDeclaration(routes: testDeclaration(testDestination(RootRoute.self), presentation: .init(style: .cover(.slide)))._routeDeclarations),
         ])
         await root.present(RootRoute())
-        let modal = try #require(engine.defaultSpace.rootPath.last)
+        let modal = try #require(engine.tree.rootPath.last)
         modal.defineTestMap(id: nil,
             selection: AnyRouteBranchSelection(Binding.constant("a")), concurrent: true,
-            definitions: Branch("a") { testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations
-                + Branch("b") { testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations)
+            definitions: Branch("a") { testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push)) }.routeScopeDeclarations
+                + Branch("b") { testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push)) }.routeScopeDeclarations)
         let a = RouteScope(id: "a", route: nil)
         let b = RouteScope(id: "b", route: nil)
         engine.mutateRouteGraph {
@@ -469,13 +454,13 @@ private struct Fixture {
         engine.root.defineTestMap(id: nil,
             selection: AnyRouteBranchSelection($selection.value), concurrent: concurrent,
             definitions:
-                Branch("sidebar") { testDeclaration(testDestination(NumberedRoute.self), presentation: .init(style: .push, priority: .default)) }.routeScopeDeclarations
-                + Branch("content") { testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push, priority: .default)); testDeclaration(testDestination(LoginRoute.self), presentation: .init(style: .sheet, priority: .default)) }.routeScopeDeclarations
+                Branch("sidebar") { testDeclaration(testDestination(NumberedRoute.self), presentation: .init(style: .push)) }.routeScopeDeclarations
+                + Branch("content") { testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push)); testDeclaration(testDestination(LoginRoute.self), presentation: .init(style: .sheet)) }.routeScopeDeclarations
                 + Branch("detail") {
-                    testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push, priority: .default))
-                    testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push, priority: .default))
-                    testDeclaration(testDestination(DroppedRoute.self), presentation: .init(style: .push, priority: .default))
-                    testDeclaration(testDestination(MessageRoute.self), presentation: .init(style: .cover(.slide), priority: .default))
+                    testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .push))
+                    testDeclaration(testDestination(HomeDetailRoute.self), presentation: .init(style: .push))
+                    testDeclaration(testDestination(DroppedRoute.self), presentation: .init(style: .push))
+                    testDeclaration(testDestination(MessageRoute.self), presentation: .init(style: .cover(.slide)))
                 }.routeScopeDeclarations)
         engine.mutateRouteGraph {
             engine.root.attachTestBranch(sidebar, for: "sidebar")

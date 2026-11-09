@@ -114,9 +114,6 @@ enum DepartureLogEvent {
     case branchActivated(from: AnyHashable, to: AnyHashable, scope: RouteScope)
     case branchActivationRejected(from: AnyHashable, to: AnyHashable, scope: RouteScope)
     case branchActivationSkipped(branch: AnyHashable, scope: RouteScope)
-    case elevatedPriorityReplacePreparing(route: any Route)
-    case elevatedSpaceCleared
-    case elevatedSpaceStarted
     case pathCleared(removedCount: Int)
     case pathTrimmed(keepThrough: RouteScope, removedCount: Int)
     case pathUnchanged(keepThrough: RouteScope)
@@ -125,11 +122,9 @@ enum DepartureLogEvent {
     case ios17PushDismissalDropped(scope: RouteScope)
     case ios17PushDismissalResumed(scope: RouteScope)
     case routeAcceptedAppend(route: any Route)
-    case routeAcceptedReplaceElevatedPriority(route: any Route)
     case routeAppendSuperseded(route: any Route)
     case routeAppendPreparing(route: any Route, match: RouterEngine.ResolvedRouteTarget)
     case routeAppended(route: any Route, path: String, match: RouterEngine.ResolvedRouteTarget)
-    case routeBlockedByElevatedPriority(route: any Route)
     case routeDroppedBranchActivationFailed(branch: AnyHashable)
     case routeDroppedResolution
     case routeLookupStarted(routeType: any Route.Type, activePath: String)
@@ -318,10 +313,8 @@ extension DepartureLogEvent {
              .mapAdopted,
              .actionInterceptorFinished,
              .branchActivated,
-             .elevatedSpaceStarted,
              .pendingRouteResuming,
              .routeAcceptedAppend,
-             .routeAcceptedReplaceElevatedPriority,
              .routeAppended,
              .unwindCompleted:
             "✓"
@@ -343,7 +336,6 @@ extension DepartureLogEvent {
              .branchActivationSkipped,
 
              .routeAppendSuperseded,
-             .routeBlockedByElevatedPriority,
              .routeDroppedBranchActivationFailed,
              .routeDroppedResolution,
              .routeNoOpEquivalent,
@@ -387,12 +379,6 @@ extension DepartureLogEvent {
             "kept \(previousBranch.departureDebugDescription); \(branch.departureDebugDescription) was rejected by \(scope.departureDebugDescription)"
         case let .branchActivationSkipped(branch, scope):
             "kept \(branch.departureDebugDescription) active in \(scope.departureDebugDescription)"
-        case let .elevatedPriorityReplacePreparing(route):
-            "preparing elevated-priority presentation for \(route.departureDebugDescription)"
-        case .elevatedSpaceCleared:
-            "cleared elevated-priority route space"
-        case .elevatedSpaceStarted:
-            "started elevated-priority route space"
         case let .pathCleared(removedCount):
             "path cleared | removed=\(removedCount)"
         case let .pathTrimmed(keepThrough, removedCount):
@@ -409,23 +395,19 @@ extension DepartureLogEvent {
             "iOS 17 push dismissal resumed after view exit | scope=\(scope.departureDebugDescription)"
         case let .routeAcceptedAppend(route):
             "will append \(route.departureDebugDescription)"
-        case let .routeAcceptedReplaceElevatedPriority(route):
-            "will replace the elevated-priority space with \(route.departureDebugDescription)"
         case let .routeAppendSuperseded(route):
             "dropped \(route.departureDebugDescription) — superseded while waiting for replaced scopes"
         case let .routeAppendPreparing(route, _):
             "preparing append for \(route.departureDebugDescription)"
         case let .routeAppended(route, path, match):
             appendedMessage(route: route, path: path, match: match)
-        case let .routeBlockedByElevatedPriority(route):
-            "blocked \(route.departureDebugDescription) — a higher-priority route is active or pending"
         case let .routeDroppedBranchActivationFailed(branch):
             "dropped route — could not activate branch \(branch.departureDebugDescription)"
         case .routeDroppedResolution:
             "dropped by route resolution"
         case let .routeLookupStarted(routeType, activePath):
             "looking up \(departureDebugName(for: routeType))"
-                + " | strategy=highest eligible space first, current path before root path, nearest scope first"
+                + " | strategy=surviving navigation ancestry, nearest scope first"
                 + "\n  active path: \(activePath)"
         case let .routeNoOpEquivalent(route, currentRoute):
             "kept \(currentRoute.departureDebugDescription) — already equivalent to \(route.departureDebugDescription)"
@@ -450,7 +432,7 @@ extension DepartureLogEvent {
         case let .ios17ViewExitWaitTimedOut(scope):
             "iOS 17 view exit wait timed out — forcing reconciliation | scope=\(scope.departureDebugDescription)"
         case .resetToRootRequested:
-            "requested reset to priority-space root"
+            "requested reset to application root"
         case let .unwindAccepted(keepThrough, removing):
             "removing \(removing) route scope\(removing == 1 ? "" : "s") through \(keepThrough.unwindDebugDescription)"
         case let .unwindCompleted(path):
@@ -491,12 +473,14 @@ private extension RouteScope {
 private extension RouterEngine.ResolvedRouteTarget.LookupStrategy {
     var departureDebugDescription: String {
         switch self {
-        case let .currentPath(spacePriority):
-            "current route path in \(spacePriority) space, nearest scope first"
-        case .defaultRootActiveBranchScope:
-            "active branch scope under default root"
-        case .defaultRootDeclarations:
-            "default root declarations, active branch before local and inactive branches"
+        case .currentPath:
+            "current route path, nearest scope first"
+        case .global:
+            "root global catalog, presented above the foreground"
+        case .selectedBranch:
+            "selected branch destination"
+        case .rootDeclarations:
+            "application root declarations, active branch before local and inactive branches"
         }
     }
 }

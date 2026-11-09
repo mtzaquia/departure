@@ -36,29 +36,29 @@ struct LoginView: View {
     private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
 
     var body: some View {
-        LabScreen("Elevated flow", eyebrow: "High-priority cover", symbol: "lock.shield.fill") {
+        LabScreen("Shared authentication", eyebrow: "Global cover", symbol: "lock.shield.fill") {
             Text("Login route active")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier(SampleAppAccessibility.loginTitle)
 
-            LabPanel("Detached window telemetry") {
+            LabPanel("Presentation environment") {
                 LabStatus(label: "Presentation", value: "SwiftUI isPresented: \(String(isPresented))", symbol: "rectangle.on.rectangle.circle.fill")
                     .accessibilityIdentifier(SampleAppAccessibility.loginIsPresented)
-                LabStatus(label: "Forwarded environment", value: "\(sampleWindowBadge) / \(scenePhase.description)", color: LabPalette.blue, symbol: "arrowshape.turn.up.forward.fill")
+                LabStatus(label: "Inherited environment", value: "\(sampleWindowBadge) / \(scenePhase.description)", color: LabPalette.blue, symbol: "arrowshape.turn.up.forward.fill")
                     .accessibilityIdentifier(SampleAppAccessibility.loginWindowEnvironmentValue)
                 LabStatus(label: "Interaction probe", value: "Login presentation probe: \(presentationProbeCount)", color: LabPalette.amber, symbol: "hand.tap.fill")
                     .accessibilityIdentifier(SampleAppAccessibility.loginPresentationProbeCount)
             }
 
-            LabPanel("Routes inside an elevated tree") {
+            LabPanel("Routes inside the global flow") {
                 LazyVGrid(columns: columns, spacing: 8) {
                     action("Increment probe", symbol: "plus.circle.fill", color: LabPalette.amber, id: SampleAppAccessibility.loginIncrementPresentationProbeButton) { presentationProbeCount += 1 }
                     action("Push detail", symbol: "arrow.right.square.fill", id: SampleAppAccessibility.loginPushDetailButton) { Task { await router.present(LoginDetailRoute()) } }
-                    action("Local high sheet", symbol: "rectangle.bottomhalf.inset.filled", color: LabPalette.blue, id: SampleAppAccessibility.loginPresentHighPrioritySheetButton) { Task { await router.present(LoginNoticeRoute()) } }
-                    action("Replace high cover", symbol: "arrow.triangle.2.circlepath", color: LabPalette.coral, id: SampleAppAccessibility.loginReplaceHighPriorityButton) { Task { await router.present(LoginReplacementRoute()) } }
-                    action("Ancestor alert", symbol: "exclamationmark.bubble.fill", color: LabPalette.coral, id: SampleAppAccessibility.loginPresentAlertButton) { Task { await router.present(AlertRoute()) } }
-                    action("Critical overlay", symbol: "exclamationmark.triangle.fill", color: LabPalette.amber, id: SampleAppAccessibility.loginPresentCriticalButton) { Task { await router.present(CriticalRoute()) } }
+                    action("Local sheet", symbol: "rectangle.bottomhalf.inset.filled", color: LabPalette.blue, id: SampleAppAccessibility.loginPresentLocalSheetButton) { Task { await router.present(LoginNoticeRoute()) } }
+                    action("Present another global", symbol: "arrow.triangle.2.circlepath", color: LabPalette.coral, id: SampleAppAccessibility.loginPresentGlobalButton) { Task { await router.present(LoginReplacementRoute()) } }
+                    action("Global alert", symbol: "exclamationmark.bubble.fill", color: LabPalette.coral, id: SampleAppAccessibility.loginPresentAlertButton) { Task { await router.present(AlertRoute()) } }
+                    action("Passcode lock", symbol: "exclamationmark.triangle.fill", color: LabPalette.amber, id: SampleAppAccessibility.loginPresentPasscodeButton) { Task { await router.present(PasscodeRoute()) } }
                 }
             }
 
@@ -118,7 +118,7 @@ struct LoginReplacementView: View {
     @UnwindRoute private var unwindRoute
 
     var body: some View {
-        LabScreen("Replacement cover", eyebrow: "Same priority", symbol: "arrow.triangle.2.circlepath") {
+        LabScreen("Replacement cover", eyebrow: "Another global", symbol: "arrow.triangle.2.circlepath") {
             Text("Replacement route active")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
@@ -127,11 +127,11 @@ struct LoginReplacementView: View {
             LabPanel("Replacement telemetry") {
                 LabStatus(label: "Presentation", value: "SwiftUI isPresented: \(String(isPresented))", symbol: "checkmark.circle.fill")
                     .accessibilityIdentifier(SampleAppAccessibility.replacementIsPresented)
-                LabStatus(label: "Forwarded environment", value: "\(sampleWindowBadge) / \(scenePhase.description)", color: LabPalette.blue, symbol: "arrowshape.turn.up.forward.fill")
+                LabStatus(label: "Inherited environment", value: "\(sampleWindowBadge) / \(scenePhase.description)", color: LabPalette.blue, symbol: "arrowshape.turn.up.forward.fill")
                     .accessibilityIdentifier(SampleAppAccessibility.replacementWindowEnvironmentValue)
             }
 
-            Text("This destination replaced the login cover because both are attached to the same scope at high priority.")
+            Text("This global cover presents above login and returns to it when dismissed.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
@@ -147,7 +147,7 @@ struct LoginReplacementView: View {
     }
 }
 
-struct CriticalView: View {
+struct PasscodeView: View {
     @Environment(\.router) private var router
     @Environment(\.isPresented) private var isPresented
     @Environment(\.sampleWindowBadge) private var sampleWindowBadge
@@ -155,38 +155,38 @@ struct CriticalView: View {
     @UnwindRoute private var unwindRoute
 
     var body: some View {
-        LabModalCard("Critical route", subtitle: "A critical window floats above the high-priority login tree.", symbol: "exclamationmark.triangle.fill", color: LabPalette.coral) {
+        LabModalCard("Passcode lock", subtitle: "This feature controls its own dismissal actions and gestures.", symbol: "exclamationmark.triangle.fill", color: LabPalette.coral) {
             Text("SwiftUI isPresented: \(String(isPresented))")
                 .font(.caption.weight(.semibold))
-                .accessibilityIdentifier(SampleAppAccessibility.criticalText)
+                .accessibilityIdentifier(SampleAppAccessibility.passcodeText)
             LabStatus(label: "Window environment", value: sampleWindowBadge, color: LabPalette.blue, symbol: "window.ceiling")
-                .accessibilityIdentifier(SampleAppAccessibility.criticalWindowEnvironmentValue)
+                .accessibilityIdentifier(SampleAppAccessibility.passcodeWindowEnvironmentValue)
             LabStatus(label: "Scene phase", value: scenePhase.description, color: LabPalette.mint, symbol: "circle.fill")
-                .accessibilityIdentifier(SampleAppAccessibility.criticalScenePhaseValue)
+                .accessibilityIdentifier(SampleAppAccessibility.passcodeScenePhaseValue)
             HStack {
                 Button("Dismiss") { Task { await unwindRoute() } }
                     .buttonStyle(.bordered)
-                    .accessibilityIdentifier(SampleAppAccessibility.criticalDismissButton)
-                Button("Replace") { Task { await router.present(CriticalReplacementRoute()) } }
+                    .accessibilityIdentifier(SampleAppAccessibility.passcodeDismissButton)
+                Button("Replace") { Task { await router.present(PasscodeOverlayRoute()) } }
                     .labPrimaryButton(color: LabPalette.coral)
-                    .accessibilityIdentifier(SampleAppAccessibility.criticalReplaceButton)
+                    .accessibilityIdentifier(SampleAppAccessibility.passcodePresentOverlayButton)
             }
         }
     }
 }
 
-struct CriticalReplacementView: View {
+struct PasscodeOverlayView: View {
     @Environment(\.isPresented) private var isPresented
     @UnwindRoute private var unwindRoute
 
     var body: some View {
-        LabModalCard("Critical replacement", subtitle: "Same-priority replacement, still above login.", symbol: "bolt.shield.fill", color: LabPalette.coral) {
+        LabModalCard("Global overlay", subtitle: "An ordinary global presentation above the passcode.", symbol: "bolt.shield.fill", color: LabPalette.coral) {
             Text("SwiftUI isPresented: \(String(isPresented))")
                 .font(.caption.weight(.semibold))
-                .accessibilityIdentifier(SampleAppAccessibility.criticalReplacementText)
-            Button("Dismiss critical replacement") { Task { await unwindRoute() } }
+                .accessibilityIdentifier(SampleAppAccessibility.passcodeOverlayText)
+            Button("Dismiss overlay") { Task { await unwindRoute() } }
                 .labPrimaryButton(color: LabPalette.coral)
-                .accessibilityIdentifier(SampleAppAccessibility.criticalReplacementDismissButton)
+                .accessibilityIdentifier(SampleAppAccessibility.passcodeOverlayDismissButton)
         }
     }
 }
@@ -207,15 +207,15 @@ struct LoginDetailView: View {
     @UnwindRoute(.nearestModal) private var unwindLogin
 
     var body: some View {
-        LabScreen("Local push", eyebrow: "Inside high priority", symbol: "arrow.right.square.fill") {
+        LabScreen("Local push", eyebrow: "Inside a global flow", symbol: "arrow.right.square.fill") {
             LabPanel {
                 Text("Pushed from the login screen.")
                     .font(.headline)
                     .accessibilityIdentifier(SampleAppAccessibility.loginDetailText)
-                Text("This is ordinary navigation inside the already-elevated route tree.")
+                Text("This is ordinary navigation inside the global route's child map.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                Button("Present equal login route") { Task { await router.present(LoginRoute(nextRoute: nil)) } }
+                Button("Present global login again") { Task { await router.present(LoginRoute(nextRoute: nil)) } }
                     .labPrimaryButton()
                     .accessibilityIdentifier(SampleAppAccessibility.loginDetailPresentLoginButton)
                 Button("Dismiss login flow") { Task { await unwindLogin() } }
@@ -234,7 +234,7 @@ struct LoginNoticeView: View {
     @Environment(\.isPresented) private var isPresented
 
     var body: some View {
-        LabModalCard("Login notice", subtitle: "A high-priority declaration behaves as a local sheet inside the high-priority tree.", symbol: "rectangle.bottomhalf.inset.filled", color: LabPalette.blue) {
+        LabModalCard("Login notice", subtitle: "A global declaration behaves as a local sheet inside the global tree.", symbol: "rectangle.bottomhalf.inset.filled", color: LabPalette.blue) {
             Text("SwiftUI isPresented: \(String(isPresented))")
                 .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.loginNoticeText)

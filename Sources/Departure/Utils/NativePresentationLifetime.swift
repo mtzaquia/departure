@@ -21,7 +21,6 @@
 //
 
 import Observation
-import SwiftUI
 
 /// The native owner's one rendered occurrence. Desired navigation stays in the live tree;
 /// this state retains outgoing content until the adapter acknowledges native completion.
@@ -30,8 +29,8 @@ final class NativePresentationLifetime {
     private struct CompletedOccurrence { weak var scope: RouteScope? }
     private enum Phase {
         case idle(CompletedOccurrence)
-        case presenting(RouteDestinationSnapshot)
-        case dismissing(RouteDestinationSnapshot)
+        case presenting(PresentedRoute)
+        case dismissing(PresentedRoute)
     }
     private enum Admission { case uncreated, created, admitted }
     private var phase: Phase = .idle(CompletedOccurrence())
@@ -39,7 +38,7 @@ final class NativePresentationLifetime {
     // publishes only its computed signal, used by the native fade animation.
     @ObservationIgnored private var admission: Admission = .uncreated
 
-    var presentation: RouteDestinationSnapshot? {
+    var presentation: PresentedRoute? {
         switch phase {
         case .idle: nil
         case .presenting(let presentation), .dismissing(let presentation): presentation
@@ -59,19 +58,19 @@ final class NativePresentationLifetime {
 
     /// Retains an admitted occurrence until native completion; unadmitted content can be replaced.
     /// The coordinator owns pending navigation, so no pending route is stored here.
-    func synchronize(_ route: PresentedRoute?, build: (PresentedRoute) -> RouteDestinationSnapshot) {
+    func synchronize(_ route: PresentedRoute?) {
         switch phase {
         case .idle(let completed):
             guard let route, route.scope !== completed.scope else { return }
             withMutation(keyPath: \.isAdmitted) { admission = .uncreated }
-            phase = .presenting(build(route))
+            phase = .presenting(route)
             route.scope.trackNativePresentation(self)
         case .presenting(let presentation):
             guard route?.id != presentation.id else { return }
             beginDismissal(of: presentation.id)
             // Content that never reached native creation has no completion callback.
             // Reconcile its successor immediately; created content finishes dismantling first.
-            synchronize(route, build: build)
+            synchronize(route)
         case .dismissing: break
         }
     }
@@ -81,7 +80,7 @@ final class NativePresentationLifetime {
         admission = .created
     }
 
-    /// The destination entered a window, or UIKit installed its native owner.
+    /// The destination entered its presentation window.
     func didAdmitPresentation(of id: PresentedRoute.ID) {
         guard presentation?.id == id, admission != .admitted else { return }
         // A cancelled destination can still enter its window before SwiftUI tears it down.
@@ -122,7 +121,7 @@ final class NativePresentationLifetime {
     }
 
     func requestDismissal(of id: PresentedRoute.ID, in router: RouterEngine) {
-        guard let scope = presentation?.route.scope, beginDismissal(of: id),
+        guard let scope = presentation?.scope, beginDismissal(of: id),
               scope.isNativePresentationOwned(by: self) else { return }
         router.nativePresentationDidDismiss(scope)
     }
@@ -132,14 +131,14 @@ final class NativePresentationLifetime {
         guard let presentation, presentation.id == id else { return }
         // Owner destruction may be the first native event. A requested dismissal
         // already started its unwind, even if its before-commit callback is pending.
-        if isPresented, presentation.route.scope.isNativePresentationOwned(by: self) {
-            router.nativePresentationDidDismiss(presentation.route.scope)
+        if isPresented, presentation.scope.isNativePresentationOwned(by: self) {
+            router.nativePresentationDidDismiss(presentation.scope)
         }
         finish(presentation)
     }
 
-    private func finish(_ presentation: RouteDestinationSnapshot) {
-        phase = .idle(CompletedOccurrence(scope: presentation.route.scope))
-        presentation.route.scope.nativePresentationDidEnd()
+    private func finish(_ presentation: PresentedRoute) {
+        phase = .idle(CompletedOccurrence(scope: presentation.scope))
+        presentation.scope.nativePresentationDidEnd()
     }
 }

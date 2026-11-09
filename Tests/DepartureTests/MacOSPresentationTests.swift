@@ -81,8 +81,8 @@ struct MacOSPresentationTests {
         let stringKey = HookDeclarationIdentity.unwindHandler(ObjectIdentifier(LoginRoute.self), payload: ObjectIdentifier(String.self))
         let intKey = HookDeclarationIdentity.unwindHandler(ObjectIdentifier(LoginRoute.self), payload: ObjectIdentifier(Int.self))
         try #require(await waitUntil {
-            engine.root.hookBinding(for: stringKey, in: engine.spaces)?.declaration != nil
-                && engine.root.hookBinding(for: intKey, in: engine.spaces)?.declaration != nil
+            engine.root.hookBinding(for: stringKey, in: engine.tree)?.declaration != nil
+                && engine.root.hookBinding(for: intKey, in: engine.tree)?.declaration != nil
         })
         for payload in ["first", 7] as [Any] {
             await owner.current.present(LoginRoute())
@@ -91,14 +91,14 @@ struct MacOSPresentationTests {
         #expect(control.events == ["string:first", "int:7"])
         control.duplicate = true
         try #require(await waitUntil {
-            if case .conflict? = engine.root.hookBinding(for: stringKey, in: engine.spaces) { return true }
+            if case .conflict? = engine.root.hookBinding(for: stringKey, in: engine.tree) { return true }
             return false
         })
         await owner.current.present(LoginRoute())
         #expect(await owner.current.unwind(.current, payload: "blocked"))
         #expect(control.events == ["string:first", "int:7"])
         control.duplicate = false
-        try #require(await waitUntil { engine.root.hookBinding(for: stringKey, in: engine.spaces)?.declaration != nil })
+        try #require(await waitUntil { engine.root.hookBinding(for: stringKey, in: engine.tree)?.declaration != nil })
         await owner.current.present(LoginRoute())
         #expect(await owner.current.unwind(.current, payload: "restored"))
         #expect(control.events == ["string:first", "int:7", "string:restored"])
@@ -117,10 +117,10 @@ struct MacOSPresentationTests {
         defer { window.close() }
         try #require(await waitUntil { owner.engine.root.isInstalledInView })
         await owner.current.present(SettingsRoute())
-        let modal = try #require(owner.engine.defaultSpace.rootPath.last)
+        let modal = try #require(owner.engine.tree.rootPath.last)
         try #require(await waitUntil { modal.isInstalledInView && window.attachedSheet != nil })
         #expect(await owner.current.unwind(.current))
-        #expect(owner.engine.defaultSpace.rootPath.isEmpty)
+        #expect(owner.engine.tree.rootPath.isEmpty)
         #expect(window.attachedSheet == nil)
         #expect(!owner.engine.isNavigating)
     }
@@ -173,7 +173,7 @@ struct MacOSPresentationTests {
         #expect(router.engine.root.definitions.routeBinding(for: MacOSPresentingRoute.self) != nil)
         #expect(router.engine.root.definitions.routeBinding(for: MacOSPresentedOnlyRoute.self) == nil)
         #expect(router.engine.root.hookBinding(
-            for: .actionInterceptor(ObjectIdentifier(ContextProbeAction.self)), in: router.engine.spaces
+            for: .actionInterceptor(ObjectIdentifier(ContextProbeAction.self)), in: router.engine.tree
         ) == nil)
         #expect(router.engine.root.branchScopes["home"] == nil)
 
@@ -182,7 +182,7 @@ struct MacOSPresentationTests {
         #expect(router.engine.root.definitions.routeBinding(for: MacOSPresentingRoute.self) != nil)
     }
 
-    @Test func replacementPreservesBranchSourceEnvironmentAndContextualDestination() async throws {
+    @Test func replacementPreservesBranchIdentityAndContextualDestination() async throws {
         let router = RootRouter()
         let engine = router.engine
         let recorder = MacOSScopeRecorder()
@@ -210,8 +210,6 @@ struct MacOSPresentationTests {
         try #require(await waitUntil { engine.root.branchScopes["detail"] != nil && recorder.scope != nil })
         let branch = try #require(engine.root.branchScopes["detail"])
         #expect(branch.parent === engine.root)
-        #expect(branch.sourceEnvironment.routeScope === branch)
-        #expect(branch.sourceEnvironment.router == Router(engine: engine, scope: branch))
         #expect(recorder.scope === branch)
         #expect(recorder.router == Router(engine: engine, scope: branch))
 
@@ -220,8 +218,6 @@ struct MacOSPresentationTests {
         try #require(await waitUntil { destinationRecorder.scope === selected && destinationRecorder.isVisible })
         #expect(destinationRecorder.router == Router(engine: engine, scope: selected))
         #expect(engine.root.branchScopes["detail"] === branch)
-        #expect(branch.sourceEnvironment.routeScope === branch)
-        #expect(branch.sourceEnvironment.router == Router(engine: engine, scope: branch))
         #expect(branch.routeAttachments.count == 1)
     }
 
@@ -250,10 +246,10 @@ struct MacOSPresentationTests {
         let second = await waitUntil { recorder.number == 2 }
         try #require(second)
         #expect(router.engine.root.routeAttachments.count == 1)
-        #expect(router.engine.defaultSpace.rootPath.count == 1)
+        #expect(router.engine.tree.rootPath.count == 1)
         #expect(window.attachedSheet == nil)
         control.isEnabled = false
-        #expect(router.engine.defaultSpace.rootPath.count == 1)
+        #expect(router.engine.tree.rootPath.count == 1)
         #expect(recorder.number == 2)
         #expect(router.engine.root.routeAttachments.count == 1)
         control.isEnabled = true
@@ -267,18 +263,15 @@ struct MacOSPresentationTests {
         #expect(router.engine.root.routeAttachments.count == 1)
     }
 
-    @Test(arguments: [RoutePriority.high, .critical])
-    func elevatedFadeCoverPresentsAndDismissesAsSheet(priority: RoutePriority) async throws {
+    @Test func globalFadeCoverPresentsAndDismissesAsSheet() async throws {
         let router = RouterEngine()
         let recorder = MacOSDismissRecorder()
         let host = WithRouter(routes: RootRouteMap {
-            HighPriority { if priority == .high { testCover(RouteDestination(MacOSFadeRoute.self) { route, _ in route.destination() }, transition: .fade) } }
-            CriticalPriority { if priority == .critical { testCover(RouteDestination(MacOSFadeRoute.self) { route, _ in route.destination() }, transition: .fade) } }
+            GlobalMap {
+                testCover(RouteDestination(MacOSFadeRoute.self) { route, _ in route.destination() }, transition: .fade)
+            }
         }, router: RootRouter(engine: router)) {
-            Color.clear.frame(width: 320, height: 240)
-                .routing()
-        } windowDestination: { destination, _ in
-            destination
+            Color.clear.frame(width: 320, height: 240).routing()
         }
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
@@ -288,18 +281,12 @@ struct MacOSPresentationTests {
         window.contentView = NSHostingView(rootView: host)
         window.orderFront(nil)
         defer { window.close() }
-
-        let installed = await waitUntil { !router.root.routeAttachments.isEmpty }
-        try #require(installed)
+        try #require(await waitUntil { router.root.isInstalledInView })
         await router.present(MacOSFadeRoute(recorder: recorder))
-        let presented = await waitUntil { window.attachedSheet != nil && recorder.dismiss != nil }
-        #expect(presented)
-        #expect(router.spaces.space(for: priority) != nil)
+        #expect(await waitUntil { window.attachedSheet != nil && recorder.dismiss != nil })
+        #expect(router.currentRouteScope.route is MacOSFadeRoute)
         recorder.dismiss?()
-        let dismissed = await waitUntil {
-            window.attachedSheet == nil && router.spaces.space(for: priority) == nil
-        }
-        #expect(dismissed)
+        #expect(await waitUntil { window.attachedSheet == nil && router.root.path.isEmpty })
     }
 
     private func waitUntil(_ condition: () -> Bool) async -> Bool {

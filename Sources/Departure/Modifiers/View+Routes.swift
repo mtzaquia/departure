@@ -44,21 +44,17 @@ public extension View {
 }
 
 extension View {
-    func routingAutomatically(nativePresentation: NativePresentationLifetime? = nil,
-                              windowDestinationBuilder: WindowDestinationBuilder? = nil) -> some View {
-        modifier(RoutingModifier(automatic: true, nativePresentation: nativePresentation,
-                                 windowDestinationBuilder: windowDestinationBuilder))
+    func routingAutomatically(nativePresentation: NativePresentationLifetime? = nil) -> some View {
+        modifier(RoutingModifier(automatic: true, nativePresentation: nativePresentation))
     }
 }
 
 private struct RoutingModifier: ViewModifier {
     @RouterEnvironment private var router
     @Environment(\.routeScope) private var scope
-    @Environment(\.self) private var environment
     var automatic = false
     var selection: AnyRouteBranchSelection?
     weak var nativePresentation: NativePresentationLifetime?
-    var windowDestinationBuilder: WindowDestinationBuilder?
     @State private var hostID = RoutePresentationHostID()
     @State private var attachment = RouteScopeAttachment(kind: .routing)
     @State private var automaticPushHost = AutomaticPushHost()
@@ -80,7 +76,6 @@ private struct RoutingModifier: ViewModifier {
             .onLifecycleEvent { view, id, event in
                 if automatic { automaticPushHost.handle(event, id: id, view: view) }
                 if automatic, let scope {
-                    if let windowDestinationBuilder { router.windowDestinationBuilder = windowDestinationBuilder }
                     // Keep the shared anchor at the outer routing boundary: modal creation
                     // must not wait for nested navigation backgrounds to materialize.
                     router.handleHostEvent(event, scope: scope, view: view, id: id)
@@ -88,7 +83,7 @@ private struct RoutingModifier: ViewModifier {
                 }
                 attachment.handle(event, id: id, target: scope, view: view,
                     apply: { scope in
-                        scope.bindRoutingHost(hostID, automatic: automatic, environment: environment, selection: selection)
+                        scope.bindRoutingHost(hostID, automatic: automatic, selection: selection)
                         reconcileSelection(in: scope)
                     }, remove: { scope in
                         scope.unbindRoutingHost(hostID)

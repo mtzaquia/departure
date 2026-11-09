@@ -35,8 +35,8 @@ public enum RouteDeclarationBuilder {
     public static func buildExpression(_ expression: Branches) -> [RouteScopeDeclaration] { expression.declarations }
 }
 
-/// Builds elevated space entries. Only modal declarations can start a space;
-/// each modal's child builder accepts the complete route declaration language.
+/// Builds sheets, covers, and reusable modal maps.
+/// Each entry's children accept the complete local declaration language.
 @resultBuilder
 public enum ModalRouteDeclarationBuilder {
     public static func buildBlock(_ components: [RouteScopeDeclaration]...) -> [RouteScopeDeclaration] { components.flatMap { $0 } }
@@ -49,7 +49,7 @@ public enum ModalRouteDeclarationBuilder {
     public static func buildExpression(_ expression: ModalRouteMap) -> [RouteScopeDeclaration] { expression.scopeDeclarations }
 }
 
-/// Composes modal entries for a high or critical space.
+/// Composes reusable sheet and cover declarations.
 ///
 /// Only sheets, covers, and other modal maps are accepted at this level.
 /// Each entry's child builder accepts the full route declaration language.
@@ -119,10 +119,8 @@ public struct RouteMap: Sendable {
     }
 }
 
-/// All definitions for a routing owner, including optional elevated root presentations.
-/// Only this map declares elevated entries. Nested maps and route children declare
-/// local navigation within their destination's owning space. An eligible scoped
-/// router may request a higher-priority entry from this owner's root catalog.
+/// Defines an application's local routes, optional global map, and shared destinations.
+/// Global maps are accepted only at this root; nested maps declare local navigation.
 public struct RootRouteMap: Sendable {
     let scopeID: AnyHashable?
     let declarations: [RouteScopeDeclaration]
@@ -130,17 +128,17 @@ public struct RootRouteMap: Sendable {
     var scopeDeclarations: [RouteScopeDeclaration] {
         (destinations.isEmpty ? [] : [.init(destinations: destinations)]) + declarations
     }
-    /// Creates the default flow, root priority groups, and shared destination builders.
+    /// Creates local navigation, global declarations, and shared destination builders.
     ///
-    /// ``HighPriority`` and ``CriticalPriority`` are accepted only in this root
+    /// ``GlobalMap`` is accepted only in this root
     /// builder. All destinations contributed by this map and its composed maps
     /// form one catalog. Each route type accepts one destination value; repeating
     /// that value is allowed. Different values conflict and disable that type
     /// throughout the tree. Destination views are evaluated only when rendered.
     ///
     /// - Parameters:
-    ///   - id: An explicit name for the default root scope.
-    ///   - routes: The default declarations and optional elevated priority groups.
+    ///   - id: An explicit name for the application root scope.
+    ///   - routes: Local declarations and optional global maps.
     ///   - destinations: Destination builders and collections available to this tree.
     public init(
         id: AnyHashable? = nil,
@@ -153,9 +151,9 @@ public struct RootRouteMap: Sendable {
     }
 }
 
-/// Builds root declarations, including high and critical priority entry groups.
+/// Builds local declarations and root-only global maps.
 ///
-/// Ordinary map and route child builders do not accept priority groups.
+/// Ordinary maps and route child builders do not accept global maps.
 @resultBuilder
 public enum RootRouteDeclarationBuilder {
     /// Combines root declaration groups.
@@ -176,36 +174,31 @@ public enum RootRouteDeclarationBuilder {
     public static func buildExpression(_ expression: ModalRouteMap) -> [RouteScopeDeclaration] { expression.scopeDeclarations }
     /// Includes the root's branch container.
     public static func buildExpression(_ expression: Branches) -> [RouteScopeDeclaration] { expression.declarations }
-    /// Includes root entries for the high priority space.
-    public static func buildExpression(_ expression: HighPriority) -> [RouteScopeDeclaration] { expression.declarations }
-    /// Includes root entries for the critical priority space.
-    public static func buildExpression(_ expression: CriticalPriority) -> [RouteScopeDeclaration] { expression.declarations }
-}
-
-/// A group of modal entries for the high priority space, declared at the map root.
-///
-/// This group is accepted only by ``RootRouteMap``. Its entries can be sheets,
-/// covers, or composed ``ModalRouteMap`` values; their children use ordinary local
-/// route declarations. Priority groups cannot be nested.
-public struct HighPriority: Sendable {
-    let declarations: [RouteScopeDeclaration]
-    /// Creates high priority modal entry declarations.
-    /// - Parameter declarations: Modal entries available from the routing root.
-    public init(@ModalRouteDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration]) {
-        self.declarations = declarations().map { $0.withPriority(.high) }
+    /// Includes routes available from every live scope in this routing owner.
+    public static func buildExpression(_ expression: GlobalMap) -> [RouteScopeDeclaration] {
+        [.init(globals: expression.scopeDeclarations)]
     }
 }
 
-/// A group of modal entries for the critical priority space, declared at the map root.
+/// Groups sheets and covers available throughout one routing owner.
 ///
-/// This group is accepted only by ``RootRouteMap``. Its entries can be sheets,
-/// covers, or composed ``ModalRouteMap`` values; their children use ordinary local
-/// route declarations. Priority groups cannot be nested.
-public struct CriticalPriority: Sendable {
-    let declarations: [RouteScopeDeclaration]
-    /// Creates critical priority modal entry declarations.
-    /// - Parameter declarations: Modal entries available from the routing root.
-    public init(@ModalRouteDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration]) {
-        self.declarations = declarations().map { $0.withPriority(.critical) }
+/// Declare this map in ``RootRouteMap``. Global requests present above the current
+/// modal flow without crawling back to the map root. Entries have independent
+/// lifetimes and child definitions.
+public struct GlobalMap: Sendable {
+    let scopeDeclarations: [RouteScopeDeclaration]
+
+    /// Creates globally available modal declarations and destination contributions.
+    /// - Parameters:
+    ///   - declarations: Sheets, covers, and reusable modal maps.
+    ///   - destinations: Builders contributed to the root's shared destination catalog.
+    public init(
+        @ModalRouteDeclarationBuilder _ declarations: () -> [RouteScopeDeclaration],
+        @RouteDestinationBuilder destinations: () -> [AnyRouteDestination] = { [] }
+    ) {
+        scopeDeclarations = [.init(destinations: destinations())] + declarations().map { declaration in
+            guard case .routes(let routes) = declaration.content else { return declaration }
+            return .init(routes: routes.map { $0.globallyAvailable() })
+        }
     }
 }

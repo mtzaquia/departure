@@ -43,42 +43,16 @@ final class SampleAppUITests: XCTestCase {
             tap(A11y.startShowInfoButton)
             assertExists(A11y.startInfoText)
             assertLabel(A11y.startInfoPresentation, contains: "Presentation: sheet")
-            assertLabel(A11y.startInfoPresentation, contains: "Priority: default")
+            assertLabel(A11y.startInfoPresentation, contains: "Global: false")
             tap(A11y.startInfoDismissButton)
             assertGone(A11y.startInfoText)
             assertExists(A11y.startButton)
         }
     }
 
-    func testElevatedRootResetAndRemovalThenDefaultPresentation() {
-        app.terminate()
-        app.launchArguments = ["--independent-space-probe"]
-        app.launch()
-        tap("sample.spaces.open-high")
-        assertExists("sample.spaces.high-root")
-        tap("sample.spaces.push")
-        tap("sample.spaces.reset")
-        assertGone("sample.spaces.reset")
-        assertExists("sample.spaces.high-root")
-        tap("sample.spaces.chain")
-        assertGone("sample.spaces.high-root")
-        assertExists("sample.spaces.default")
-    }
 
-    func testOwnerRemovalOfCoveredHighLeavesCriticalVisible() {
-        app.terminate()
-        app.launchArguments = ["--independent-space-probe"]
-        app.launch()
-        tap("sample.spaces.open-high")
-        tap("sample.spaces.open-critical")
-        assertExists("sample.spaces.critical-root")
-        tap("sample.spaces.remove-covered-high")
-        assertGone("sample.spaces.high-root")
-        assertExists("sample.spaces.critical-root")
-        tap("sample.spaces.close-critical")
-        assertGone("sample.spaces.critical-root")
-        assertExists("sample.spaces.open-high")
-    }
+
+
 
     func testSheetKeepsTwoPushesDuringRootUnwind() {
         assertSheetKeepsTwoPushesDuringDismissal("sample.dismissal-probe.unwind")
@@ -119,21 +93,17 @@ final class SampleAppUITests: XCTestCase {
         XCTAssertEqual(dismissalProbeValue("sample.nested-modal.b-minimum-depth"), bDepth)
     }
 
-    func testDefaultEquivalentRouteKeepsDepartingNestedStack() {
-        assertEquivalentRouteKeepsDepartingNestedStack(priorityArgument: nil)
+    func testLocalEquivalentRouteKeepsDepartingNestedStack() {
+        assertEquivalentRouteKeepsDepartingNestedStack(globalArgument: nil)
     }
 
-    func testHighEquivalentRouteKeepsDepartingNestedStack() {
-        assertEquivalentRouteKeepsDepartingNestedStack(priorityArgument: "--nested-modal-high")
+    func testGlobalEquivalentRouteKeepsDepartingNestedStack() {
+        assertEquivalentRouteKeepsDepartingNestedStack(globalArgument: "--nested-modal-global")
     }
 
-    func testCriticalEquivalentRouteKeepsDepartingNestedStack() {
-        assertEquivalentRouteKeepsDepartingNestedStack(priorityArgument: "--nested-modal-critical")
-    }
-
-    private func assertEquivalentRouteKeepsDepartingNestedStack(priorityArgument: String?) {
+    private func assertEquivalentRouteKeepsDepartingNestedStack(globalArgument: String?) {
         app.terminate()
-        app.launchArguments = ["--nested-modal-probe"] + [priorityArgument].compactMap { $0 }
+        app.launchArguments = ["--nested-modal-probe"] + [globalArgument].compactMap { $0 }
         app.launch()
 
         tap("sample.nested-modal.present-a")
@@ -473,33 +443,7 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.homeWelcome)
     }
 
-    func testHighPriorityWindowReplacementAndContinuation() {
-        openLanding()
 
-        tap(A11y.homeProfileButton)
-        assertExists(A11y.loginTitle)
-        assertLabel(A11y.loginIsPresented, contains: "true")
-        assertLabel(A11y.loginWindowEnvironmentValue, contains: "forwarded from app window")
-        assertLabel(A11y.loginWindowEnvironmentValue, contains: "active")
-
-        tap(A11y.loginReplaceHighPriorityButton)
-        assertExists(A11y.replacementTitle)
-        assertLabel(A11y.replacementIsPresented, contains: "true")
-        assertLabel(A11y.replacementWindowEnvironmentValue, contains: "forwarded from app window")
-        assertLabel(A11y.replacementWindowEnvironmentValue, contains: "active")
-
-        tap(A11y.replacementDismissButton)
-        assertGone(A11y.replacementTitle)
-
-        tap(A11y.homeProfileButton)
-        assertExists(A11y.loginTitle)
-
-        tap(A11y.loginButton)
-        assertExists(A11y.profileTitle)
-
-        tap(A11y.profileSignOutButton)
-        assertExists(A11y.startButton)
-    }
 
     func testPresentedProfileIsTheOnlyActiveRoutePhase() {
         openLanding()
@@ -514,81 +458,11 @@ final class SampleAppUITests: XCTestCase {
         assertLabel(A11y.homeRoutePhase, contains: "Home route phase: inactive")
     }
 
-    func testRoutesFromHighPriorityTreeBehaveAsDefaultNavigationAndModal() {
-        openLanding()
 
-        // Reaching profile while logged out reroutes to the login high-priority cover, starting a
-        // high-priority tree.
-        tap(A11y.homeProfileButton)
-        assertExists(A11y.loginTitle)
-        assertLabel(A11y.loginIsPresented, contains: "true")
 
-        // A default push declared inside the tree navigates within the login stack (it is not
-        // blocked the way a default route before the tree would be).
-        tap(A11y.loginIncrementPresentationProbeButton)
-        assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
 
-        tap(A11y.loginPushDetailButton)
-        assertExists(A11y.loginDetailText)
 
-        tap(A11y.loginDetailPresentLoginButton)
-        assertGone(A11y.loginDetailText)
-        assertExists(A11y.loginTitle)
-        assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
-
-        // A high-priority sheet declared inside the tree presents as a default sheet over login
-        // — it must not escalate/replace the login cover, so login stays in the hierarchy behind it.
-        tap(A11y.loginPresentHighPrioritySheetButton)
-        assertExists(A11y.loginNoticeText)
-        assertLabel(A11y.loginNoticeText, contains: "true")
-        assertExists(A11y.loginTitle)
-
-        tap(A11y.loginNoticeDismissButton)
-        assertGone(A11y.loginNoticeText)
-        assertExists(A11y.loginTitle)
-    }
-
-    func testCriticalPriorityPresentationOverlaysAndReplacesAboveHighPriorityTree() {
-        openLanding()
-
-        tap(A11y.homeProfileButton)
-        assertExists(A11y.loginTitle)
-        assertLabel(A11y.loginIsPresented, contains: "true")
-        assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 0")
-        let loginProbeCoordinate = app.buttons[A11y.loginToolbarIncrementPresentationProbeButton]
-            .firstMatch
-            .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        tap(A11y.loginPresentCriticalButton)
-        assertExists(A11y.criticalText)
-        assertLabel(A11y.criticalText, contains: "true")
-        assertLabel(A11y.criticalWindowEnvironmentValue, contains: "forwarded from app window")
-        assertLabel(A11y.criticalScenePhaseValue, contains: "active")
-        assertExists(A11y.loginTitle)
-
-        loginProbeCoordinate.tap()
-        assertLabel(A11y.loginPresentationProbeCount, contains: "Login presentation probe: 1")
-        assertExists(A11y.criticalText)
-
-        tap(A11y.criticalDismissButton)
-        assertGone(A11y.criticalText)
-        assertExists(A11y.loginTitle)
-
-        tap(A11y.loginPresentCriticalButton)
-        assertExists(A11y.criticalText)
-        assertLabel(A11y.criticalText, contains: "true")
-
-        tap(A11y.criticalReplaceButton)
-        assertExists(A11y.criticalReplacementText)
-        assertLabel(A11y.criticalReplacementText, contains: "true")
-        assertGone(A11y.criticalText)
-        assertExists(A11y.loginTitle)
-
-        tap(A11y.criticalReplacementDismissButton)
-        assertGone(A11y.criticalReplacementText)
-        assertExists(A11y.loginTitle)
-    }
-
-    func testHighPrioritySheetHonorsSwiftUIPresentationPassthrough() {
+    func testGlobalSheetHonorsSwiftUIPresentationPassthrough() {
         openLanding()
 
         assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 0")
@@ -602,21 +476,21 @@ final class SampleAppUITests: XCTestCase {
             .firstMatch
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
 
-        tap(A11y.homePresentHighPriorityPassthroughSheetButton)
-        assertExists(A11y.highPriorityPassthroughSheetText)
-        assertLabel(A11y.highPriorityPassthroughSheetText, contains: "true")
-        assertLabel(A11y.highPriorityPassthroughSheetRoutePhase, contains: "Route phase: active")
+        tap(A11y.homePresentGlobalPassthroughSheetButton)
+        assertExists(A11y.globalPassthroughSheetText)
+        assertLabel(A11y.globalPassthroughSheetText, contains: "true")
+        assertLabel(A11y.globalPassthroughSheetRoutePhase, contains: "Route phase: active")
         assertLabel(A11y.homeRoutePhase, contains: "Home route phase: inactive")
 
         behindCoordinate.tap()
-        assertExists(A11y.highPriorityPassthroughSheetText)
+        assertExists(A11y.globalPassthroughSheetText)
         assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 1")
 
-        tap(A11y.highPriorityPassthroughSheetDismissButton)
-        assertGone(A11y.highPriorityPassthroughSheetText)
+        tap(A11y.globalPassthroughSheetDismissButton)
+        assertGone(A11y.globalPassthroughSheetText)
     }
 
-    func testHighPrioritySheetScrimBlocksPresentationPassthrough() {
+    func testGlobalSheetScrimBlocksPresentationPassthrough() {
         openLanding()
 
         assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 0")
@@ -625,19 +499,19 @@ final class SampleAppUITests: XCTestCase {
             .firstMatch
             .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
 
-        tap(A11y.homePresentHighPriorityBlockingSheetButton)
-        assertExists(A11y.highPriorityBlockingSheetText)
-        assertLabel(A11y.highPriorityBlockingSheetText, contains: "true")
+        tap(A11y.homePresentGlobalScrimSheetButton)
+        assertExists(A11y.globalScrimSheetText)
+        assertLabel(A11y.globalScrimSheetText, contains: "true")
 
         behindCoordinate.tap()
         assertLabel(A11y.homePassthroughTapCount, contains: "Behind sheet taps: 0")
 
-        guard element(A11y.highPriorityBlockingSheetDismissButton).exists else {
+        guard element(A11y.globalScrimSheetDismissButton).exists else {
             return
         }
 
-        tap(A11y.highPriorityBlockingSheetDismissButton)
-        assertGone(A11y.highPriorityBlockingSheetText)
+        tap(A11y.globalScrimSheetDismissButton)
+        assertGone(A11y.globalScrimSheetText)
     }
 
     func testSwiftUIDismissSynchronizationAndHandlerTiming() {
@@ -879,14 +753,7 @@ final class SampleAppUITests: XCTestCase {
         assertExists(A11y.settingsAuthenticationButton)
     }
 
-    func testPendingElevatedBranchRequestBlocksDefaultPresentationBeforeWindowStarts() {
-        openLanding()
 
-        tap(A11y.homePresentPendingPriorityRaceButton)
-
-        assertExists(A11y.pendingPriorityText)
-        assertGone(A11y.topLevelSheetText)
-    }
 
     func testPayloadDeliveryAndMismatchAreVisible() {
         openLanding()
@@ -948,17 +815,17 @@ final class SampleAppUITests: XCTestCase {
     func testAncestorAlertSupportsBothDismissalPaths() {
         openLanding()
         tap(A11y.homeProfileButton)
-
         tap(A11y.loginPresentAlertButton)
         assertExists(A11y.alertText)
         tap(A11y.alertDismissSwiftUIButton)
         assertGone(A11y.alertText)
-
-        tap(A11y.homeProfileButton)
+        assertExists(A11y.loginTitle)
         tap(A11y.loginPresentAlertButton)
         assertExists(A11y.alertText)
         tap(A11y.alertDismissUnwindButton)
         assertGone(A11y.alertText)
+        assertExists(A11y.loginTitle)
+        tap(A11y.loginCancelButton)
         assertExists(A11y.homeWelcome)
     }
 }
@@ -1101,9 +968,9 @@ private enum A11y {
     static let homeShowMessageButton = "sample.home.show-message"
     static let homeProfileButton = "sample.home.profile"
     static let homeShowDismissProbeButton = "sample.home.show-dismiss-probe"
-    static let homePresentPendingPriorityRaceButton = "sample.home.present-pending-priority-race"
-    static let homePresentHighPriorityPassthroughSheetButton = "sample.home.present-high-priority-passthrough-sheet"
-    static let homePresentHighPriorityBlockingSheetButton = "sample.home.present-high-priority-blocking-sheet"
+    static let homePresentPendingGlobalRaceButton = "sample.home.present-pending-global-race"
+    static let homePresentGlobalPassthroughSheetButton = "sample.home.present-global-passthrough-sheet"
+    static let homePresentGlobalScrimSheetButton = "sample.home.present-global-scrim-sheet"
     static let homeShowNavigationBarFadeButton = "sample.home.show-navigation-bar-fade"
     static let homeShowLifecycleTeardownButton = "sample.home.show-lifecycle-teardown"
     static let homePresentLegacySheetButton = "sample.home.present-legacy-sheet"
@@ -1172,11 +1039,11 @@ private enum A11y {
     static let topLevelCoverPresentReplacementButton = "sample.top-level-cover.present-replacement"
     static let topLevelReplacementCoverText = "sample.top-level-replacement-cover.text"
     static let topLevelReplacementCoverDismissButton = "sample.top-level-replacement-cover.dismiss"
-    static let highPriorityPassthroughSheetText = "sample.high-priority-passthrough-sheet.text"
-    static let highPriorityPassthroughSheetRoutePhase = "sample.high-priority-passthrough-sheet.route-phase"
-    static let highPriorityPassthroughSheetDismissButton = "sample.high-priority-passthrough-sheet.dismiss"
-    static let highPriorityBlockingSheetText = "sample.high-priority-blocking-sheet.text"
-    static let highPriorityBlockingSheetDismissButton = "sample.high-priority-blocking-sheet.dismiss"
+    static let globalPassthroughSheetText = "sample.global-passthrough-sheet.text"
+    static let globalPassthroughSheetRoutePhase = "sample.global-passthrough-sheet.route-phase"
+    static let globalPassthroughSheetDismissButton = "sample.global-passthrough-sheet.dismiss"
+    static let globalScrimSheetText = "sample.global-scrim-sheet.text"
+    static let globalScrimSheetDismissButton = "sample.global-scrim-sheet.dismiss"
 
     static let messageText = "sample.message.text"
     static let messagePresentationSource = "sample.message.presentation-source"
@@ -1198,7 +1065,7 @@ private enum A11y {
     static let settingsModalDismissButton = "sample.settings-modal.dismiss"
     static let rerouteChainFinalText = "sample.reroute-chain-final.text"
     static let rerouteChainFinalDismissButton = "sample.reroute-chain-final.dismiss"
-    static let pendingPriorityText = "sample.pending-priority.text"
+    static let pendingGlobalText = "sample.pending-global.text"
 
     static let alertText = "sample.alert.text"
     static let alertDismissUnwindButton = "sample.alert.dismiss-unwind"
@@ -1212,11 +1079,11 @@ private enum A11y {
     static let loginToolbarIncrementPresentationProbeButton = "sample.login.toolbar-increment-presentation-probe"
     static let loginButton = "sample.login.button"
     static let loginCancelButton = "sample.login.cancel"
-    static let loginReplaceHighPriorityButton = "sample.login.replace-high-priority"
+    static let loginPresentGlobalButton = "sample.login.replace-global"
     static let loginPresentAlertButton = "sample.login.present-alert"
-    static let loginPresentCriticalButton = "sample.login.present-critical"
+    static let loginPresentPasscodeButton = "sample.login.present-passcode"
     static let loginPushDetailButton = "sample.login.push-detail"
-    static let loginPresentHighPrioritySheetButton = "sample.login.present-high-priority-sheet"
+    static let loginPresentLocalSheetButton = "sample.login.present-global-sheet"
 
     static let loginDetailText = "sample.login-detail.text"
     static let loginDetailPresentLoginButton = "sample.login-detail.present-login"
@@ -1228,13 +1095,13 @@ private enum A11y {
     static let replacementIsPresented = "sample.replacement.is-presented"
     static let replacementWindowEnvironmentValue = "sample.replacement.window-environment"
     static let replacementDismissButton = "sample.replacement.dismiss"
-    static let criticalText = "sample.critical.text"
-    static let criticalWindowEnvironmentValue = "sample.critical.window-environment"
-    static let criticalScenePhaseValue = "sample.critical.scene-phase"
-    static let criticalReplaceButton = "sample.critical.replace"
-    static let criticalDismissButton = "sample.critical.dismiss"
-    static let criticalReplacementText = "sample.critical-replacement.text"
-    static let criticalReplacementDismissButton = "sample.critical-replacement.dismiss"
+    static let passcodeText = "sample.passcode.text"
+    static let passcodeWindowEnvironmentValue = "sample.passcode.window-environment"
+    static let passcodeScenePhaseValue = "sample.passcode.scene-phase"
+    static let passcodePresentOverlayButton = "sample.passcode.replace"
+    static let passcodeDismissButton = "sample.passcode.dismiss"
+    static let passcodeOverlayText = "sample.passcode-overlay.text"
+    static let passcodeOverlayDismissButton = "sample.passcode-overlay.dismiss"
 
     static let profileTitle = "sample.profile.title"
     static let profileRoutePhase = "sample.profile.route-phase"

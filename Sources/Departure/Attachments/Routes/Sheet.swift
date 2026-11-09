@@ -34,15 +34,32 @@ public struct Sheet: RouteDeclaration, Sendable {
     ///
     /// - Parameters:
     ///   - route: The route type available at this map location.
+    ///   - compactAdaptation: How the sheet appears in compact size classes. The default
+    ///     keeps the sheet; `.cover` requests a slide-up, full-screen presentation.
     ///   - id: An explicit name for the destination's scope.
     ///   - children: The navigation available from this destination.
     public init<R: Route>(
         _ route: R.Type,
+        compactAdaptation: CompactAdaptation = .none,
         id: AnyHashable? = nil,
         @RouteDeclarationBuilder _ children: () -> [RouteScopeDeclaration] = { [] }
     ) {
-        declaration = AnyRouteDeclaration(route, presentation: .init(style: .sheet, priority: .default), id: id, children: children())
+        declaration = AnyRouteDeclaration(route,
+            presentation: .init(style: .sheet, compactAdaptation: compactAdaptation), id: id, children: children())
     }
 
     public var _routeDeclarations: [AnyRouteDeclaration] { [declaration] }
+}
+
+extension Sheet {
+    /// How a sheet appears when either size class is compact.
+    ///
+    /// Adaptation changes native presentation, preserving the sheet's declaration,
+    /// route instance, and child definitions. It has no custom transition choice.
+    public enum CompactAdaptation: Hashable, Sendable, CaseIterable {
+        /// Keeps the sheet presentation in compact size classes.
+        case none
+        /// Uses a slide-up cover in compact size classes, and a sheet in regular size classes.
+        case cover
+    }
 }

@@ -28,7 +28,33 @@ struct RouteDestinationBindings: Sendable {
         var bindings: [ObjectIdentifier: DeclarationBinding<AnyRouteDestination>] = [:]
         destinations.forEach(include)
         collect(declarations)
+        // A route type cannot be both global and local: contextual shadowing
+        // would change its availability or physical presentation unexpectedly.
+        var localTypes = Set<ObjectIdentifier>()
+        var globalTypes = Set<ObjectIdentifier>()
+        collectTypes(declarations)
+        for type in localTypes.intersection(globalTypes) {
+            let name = bindings[type]?.declaration.map { String(reflecting: $0.routeType) } ?? "A route type"
+            bindings[type] = .conflict
+            log.departureWarning("\(name) is declared both globally and locally; its declarations are disabled.")
+        }
         self.destinations = bindings
+
+        func collectTypes(_ declarations: [RouteScopeDeclaration], global: Bool = false) {
+            for declaration in declarations {
+                switch declaration.content {
+                case .routes(let routes):
+                    for route in routes {
+                        if global { globalTypes.insert(ObjectIdentifier(route.routeType)) }
+                        else { localTypes.insert(ObjectIdentifier(route.routeType)) }
+                        collectTypes(route.children)
+                    }
+                case .globals(let children): collectTypes(children, global: true)
+                case .branch(_, let children), .branches(_, let children): collectTypes(children)
+                case .scopeID, .destinations: break
+                }
+            }
+        }
 
         func include(_ destination: AnyRouteDestination) {
             let type = ObjectIdentifier(destination.routeType)
@@ -55,7 +81,7 @@ struct RouteDestinationBindings: Sendable {
                         if let destination = route.destination { include(destination) }
                         collect(route.children)
                     }
-                case .branch(_, let children), .branches(_, let children):
+                case .branch(_, let children), .branches(_, let children), .globals(let children):
                     collect(children)
                 case .scopeID:
                     break

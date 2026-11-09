@@ -91,8 +91,7 @@ public struct AnyRouteDestination: Sendable, Hashable {
 
 /// Presentation metadata for the particular destination being rendered.
 ///
-/// Style describes this destination; priority describes its enclosing priority space.
-/// A push inside a high-priority cover has ``Style/push`` style and ``RoutePriority/high`` priority.
+/// Metadata reflects the matched declaration and its configured presentation.
 public struct RoutePresentation: Hashable, Sendable {
     /// The presentation style used for this destination.
     public enum Style: Hashable, Sendable {
@@ -110,8 +109,18 @@ public struct RoutePresentation: Hashable, Sendable {
     }
     /// The matched presentation style, including a cover's transition.
     public let style: Style
-    /// The effective priority, including priority inherited from an enclosing flow.
-    public let priority: RoutePriority
+    /// The declared sheet's compact adaptation. Other presentation styles use `.none`.
+    /// The declared ``style`` remains `.sheet` when native presentation adapts to a cover.
+    public let compactAdaptation: Sheet.CompactAdaptation
+    /// Whether this occurrence was presented from the root global catalog.
+    public let isGlobal: Bool
+
+    init(style: Style, compactAdaptation: Sheet.CompactAdaptation = .none,
+         isGlobal: Bool = false) {
+        self.style = style
+        self.compactAdaptation = compactAdaptation
+        self.isGlobal = isGlobal
+    }
 }
 
 /// Values supplied by Departure for a destination's own scope during view construction.
@@ -127,7 +136,7 @@ public struct RouteContext {
     public let router: Router
     /// Unwinds this exact scope, optionally delivering a payload.
     public let unwindRoute: UnwindRouteAction
-    /// The destination's actual style and effective priority after route resolution.
+    /// The destination's matched style and declaration metadata.
     public let presentation: RoutePresentation
     /// The environment visible to this destination during the current builder evaluation.
     public let environment: EnvironmentValues

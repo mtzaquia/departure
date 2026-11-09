@@ -35,7 +35,7 @@ final class RouterEngine: Identifiable, Equatable {
     @ObservationIgnored private(set) var hasTracedMapAdoption = false
 #endif
 
-    var spaces: RouteSpaces
+    let tree: RouteTree
 
     @ObservationIgnored
     var pendingRoute: PendingNavigation?
@@ -48,10 +48,6 @@ final class RouterEngine: Identifiable, Equatable {
 
     var isNavigating: Bool { !navigationOperations.isEmpty }
 
-    var hasOutgoingPresentations: Bool {
-        navigationOperations.contains { !$0.outgoing.isEmpty }
-    }
-
     @ObservationIgnored
     var routeGraphMutationDepth = 0
 
@@ -59,21 +55,14 @@ final class RouterEngine: Identifiable, Equatable {
     var ios17NavigationStackPushWorkaround: (any IOS17NavigationStackPushWorkaroundHandling)? =
         IOS17NavigationStackPushWorkaroundFactory.makeForCurrentPlatform()
 
-    @ObservationIgnored
-    var windowDestinationBuilder = WindowDestinationBuilder.passthrough
-
     var activeRouteScopeID: ObjectIdentifier { ObjectIdentifier(currentRouteScope) }
 
     var root: RouteScope {
-        spaces.defaultSpace.root
-    }
-
-    var defaultSpace: RouteSpace {
-        spaces.defaultSpace
+        tree.root
     }
 
     var currentRouteScope: RouteScope {
-        spaces.activeSpace.currentRouteScope
+        tree.currentRouteScope
     }
 
     /// Creates an empty router.
@@ -83,8 +72,7 @@ final class RouterEngine: Identifiable, Equatable {
             isConfigured = true
             root.useDefinitions(RouteDefinitions(routes.scopeDeclarations, id: routes.scopeID))
         }
-        let defaultSpace = RouteSpace(priority: .default, root: root)
-        self.spaces = RouteSpaces(defaultSpace: defaultSpace)
+        self.tree = RouteTree(root: root)
     }
 
     func configureMap(_ map: RootRouteMap) {
@@ -157,23 +145,19 @@ extension RouterEngine {
         if routeGraphMutationDepth == 0 {
             ios17NavigationStackPushWorkaround?.routeGraphDidMutate(in: self)
             #if DEBUG
-            spaces.validateInvariants()
+            tree.validateInvariants()
             #endif
         }
     }
 
     func isNavigationEligible(_ scope: RouteScope) -> Bool {
-        scope.belongs(to: spaces.activeSpace)
+        scope.belongs(to: tree)
     }
 
     func synchronizeBranchSelection(ownedBy owner: RoutePresentationHostID, in scope: RouteScope, restoring: Bool = false) {
-        guard spaces.routePath(containing: scope) != nil else { return }
+        guard tree.routePath(containing: scope) != nil else { return }
         guard !restoring, let selection = scope.branchSelection(ownedBy: owner) else {
             scope.restoreBranchSelection()
-            return
-        }
-        guard isNavigationEligible(scope) else {
-            _ = selection.setValue(scope.activeBranch)
             return
         }
         scope.bindBranchSelection(selection)
@@ -187,7 +171,7 @@ extension RouterEngine {
     /// Resolves a command's captured origin; an absent origin is the internal
     /// current-scope lookup used by engine operations.
     func resolveRequestOrigin(_ origin: RouteRequestOrigin?) -> RouteScope? {
-        if let origin { return origin.resolve(in: spaces) }
+        if let origin { return origin.resolve(in: tree) }
         return currentRouteScope
     }
 

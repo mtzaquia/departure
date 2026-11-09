@@ -23,8 +23,8 @@
 import XCTest
 
 final class SheetFocusTests: XCTestCase {
-    func testElevatedSheetSwipeDismissalAllowsRepeatedReopening() {
-        let app = launch(elevated: true)
+    func testGlobalSheetSwipeDismissalAllowsRepeatedReopening() {
+        let app = launch(globalRoute: true)
         defer { app.terminate() }
         for _ in 0..<5 {
             tap("sample.sheet-focus.present", in: app)
@@ -38,20 +38,20 @@ final class SheetFocusTests: XCTestCase {
         }
     }
 
-    func testElevatedSheetReplacementAndProgrammaticDismissal() {
-        verifyElevatedReplacement()
+    func testGlobalSheetReplacementAndProgrammaticDismissal() {
+        verifyGlobalReplacement()
     }
 
-    func testElevatedSlideCoverReplacementAndProgrammaticDismissal() {
-        verifyElevatedReplacement(slide: true)
+    func testGlobalSlideCoverReplacementAndProgrammaticDismissal() {
+        verifyGlobalReplacement(slide: true)
     }
 
-    func testElevatedFadeCoverReplacementAndProgrammaticDismissal() {
-        verifyElevatedReplacement(fade: true)
+    func testGlobalFadeCoverReplacementAndProgrammaticDismissal() {
+        verifyGlobalReplacement(fade: true)
     }
 
-    private func verifyElevatedReplacement(fade: Bool = false, slide: Bool = false) {
-        let app = launch(fade: fade, elevated: true, slide: slide)
+    private func verifyGlobalReplacement(fade: Bool = false, slide: Bool = false) {
+        let app = launch(fade: fade, globalRoute: true, slide: slide)
         defer { app.terminate() }
         for _ in 0..<3 {
             tap("sample.sheet-focus.present", in: app)
@@ -224,12 +224,12 @@ final class SheetFocusTests: XCTestCase {
         XCTAssertTrue(app.textFields["sample.sheet-focus.field"].waitForExistence(timeout: 5))
     }
 
-    private func launch(root: Bool = false, fade: Bool = false, elevated: Bool = false, slide: Bool = false) -> XCUIApplication {
+    private func launch(root: Bool = false, fade: Bool = false, globalRoute: Bool = false, slide: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["--sheet-focus-probe"] + (root ? ["--sheet-focus-root"] : [])
             + (fade ? ["--sheet-focus-fade"] : [])
-            + (elevated ? ["--sheet-focus-elevated"] : []) + (slide ? ["--sheet-focus-slide"] : [])
+            + (globalRoute ? ["--sheet-focus-global"] : []) + (slide ? ["--sheet-focus-slide"] : [])
         app.launch()
         return app
     }

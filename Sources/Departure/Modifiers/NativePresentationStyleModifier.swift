@@ -62,12 +62,7 @@ struct NativePresentationStyleModifier: ViewModifier {
         case .sheet:
             content.modifier(SystemModalPresentationModifier(style: .sheet, route: presentation))
         case .cover(let transition):
-            #if canImport(UIKit)
-            let builder = transition == .fade ? router.windowDestinationBuilder : nil
-            #else
-            let builder: WindowDestinationBuilder? = nil
-            #endif
-            content.modifier(SystemModalPresentationModifier(style: .cover(transition), route: presentation, destinationBuilder: builder))
+            content.modifier(SystemModalPresentationModifier(style: .cover(transition), route: presentation))
         }
     }
 }
@@ -76,7 +71,6 @@ struct NativePresentationStyleModifier: ViewModifier {
 struct SystemModalPresentationModifier: ViewModifier {
     let style: RoutePresentationKind
     @Binding var route: PresentedRoute?
-    var destinationBuilder: WindowDestinationBuilder?
     @RouterEnvironment private var router
     @Environment(\.scenePhase) private var scenePhase
     @State private var lifetime = NativePresentationLifetime()
@@ -114,16 +108,18 @@ struct SystemModalPresentationModifier: ViewModifier {
             }
             .onChange(of: admittedFadeID, initial: true) { _, id in
                 guard let id, lifetime.presentation?.id == id, lifetime.isPresented else { return }
-                withAnimation(.easeInOut(duration: 0.35)) { fade = .visible }
+                fade = .visible
             }
             .task(id: fades ? lifetime.dismissalID : nil) {
                 guard fades, let id = lifetime.dismissalID else { return }
-                withAnimation(.easeInOut(duration: 0.25), completionCriteria: .removed) {
-                    fade = .hidden
-                } completion: {
+                // The scoped opacity animation reports completion through this
+                // transaction without supplying an animation to destination content.
+                var transaction = Transaction()
+                transaction.addAnimationCompletion(criteria: .removed) {
                     guard lifetime.dismissalID == id else { return }
                     fade = .dismissed(id)
                 }
+                withTransaction(transaction) { fade = .hidden }
             }
             .onLifecycleEvent { _, _, event in
                 switch event {
@@ -136,7 +132,7 @@ struct SystemModalPresentationModifier: ViewModifier {
     }
 
     @ViewBuilder
-    private func systemPresentation(_ content: Content, presented: Binding<Bool>, rendered: RouteDestinationSnapshot?) -> some View {
+    private func systemPresentation(_ content: Content, presented: Binding<Bool>, rendered: PresentedRoute?) -> some View {
         #if canImport(UIKit)
         if fades {
             content.fullScreenCover(isPresented: presented, onDismiss: { complete(rendered) }) {
@@ -160,15 +156,26 @@ struct SystemModalPresentationModifier: ViewModifier {
     }
 
     @ViewBuilder
-    private func destination(_ rendered: RouteDestinationSnapshot) -> some View {
+    private func destination(_ rendered: PresentedRoute) -> some View {
         if fades {
             let _ = prepareFadeDestination(rendered.id)
-            rendered.destination.id(rendered.id)
+            RouteView(scope: rendered.scope, nativePresentation: lifetime).id(rendered.id)
                 .environment(\.routerEngine, router)
                 .environment(\.scenePhase, scenePhase)
-                .opacity(fade.opacity)
+                .transaction { transaction in
+                    // Animate only opacity. An ambient animation also animates the
+                    // destination's initial size and native toolbar placement.
+                    transaction.disablesAnimations = false
+                    transaction.animation = .easeInOut(duration: fade == .visible ? 0.35 : 0.25)
+                } body: { content in
+                    content.opacity(fade.opacity)
+                }
+        } else if style == .sheet {
+            RouteView(scope: rendered.scope, nativePresentation: lifetime).id(rendered.id)
+                .presentationCompactAdaptation(
+                    rendered.scope.routePresentation?.compactAdaptation == .cover ? .fullScreenCover : .none)
         } else {
-            rendered.destination.id(rendered.id)
+            RouteView(scope: rendered.scope, nativePresentation: lifetime).id(rendered.id)
         }
     }
 
@@ -191,13 +198,10 @@ struct SystemModalPresentationModifier: ViewModifier {
 
     private func synchronize() {
         let previousID = lifetime.presentation?.id
-        lifetime.synchronize(route) {
-            if let destinationBuilder { RouteDestinationSnapshot(route: $0, destinationBuilder: destinationBuilder, nativePresentation: lifetime) }
-            else { RouteDestinationSnapshot(route: $0, nativePresentation: lifetime) }
-        }
+        lifetime.synchronize(route)
         if previousID != lifetime.presentation?.id { fade = .hidden }
     }
-    private func complete(_ rendered: RouteDestinationSnapshot?) {
+    private func complete(_ rendered: PresentedRoute?) {
         guard let rendered else { return }
         lifetime.completeDismissal(of: rendered.id, in: router)
         synchronize()

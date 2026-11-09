@@ -86,7 +86,7 @@ extension RouterEngine {
 private extension RouterEngine {
     func performAction<A: Action>(_ action: A, hasRerouted: Bool, origin: RouteRequestOrigin? = nil) async {
         guard let source = navigationSource(origin) else { return }
-        if let binding = source.hookBinding(for: .actionInterceptor(ObjectIdentifier(A.self)), in: spaces) {
+        if let binding = source.hookBinding(for: .actionInterceptor(ObjectIdentifier(A.self)), in: tree) {
             guard let interceptor = binding.declaration?.interceptor(for: A.self) else { return }
             log.departureDebug(.actionIntercepted(action: action, scope: source))
             await interceptor.invoke(self, action, hasRerouted, origin)

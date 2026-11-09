@@ -75,9 +75,9 @@ extension AnyRouteDeclaration {
         case .replace:
             presentationDescription = "replace"
         case .sheet:
-            presentationDescription = "sheet@\(priority)"
+            presentationDescription = "sheet"
         case let .cover(transition):
-            presentationDescription = "cover.\(transition)@\(priority)"
+            presentationDescription = "cover.\(transition)"
         }
 
         return "\(departureDebugName(for: routeType))[\(presentationDescription)]"
@@ -100,14 +100,6 @@ extension RouteScope {
 
         let branchDescription = isFlatScope ? "" : ", active=\(activeBranch.departureDebugDescription)"
         return "rootScope#\(id.departureDebugDescription)\(branchDescription)"
-    }
-
-    var branchDebugDescription: String? {
-        guard isFlatScope == false else {
-            return nil
-        }
-
-        return "[\(branchScopes.keys.map(\.departureDebugDescription).joined(separator: ", "))]"
     }
 
     private var isFlatScope: Bool {

@@ -28,7 +28,7 @@ struct AlertView: View {
     @UnwindRoute private var unwindRoute
 
     var body: some View {
-        LabModalCard("Ancestor alert", subtitle: "This high-priority fade cover was declared above login and replaces it.", symbol: "exclamationmark.bubble.fill", color: LabPalette.coral) {
+        LabModalCard("Global alert", subtitle: "This global fade cover presents above the current flow.", symbol: "exclamationmark.bubble.fill", color: LabPalette.coral) {
             Text("This is an alert!")
                 .font(.caption.weight(.semibold))
                 .accessibilityIdentifier(SampleAppAccessibility.alertText)

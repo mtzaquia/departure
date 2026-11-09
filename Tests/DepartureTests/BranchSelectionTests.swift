@@ -48,8 +48,8 @@ import Testing
         let engine = fixture()
         let selection = Selection("first")
         bind(selection, owner: RoutePresentationHostID(), in: engine)
-        engine.root.bindRoutingHost(RoutePresentationHostID(), automatic: true, environment: engine.root.sourceEnvironment)
-        engine.root.bindRoutingHost(RoutePresentationHostID(), automatic: false, environment: engine.root.sourceEnvironment)
+        engine.root.bindRoutingHost(RoutePresentationHostID(), automatic: true)
+        engine.root.bindRoutingHost(RoutePresentationHostID(), automatic: false)
         #expect(!engine.root.hasConflictingBranchSelection)
         await Router(engine: engine, scope: engine.root).branch("second").present(Second())
         #expect(selection.value == "second")
@@ -71,7 +71,7 @@ import Testing
         let engine = fixture()
         var selection = 0
         let owner = RoutePresentationHostID()
-        engine.root.bindRoutingHost(owner, automatic: false, environment: engine.root.sourceEnvironment,
+        engine.root.bindRoutingHost(owner, automatic: false,
             selection: AnyRouteBranchSelection(Binding(get: { selection }, set: { selection = $0 })))
         engine.synchronizeBranchSelection(ownedBy: owner, in: engine.root)
         await Router(engine: engine, scope: engine.root).branch("second").present(Second())
@@ -95,7 +95,7 @@ import Testing
             }
         })
         await engine.present(LoginRoute())
-        let outgoing = try #require(engine.defaultSpace.rootPath.last)
+        let outgoing = try #require(engine.tree.rootPath.last)
         let selection = Selection("first"), duplicate = Selection("first")
         let owner = RoutePresentationHostID()
         bind(selection, owner: owner, in: engine, scope: outgoing)
@@ -108,7 +108,7 @@ import Testing
         #expect(selection.value == "second")
         #expect(duplicate.value == "second")
         #expect(outgoing.activeBranch == AnyHashable("first"))
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
     }
 
     private func fixture() -> RouterEngine {
@@ -122,7 +122,7 @@ import Testing
 
     private func bind(_ selection: Selection, owner: RoutePresentationHostID, in engine: RouterEngine, scope: RouteScope? = nil) {
         let scope = scope ?? engine.root
-        scope.bindRoutingHost(owner, automatic: false, environment: scope.sourceEnvironment,
+        scope.bindRoutingHost(owner, automatic: false,
             selection: AnyRouteBranchSelection(Binding(get: { selection.value }, set: { selection.value = $0 })))
         engine.synchronizeBranchSelection(ownedBy: owner, in: scope)
     }

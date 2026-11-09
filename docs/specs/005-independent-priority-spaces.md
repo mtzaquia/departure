@@ -1,5 +1,7 @@
 # Independent priority spaces
 
+Historical contract: [specification 11](011-global-routes.md) supersedes priority spaces and detached window hosting with global maps and consumer-owned dismissal rules.
+
 Status: Implemented. Automated and functional native checks passed; animation-frame verification is limited by recording. The accepted rules below supersede the corresponding cross-priority behavior in specification 3.
 
 ## Accepted rules

@@ -37,10 +37,9 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
     let children: [RouteScopeDeclaration]
     let childScope: RouteDefinitions?
     let destination: AnyRouteDestination?
+    let isGlobal: Bool
 
     init(_ route: any Route.Type, presentation: RoutePresentation, id: AnyHashable? = nil, children: [RouteScopeDeclaration] = []) {
-        precondition(presentation.style.isModal || presentation.priority == .default,
-                     "Only modal declarations can start a priority space.")
         identity = UUID()
         routeType = route
         self.presentation = presentation
@@ -48,9 +47,10 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
         self.children = children
         childScope = nil
         destination = nil
+        isGlobal = false
     }
 
-    private init(copy: Self, destination: AnyRouteDestination?, presentation: RoutePresentation? = nil, identity: UUID? = nil, childScope: RouteDefinitions? = nil) {
+    private init(copy: Self, destination: AnyRouteDestination?, presentation: RoutePresentation? = nil, identity: UUID? = nil, childScope: RouteDefinitions? = nil, isGlobal: Bool? = nil) {
         self.identity = identity ?? copy.identity
         routeType = copy.routeType
         self.presentation = presentation ?? copy.presentation
@@ -58,6 +58,7 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
         children = copy.children
         self.childScope = childScope ?? copy.childScope
         self.destination = destination
+        self.isGlobal = isGlobal ?? copy.isGlobal
     }
 
     func compiled(destinations: RouteDestinationBindings) -> Self {
@@ -65,32 +66,18 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
              identity: UUID(), childScope: RouteDefinitions(children, id: scopeID, destinations: destinations))
     }
 
-    func withPriority(_ priority: RoutePriority) -> Self {
-        precondition(presentation.style.isModal || priority == .default,
-                     "Root priority builders accept only modal presentations.")
-        return Self(copy: self, destination: destination, presentation: .init(style: presentation.style, priority: priority))
+    func globallyAvailable() -> Self {
+        Self(copy: self, destination: destination, isGlobal: true)
     }
 
     public var _routeDeclarations: [AnyRouteDeclaration] { [self] }
     public static func == (lhs: Self, rhs: Self) -> Bool { lhs.identity == rhs.identity }
     public nonisolated func hash(into hasher: inout Hasher) { hasher.combine(identity) }
 
-    var priority: RoutePriority { presentation.priority }
     var presentationKind: RoutePresentationKind { presentation.style }
 }
 
 typealias RoutePresentationKind = RoutePresentation.Style
-
-/// Priority of a presentation. Elevated presentations are anchored at the routing root.
-public enum RoutePriority: Int, Comparable, Hashable, Sendable {
-    /// The permanent application flow, covered while an elevated space exists.
-    case `default`
-    /// A modal space presented above the default flow.
-    case high
-    /// The highest-priority modal space.
-    case critical
-    public nonisolated static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
-}
 
 /// A declaration group in a map. Branch groups preserve their own child definitions.
 public struct RouteScopeDeclaration: Sendable, Hashable {
@@ -98,6 +85,7 @@ public struct RouteScopeDeclaration: Sendable, Hashable {
         case scopeID(AnyHashable)
         case routes([AnyRouteDeclaration])
         case destinations([AnyRouteDestination])
+        case globals([RouteScopeDeclaration])
         case branch(AnyHashable, children: [RouteScopeDeclaration])
         case branches(concurrent: Bool, children: [RouteScopeDeclaration])
     }
@@ -122,19 +110,11 @@ public struct RouteScopeDeclaration: Sendable, Hashable {
     init(branches: [RouteScopeDeclaration], concurrent: Bool) {
         content = .branches(concurrent: concurrent, children: branches)
     }
+    init(globals: [RouteScopeDeclaration]) { content = .globals(globals) }
     init(scopeID: AnyHashable) {
         content = .scopeID(scopeID)
     }
-    func withPriority(_ priority: RoutePriority) -> Self {
-        switch content {
-        case .routes(let routes):
-            return Self(routes: routes.map { $0.withPriority(priority) })
-        case .destinations:
-            return self
-        default:
-            preconditionFailure("Root priority groups accept only modal route declarations.")
-        }
-    }
+
 }
 
 public protocol RouteDeclaration {

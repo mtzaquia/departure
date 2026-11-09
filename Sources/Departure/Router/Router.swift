@@ -22,21 +22,20 @@
 
 import SwiftUI
 
-/// A scope-bound navigation handle supplied by `WithRouter` or `RouteContext`.
-/// Stored routers retain their source identity and become inactive when that scope
-/// leaves navigation. Read ``RootRouter/default`` for external entry points or
-/// ``RootRouter/current`` to capture a source in the top space.
-/// Live scopes in that space may issue commands even when their ``RoutePhase`` is
-/// inactive. Covered or removed scopes cannot issue commands.
+/// A weak, scope-bound navigation handle supplied by the environment or RouteContext.
+/// Captured routers keep their source identity and become inactive when it leaves
+/// navigation. Read ``RootRouter/root`` for external entry points or
+/// ``RootRouter/current`` to capture the foreground. Consumers control which
+/// navigation requests and dismissals their app permits.
 public struct Router: Equatable {
     /// A policy shared by ``Router/unwind(_:)`` and ``UnwindRoute``.
     public enum UnwindTarget: Equatable {
         /// Dismisses the captured destination and its descendants.
-        /// An elevated root removes its space; the permanent default root returns `false`.
+        /// The permanent application root returns `false`.
         case current
 
         /// Dismisses the nearest enclosing sheet or cover, including its pushed descendants.
-        /// Includes the current destination and stays within its priority space.
+        /// Includes the current destination and stays within the navigation tree.
         case nearestModal
 
     }
@@ -61,7 +60,7 @@ public struct Router: Equatable {
     static let inactive = Router(engine: nil, origin: nil)
 
     /// Returns a router targeting a named branch of the nearest enclosing container.
-    /// External callers can capture a default flow router through ``RootRouter/default``.
+    /// External callers can capture an application-root router through ``RootRouter/root``.
     ///
     /// Obtaining the router does not activate the branch. A presentation owned by
     /// the branch activates it through the container's selection binding. A missing
@@ -74,13 +73,13 @@ public struct Router: Equatable {
     public func branch<ID: Hashable & Sendable>(_ id: ID) -> Router {
         guard let engine else { return .inactive }
         let source = origin ?? RouteRequestOrigin(scope: engine.currentRouteScope)
-        guard let target = source.targeting(AnyHashable(id), in: engine.spaces) else {
+        guard let target = source.targeting(AnyHashable(id), in: engine.tree) else {
             return .inactive
         }
         return Router(engine: engine, origin: target)
     }
 
-    /// Resolves and presents a route from this router's scope, within its priority space.
+    /// Resolves and presents a route from this router's scope, within the navigation tree.
     ///
     /// Returns after the destination is inserted or reused in routing state, or the
     /// request is dropped, superseded or cancelled. Any required parent-host staging completes
@@ -92,19 +91,19 @@ public struct Router: Equatable {
     /// is retained; callers superseded before admission return without resolving.
     /// Resolution continues in each caller's own task.
     /// During an unfinished navigation operation, the latest presentation attempt
-    /// from a live scope waits for completion. Coverage is checked when it resumes;
-    /// a surviving higher-priority space causes the request to be dropped.
+    /// from a live scope waits for completion. Source lifetime and declaration
+    /// eligibility are checked again when the request resumes.
     /// - Parameter route: The route to resolve and present.
     public func present(_ route: any Route) async {
         guard let engine else { return }
         await engine.requestRouteWhenReady(route, origin: origin)
     }
 
-    /// Applies an unwind policy from this router's captured scope within its priority space.
+    /// Applies an unwind policy from this router's captured scope within the navigation tree.
     ///
     /// Waits for this unwind's native teardown. A buffered presentation waits for all
     /// ongoing unwinds, then continues in its own caller without delaying this return.
-    /// - Returns: Whether the request was accepted for a live scope in the top space.
+    /// - Returns: Whether the request was accepted for a live scope.
     @discardableResult
     public func unwind(_ target: UnwindTarget) async -> Bool {
         guard let engine else { return false }
@@ -113,7 +112,7 @@ public struct Router: Equatable {
 
     /// Unwinds from this router's scope, and delivers a payload to a matching handler.
     /// Waits for this unwind's native teardown, independently of any buffered presentation.
-    /// - Returns: Whether the request was accepted for a live scope in the top space.
+    /// - Returns: Whether the request was accepted for a live scope.
     @discardableResult
     public func unwind<Payload>(_ target: UnwindTarget, payload: Payload) async -> Bool {
         guard let engine else { return false }
@@ -121,7 +120,7 @@ public struct Router: Equatable {
     }
 
     /// Dismisses the nearest live occurrence of an exact route type and its descendants.
-    /// Lookup includes the current destination and stays within its priority space.
+    /// Lookup includes the current destination and stays within the navigation tree.
     /// - Parameter route: The exact route type whose nearest occurrence should be dismissed.
     /// - Returns: Whether a matching scope was found and dismissed, after native teardown.
     @discardableResult
@@ -141,43 +140,34 @@ public struct Router: Equatable {
         return await engine.unwindAndWait(.routeType(route), payload: payload, origin: origin)
     }
 
-    /// Resets navigation in this router's priority space, retaining its root and outer presentation.
+    /// Resets navigation in the navigation tree, retaining the application root.
     ///
-    /// The captured source must be live in the top space. Waits for native teardown
+    /// The captured source must be live. Waits for native teardown
     /// and uses the source route for matching unwind-handler delivery.
-    /// Use ``dismissSpace()`` to remove the entire elevated space.
-    /// - Returns: Whether the reset was accepted. An empty space, removed source,
-    ///   or covered space returns `false`.
+    /// - Returns: Whether the reset was accepted. An empty tree or removed source returns `false`.
     @discardableResult
     public func resetToRoot() async -> Bool {
         guard let engine else { return false }
         return await engine.resetToRoot(origin: origin)
     }
 
-    /// Resets this priority space to its root and delivers a payload to a matching ``UnwindHandler``.
+    /// Resets the navigation tree to its root and delivers a payload to a matching ``UnwindHandler``.
     ///
-    /// Retains the root and its outer presentation, and waits for native teardown.
-    /// The captured source must remain live in the top space until commit.
+    /// Retains the application root, and waits for native teardown.
+    /// The captured source must remain live until commit.
     /// - Parameter payload: The value delivered for the requesting source route.
-    /// - Returns: Whether the reset was accepted. An empty space, removed source, or covered space returns `false`.
+    /// - Returns: Whether the reset was accepted. An empty tree or removed source returns `false`.
     @discardableResult
     public func resetToRoot<Payload>(payload: Payload) async -> Bool {
         guard let engine else { return false }
         return await engine.resetToRoot(payload: payload, origin: origin)
     }
 
-    /// Performs an action from this router's scope, within its priority space.
-    /// Covered or removed scopes reject dispatch, including their interceptors.
+    /// Performs an action from this router's scope, within the navigation tree.
+    /// Removed scopes reject dispatch, including their interceptors.
     public func perform(_ action: any Action) async {
         guard let engine else { return }
         await engine.performAction(action, origin: origin)
-    }
-
-    /// Removes this router's entire elevated space. Only the top space can request it.
-    @discardableResult
-    public func dismissSpace() async -> Bool {
-        guard let engine, let source = engine.navigationSource(origin), let space = source.space else { return false }
-        return await engine.dismissSpace(space, source: source)
     }
 
     public static func == (lhs: Router, rhs: Router) -> Bool {
@@ -197,7 +187,7 @@ final class RouteRequestOrigin: Equatable {
         self.branches = branches
     }
 
-    func targeting(_ branch: AnyHashable, in forest: RouteSpaces?) -> RouteRequestOrigin? {
+    func targeting(_ branch: AnyHashable, in forest: RouteTree?) -> RouteRequestOrigin? {
         guard let scope, let forest, forest.routePath(containing: scope) != nil else { return nil }
         if branches.isEmpty {
             guard let owner = scope.ancestry.first(where: { $0.branchContainer != nil }) else { return nil }
@@ -212,7 +202,7 @@ final class RouteRequestOrigin: Equatable {
 }
 
 extension RouteRequestOrigin {
-    func resolve(in forest: RouteSpaces) -> RouteScope? {
+    func resolve(in forest: RouteTree) -> RouteScope? {
         guard let scope, forest.routePath(containing: scope) != nil else { return nil }
         guard branches.isEmpty == false else { return scope }
 

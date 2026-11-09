@@ -91,7 +91,7 @@ struct ViewLifecycleBridgeTests {
         engine.hostDidAttach(engine.root, view: old, id: old.id)
         let handler: @MainActor (ViewLifecycleBridge.LifecycleView?, UUID, ViewLifecycleBridge.Event) -> Void = { view, id, event in
             attachment.handle(event, id: id, target: engine.root, view: view,
-                apply: { $0.bindRoutingHost(hostID, automatic: false, environment: $0.sourceEnvironment) },
+                apply: { $0.bindRoutingHost(hostID, automatic: false) },
                 remove: { $0.unbindRoutingHost(hostID) })
         }
         delivery.deliver(.installedInWindow(isInitial: true), for: old, handler: handler)

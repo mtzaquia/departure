@@ -31,72 +31,83 @@ struct StartView: View {
         ZStack {
             LabBackground()
 
-            VStack(spacing: 24) {
-                Spacer()
+            GeometryReader { geometry in
+                ScrollView {
+                    VStack(spacing: 24) {
+                        Spacer()
 
-                ZStack {
-                    RoundedRectangle(cornerRadius: 32)
-                        .fill(LabPalette.indigo.gradient)
-                        .frame(width: 112, height: 112)
-                        .rotationEffect(.degrees(8))
-                        .shadow(color: LabPalette.indigo.opacity(0.3), radius: 24, y: 14)
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 32)
+                                .fill(LabPalette.indigo.gradient)
+                                .frame(width: 112, height: 112)
+                                .rotationEffect(.degrees(8))
+                                .shadow(color: LabPalette.indigo.opacity(0.3), radius: 24, y: 14)
 
-                    Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
-                        .font(.system(size: 46, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
+                            Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                                .font(.system(size: 46, weight: .semibold))
+                                .foregroundStyle(.white)
+                        }
 
-                VStack(spacing: 8) {
-                    Text("DEPARTURE LAB")
-                        .font(.caption.weight(.bold))
-                        .tracking(2.4)
-                        .foregroundStyle(LabPalette.indigo)
-                    Text("Every route. One cockpit.")
-                        .font(.largeTitle.bold())
-                        .multilineTextAlignment(.center)
-                    Text("Explore pushes, sheets, covers, branches, priorities, actions, and unwinds—with live routing diagnostics always in view.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 340)
-                }
+                        VStack(spacing: 8) {
+                            Text("DEPARTURE LAB")
+                                .font(.caption.weight(.bold))
+                                .tracking(2.4)
+                                .foregroundStyle(LabPalette.indigo)
+                            Text("Every route. One cockpit.")
+                                .font(.largeTitle.bold())
+                                .multilineTextAlignment(.center)
+                            Text("Explore pushes, sheets, covers, branches, globals, actions, and unwinds—with live routing diagnostics always in view.")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: 340)
+                        }
 
-                LabPanel("Live telemetry") {
-                    LabStatus(
-                        label: "Root unwind handlers",
-                        value: "Root unwind hooks: \(storage.rootUnwindHookCount)",
-                        symbol: "arrow.uturn.backward.circle.fill"
-                    )
-                    .accessibilityIdentifier(SampleAppAccessibility.rootHookStatus)
-                }
-                .frame(maxWidth: 360)
+                        LabPanel("Live telemetry") {
+                            LabStatus(
+                                label: "Root unwind handlers",
+                                value: "Root unwind hooks: \(storage.rootUnwindHookCount)",
+                                symbol: "arrow.uturn.backward.circle.fill"
+                            )
+                            .accessibilityIdentifier(SampleAppAccessibility.rootHookStatus)
+                        }
+                        .frame(maxWidth: 360)
 
-                VStack(spacing: 10) {
-                    Button("Launch route lab") {
-                        Task { await router.present(LandingRoute()) }
+                        VStack(spacing: 10) {
+                            Button("Launch route lab") {
+                                Task { await router.present(LandingRoute()) }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .controlSize(.large)
+                            .labPrimaryButton()
+                            .accessibilityIdentifier(SampleAppAccessibility.startButton)
+
+                            Button("Split-view lab", systemImage: "rectangle.split.3x1") {
+                                Task { await router.present(SplitBranchesRoute()) }
+                            }
+                            .accessibilityIdentifier(SampleAppAccessibility.splitStart)
+
+                            Button("Global routes and passcode", systemImage: "lock.shield") {
+                                Task { await router.present(GlobalRoutesLabRoute()) }
+                            }
+                            .accessibilityIdentifier("sample.globals.open-lab")
+
+                            Button("About this sample", systemImage: "info.circle") {
+                                Task { await router.present(StartInfoRoute()) }
+                            }
+                            .buttonStyle(.bordered)
+                            .buttonBorderShape(.roundedRectangle(radius: 12))
+                            .accessibilityIdentifier(SampleAppAccessibility.startShowInfoButton)
+                        }
+                        .frame(maxWidth: 360)
+
+                        Spacer()
                     }
-                    .frame(maxWidth: .infinity)
-                    .controlSize(.large)
-                    .labPrimaryButton()
-                    .accessibilityIdentifier(SampleAppAccessibility.startButton)
-
-                    Button("Split-view lab", systemImage: "rectangle.split.3x1") {
-                        Task { await router.present(SplitBranchesRoute()) }
-                    }
-                    .accessibilityIdentifier(SampleAppAccessibility.splitStart)
-
-                    Button("About this sample", systemImage: "info.circle") {
-                        Task { await router.present(StartInfoRoute()) }
-                    }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.roundedRectangle(radius: 12))
-                    .accessibilityIdentifier(SampleAppAccessibility.startShowInfoButton)
+                    .padding(24)
+                    .frame(minHeight: geometry.size.height)
                 }
-                .frame(maxWidth: 360)
-
-                Spacer()
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .padding(24)
         }
         .routing()
         .hooks {
@@ -125,10 +136,13 @@ struct StartInfoView: View {
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier(SampleAppAccessibility.startInfoText)
 
-                Text("Presentation: \(String(describing: presentation.style)) · Priority: \(String(describing: presentation.priority))")
+                Text("Presentation: \(String(describing: presentation.style)) · Global: \(String(describing: presentation.isGlobal))")
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier(SampleAppAccessibility.startInfoPresentation)
+
+                Text("Compact adaptation: \(String(describing: presentation.compactAdaptation))")
+                    .font(.caption)
 
                 Button("Done") { Task { await unwindRoute() } }
                     .frame(maxWidth: .infinity)

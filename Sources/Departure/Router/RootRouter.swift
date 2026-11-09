@@ -27,28 +27,9 @@ public struct RootRouter {
     public init() { engine = RouterEngine() }
     init(engine: RouterEngine) { self.engine = engine }
 
-    /// Captures the current scope of the top space for ordinary navigation.
+    /// Captures the current foreground scope for ordinary navigation.
     public var current: Router { Router(engine: engine, scope: engine.currentRouteScope) }
 
-    /// Captures the current scope of the default flow for external entry points.
-    ///
-    /// Use this handle for deep links and notifications. Presentations, unwinds,
-    /// and action dispatch are rejected while a high or critical space covers it.
-    /// Presentations attempted during an unfinished navigation operation wait
-    /// and check coverage when they resume.
-    /// The captured router becomes inactive if its exact scope leaves navigation.
-    public var `default`: Router { Router(engine: engine, scope: engine.defaultSpace.currentRouteScope) }
-
-    /// Removes the captured elevated space, including a covered space, and awaits native teardown.
-    @discardableResult
-    public func dismissSpace(_ priority: RoutePriority) async -> Bool {
-        guard let space = engine.spaces.space(for: priority) else { return false }
-        return await engine.dismissSpace(space)
-    }
-
-    /// Removes all elevated spaces present when this operation is accepted.
-    @discardableResult
-    public func dismissSpaces() async -> Bool {
-        await engine.dismissSpaces(engine.spaces.allSpaces.filter { $0.priority != .default })
-    }
+    /// Captures the permanent application root for external navigation.
+    public var root: Router { Router(engine: engine, scope: engine.root) }
 }

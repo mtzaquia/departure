@@ -11,7 +11,7 @@ import Testing
         #expect(ancestor == UnwindRouteAction(router: engine, routeScope: parent))
         #expect(local != ancestor)
         #expect(await ancestor())
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
         #expect(!(await local()))
     }
 
@@ -25,17 +25,17 @@ import Testing
             testDestination(HomeDetailRoute.self)
         })
         await engine.present(NumberedRoute(number: 1))
-        let outer = try #require(engine.defaultSpace.rootPath.last)
+        let outer = try #require(engine.tree.rootPath.last)
         await Router(engine: engine, scope: outer).present(NumberedRoute(number: 2))
-        let inner = try #require(engine.defaultSpace.rootPath.last)
+        let inner = try #require(engine.tree.rootPath.last)
         #expect(engine.unwindRouteAction(from: inner, selection: .routeType(NumberedRoute.self))
             == UnwindRouteAction(router: engine, routeScope: inner))
         await Router(engine: engine, scope: inner).present(HomeDetailRoute())
-        let leaf = try #require(engine.defaultSpace.rootPath.last)
+        let leaf = try #require(engine.tree.rootPath.last)
         let action = engine.unwindRouteAction(from: leaf, selection: .routeType(NumberedRoute.self))
         #expect(action == UnwindRouteAction(router: engine, routeScope: inner))
         #expect(await action())
-        #expect(engine.defaultSpace.rootPath.last === outer)
+        #expect(engine.tree.rootPath.last === outer)
     }
 
     @Test func missingAndRemovedReadersNeverFallBack() async throws {
@@ -43,12 +43,12 @@ import Testing
         let missing = engine.unwindRouteAction(from: leaf, selection: .routeType(MessageRoute.self))
         #expect(!(await missing()))
         #expect(!(await missing(payload: "ignored")))
-        #expect(engine.defaultSpace.rootPath.last === leaf)
+        #expect(engine.tree.rootPath.last === leaf)
         #expect(!(await engine.unwindRouteAction(from: nil)()))
         #expect(await UnwindRouteAction(router: engine, routeScope: leaf)())
         let removed = engine.unwindRouteAction(from: leaf, selection: .routeType(SettingsRoute.self))
         #expect(!(await removed()))
-        #expect(engine.defaultSpace.rootPath.scopes.contains { $0 === parent })
+        #expect(engine.tree.rootPath.scopes.contains { $0 === parent })
     }
 
     @Test func retainedAncestorActionNeverRetargetsAReplacementInstance() async throws {
@@ -56,10 +56,10 @@ import Testing
         let action = engine.unwindRouteAction(from: leaf, selection: .routeType(SettingsRoute.self))
         #expect(await action())
         await engine.present(SettingsRoute())
-        let replacement = try #require(engine.defaultSpace.rootPath.last)
+        let replacement = try #require(engine.tree.rootPath.last)
         #expect(replacement !== parent)
         #expect(!(await action()))
-        #expect(engine.defaultSpace.rootPath.last === replacement)
+        #expect(engine.tree.rootPath.last === replacement)
     }
 
     @Test func lookupNeverSearchesASiblingBranch() async throws {
@@ -81,34 +81,6 @@ import Testing
         #expect(engine.root.branchScopes["second"]?.path.last === second)
     }
 
-    @Test func lookupStaysInItsSpaceAndCoveredCapturesRemainScopeBound() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(SettingsRoute.self) { Push(HomeDetailRoute.self) }
-            HighPriority { Cover(MessageRoute.self) { Push(NumberedRoute.self) } }
-        } destinations: {
-            testDestination(SettingsRoute.self)
-            testDestination(HomeDetailRoute.self)
-            testDestination(MessageRoute.self)
-            testDestination(NumberedRoute.self)
-        })
-        await engine.present(SettingsRoute())
-        let parent = try #require(engine.defaultSpace.rootPath.last)
-        await Router(engine: engine, scope: parent).present(HomeDetailRoute())
-        let lower = try #require(engine.defaultSpace.rootPath.last)
-        await engine.present(MessageRoute())
-        let high = try #require(engine.spaces.highSpace)
-        await Router(engine: engine, scope: high.root).present(NumberedRoute(number: 1))
-        let upper = try #require(high.rootPath.last)
-        #expect(!(await engine.unwindRouteAction(from: upper, selection: .routeType(SettingsRoute.self))()))
-        let lowerAction = engine.unwindRouteAction(from: lower, selection: .routeType(SettingsRoute.self))
-        #expect(lowerAction == UnwindRouteAction(router: engine, routeScope: parent))
-        #expect(!(await lowerAction()))
-        #expect(await engine.unwindRouteAction(from: upper, selection: .routeType(MessageRoute.self))())
-        #expect(engine.spaces.highSpace == nil)
-        #expect(await lowerAction())
-        #expect(engine.defaultSpace.rootPath.isEmpty)
-    }
-
     @Test func ancestorActionPreservesTypedPayloadDelivery() async throws {
         let (engine, _, _, leaf) = try await flow()
         var received: String?
@@ -118,7 +90,7 @@ import Testing
         let action = engine.unwindRouteAction(from: leaf, selection: .routeType(SettingsRoute.self))
         #expect(await action(payload: "completed"))
         #expect(received == "completed")
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
     }
 
     @Test func missingTargetWarningIdentifiesRequestedType() {
@@ -168,7 +140,7 @@ import Testing
             #expect(await router.unwind(from: SettingsRoute.self))
             #expect(received == nil)
         }
-        #expect(engine.defaultSpace.rootPath.isEmpty)
+        #expect(engine.tree.rootPath.isEmpty)
         #expect(!(await router.unwind(from: SettingsRoute.self)))
     }
 
@@ -194,7 +166,7 @@ import Testing
         let router = Router(engine: engine, scope: leaf)
         #expect(await engine.unwindRouteAction(from: leaf)())
         #expect(!(await router.resetToRoot()))
-        #expect(engine.defaultSpace.rootPath.count == 2)
+        #expect(engine.tree.rootPath.count == 2)
     }
 
     @Test func missingModalNeverFallsBackToLocalDismissal() async throws {
@@ -202,34 +174,11 @@ import Testing
             Push(SettingsRoute.self)
         } destinations: { testDestination(SettingsRoute.self) })
         await engine.present(SettingsRoute())
-        let scope = try #require(engine.defaultSpace.rootPath.last)
+        let scope = try #require(engine.tree.rootPath.last)
         #expect(!(await Router(engine: engine, scope: scope).unwind(.nearestModal)))
         #expect(!(await engine.unwindRouteAction(from: scope, target: .nearestModal)()))
-        #expect(engine.defaultSpace.rootPath.last === scope)
+        #expect(engine.tree.rootPath.last === scope)
         #expect(!(await Router(engine: engine, scope: scope).unwind(from: NumberedRoute.self)))
-    }
-
-    @Test func nearestModalDoesNotCrossPrioritySpaces() async throws {
-        let engine = RouterEngine(routes: RootRouteMap {
-            Sheet(SettingsRoute.self)
-            HighPriority { Cover(MessageRoute.self) { Push(NumberedRoute.self) } }
-        } destinations: {
-            testDestination(SettingsRoute.self)
-            testDestination(MessageRoute.self)
-            testDestination(NumberedRoute.self)
-        })
-        await engine.present(SettingsRoute())
-        let lower = try #require(engine.defaultSpace.rootPath.last)
-        let action = engine.unwindRouteAction(from: lower, target: .nearestModal)
-        await engine.present(MessageRoute())
-        let high = try #require(engine.spaces.highSpace)
-        await Router(engine: engine, scope: high.root).present(NumberedRoute(number: 1))
-        let upper = try #require(high.rootPath.last)
-        #expect(!(await action()))
-        #expect(await Router(engine: engine, scope: upper).unwind(.nearestModal))
-        #expect(engine.spaces.highSpace == nil)
-        #expect(engine.defaultSpace.rootPath.last === lower)
-        #expect(await action())
     }
 
     private func policyFlow() async throws -> (RouterEngine, RouteScope) {
@@ -271,10 +220,10 @@ import Testing
             testDestination(NumberedRoute.self)
         })
         await engine.present(SettingsRoute())
-        let parent = try #require(engine.defaultSpace.rootPath.last)
+        let parent = try #require(engine.tree.rootPath.last)
         await Router(engine: engine, scope: parent).present(HomeDetailRoute())
-        let child = try #require(engine.defaultSpace.rootPath.last)
+        let child = try #require(engine.tree.rootPath.last)
         await Router(engine: engine, scope: child).present(NumberedRoute(number: 1))
-        return (engine, parent, child, try #require(engine.defaultSpace.rootPath.last))
+        return (engine, parent, child, try #require(engine.tree.rootPath.last))
     }
 }

@@ -28,18 +28,16 @@ extension RouterEngine {
         log.departureDebug(.unwindPreviousRequested)
 
         guard isNavigationEligible(sourceScope) else { return false }
-        if let space = sourceScope.space, sourceScope === space.root {
-            return await dismissSpace(space, source: sourceScope, payload: payload)
-        }
+        guard sourceScope !== root else { return false }
         guard
-            let routePath = spaces.routePath(containing: sourceScope),
+            let routePath = tree.routePath(containing: sourceScope),
             let retained = routePath.scope(before: sourceScope)
         else {
             log.departureDebug(.unwindSkippedNoRoute)
             return false
         }
 
-        let plan = RouteSpaces.UnwindPlan(retaining: [retained])
+        let plan = RouteTree.UnwindPlan(retaining: [retained])
         guard plan.removedScopes.isEmpty == false else {
             log.departureDebug(.unwindSkippedNoRoute)
             return false
@@ -62,16 +60,16 @@ extension RouterEngine {
         if await prepareReplacement(after: match) { return nil }
 
         // Preparation may remove the requesting child. Its captured presentation anchor
-        // must remain in the live top space for the accepted navigation to continue.
+        // must remain in the live navigation tree for the accepted navigation to continue.
         guard isNavigationEligible(match.presentingScope), !Task.isCancelled else { return nil }
         if let equivalent = equivalentRouteMatch(to: route, after: match) {
             guard activateBranch(for: match) else { return nil }
             return await reuseEquivalentRoute(route, at: equivalent,
-                plan: spaces.presentationUnwindPlan(after: match, retaining: equivalent))
+                plan: tree.presentationUnwindPlan(after: match, retaining: equivalent))
         }
 
         log.departureDebug(.routeAppendPreparing(route: route, match: match))
-        return await commitPresentation(route, after: match, unwinding: spaces.presentationUnwindPlan(after: match))
+        return await commitPresentation(route, after: match, unwinding: tree.presentationUnwindPlan(after: match))
     }
 
     /// Keep an inline selection's native stack until its pushed children finish popping.
@@ -79,12 +77,12 @@ extension RouterEngine {
         guard match.declaration.presentationKind == .replace,
               let replacing = routePresentation(from: match.presentingScope, matching: .replace,
                   hostedBy: match.presentationHostID)?.scope,
-              let path = spaces.routePath(containing: replacing),
+              let path = tree.routePath(containing: replacing),
               path.scopesRemoved(after: replacing).contains(where: {
                   $0.presentationDeclaration?.presentationKind == .push
               }) else { return false }
 
-        let operation = beginNavigationOperation(plan: RouteSpaces.UnwindPlan(retaining: [replacing]))
+        let operation = beginNavigationOperation(plan: RouteTree.UnwindPlan(retaining: [replacing]))
         commitNavigationOperation(operation, preservesModalPresentationBindings: false)
         await waitForNavigationOperation(operation)
         let wasSuperseded = pendingRoute != nil || bufferedPresentationRequest != nil
@@ -95,7 +93,7 @@ extension RouterEngine {
     private func commitPresentation(
         _ route: any Route,
         after match: ResolvedRouteTarget,
-        unwinding plan: RouteSpaces.UnwindPlan
+        unwinding plan: RouteTree.UnwindPlan
     ) async -> RouteScope? {
         let operation = beginNavigationOperation(plan: plan, presentation: .init(route: route, match: match))
         return await withTaskCancellationHandler {
@@ -124,14 +122,14 @@ extension RouterEngine {
 
     func appendPreparedRoute(_ operation: NavigationOperation) {
         guard let presentation = operation.presentation,
-              presentation.match.space === spaces.activeSpace else { operation.discardPresentation(); return }
+              isNavigationEligible(presentation.match.presentingScope) else { operation.discardPresentation(); return }
         let match = presentation.match
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
         guard activateBranch(for: match) else { operation.discardPresentation(); return }
         appendOrPendRoute(operation, waitsForBranchActivation: waitsForBranchActivation)
     }
 
-    func reuseEquivalentRoute(_ route: any Route, at destination: RouteScope, plan: RouteSpaces.UnwindPlan) async -> RouteScope? {
+    func reuseEquivalentRoute(_ route: any Route, at destination: RouteScope, plan: RouteTree.UnwindPlan) async -> RouteScope? {
         guard !Task.isCancelled else { return nil }
         if plan.removedScopes.isEmpty {
             if let current = destination.route { log.departureDebug(.routeNoOpEquivalent(route: route, currentRoute: current)) }
@@ -230,7 +228,8 @@ extension RouterEngine {
     }
 
     func canActivateBranch(_ branchID: AnyHashable, in scope: RouteScope) -> Bool {
-        isNavigationEligible(scope) && !scope.hasConflictingBranchSelection
+        isNavigationEligible(scope)
+            && !scope.hasConflictingBranchSelection
             && (scope.activeBranch == branchID || scope.branchSelection?.acceptsValue(branchID) != false)
     }
 
@@ -257,36 +256,6 @@ extension RouterEngine {
         }
     }
 
-    @discardableResult
-    func replaceElevatedSpace(
-        _ priority: RoutePriority,
-        with route: any Route,
-        after match: ResolvedRouteTarget,
-        origin: RouteRequestOrigin? = nil
-    ) async -> RouteScope? {
-        let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
-        guard !Task.isCancelled, navigationSource(origin) != nil else { return nil }
-        log.departureDebug(.elevatedPriorityReplacePreparing(route: route))
-
-        // Commit the incoming root before awaiting native teardown: replacement
-        // never exposes a temporary lower space or leaves a logical closing root.
-        let operation = beginNavigationOperation(plan: spaces.space(for: priority).map {
-            RouteSpaces.UnwindPlan(removing: [$0])
-        })
-        commitNavigationOperation(operation, preservesModalPresentationBindings: false)
-        let scope = RouteScope(id: AnyHashable(route.id),
-            route: route, definitions: match.declaration.childScope ?? .empty)
-        scope.attachPresentation(to: root, declaration: match.declaration, priority: priority)
-        let space = RouteSpace(priority: priority, root: scope)
-        mutateRouteGraph {
-            spaces.setElevatedSpace(space, for: priority)
-        }
-        log.departureDebug(.elevatedSpaceStarted)
-        await waitForNavigationOperation(operation)
-        finishNavigationOperation(operation)
-        return isNavigationEligible(scope) && !Task.isCancelled ? scope : nil
-    }
-
     func appendOrPendRoute(_ operation: NavigationOperation, waitsForBranchActivation: Bool = false) {
         guard let presentation = operation.presentation else { return }
         let route = presentation.route
@@ -301,11 +270,9 @@ extension RouterEngine {
         }
 
         replacePendingRoute(nil)
-        let space = match.space
-        guard space === spaces.activeSpace,
-              spaces.routePath(containing: match.presentingScope) != nil,
+        guard isNavigationEligible(match.presentingScope),
               !match.presentingScope.hasConflictingPresentationHosts,
-              match.presentingScope.definitions.routeBinding(for: match.declaration.routeType)?.declaration == match.declaration else {
+              declarationIsCurrent(match) else {
             operation.discardPresentation(); return
         }
         let appendedPath = match.presentationPath
@@ -313,7 +280,7 @@ extension RouterEngine {
             route: route, definitions: match.declaration.childScope ?? .empty)
         mutateRouteGraph {
             let declaration = match.declaration
-            scope.attachPresentation(to: match.presentingScope, declaration: declaration, priority: space.priority)
+            scope.attachPresentation(to: match.presentingScope, declaration: declaration)
             appendedPath.append(scope)
         }
         log.departureDebug(.routeAppended(route: route, path: appendedPath.departureDebugPathDescription, match: match))
@@ -332,13 +299,14 @@ extension RouterEngine {
            (!branchScope.isAvailableForPresentation || !presentation.match.presentingScope.isAvailableForPresentation) { return }
 
         guard takePendingPresentation(operation) else { return }
-        guard presentation.match.space === spaces.activeSpace else { operation.discardPresentation(); return }
+        guard isNavigationEligible(presentation.match.presentingScope) else { operation.discardPresentation(); return }
         log.departureDebug(.pendingRouteResuming(route: presentation.route))
-        applyUnwindPlan(spaces.presentationUnwindPlan(after: presentation.match))
+        let plan = tree.presentationUnwindPlan(after: presentation.match)
+        applyUnwindPlan(plan)
         appendOrPendRoute(operation)
     }
 
-    func applyUnwindPlan(_ plan: RouteSpaces.UnwindPlan) {
+    func applyUnwindPlan(_ plan: RouteTree.UnwindPlan) {
         let effects = plan.retainedScopes.map { scope in
             (scope: scope, removedCount: scope.routePath.scopesRemoved(after: scope).count)
         }
@@ -346,10 +314,6 @@ extension RouterEngine {
         mutateRouteGraph {
             for effect in effects where effect.removedCount > 0 {
                 effect.scope.routePath.keepThrough(effect.scope)
-            }
-
-            for space in plan.spacesToRemove where spaces.space(for: space.priority) === space {
-                spaces.setElevatedSpace(nil, for: space.priority)
             }
         }
 
@@ -432,8 +396,10 @@ extension RouterEngine {
 
         func permitsCommit(in router: RouterEngine) -> Bool {
             switch self {
-            case .scope(let scope): !Task.isCancelled && router.isNavigationEligible(scope)
-            case .owner: !Task.isCancelled
+            case .scope(let scope):
+                !Task.isCancelled && router.isNavigationEligible(scope)
+            case .owner:
+                !Task.isCancelled
             case .nativeOwner: true
             }
         }
@@ -460,24 +426,9 @@ extension RouterEngine {
         }
         await waitForNavigationOperation(operation)
         if logsCompletion {
-            log.departureDebug(.unwindCompleted(path: spaces.activeSpace.currentRoutePath.departureDebugPathDescription))
+            log.departureDebug(.unwindCompleted(path: tree.currentRoutePath.departureDebugPathDescription))
         }
         return true
-    }
-
-    @discardableResult
-    func dismissSpace(_ space: RouteSpace, source: RouteScope? = nil, payload: Any? = nil) async -> Bool {
-        await dismissSpaces([space], source: source, payload: payload)
-    }
-
-    @discardableResult
-    func dismissSpaces(_ candidates: [RouteSpace], source: RouteScope? = nil, payload: Any? = nil) async -> Bool {
-        let captured = candidates.filter { $0.priority != .default && spaces.space(for: $0.priority) === $0 }
-        let authority = source.map(UnwindAuthority.scope) ?? .owner
-        guard !captured.isEmpty, authority.permitsCommit(in: self) else { return false }
-        return await performPlannedUnwind(beginNavigationOperation(plan: RouteSpaces.UnwindPlan(removing: captured)),
-            notifying: captured.sorted { $0.priority > $1.priority }.map(\.root), payload: payload,
-            authority: authority)
     }
 
     /// Capture outgoing projections before cutting their owning edges in the live tree.
@@ -504,7 +455,7 @@ extension RouterEngine {
     }
 
     func outgoingPresentations(
-        for plan: RouteSpaces.UnwindPlan,
+        for plan: RouteTree.UnwindPlan,
         preservesModalPresentationBindings: Bool = true
     ) -> [PresentationKey: NavigationOperation.Outgoing] {
         // A departing modal tears down its nested NavigationStack as part of the same
@@ -523,14 +474,13 @@ extension RouterEngine {
         for path in plan.preservedPaths {
             let animatesFirstPush = !containsDepartingModal && !isDeparting(path.routePath.owner)
             for scope in path.scopes {
-                guard let host = scope.presentationOrigin, let declaration = scope.presentationDeclaration,
-                      shouldHostLocally(scope) else { continue }
+                guard let host = scope.presentationOrigin, let declaration = scope.presentationDeclaration else { continue }
                 let key = PresentationKey(host, declaration.presentationKind)
                 guard presentations[key] == nil else { continue }
                 let retainsBinding = containsDepartingModal && isDeparting(host)
                     && (!declaration.presentationKind.isModal || preservesModalPresentationBindings)
                 presentations[key] = .init(
-                    presentation: .init(scope: scope, sourceEnvironment: host.sourceEnvironment),
+                    presentation: .init(scope: scope),
                     retainsBinding: retainsBinding,
                     disablesAnimation: !containsDepartingModal && declaration.presentationKind == .push
                         && (!animatesFirstPush || scope !== path.scopes.first))
@@ -566,7 +516,7 @@ extension RouterEngine {
                     // The callback enters before the entry task resumes. Every
                     // unwind sharing this delivery waits for that same boundary.
                     started.resume()
-                    guard self.spaces.routePath(containing: match.scope) != nil else { return }
+                    guard self.tree.routePath(containing: match.scope) != nil else { return }
                     await match.handler.invoke(sourceRoute, payload, match.scope.id)
                 }
             }
@@ -578,26 +528,15 @@ extension RouterEngine {
     private func unwindHandlerBinding(
         for sourceScope: RouteScope, payload: Any?, in targetScope: RouteScope?, removing removedScopes: [RouteScope]
     ) -> DeclarationBinding<RouteScope.UnwindHandlerMatch>? {
-        guard let route = sourceScope.route, let sourceSpace = sourceScope.space,
-              spaces.routePath(containing: sourceScope) != nil else { return nil }
+        guard let route = sourceScope.route, tree.routePath(containing: sourceScope) != nil else { return nil }
         let removed = Set(removedScopes.map(ObjectIdentifier.init))
-        if let binding = targetScope?.firstUnwindHandlerBinding(for: type(of: route), payload: payload, in: spaces, excluding: removed) {
-            return binding
-        }
-        // Notification follows the nearest surviving lower space, without
-        // changing navigation ancestry or granting that space command authority.
-        for space in spaces.allSpaces.reversed()
-            where space.priority < sourceSpace.priority && !removed.contains(ObjectIdentifier(space.root)) {
-            if let binding = space.currentRouteScope.firstUnwindHandlerBinding(for: type(of: route), payload: payload, in: spaces, excluding: removed) {
-                return binding
-            }
-        }
-        return nil
+        return targetScope?.firstUnwindHandlerBinding(for: type(of: route), payload: payload,
+            in: tree, excluding: removed)
     }
 
-    func beginNavigationOperation(plan: RouteSpaces.UnwindPlan? = nil,
+    func beginNavigationOperation(plan: RouteTree.UnwindPlan? = nil,
         presentation: NavigationOperation.Presentation? = nil) -> NavigationOperation {
-        let operation = NavigationOperation(plan: plan ?? RouteSpaces.UnwindPlan(), presentation: presentation)
+        let operation = NavigationOperation(plan: plan ?? RouteTree.UnwindPlan(), presentation: presentation)
         navigationOperations.append(operation)
         return operation
     }
@@ -650,12 +589,12 @@ extension RouterEngine {
         origin: RouteRequestOrigin? = nil
     ) async -> RouteScope? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
-        // A live lower-space handler can request its follow-up before unwind commits.
-        // Coverage is evaluated after the global operation completes.
+        // A surviving ancestor's handler can request follow-up before unwind commits.
+        // Source lifetime and declaration eligibility are rechecked after the operation completes.
         guard Task.isCancelled == false, resolveRequestOrigin(origin) != nil else { return nil }
         if case .resolve = stage, isPresentationRequestInProgress || !isNavigating {
-            // Covered callers may wait through an unwind, but cannot replace an
-            // eligible caller merely because another route is resolving.
+            // Live callers may wait through an unwind; source membership is
+            // checked before acquiring presentation admission.
             guard isNavigating || navigationSource(origin) != nil else { return nil }
             guard await beginPresentationRequest(route) else { return nil }
             defer { finishPresentationRequest() }
@@ -711,7 +650,7 @@ extension RouterEngine {
         }
     }
 
-    func performPresentationDismissalUnwind(for sourceScope: RouteScope, in targetScope: RouteScope?, plan: RouteSpaces.UnwindPlan, nativeOwner: Bool = false) {
+    func performPresentationDismissalUnwind(for sourceScope: RouteScope, in targetScope: RouteScope?, plan: RouteTree.UnwindPlan) {
         guard !plan.removedScopes.isEmpty else { applyUnwindPlan(plan); return }
         let operation = beginNavigationOperation(plan: plan)
         // Without a callback, native write-back can commit in this call stack.
@@ -720,8 +659,7 @@ extension RouterEngine {
         if !hasHandler { commitNavigationOperation(operation) }
         Task { @MainActor in
             await performPlannedUnwind(operation, notifying: [sourceScope], in: targetScope,
-                authority: nativeOwner ? .nativeOwner : .scope(sourceScope),
-                logsCompletion: hasHandler && !nativeOwner)
+                authority: .nativeOwner, logsCompletion: hasHandler)
         }
     }
 
@@ -733,12 +671,12 @@ private extension RouteScope {
         let scope: RouteScope
     }
 
-    func firstUnwindHandlerBinding(for routeType: any Route.Type, payload: Any?, in spaces: RouteSpaces,
+    func firstUnwindHandlerBinding(for routeType: any Route.Type, payload: Any?, in tree: RouteTree,
                                   excluding removed: Set<ObjectIdentifier>) -> DeclarationBinding<UnwindHandlerMatch>? {
-        guard spaces.routePath(containing: self) != nil else { return nil }
+        guard tree.routePath(containing: self) != nil else { return nil }
         for currentScope in ancestry {
             if !removed.contains(ObjectIdentifier(currentScope)),
-               let binding = currentScope.unwindHandlerBinding(for: routeType, payload: payload, in: spaces) {
+               let binding = currentScope.unwindHandlerBinding(for: routeType, payload: payload, in: tree) {
                 guard let handler = binding.declaration?.unwindHandler(for: routeType) else { return .conflict }
                 return .declared(UnwindHandlerMatch(handler: handler, scope: currentScope))
             }

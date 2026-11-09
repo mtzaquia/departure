@@ -74,7 +74,7 @@ struct SaveAppearanceSettingsAction: Action {
 }
 
 extension EnvironmentValues {
-    @Entry var sampleWindowBadge: String = "not forwarded"
+    @Entry var sampleWindowBadge: String = "inherited"
     @Entry var samplePresentationSource: String = "unknown"
 }
 
@@ -88,19 +88,12 @@ struct DepartureSampleApp: App {
 
     var body: some Scene {
         WindowGroup {
-            if ProcessInfo.processInfo.arguments.contains("--detached-window-probe") {
-                DetachedWindowProbe()
+            if ProcessInfo.processInfo.arguments.contains("--scenario=global-routes") {
+                GlobalRoutesProbe()
             } else if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--push-host-probe=") }) {
                 PushHostProbe(scenario: String(argument.dropFirst("--push-host-probe=".count)))
             } else if ProcessInfo.processInfo.arguments.contains("--sheet-focus-probe") {
                 WithRouter(routes: SheetFocusProbeRoot.routes) { SheetFocusProbeRoot() }
-            } else if ProcessInfo.processInfo.arguments.contains("--independent-space-probe") {
-                WithRouter(routes: IndependentSpaceProbeMap.root(owner: router), router: router) {
-                    NavigationStack {
-                        IndependentSpaceProbeRoot()
-                            .routing()
-                    }
-                }
             } else if ProcessInfo.processInfo.arguments.contains("--nested-modal-probe") {
                 WithRouter(routes: NestedModalProbeMap.root, router: router) {
                     NavigationStack {
@@ -118,11 +111,7 @@ struct DepartureSampleApp: App {
                     NavigationStack {
                         StartView().modifier(SampleRoutingContext())
                     }
-                    .environment(\.sampleWindowBadge, "forwarded from app window")
-                } windowDestination: { destination, environment in
-                    destination
-                        .environment(\.sampleWindowBadge, environment.sampleWindowBadge)
-                        .environment(\.samplePresentationSource, environment.samplePresentationSource)
+                    .environment(\.sampleWindowBadge, "inherited from app hierarchy")
                 }
                 .onOpenURL { url in
                     guard let link = SampleDeepLink(url: url) else {

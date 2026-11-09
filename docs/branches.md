@@ -94,4 +94,4 @@ A sheet or cover in one branch replaces another modal in the same lane. Modals a
 
 The [split-view sample](../SampleApp/SampleApp/Views/SplitBranchesView.swift) exercises targeted pushes, replacement selections, and detail-owned covers.
 
-Next: [Priority](priority.md)
+Next: [Global routes](global-routes.md)
