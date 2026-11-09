@@ -187,8 +187,8 @@ final class RouteRequestOrigin: Equatable {
         self.branches = branches
     }
 
-    func targeting(_ branch: AnyHashable, in forest: RouteTree?) -> RouteRequestOrigin? {
-        guard let scope, let forest, forest.routePath(containing: scope) != nil else { return nil }
+    func targeting(_ branch: AnyHashable, in tree: RouteTree?) -> RouteRequestOrigin? {
+        guard let scope, let tree, scope.belongs(to: tree) else { return nil }
         if branches.isEmpty {
             guard let owner = scope.ancestry.first(where: { $0.branchContainer != nil }) else { return nil }
             return RouteRequestOrigin(scope: owner, branches: [branch])
@@ -202,8 +202,8 @@ final class RouteRequestOrigin: Equatable {
 }
 
 extension RouteRequestOrigin {
-    func resolve(in forest: RouteTree) -> RouteScope? {
-        guard let scope, forest.routePath(containing: scope) != nil else { return nil }
+    func resolve(in tree: RouteTree) -> RouteScope? {
+        guard let scope, scope.belongs(to: tree) else { return nil }
         guard branches.isEmpty == false else { return scope }
 
         // Branch handles already capture their container at creation. Losing

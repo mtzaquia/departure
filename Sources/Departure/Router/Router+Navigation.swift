@@ -27,11 +27,10 @@ extension RouterEngine {
     func unwindPrevious(from sourceScope: RouteScope, payload: Any? = nil) async -> Bool {
         log.departureDebug(.unwindPreviousRequested)
 
-        guard isNavigationEligible(sourceScope) else { return false }
+        guard sourceScope.belongs(to: tree) else { return false }
         guard sourceScope !== root else { return false }
         guard
-            let routePath = tree.routePath(containing: sourceScope),
-            let retained = routePath.scope(before: sourceScope)
+            let retained = sourceScope.routePath.scope(before: sourceScope)
         else {
             log.departureDebug(.unwindSkippedNoRoute)
             return false
@@ -49,8 +48,7 @@ extension RouterEngine {
         ))
 
         return await performPlannedUnwind(beginNavigationOperation(plan: plan),
-            notifying: [sourceScope], payload: payload, in: retained,
-            authority: .scope(sourceScope), logsCompletion: true)
+            notifying: sourceScope, payload: payload, in: retained, logsCompletion: true)
     }
 
     func appendRoute(_ route: any Route, after match: ResolvedRouteTarget, origin: RouteRequestOrigin? = nil) async -> RouteScope? {
@@ -61,7 +59,7 @@ extension RouterEngine {
 
         // Preparation may remove the requesting child. Its captured presentation anchor
         // must remain in the live navigation tree for the accepted navigation to continue.
-        guard isNavigationEligible(match.presentingScope), !Task.isCancelled else { return nil }
+        guard match.presentingScope.belongs(to: tree), !Task.isCancelled else { return nil }
         if let equivalent = equivalentRouteMatch(to: route, after: match) {
             guard activateBranch(for: match) else { return nil }
             return await reuseEquivalentRoute(route, at: equivalent,
@@ -122,7 +120,7 @@ extension RouterEngine {
 
     func appendPreparedRoute(_ operation: NavigationOperation) {
         guard let presentation = operation.presentation,
-              isNavigationEligible(presentation.match.presentingScope) else { operation.discardPresentation(); return }
+              presentation.match.presentingScope.belongs(to: tree) else { operation.discardPresentation(); return }
         let match = presentation.match
         let waitsForBranchActivation = waitsForBranchActivation(for: match)
         guard activateBranch(for: match) else { operation.discardPresentation(); return }
@@ -138,7 +136,7 @@ extension RouterEngine {
             commitNavigationOperation(operation, preservesModalPresentationBindings: false)
             await performPlannedUnwind(operation)
         }
-        return isNavigationEligible(destination) && !Task.isCancelled ? destination : nil
+        return destination.belongs(to: tree) && !Task.isCancelled ? destination : nil
     }
 
     func equivalentRouteMatch(
@@ -228,7 +226,7 @@ extension RouterEngine {
     }
 
     func canActivateBranch(_ branchID: AnyHashable, in scope: RouteScope) -> Bool {
-        isNavigationEligible(scope)
+        scope.belongs(to: tree)
             && !scope.hasConflictingBranchSelection
             && (scope.activeBranch == branchID || scope.branchSelection?.acceptsValue(branchID) != false)
     }
@@ -270,7 +268,7 @@ extension RouterEngine {
         }
 
         replacePendingRoute(nil)
-        guard isNavigationEligible(match.presentingScope),
+        guard match.presentingScope.belongs(to: tree),
               !match.presentingScope.hasConflictingPresentationHosts,
               declarationIsCurrent(match) else {
             operation.discardPresentation(); return
@@ -299,7 +297,7 @@ extension RouterEngine {
            (!branchScope.isAvailableForPresentation || !presentation.match.presentingScope.isAvailableForPresentation) { return }
 
         guard takePendingPresentation(operation) else { return }
-        guard isNavigationEligible(presentation.match.presentingScope) else { operation.discardPresentation(); return }
+        guard presentation.match.presentingScope.belongs(to: tree) else { operation.discardPresentation(); return }
         log.departureDebug(.pendingRouteResuming(route: presentation.route))
         let plan = tree.presentationUnwindPlan(after: presentation.match)
         applyUnwindPlan(plan)
@@ -391,37 +389,24 @@ extension RouterEngine {
         }
     }
 
-    enum UnwindAuthority {
-        case scope(RouteScope), owner, nativeOwner
-
-        func permitsCommit(in router: RouterEngine) -> Bool {
-            switch self {
-            case .scope(let scope):
-                !Task.isCancelled && router.isNavigationEligible(scope)
-            case .owner:
-                !Task.isCancelled
-            case .nativeOwner: true
-            }
-        }
-    }
-
     /// Every unwind shares notification, commit, native completion and coordinator release.
     /// Already-committed operations still complete when their requesting task is cancelled.
     @discardableResult
     func performPlannedUnwind(
         _ operation: NavigationOperation,
-        notifying sources: [RouteScope] = [],
+        notifying source: RouteScope? = nil,
         payload: Any? = nil,
         in targetScope: RouteScope? = nil,
-        authority: UnwindAuthority = .owner,
+        isNativeDismissal: Bool = false,
         logsCompletion: Bool = false
     ) async -> Bool {
         defer { finishNavigationOperation(operation) }
         if case .preparingUnwind = operation.stage {
-            for source in sources {
-                await deliverUnwindHandlers(for: source, payload: payload, in: targetScope, removing: operation.removedScopes)
-            }
-            guard authority.permitsCommit(in: self) else { return false }
+            guard let source else { return false }
+            await deliverUnwindHandlers(for: source, payload: payload, in: targetScope, removing: operation.removedScopes)
+            // Native dismissal must reconcile even if the source left navigation
+            // during notification. Explicit commands still require a live caller.
+            guard isNativeDismissal || (!Task.isCancelled && source.belongs(to: tree)) else { return false }
             commitNavigationOperation(operation)
         }
         await waitForNavigationOperation(operation)
@@ -591,11 +576,8 @@ extension RouterEngine {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
         // A surviving ancestor's handler can request follow-up before unwind commits.
         // Source lifetime and declaration eligibility are rechecked after the operation completes.
-        guard Task.isCancelled == false, resolveRequestOrigin(origin) != nil else { return nil }
+        guard Task.isCancelled == false, navigationSource(origin) != nil else { return nil }
         if case .resolve = stage, isPresentationRequestInProgress || !isNavigating {
-            // Live callers may wait through an unwind; source membership is
-            // checked before acquiring presentation admission.
-            guard isNavigating || navigationSource(origin) != nil else { return nil }
             guard await beginPresentationRequest(route) else { return nil }
             defer { finishPresentationRequest() }
             return await requestRouteWhenReady(route, stage: .resolveAdmitted, origin: origin)
@@ -621,7 +603,7 @@ extension RouterEngine {
                     // A wake-up does not claim the slot. A newer attempt may win,
                     // or another unwind may start before this caller gets its turn.
                     guard ready, !Task.isCancelled, pendingRoute?.request === request,
-                          resolveRequestOrigin(origin) != nil else { return false }
+                          navigationSource(origin) != nil else { return false }
                 } while isNavigating
                 return true
             } onCancel: {
@@ -658,8 +640,8 @@ extension RouterEngine {
         let hasHandler = unwindHandlerBinding(for: sourceScope, payload: nil, in: targetScope, removing: operation.removedScopes)?.declaration != nil
         if !hasHandler { commitNavigationOperation(operation) }
         Task { @MainActor in
-            await performPlannedUnwind(operation, notifying: [sourceScope], in: targetScope,
-                authority: .nativeOwner, logsCompletion: hasHandler)
+            await performPlannedUnwind(operation, notifying: sourceScope, in: targetScope,
+                isNativeDismissal: true, logsCompletion: hasHandler)
         }
     }
 

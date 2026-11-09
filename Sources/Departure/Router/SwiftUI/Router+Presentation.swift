@@ -81,7 +81,7 @@ extension RouterEngine {
     /// Reconciles the exact occurrence removed by its native owner. Destination views
     /// decide whether interactive dismissal is available and which routing commands to issue.
     func nativePresentationDidDismiss(_ scope: RouteScope) {
-        guard isNavigationEligible(scope), scope.presentationDeclaration?.presentationKind.isModal == true,
+        guard scope.belongs(to: tree), scope.presentationDeclaration?.presentationKind.isModal == true,
               let retained = scope.routePath.scope(before: scope) else { return }
         performPresentationDismissalUnwind(for: scope, in: retained,
             plan: RouteTree.UnwindPlan(retaining: [retained]))
@@ -89,7 +89,7 @@ extension RouterEngine {
 
     private func dismissPresentation(_ presentation: PresentedRoute) {
         let scope = presentation.scope
-        guard isNavigationEligible(scope), let declaration = scope.presentationDeclaration else { return }
+        guard scope.belongs(to: tree), let declaration = scope.presentationDeclaration else { return }
         if ios17NavigationStackPushWorkaround?.interceptDismissal(of: presentation,
             matching: declaration.presentationKind, in: self) == true { return }
         guard let retained = scope.routePath.scope(before: scope) else { return }

@@ -494,7 +494,7 @@ extension RouteScope {
 
     @discardableResult
     func waitUntilInstalled(in engine: RouterEngine? = nil) async -> Bool {
-        let eligible: (() -> Bool)? = engine.map { engine in { engine.isNavigationEligible(self) } }
+        let eligible: (() -> Bool)? = engine.map { engine in { self.belongs(to: engine.tree) } }
         return await RouteScopeReadiness.wait(in: self, while: eligible) { engine == nil ? self.isInstalledInView : self.isAvailableForPresentation }
     }
 

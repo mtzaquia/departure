@@ -50,7 +50,7 @@ import RouteDomainFixtures
             unwindRoute: UnwindRouteAction(router: engine, routeScope: scope),
             presentation: try #require(scope.routePresentation), environment: EnvironmentValues()
         )
-        _ = try #require(scope.presentation?.destination).build(try #require(scope.route), context)
+        _ = try #require(scope.presentationDeclaration?.destination).build(try #require(scope.route), context)
         #expect(recorder.number == (nested ? 42 : -42))
         #expect(recorder.context?.router == context.router)
         #expect(recorder.context?.presentation.style == (nested ? .push : .sheet))

@@ -195,14 +195,14 @@ struct NativePresentationLifetimeTests {
         var completed: Bool?
         let unwind = Task { completed = await UnwindRouteAction(router: engine, routeScope: child)() }
         defer { unwind.cancel() }
-        await waitUntil { !engine.isNavigationEligible(child) }
+        await waitUntil { !child.belongs(to: engine.tree) }
         #expect(completed == nil)
         #expect(child.isAwaitingPresentationEnd)
         #expect(lifetime.isPresented)
         engine.routeScopeDidLeaveView(child)
         await waitUntil { completed != nil }
         #expect(completed == true)
-        #expect(engine.isNavigationEligible(modal))
+        #expect(modal.belongs(to: engine.tree))
         #expect(modal.isAwaitingPresentationEnd)
         lifetime.completeDismissal(of: ObjectIdentifier(modal), in: engine)
         await waitUntil { !engine.isNavigating }
@@ -218,11 +218,11 @@ struct NativePresentationLifetimeTests {
         var childCompleted: Bool?, modalCompleted: Bool?
         let pop = Task { childCompleted = await UnwindRouteAction(router: engine, routeScope: child)() }
         defer { pop.cancel() }
-        await waitUntil { !engine.isNavigationEligible(child) }
+        await waitUntil { !child.belongs(to: engine.tree) }
         #expect(childCompleted == nil)
         let dismiss = Task { modalCompleted = await UnwindRouteAction(router: engine, routeScope: modal)() }
         defer { dismiss.cancel() }
-        await waitUntil { !engine.isNavigationEligible(modal) }
+        await waitUntil { !modal.belongs(to: engine.tree) }
         #expect(childCompleted == nil)
         #expect(modalCompleted == nil)
         lifetime.synchronize(nil)

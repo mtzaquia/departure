@@ -22,9 +22,9 @@ import Testing
         #expect(engine.routePhase(for: home) == .inactive)
         #expect(engine.routePhase(for: wallet) == .inactive)
         #expect(engine.routePhase(for: engine.root) == .inactive)
-        #expect(engine.isNavigationEligible(engine.root))
-        #expect(engine.isNavigationEligible(home))
-        #expect(engine.isNavigationEligible(wallet))
+        #expect(engine.root.belongs(to: engine.tree))
+        #expect(home.belongs(to: engine.tree))
+        #expect(wallet.belongs(to: engine.tree))
         #expect(!wallet.isInstalledInView)
 
         await Router(engine: engine, scope: engine.root).branch(AppTab.wallet).present(SettingsRoute())
@@ -67,11 +67,11 @@ import Testing
         #expect(modal.route is LoginRoute)
         for scope in [home, wallet] {
             #expect(engine.routePhase(for: scope) == .inactive)
-            #expect(engine.isNavigationEligible(scope))
+            #expect(scope.belongs(to: engine.tree))
         }
         for scope in modal.branchScopes.values {
             #expect(engine.routePhase(for: scope) == .active)
-            #expect(engine.isNavigationEligible(scope))
+            #expect(scope.belongs(to: engine.tree))
         }
     }
 }

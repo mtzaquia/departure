@@ -203,11 +203,11 @@ extension RouteTree {
 
     func firstDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin? = nil) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
         let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
-        if let originScope = origin.resolve(in: self) {
-            for source in originScope.ancestry {
-                guard routePath(containing: source) != nil else { break }
-                if let binding = resolveDefinitions(at: source, includingBranches: origin.branches.isEmpty) { return binding }
-            }
+        guard let originScope = origin.resolve(in: self) else { return nil }
+        // A live scope's ancestors and owned branches stay live throughout this
+        // synchronous lookup; no additional membership checks are needed here.
+        for source in originScope.ancestry {
+            if let binding = resolveDefinitions(at: source, includingBranches: origin.branches.isEmpty) { return binding }
         }
         return nil
 
@@ -217,7 +217,7 @@ extension RouteTree {
             let selectedRoot = source.branchScopes[source.activeBranch]
             let selectedDestination = includingBranches ? selectedRoot?.activeLocalScope : nil
             let locations = [selectedDestination !== selectedRoot ? selectedDestination : nil, source].compactMap { $0 }
-            for location in locations where location.tree != nil {
+            for location in locations {
                 let owners = includingBranches && location.branchContainer != nil
                     ? [location.branchScopes[location.activeBranch], location].compactMap { $0 }
                         + location.branchScopes.keys.filter { $0 != location.activeBranch }.compactMap { location.branchScopes[$0] }

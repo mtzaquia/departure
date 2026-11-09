@@ -23,11 +23,9 @@
 final class RouteScopePresentation {
     weak var origin: RouteScope?
     let declaration: AnyRouteDeclaration
-    let destination: AnyRouteDestination?
 
     init(origin: RouteScope, declaration: AnyRouteDeclaration) {
         self.origin = origin
         self.declaration = declaration
-        destination = declaration.destination
     }
 }
