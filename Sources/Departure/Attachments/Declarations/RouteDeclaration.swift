@@ -74,7 +74,7 @@ public struct AnyRouteDeclaration: Sendable, Hashable, RouteDeclaration {
     public static func == (lhs: Self, rhs: Self) -> Bool { lhs.identity == rhs.identity }
     public nonisolated func hash(into hasher: inout Hasher) { hasher.combine(identity) }
 
-    var presentationKind: RoutePresentationKind { presentation.style }
+    var presentationKind: RoutePresentationKind { presentation.declaredStyle }
 }
 
 typealias RoutePresentationKind = RoutePresentation.Style

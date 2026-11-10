@@ -43,7 +43,7 @@ extension RouterEngine {
         case .policy(.current):
             return source
         case .policy(.nearestModal):
-            guard let modal = ancestry.first(where: { $0.routePresentation?.style.isModal == true }) else { return nil }
+            guard let modal = ancestry.first(where: { $0.routePresentation?.declaredStyle.isModal == true }) else { return nil }
             return modal
         case let .routeType(type):
             guard let match = ancestry.first(where: {

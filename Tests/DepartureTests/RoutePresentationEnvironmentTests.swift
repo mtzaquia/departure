@@ -51,22 +51,27 @@ struct RoutePresentationEnvironmentTests {
             }
         } destinations: {
             RouteDestination(PresentationSheetRoute.self) { _, context in
+                let _ = #expect(context.presentation == context.environment.routePresentation)
                 NavigationStack {
-                    PresentationReader(name: "sheet", recorder: recorder, context: context.environment.routePresentation)
+                    PresentationReader(name: "sheet", recorder: recorder, context: context.presentation)
                         .routing()
                 }
             }
             RouteDestination(PresentationFirstRoute.self) { _, context in
-                PresentationReader(name: "first", recorder: recorder, context: context.environment.routePresentation)
+                let _ = #expect(context.presentation == context.environment.routePresentation)
+                PresentationReader(name: "first", recorder: recorder, context: context.presentation)
             }
             RouteDestination(PresentationSecondRoute.self) { _, context in
-                PresentationReader(name: "second", recorder: recorder, context: context.environment.routePresentation)
+                let _ = #expect(context.presentation == context.environment.routePresentation)
+                PresentationReader(name: "second", recorder: recorder, context: context.presentation)
             }
             RouteDestination(PresentationCoverRoute.self) { _, context in
-                PresentationReader(name: "cover", recorder: recorder, context: context.environment.routePresentation)
+                let _ = #expect(context.presentation == context.environment.routePresentation)
+                PresentationReader(name: "cover", recorder: recorder, context: context.presentation)
             }
             RouteDestination(PresentationReplacementRoute.self) { _, context in
-                PresentationReader(name: "replacement", recorder: recorder, context: context.environment.routePresentation)
+                let _ = #expect(context.presentation == context.environment.routePresentation)
+                PresentationReader(name: "replacement", recorder: recorder, context: context.presentation)
             }
         }
         let root = WithRouter(routes: routes, router: owner) {
@@ -151,9 +156,9 @@ private struct PresentationReplacementRoute: Route {}
     var contexts: [String: RoutePresentationState] = [:]
 
     func matches(_ name: String, style: RoutePresentation.Style, withinSheet: Bool, global: Bool = false) -> Bool {
-        let expected = RoutePresentationState(effectivePresentationStyle: style,
-                                              isWithinSheetRoute: withinSheet, isGlobalRoute: global)
-        return views[name] == expected && contexts[name] == expected
+        guard let view = views[name], let context = contexts[name] else { return false }
+        return view == context && view.effectivePresentationStyle == style
+            && view.isWithinSheetRoute == withinSheet && view.isGlobalRoute == global
     }
 }
 
