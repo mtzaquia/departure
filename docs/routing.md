@@ -104,7 +104,7 @@ Sheet(SettingsRoute.self, compactAdaptation: .cover) {
 }
 ```
 
-The default is `.none`, keeping sheet presentation in compact size classes. `.cover` uses the system's slide-up presentation with no transition parameter. Adaptation follows either compact size class, including compact iPad windows; it does not inspect the device type or change the route tree. `context.presentation.style` remains `.sheet`, and `context.presentation.compactAdaptation` reports the declared option. Local and global sheets use the same behavior.
+The default is `.none`, keeping sheet presentation in compact size classes. `.cover` uses the system's slide-up presentation with no transition parameter. Adaptation follows either of the presenter's compact size classes, including compact iPad windows; it does not inspect the device type or change the route tree. The `routePresentation` environment value reports `.cover(.slide)` while adapted and updates as size classes change. Local and global sheets use the same behavior.
 
 Reusable `RouteMap` values compose in ordinary builders. `ModalRouteMap` composes sheets and covers and can supply destination builders. A root-only `GlobalMap` accepts modal declarations and modal maps; its entries' children accept ordinary declarations and maps. Global entries are available from every live scope. See [global routes](global-routes.md).
 
@@ -136,12 +136,37 @@ RouteDestination(EditorRoute.self) { route, context in
   EditorView(
     documentID: route.documentID,
     close: context.unwindRoute,
-    presentation: context.presentation
+    presentation: context.environment.routePresentation
   )
 }
 ```
 
-`context.router` and `context.unwindRoute` belong to this destination's scope. `context.presentation.style` reports push, replace, sheet, or cover; `.isGlobal` identifies a global occurrence and `.compactAdaptation` reports the sheet adaptation option. `context.environment` contains the values supplied to the destination and refreshes when they change. The builder can choose wrapping content directly using that context.
+`context.router` and `context.unwindRoute` belong to this destination's scope. `context.environment` contains the values supplied to the destination and refreshes when they change. The builder can choose wrapping content directly using that context. `RouteContext.presentation` is deprecated; use `context.environment.routePresentation` for current presentation state.
+
+## Read live presentation state
+
+Departure automatically supplies `routePresentation` to each destination and its children:
+
+```swift
+struct EditorView: View {
+  @Environment(\.routePresentation) private var presentation
+
+  var body: some View {
+    EditorContent()
+      .toolbar {
+        if presentation.isWithinSheetRoute {
+          Button("Done") { /* close the editing flow */ }
+        }
+      }
+  }
+}
+```
+
+- `effectivePresentationStyle` reports the current destination's `.push`, `.replace`, `.sheet`, or `.cover(transition)` style. A sheet adapted to a cover reports `.cover(.slide)`. On macOS, covers use native sheets and report `.sheet`.
+- `isWithinSheetRoute` follows the nearest enclosing Departure modal. Pushes, replacements, and branches inherit it. A cover, including an adapted sheet, sets it to `false`; a nested sheet sets it to `true` again.
+- `isGlobalRoute` identifies this destination occurrence. A local screen pushed inside a global sheet reads `false`.
+
+The value updates when presentation size classes change, including for screens pushed inside an adapting sheet. Read it with `@Environment` to follow updates; a stored copy is a snapshot. Outside Departure destinations, the style is `nil` and both flags are `false`.
 
 ## Find the nearest eligible declaration
 

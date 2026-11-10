@@ -140,6 +140,7 @@ struct RouteDestinationRenderingTests {
     @Test(arguments: Sheet.CompactAdaptation.allCases)
     func sheetCompactAdaptationChangesOnlyNativePresentation(adaptation: Sheet.CompactAdaptation) async throws {
         let router = RootRouter()
+        let recorder = RenderedDestinationRecorder()
         let routes = RootRouteMap {
             Sheet(DomainOnlyRoute.self, compactAdaptation: adaptation)
         } destinations: {
@@ -147,9 +148,8 @@ struct RouteDestinationRenderingTests {
                 NavigationStack {
                     Text("Adaptive sheet").navigationTitle("Adaptation")
                 }
-                .onAppear {
-                    #expect(context.presentation.style == .sheet)
-                    #expect(context.presentation.compactAdaptation == adaptation)
+                .onChange(of: context.environment.routePresentation, initial: true) { _, presentation in
+                    recorder.presentation = presentation
                 }
             }
         }
@@ -165,6 +165,10 @@ struct RouteDestinationRenderingTests {
         let frame = controller.view.convert(controller.view.bounds, to: window)
         let compact = window.traitCollection.horizontalSizeClass == .compact
             || window.traitCollection.verticalSizeClass == .compact
+        let presentation = try #require(recorder.presentation)
+        #expect(presentation.effectivePresentationStyle == (adaptation == .cover && compact ? .cover(.slide) : .sheet))
+        #expect(presentation.isWithinSheetRoute == !(adaptation == .cover && compact))
+        #expect(!presentation.isGlobalRoute)
         if adaptation == .cover && compact {
             #expect(abs(frame.minY - window.bounds.minY) < 1)
             #expect(abs(frame.height - window.bounds.height) < 1)
@@ -280,6 +284,7 @@ private extension NSWindow {
 @MainActor
 private final class RenderedDestinationRecorder {
     var unwindRoute: UnwindRouteAction?
+    var presentation: RoutePresentationState?
 }
 
 private struct AncestorUnwindReader: View {

@@ -40,6 +40,7 @@ struct NativePresentationStyleModifier: ViewModifier {
     let presentationHostID: RoutePresentationHostID
     @RouterEnvironment private var router
     @Environment(\.routeScope) private var routeScope
+    @Environment(\.routePresentation) private var routePresentation
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -54,7 +55,9 @@ struct NativePresentationStyleModifier: ViewModifier {
             content
                 .navigationDestination(item: presentation) {
                     // The stack may live outside WithRouter's environment.
-                    RouteView(scope: $0.scope).environment(\.routerEngine, router)
+                    RouteView(scope: $0.scope)
+                        .environment(\.routerEngine, router)
+                        .environment(\.routePresentation, routePresentation)
                 }
                 .transaction { transaction in
                     if disablesDismissalAnimations { transaction.disablesAnimations = true }
@@ -73,6 +76,10 @@ struct SystemModalPresentationModifier: ViewModifier {
     @Binding var route: PresentedRoute?
     @RouterEnvironment private var router
     @Environment(\.scenePhase) private var scenePhase
+    #if canImport(UIKit)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    #endif
     @State private var lifetime = NativePresentationLifetime()
     @State private var fade: Fade = .hidden
 
@@ -159,7 +166,7 @@ struct SystemModalPresentationModifier: ViewModifier {
     private func destination(_ rendered: PresentedRoute) -> some View {
         if fades {
             let _ = prepareFadeDestination(rendered.id)
-            RouteView(scope: rendered.scope, nativePresentation: lifetime).id(rendered.id)
+            routeView(rendered)
                 .environment(\.routerEngine, router)
                 .environment(\.scenePhase, scenePhase)
                 .transaction { transaction in
@@ -171,12 +178,24 @@ struct SystemModalPresentationModifier: ViewModifier {
                     content.opacity(fade.opacity)
                 }
         } else if style == .sheet {
-            RouteView(scope: rendered.scope, nativePresentation: lifetime).id(rendered.id)
+            routeView(rendered)
                 .presentationCompactAdaptation(
                     rendered.scope.routePresentation?.compactAdaptation == .cover ? .fullScreenCover : .none)
         } else {
-            RouteView(scope: rendered.scope, nativePresentation: lifetime).id(rendered.id)
+            routeView(rendered)
         }
+    }
+
+    private func routeView(_ rendered: PresentedRoute) -> some View {
+        #if canImport(UIKit)
+        let compact = horizontalSizeClass == .compact || verticalSizeClass == .compact
+        #else
+        let compact = false
+        #endif
+        let effectiveStyle = rendered.scope.routePresentation?.effectiveStyle(inCompactSizeClass: compact)
+        return RouteView(scope: rendered.scope, nativePresentation: lifetime,
+                         effectivePresentationStyle: effectiveStyle)
+            .id(rendered.id)
     }
 
     private func prepareFadeDestination(_ id: PresentedRoute.ID) {

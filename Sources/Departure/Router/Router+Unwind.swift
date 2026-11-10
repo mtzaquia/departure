@@ -37,7 +37,7 @@ extension RouterEngine {
     }
 
     func resolveUnwind(_ selection: UnwindSelection, from source: RouteScope) -> RouteScope? {
-        guard isNavigationEligible(source) else { return nil }
+        guard source.belongs(to: tree) else { return nil }
         let ancestry = source.ancestry
         switch selection {
         case .policy(.current):
@@ -94,7 +94,7 @@ extension RouterEngine {
             return false
         }
         log.departureDebug(.unwindAccepted(keepThrough: target, removing: plan.removedScopes.count))
-        return await performPlannedUnwind(beginNavigationOperation(plan: plan), notifying: [source],
-            payload: payload, in: target, authority: .scope(source), logsCompletion: true)
+        return await performPlannedUnwind(beginNavigationOperation(plan: plan), notifying: source,
+            payload: payload, in: target, logsCompletion: true)
     }
 }

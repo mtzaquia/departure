@@ -25,15 +25,25 @@ import SwiftUI
 public struct RouteView: View {
     let scope: RouteScope
     @RouterEnvironment private var router
+    @Environment(\.routePresentation) private var inheritedPresentation
+    private let effectivePresentationStyle: RoutePresentation.Style?
     private weak var nativePresentation: NativePresentationLifetime?
-    init(scope: RouteScope, nativePresentation: NativePresentationLifetime? = nil) {
+    init(scope: RouteScope, nativePresentation: NativePresentationLifetime? = nil,
+         effectivePresentationStyle: RoutePresentation.Style? = nil) {
         self.scope = scope
         self.nativePresentation = nativePresentation
+        self.effectivePresentationStyle = effectivePresentationStyle
     }
     public var body: some View {
         DestinationContent(scope: scope)
             .routingAutomatically(nativePresentation: nativePresentation)
             .routeScopeEnvironment(scope, router: router)
+            .environment(\.routePresentation, presentation)
+    }
+
+    private var presentation: RoutePresentationState {
+        guard let declaration = scope.presentationDeclaration else { return inheritedPresentation }
+        return inheritedPresentation.presenting(declaration, effectiveStyle: effectivePresentationStyle)
     }
 }
 
@@ -42,7 +52,7 @@ private struct DestinationContent: View {
     @RouterEnvironment private var router
     @Environment(\.self) private var environment
     var body: some View {
-        if let route = scope.route, let destination = scope.presentation?.destination, let presentation = scope.routePresentation {
+        if let route = scope.route, let destination = scope.presentationDeclaration?.destination, let presentation = scope.routePresentation {
             destination.build(route, RouteContext(
                 router: Router(engine: router, scope: scope),
                 unwindRoute: router.unwindRouteAction(from: scope),

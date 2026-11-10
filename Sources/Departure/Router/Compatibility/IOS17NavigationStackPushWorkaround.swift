@@ -254,7 +254,7 @@ final class IOS17NavigationStackPushWorkaround: IOS17NavigationStackPushWorkarou
     }
 
     private func isActivePresentationPath(_ routePath: RoutePath, in router: RouterEngine) -> Bool {
-        guard let owner = routePath.owner, router.isNavigationEligible(owner) else { return false }
+        guard let owner = routePath.owner, owner.belongs(to: router.tree) else { return false }
         let tree = router.tree
         return routePath === tree.rootPath
             || tree.activeBranchPaths().contains(where: { $0 === routePath })

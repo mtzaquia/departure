@@ -64,7 +64,7 @@ extension RouterEngine {
                 Task {
                     let sourceScope = source
                     guard let targetScope = await requestRouteWhenReady(route, origin: origin),
-                          isNavigationEligible(targetScope) else { return }
+                          targetScope.belongs(to: tree) else { return }
 
                     if targetScope !== sourceScope || targetScope.isInstalledInView {
                         guard await targetScope.waitUntilInstalled(in: self) else { return }

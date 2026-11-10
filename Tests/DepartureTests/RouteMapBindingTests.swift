@@ -351,7 +351,7 @@ import Testing
 
     private func render(_ scope: RouteScope, in engine: RouterEngine) throws {
         let route = try #require(scope.route)
-        let destination = try #require(scope.presentation?.destination)
+        let destination = try #require(scope.presentationDeclaration?.destination)
         _ = destination.build(
             route,
             RouteContext(

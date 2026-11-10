@@ -150,10 +150,6 @@ extension RouterEngine {
         }
     }
 
-    func isNavigationEligible(_ scope: RouteScope) -> Bool {
-        scope.belongs(to: tree)
-    }
-
     func synchronizeBranchSelection(ownedBy owner: RoutePresentationHostID, in scope: RouteScope, restoring: Bool = false) {
         guard tree.routePath(containing: scope) != nil else { return }
         guard !restoring, let selection = scope.branchSelection(ownedBy: owner) else {
@@ -163,14 +159,9 @@ extension RouterEngine {
         scope.bindBranchSelection(selection)
     }
 
-    func navigationSource(_ origin: RouteRequestOrigin?) -> RouteScope? {
-        guard let scope = resolveRequestOrigin(origin), isNavigationEligible(scope) else { return nil }
-        return scope
-    }
-
     /// Resolves a command's captured origin; an absent origin is the internal
     /// current-scope lookup used by engine operations.
-    func resolveRequestOrigin(_ origin: RouteRequestOrigin?) -> RouteScope? {
+    func navigationSource(_ origin: RouteRequestOrigin?) -> RouteScope? {
         if let origin { return origin.resolve(in: tree) }
         return currentRouteScope
     }

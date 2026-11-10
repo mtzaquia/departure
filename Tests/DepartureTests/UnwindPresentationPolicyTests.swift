@@ -38,8 +38,8 @@ struct UnwindPresentationPolicyTests {
         sheetBinding.wrappedValue = nil
         pushBinding.wrappedValue = nil
         #expect(engine.navigationOperations.count == 1)
-        #expect(!engine.isNavigationEligible(sheet))
-        #expect(!engine.isNavigationEligible(push))
+        #expect(!sheet.belongs(to: engine.tree))
+        #expect(!push.belongs(to: engine.tree))
         for scope in [container, sheet, push] { engine.routeScopeDidLeaveView(scope) }
         #expect(await unwind.value)
         #expect(sheetBinding.wrappedValue == nil)

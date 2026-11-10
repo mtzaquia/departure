@@ -31,7 +31,7 @@ import RouteDomainFixtures
     func nearestDeclarationBuildsTypedDataInItsOwnContext(nested: Bool) async throws {
         let recorder = BuildRecorder()
         let destination = RouteDestination(NumberedRoute.self) { route, context in
-            recorder.number = context.presentation.style == .push ? route.number : -route.number
+            recorder.number = context.environment.routePresentation.effectivePresentationStyle == .push ? route.number : -route.number
             recorder.context = context
             return EmptyView()
         }
@@ -45,15 +45,17 @@ import RouteDomainFixtures
         if nested { await engine.present(HomeDetailRoute()) }
         await engine.present(NumberedRoute(number: 42))
         let scope = try #require(engine.tree.rootPath.last)
+        var environment = EnvironmentValues()
+        environment.routePresentation = RoutePresentationState().presenting(try #require(scope.presentationDeclaration))
         let context = RouteContext(
             router: Router(engine: engine, scope: scope),
             unwindRoute: UnwindRouteAction(router: engine, routeScope: scope),
-            presentation: try #require(scope.routePresentation), environment: EnvironmentValues()
+            presentation: try #require(scope.routePresentation), environment: environment
         )
-        _ = try #require(scope.presentation?.destination).build(try #require(scope.route), context)
+        _ = try #require(scope.presentationDeclaration?.destination).build(try #require(scope.route), context)
         #expect(recorder.number == (nested ? 42 : -42))
         #expect(recorder.context?.router == context.router)
-        #expect(recorder.context?.presentation.style == (nested ? .push : .sheet))
+        #expect(recorder.context?.environment.routePresentation.effectivePresentationStyle == (nested ? .push : .sheet))
         #expect(await context.unwindRoute())
         #expect(engine.tree.rootPath.scopes.count == (nested ? 1 : 0))
     }
