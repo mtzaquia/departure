@@ -190,7 +190,7 @@ struct MacOSPresentationTests {
         let host = WithRouter(routes: RootRouteMap { Branches(concurrent: true) { Branch("detail") {
             testReplace(RouteDestination(MacOSScopedReplacementRoute.self) { route, context in
                 let _ = #expect(context.router == context.environment.router)
-                let _ = #expect(context.presentation.style == .replace)
+                let _ = #expect(context.environment.routePresentation.effectivePresentationStyle == .replace)
                 route.destination()
             })
         } } }, router: router) {

@@ -120,7 +120,7 @@ struct StartView: View {
 
 struct StartInfoView: View {
     let unwindRoute: UnwindRouteAction
-    let presentation: RoutePresentation
+    @Environment(\.routePresentation) private var presentation
 
     var body: some View {
         ZStack {
@@ -136,13 +136,14 @@ struct StartInfoView: View {
                     .multilineTextAlignment(.center)
                     .accessibilityIdentifier(SampleAppAccessibility.startInfoText)
 
-                Text("Presentation: \(String(describing: presentation.style)) · Global: \(String(describing: presentation.isGlobal))")
+                Text("Presentation: \(presentation.effectivePresentationStyle.map { String(describing: $0) } ?? "none") · Global: \(String(describing: presentation.isGlobalRoute))")
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier(SampleAppAccessibility.startInfoPresentation)
 
-                Text("Compact adaptation: \(String(describing: presentation.compactAdaptation))")
+                Text("Within sheet: \(String(describing: presentation.isWithinSheetRoute))")
                     .font(.caption)
+                    .accessibilityIdentifier(SampleAppAccessibility.startInfoWithinSheet)
 
                 Button("Done") { Task { await unwindRoute() } }
                     .frame(maxWidth: .infinity)

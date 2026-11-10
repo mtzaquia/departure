@@ -34,7 +34,7 @@ Departure requires Swift 6.3+, iOS 17+, or macOS 14+.
 
 ```swift
 dependencies: [
-  .package(url: "https://github.com/mtzaquia/departure.git", from: "3.1.0"),
+  .package(url: "https://github.com/mtzaquia/departure.git", from: "3.2.0"),
 ]
 ```
 

@@ -89,9 +89,10 @@ public struct AnyRouteDestination: Sendable, Hashable {
     public nonisolated func hash(into hasher: inout Hasher) { hasher.combine(identity) }
 }
 
-/// Presentation metadata for the particular destination being rendered.
+/// Declared presentation metadata for a destination.
 ///
 /// Metadata reflects the matched declaration and its configured presentation.
+/// Read `EnvironmentValues.routePresentation` for the effective style and enclosing modal state.
 public struct RoutePresentation: Hashable, Sendable {
     /// The presentation style used for this destination.
     public enum Style: Hashable, Sendable {
@@ -137,6 +138,10 @@ public struct RouteContext {
     /// Unwinds this exact scope, optionally delivering a payload.
     public let unwindRoute: UnwindRouteAction
     /// The destination's matched style and declaration metadata.
+    ///
+    /// Use `environment.routePresentation` during construction, or read
+    /// `@Environment(\.routePresentation)` inside the destination, for live state.
+    @available(*, deprecated, message: "Read environment.routePresentation or @Environment(\\.routePresentation) for live presentation state.")
     public let presentation: RoutePresentation
     /// The environment visible to this destination during the current builder evaluation.
     public let environment: EnvironmentValues

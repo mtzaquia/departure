@@ -107,11 +107,13 @@ both automatic container discovery and explicit targeting, and the external URL 
 rather than relying on a globally current routing scope.
 
 The start screen's **About this sample** sheet binds a domain-only route using
-`RouteDestination`. It displays `context.presentation` and dismisses using the supplied
-scoped unwind action. Its single `Sheet(StartInfoRoute.self, compactAdaptation: .cover)`
+`RouteDestination`. It displays the live `routePresentation` environment value and
+dismisses using the supplied scoped unwind action. Its single
+`Sheet(StartInfoRoute.self, compactAdaptation: .cover)`
 declaration remains a sheet on regular iPad layouts and slides up as a full-screen cover
 in compact layouts. The declaration and child tree remain fixed; the displayed metadata
-continues to identify a sheet and shows the compact-adaptation option. Other sheets use
+reports the effective style, whether the destination is within a sheet, and global-route
+membership. Other sheets use
 the default `.none`. All flows use type-only map declarations and typed builders in
 `destinations:` closures. Shared entries use a root-only `GlobalMap`; destination implementations and app state own dismissal rules.
 

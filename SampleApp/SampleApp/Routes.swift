@@ -478,7 +478,7 @@ enum Destinations {
             .modifier(SampleRoutingContext())
     }
     static let startInfoRoute = RouteDestination(StartInfoRoute.self) { route, context in
-        StartInfoView(unwindRoute: context.unwindRoute, presentation: context.presentation)
+        StartInfoView(unwindRoute: context.unwindRoute)
             .modifier(SampleRoutingContext())
     }
     static let loginRoute = RouteDestination(LoginRoute.self) { route, context in
