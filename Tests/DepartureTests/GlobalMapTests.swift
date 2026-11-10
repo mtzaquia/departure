@@ -36,7 +36,7 @@ struct GlobalMapTests {
         #expect(owner.engine.root.definitions.globals?.routeAttachments.count == 3)
         await owner.root.present(SecondFactor())
         #expect(owner.engine.currentRouteScope.route is SecondFactor)
-        #expect(owner.engine.currentRouteScope.routePresentation?.isGlobal == true)
+        #expect(owner.engine.currentRouteScope.routePresentation?.isGlobalRoute == true)
     }
 
     @Test(arguments: Cover.Transition.allCases)
@@ -91,7 +91,7 @@ struct GlobalMapTests {
         } else {
             #expect(engine.currentRouteScope.route is Help)
             #expect(engine.currentRouteScope.presentationOrigin === lock)
-            #expect(engine.currentRouteScope.routePresentation?.isGlobal == false)
+            #expect(engine.currentRouteScope.routePresentation?.isGlobalRoute == false)
         }
     }
 
@@ -308,7 +308,7 @@ struct GlobalMapTests {
         }
         _ = WithRouter(routes: RootRouteMap { GlobalMap { feature } }, router: owner) { EmptyView() }
         await owner.root.present(SecondFactor())
-        #expect(owner.engine.currentRouteScope.routePresentation?.isGlobal == true)
+        #expect(owner.engine.currentRouteScope.routePresentation?.isGlobalRoute == true)
     }
 
     @Test func globalsDoNotActivateTheRequestersInactiveBranch() async {

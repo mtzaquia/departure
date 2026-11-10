@@ -22,45 +22,18 @@
 
 import SwiftUI
 
-/// The current destination's presentation and enclosing modal state.
-///
-/// Read this value with `@Environment(\.routePresentation)`. Departure updates it
-/// when a sheet adapts as size classes change. Each environment read is a snapshot;
-/// storing a copy does not subscribe that copy to later changes.
-public struct RoutePresentationState: Hashable, Sendable {
-    /// The destination's current style, or `nil` outside a routed destination.
-    ///
-    /// A sheet with ``Sheet/CompactAdaptation/cover`` reports `.cover(.slide)`
-    /// when either of its presenter's size classes is compact. Pushed and replaced
-    /// destinations report `.push` and `.replace`, even inside a modal.
-    /// On macOS, both sheet and cover routes use native sheets and report `.sheet`.
-    public let effectivePresentationStyle: RoutePresentation.Style?
+/// An equivalent name for the presentation value shared by destination contexts and the environment.
+public typealias RoutePresentationState = RoutePresentation
 
-    /// Whether the nearest enclosing Departure modal currently appears as a sheet.
-    ///
-    /// This value passes through pushes, replacements, and branches. A new modal
-    /// overrides it: a cover, including an adapted sheet, sets it to `false`.
-    public let isWithinSheetRoute: Bool
-
-    /// Whether this destination occurrence was presented from the root global catalog.
-    ///
-    /// This describes the current route, independently of its enclosing routes.
-    /// A local destination pushed inside a global sheet reads `false`.
-    public let isGlobalRoute: Bool
-
-    init(effectivePresentationStyle: RoutePresentation.Style? = nil,
-         isWithinSheetRoute: Bool = false, isGlobalRoute: Bool = false) {
-        self.effectivePresentationStyle = effectivePresentationStyle
-        self.isWithinSheetRoute = isWithinSheetRoute
-        self.isGlobalRoute = isGlobalRoute
-    }
-
+extension RoutePresentation {
     func presenting(_ declaration: AnyRouteDeclaration,
                     effectiveStyle: RoutePresentation.Style? = nil) -> Self {
         let style = effectiveStyle ?? declaration.presentationKind
         return Self(effectivePresentationStyle: style,
                     isWithinSheetRoute: style.isModal ? style == .sheet : isWithinSheetRoute,
-                    isGlobalRoute: declaration.isGlobal)
+                    isGlobalRoute: declaration.isGlobal,
+                    declaredStyle: declaration.presentationKind,
+                    declaredCompactAdaptation: declaration.presentation.declaredCompactAdaptation)
     }
 }
 
@@ -68,19 +41,19 @@ public extension EnvironmentValues {
     /// Live presentation information for this destination and its enclosing modal.
     ///
     /// Departure installs this value automatically before evaluating destination
-    /// builders. It is also available through ``RouteContext/environment``.
+    /// builders. ``RouteContext/presentation`` supplies the same value directly.
     /// Outside a routed destination, the style is `nil` and both flags are `false`.
-    @Entry var routePresentation = RoutePresentationState()
+    @Entry var routePresentation = RoutePresentation()
 }
 
 extension RoutePresentation {
     /// Uses the presenter's traits, rather than a sheet's potentially narrower content.
     func effectiveStyle(inCompactSizeClass compact: Bool) -> Style {
         #if canImport(UIKit)
-        if style == .sheet, compactAdaptation == .cover, compact { return .cover(.slide) }
-        return style
+        if declaredStyle == .sheet, declaredCompactAdaptation == .cover, compact { return .cover(.slide) }
+        return declaredStyle
         #else
-        return style.isModal ? .sheet : style
+        return declaredStyle.isModal ? .sheet : declaredStyle
         #endif
     }
 }

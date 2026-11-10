@@ -180,7 +180,7 @@ struct SystemModalPresentationModifier: ViewModifier {
         } else if style == .sheet {
             routeView(rendered)
                 .presentationCompactAdaptation(
-                    rendered.scope.routePresentation?.compactAdaptation == .cover ? .fullScreenCover : .none)
+                    rendered.scope.routePresentation?.declaredCompactAdaptation == .cover ? .fullScreenCover : .none)
         } else {
             routeView(rendered)
         }

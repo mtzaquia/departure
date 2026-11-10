@@ -69,7 +69,7 @@ extension AnyRouteDeclaration {
     var departureDebugDescription: String {
         let presentationDescription: String
 
-        switch presentation.style {
+        switch presentation.declaredStyle {
         case .push:
             presentationDescription = "push"
         case .replace:

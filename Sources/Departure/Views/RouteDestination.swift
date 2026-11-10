@@ -89,10 +89,11 @@ public struct AnyRouteDestination: Sendable, Hashable {
     public nonisolated func hash(into hasher: inout Hasher) { hasher.combine(identity) }
 }
 
-/// Declared presentation metadata for a destination.
+/// The current destination's presentation and enclosing modal state.
 ///
-/// Metadata reflects the matched declaration and its configured presentation.
-/// Read `EnvironmentValues.routePresentation` for the effective style and enclosing modal state.
+/// Departure supplies the same value through ``RouteContext/presentation`` and
+/// `@Environment(\.routePresentation)`. Size-class changes refresh both access paths
+/// during view construction. A stored copy is a snapshot.
 public struct RoutePresentation: Hashable, Sendable {
     /// The presentation style used for this destination.
     public enum Style: Hashable, Sendable {
@@ -108,19 +109,59 @@ public struct RoutePresentation: Hashable, Sendable {
             switch self { case .sheet, .cover: true; case .push, .replace: false }
         }
     }
-    /// The matched presentation style, including a cover's transition.
-    public let style: Style
-    /// The declared sheet's compact adaptation. Other presentation styles use `.none`.
-    /// The declared ``style`` remains `.sheet` when native presentation adapts to a cover.
-    public let compactAdaptation: Sheet.CompactAdaptation
+    /// The destination's current style, or `nil` outside a routed destination.
+    ///
+    /// A sheet with ``Sheet/CompactAdaptation/cover`` reports `.cover(.slide)`
+    /// when either of its presenter's size classes is compact. Pushed and replaced
+    /// destinations report `.push` and `.replace`, even inside a modal.
+    /// On macOS, both sheet and cover routes use native sheets and report `.sheet`.
+    public let effectivePresentationStyle: Style?
+
+    /// Whether the nearest enclosing Departure modal currently appears as a sheet.
+    ///
+    /// This value passes through pushes, replacements, and branches. A new modal
+    /// overrides it: a cover, including an adapted sheet, sets it to `false`.
+    public let isWithinSheetRoute: Bool
+
+    /// Whether this destination occurrence was presented from the root global catalog.
+    ///
+    /// This describes the current route, independently of its enclosing routes.
+    /// A local destination pushed inside a global sheet reads `false`.
+    public let isGlobalRoute: Bool
+
+    /// The declared style, including a cover's transition.
+    ///
+    /// An adapted sheet continues to report `.sheet`. Outside a routed destination,
+    /// this compatibility accessor returns `.replace`.
+    @available(*, deprecated, message: "Use effectivePresentationStyle for the current presentation style, including sheet adaptation.")
+    public var style: Style { declaredStyle }
+
+    /// The declared sheet's compact adaptation, or `.none` for other styles.
+    @available(*, deprecated, message: "Use effectivePresentationStyle to inspect the current presentation after adaptation.")
+    public var compactAdaptation: Sheet.CompactAdaptation { declaredCompactAdaptation }
+
     /// Whether this occurrence was presented from the root global catalog.
-    public let isGlobal: Bool
+    @available(*, deprecated, renamed: "isGlobalRoute")
+    public var isGlobal: Bool { isGlobalRoute }
+
+    let declaredStyle: Style
+    let declaredCompactAdaptation: Sheet.CompactAdaptation
+
+    init(effectivePresentationStyle: Style? = nil, isWithinSheetRoute: Bool = false,
+         isGlobalRoute: Bool = false, declaredStyle: Style? = nil,
+         declaredCompactAdaptation: Sheet.CompactAdaptation = .none) {
+        self.effectivePresentationStyle = effectivePresentationStyle
+        self.isWithinSheetRoute = isWithinSheetRoute
+        self.isGlobalRoute = isGlobalRoute
+        self.declaredStyle = declaredStyle ?? effectivePresentationStyle ?? .replace
+        self.declaredCompactAdaptation = declaredCompactAdaptation
+    }
 
     init(style: Style, compactAdaptation: Sheet.CompactAdaptation = .none,
          isGlobal: Bool = false) {
-        self.style = style
-        self.compactAdaptation = compactAdaptation
-        self.isGlobal = isGlobal
+        self.init(effectivePresentationStyle: style, isWithinSheetRoute: style == .sheet,
+                  isGlobalRoute: isGlobal, declaredStyle: style,
+                  declaredCompactAdaptation: compactAdaptation)
     }
 }
 
@@ -137,11 +178,10 @@ public struct RouteContext {
     public let router: Router
     /// Unwinds this exact scope, optionally delivering a payload.
     public let unwindRoute: UnwindRouteAction
-    /// The destination's matched style and declaration metadata.
+    /// The same live presentation value supplied by `EnvironmentValues.routePresentation`.
     ///
-    /// Use `environment.routePresentation` during construction, or read
-    /// `@Environment(\.routePresentation)` inside the destination, for live state.
-    @available(*, deprecated, message: "Read environment.routePresentation or @Environment(\\.routePresentation) for live presentation state.")
+    /// This value refreshes when the destination builder is reevaluated, including
+    /// after size-class changes. Retained copies remain snapshots.
     public let presentation: RoutePresentation
     /// The environment visible to this destination during the current builder evaluation.
     public let environment: EnvironmentValues

@@ -55,9 +55,9 @@ public enum RoutePriority: Int, Comparable, Hashable, Sendable {
 extension RoutePresentation {
     /// Returns `.default` for every destination, including global routes.
     ///
-    /// Priority is no longer part of presentation behavior. Use ``isGlobal`` to
+    /// Priority is no longer part of presentation behavior. Use ``isGlobalRoute`` to
     /// determine whether the matched declaration belongs to a global map.
-    @available(*, deprecated, message: "Always returns .default. Use isGlobal to identify global declarations.")
+    @available(*, deprecated, message: "Always returns .default. Use isGlobalRoute to identify global declarations.")
     public var priority: RoutePriority { .default }
 }
 

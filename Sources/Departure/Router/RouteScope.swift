@@ -176,7 +176,7 @@ extension RouteScope {
 
     var routePresentation: RoutePresentation? {
         presentation.map { RoutePresentation(style: $0.declaration.presentationKind,
-            compactAdaptation: $0.declaration.presentation.compactAdaptation,
+            compactAdaptation: $0.declaration.presentation.declaredCompactAdaptation,
             isGlobal: $0.declaration.isGlobal) }
     }
 

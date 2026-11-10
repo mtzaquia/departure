@@ -136,12 +136,16 @@ RouteDestination(EditorRoute.self) { route, context in
   EditorView(
     documentID: route.documentID,
     close: context.unwindRoute,
-    presentation: context.environment.routePresentation
+    presentation: context.presentation
   )
 }
 ```
 
-`context.router` and `context.unwindRoute` belong to this destination's scope. `context.environment` contains the values supplied to the destination and refreshes when they change. The builder can choose wrapping content directly using that context. `RouteContext.presentation` is deprecated; use `context.environment.routePresentation` for current presentation state.
+`context.router` and `context.unwindRoute` belong to this destination's scope. `context.presentation` is a supported shortcut to the same `RoutePresentation` value as `context.environment.routePresentation`. It reports the effective style and enclosing modal state, and refreshes when size classes change. Views can read the same value with `@Environment(\.routePresentation)`. The `RoutePresentationState` name is an equivalent type alias.
+
+The older `.style`, `.compactAdaptation`, and `.isGlobal` accessors remain available as deprecated compatibility shims. `.style` and `.compactAdaptation` retain the declared metadata, so an adapted sheet still reports `.sheet` through `.style`; use `.effectivePresentationStyle` for its current appearance. Replace `.isGlobal` with `.isGlobalRoute`.
+
+`context.environment` contains the values supplied to the destination and refreshes when they change. The builder can choose wrapping content directly using that context.
 
 ## Read live presentation state
 

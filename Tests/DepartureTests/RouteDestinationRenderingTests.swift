@@ -175,7 +175,7 @@ struct RouteDestinationRenderingTests {
         } else {
             #expect(frame.height < window.bounds.height - 1)
         }
-        #expect(scope.routePresentation?.style == .sheet)
+        #expect(scope.routePresentation?.declaredStyle == .sheet)
         #expect(await UnwindRouteAction(router: router.engine, routeScope: scope)())
         #expect(router.engine.tree.rootPath.isEmpty)
     }

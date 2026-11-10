@@ -32,8 +32,8 @@ import Testing
 
     @Test func sheetsKeepTheirPresentationByDefault() {
         let sheet = Sheet(SettingsRoute.self)
-        #expect(sheet.declaration.presentation.style == .sheet)
-        #expect(sheet.declaration.presentation.compactAdaptation == .none)
+        #expect(sheet.declaration.presentation.declaredStyle == .sheet)
+        #expect(sheet.declaration.presentation.declaredCompactAdaptation == .none)
     }
 
     @Test(arguments: Sheet.CompactAdaptation.allCases, [false, true])
@@ -49,9 +49,9 @@ import Testing
         let scope = try #require(engine.tree.rootPath.last)
         let presentation = try #require(scope.routePresentation)
         #expect(scope.id == AnyHashable("settings"))
-        #expect(presentation.style == .sheet)
-        #expect(presentation.compactAdaptation == adaptation)
-        #expect(presentation.isGlobal == global)
+        #expect(presentation.declaredStyle == .sheet)
+        #expect(presentation.declaredCompactAdaptation == adaptation)
+        #expect(presentation.isGlobalRoute == global)
         #expect(scope.routeAttachments.count == 1)
         #expect(scope.routeAttachments.first?.routeType == HomeDetailRoute.self)
         #if DEBUG

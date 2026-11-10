@@ -71,7 +71,7 @@ import Testing
         #expect(builds == 0)
         try render(child, in: engine)
         #expect(builds == 1)
-        #expect(child.routePresentation?.style == .push)
+        #expect(child.routePresentation?.declaredStyle == .push)
     }
 
     @Test func rootCompletesFeatureDestinationContributions() async throws {

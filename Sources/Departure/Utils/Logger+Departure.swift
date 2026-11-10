@@ -249,7 +249,7 @@ extension DepartureLogEvent {
             + " | style=\(style) owner=\(ownerName) host=\(host.rawValue)"
             + "\n  path: \(path)"
         if match.declaration.presentationKind == .push,
-           owner.routePresentation?.style.isModal == true,
+           owner.routePresentation?.declaredStyle.isModal == true,
            host == .automatic {
             message += "\n  hint: \(ownerName) has no explicit routing host."
                 + " If its RouteDestination creates a NavigationStack, add `.routing()`"

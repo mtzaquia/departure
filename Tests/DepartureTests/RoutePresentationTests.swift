@@ -26,10 +26,22 @@ import Testing
 
 @MainActor @Suite struct RoutePresentationTests {
     @Test func outsideDestinationsHasNoPresentation() {
-        let presentation = EnvironmentValues().routePresentation
+        let presentation: RoutePresentation = EnvironmentValues().routePresentation
+        let state: RoutePresentationState = presentation
+        #expect(state == presentation)
         #expect(presentation.effectivePresentationStyle == nil)
         #expect(!presentation.isWithinSheetRoute)
         #expect(!presentation.isGlobalRoute)
+    }
+
+    @Test func legacyAccessorsPreserveDeclaredMetadataForAdaptedSheets() {
+        let sheet = Sheet(SettingsRoute.self, compactAdaptation: .cover).declaration.globallyAvailable()
+        let presentation: RoutePresentationState = RoutePresentation().presenting(sheet, effectiveStyle: .cover(.slide))
+        #expect(presentation.effectivePresentationStyle == .cover(.slide))
+        #expect(!presentation.isWithinSheetRoute)
+        #expect(presentation.style == .sheet)
+        #expect(presentation.compactAdaptation == .cover)
+        #expect(presentation.isGlobal == presentation.isGlobalRoute)
     }
 
     @Test(arguments: [false, true], Sheet.CompactAdaptation.allCases)
@@ -41,8 +53,8 @@ import Testing
         let expected: RoutePresentation.Style = .sheet
         #endif
         #expect(declared.effectiveStyle(inCompactSizeClass: compact) == expected)
-        #expect(declared.style == .sheet)
-        #expect(declared.compactAdaptation == adaptation)
+        #expect(declared.declaredStyle == .sheet)
+        #expect(declared.declaredCompactAdaptation == adaptation)
     }
 
     @Test(arguments: [RoutePresentation.Style.push, .replace, .sheet, .cover(.slide), .cover(.fade)])
