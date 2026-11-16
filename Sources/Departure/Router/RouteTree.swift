@@ -200,40 +200,4 @@ extension RouteTree {
         if match.presentationPath !== match.declaringPath { retained.append(match.declaringScope) }
         return UnwindPlan(retaining: retained)
     }
-
-    func firstDeclaration(including routeType: any Route.Type, origin: RouteRequestOrigin? = nil) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
-        let origin = origin ?? RouteRequestOrigin(scope: currentRouteScope)
-        guard let originScope = origin.resolve(in: self) else { return nil }
-        // A live scope's ancestors and owned branches stay live throughout this
-        // synchronous lookup; no additional membership checks are needed here.
-        for source in originScope.ancestry {
-            if let binding = resolveDefinitions(at: source, includingBranches: origin.branches.isEmpty) { return binding }
-        }
-        return nil
-
-        // One ordered search reads definitions without constructing intermediate matches.
-        // Explicit branch handles omit branch look-forward and sibling fallback.
-        func resolveDefinitions(at source: RouteScope, includingBranches: Bool) -> DeclarationBinding<RouterEngine.ResolvedRouteTarget>? {
-            let selectedRoot = source.branchScopes[source.activeBranch]
-            let selectedDestination = includingBranches ? selectedRoot?.activeLocalScope : nil
-            let locations = [selectedDestination !== selectedRoot ? selectedDestination : nil, source].compactMap { $0 }
-            for location in locations {
-                let owners = includingBranches && location.branchContainer != nil
-                    ? [location.branchScopes[location.activeBranch], location].compactMap { $0 }
-                        + location.branchScopes.keys.filter { $0 != location.activeBranch }.compactMap { location.branchScopes[$0] }
-                    : [location]
-                for owner in owners {
-                    guard let binding = owner.definitions.routeBinding(for: routeType) else { continue }
-                    let looksForward = location !== source
-                    let presentingScope = looksForward ? location : owner
-                    let declaringScope = looksForward ? source : (owner.branchID == nil ? owner : owner.parent ?? owner)
-                    let strategy: RouterEngine.ResolvedRouteTarget.LookupStrategy = looksForward ? .selectedBranch
-                        : source === root ? .rootDeclarations : .currentPath
-                    return binding.map { .init(presentingScope: presentingScope,
-                        declaringScope: declaringScope, declaration: $0, lookupStrategy: strategy) }
-                }
-            }
-            return nil
-        }
-    }
 }

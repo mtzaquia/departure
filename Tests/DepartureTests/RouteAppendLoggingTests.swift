@@ -87,7 +87,7 @@ import Testing
     @Test func automaticRootPushDoesNotSuggestAMissingModalHost() throws {
         let engine = RouterEngine(routes: RootRouteMap { testPush(testDestination(HomeDetailRoute.self)) })
         engine.root.bindRoutingHost(RoutePresentationHostID(), automatic: true)
-        let match = try #require(engine.tree.firstDeclaration(including: HomeDetailRoute.self)?.declaration)
+        let match = try #require(engine.tree.resolvePresentation(of: HomeDetailRoute())?.declaration)
         let event = DepartureLogEvent.routeAppended(route: HomeDetailRoute(), path: "path", match: match)
         #expect(event.message.contains("style=push owner=root host=automatic"))
         #expect(!event.message.contains("hint:"))
@@ -133,8 +133,7 @@ import Testing
         })
         await engine.present(SettingsRoute())
         let owner = try #require(engine.tree.rootPath.last)
-        let match = try #require(engine.tree.firstDeclaration(including: HomeDetailRoute.self,
-            origin: RouteRequestOrigin(scope: owner))?.declaration)
+        let match = try #require(engine.tree.resolvePresentation(of: HomeDetailRoute(), from: owner)?.declaration)
         return (engine, owner, match)
     }
 }

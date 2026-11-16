@@ -270,7 +270,7 @@ extension RouterEngine {
         replacePendingRoute(nil)
         guard match.presentingScope.belongs(to: tree),
               !match.presentingScope.hasConflictingPresentationHosts,
-              declarationIsCurrent(match) else {
+              tree.declarationIsCurrent(match) else {
             operation.discardPresentation(); return
         }
         let appendedPath = match.presentationPath

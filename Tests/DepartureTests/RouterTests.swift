@@ -319,7 +319,7 @@ struct RouterTests {
         engine.root.setActiveBranch(AppTab.wallet)
         #expect(selected() == .wallet)
         #expect(engine.root.branchScopes.values.flatMap(\.routeAttachments).map(\.identity) == identity)
-        #expect(engine.tree.firstDeclaration(including: SettingsRoute.self)?.declaration?.branchID == AnyHashable(AppTab.wallet))
+        #expect(engine.tree.resolvePresentation(of: SettingsRoute())?.declaration?.branchID == AnyHashable(AppTab.wallet))
     }
 
     @Test func repeatedDuplicateRouteDeclarationsAreDisabled() {
@@ -329,7 +329,7 @@ struct RouterTests {
         }
         let engine = RouterEngine(routes: map)
         #expect(engine.root.routeAttachments.isEmpty)
-        guard case .conflict? = engine.tree.firstDeclaration(including: SettingsRoute.self) else {
+        guard case .conflict? = engine.tree.resolvePresentation(of: SettingsRoute()) else {
             Issue.record("Expected a conflicting declaration")
             return
         }
@@ -832,7 +832,7 @@ struct RouterTests {
         walletScope.path.replaceTestPath([walletRouteScope])
         router.tree.rootPath.replaceTestPath([modalScope])
 
-        let match = try #require(router.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        let match = try #require(router.tree.resolvePresentation(of: SettingsRoute())?.declaration)
         let unwindPlan = router.tree.presentationUnwindPlan(after: match)
 
         #expect(match.lookupStrategy == .selectedBranch)
@@ -917,7 +917,7 @@ struct RouterTests {
         )
         router.tree.rootPath.replaceTestPath([modalScope])
 
-        let match = try #require(router.tree.firstDeclaration(including: TransactionRoute.self)?.declaration)
+        let match = try #require(router.tree.resolvePresentation(of: TransactionRoute())?.declaration)
         router.appendOrPendRoute(
             RouterEngine.NavigationOperation(awaitingHost: .init(route: TransactionRoute(), match: match)),
             waitsForBranchActivation: true
@@ -967,7 +967,7 @@ struct RouterTests {
         walletScope.path.replaceTestPath([walletRouteScope])
         router.tree.rootPath.replaceTestPath([modalScope])
 
-        let match = try #require(router.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        let match = try #require(router.tree.resolvePresentation(of: SettingsRoute())?.declaration)
         let unwindPlan = router.tree.presentationUnwindPlan(after: match)
 
         #expect(match.lookupStrategy == .rootDeclarations)
@@ -3579,7 +3579,7 @@ struct RouterTests {
         )
         router.tree.rootPath.replaceTestPath([ancestorScope, firstDescendant, secondDescendant])
 
-        let match = try #require(router.tree.firstDeclaration(including: MessageRoute.self)?.declaration)
+        let match = try #require(router.tree.resolvePresentation(of: MessageRoute())?.declaration)
         let plan = router.tree.presentationUnwindPlan(after: match)
         let expectedDescription = "MessageRoute[push] • local scope"
             + " • lookup=current route path, nearest scope first"

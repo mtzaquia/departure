@@ -52,7 +52,9 @@ extension RouterEngine {
             routeType: routeType,
             activePath: tree.currentRoutePath.departureDebugPathDescription
         ))
-        guard let binding = declaration(for: resolvedRoute, origin: origin) else {
+        guard let binding = tree.resolvePresentation(
+            of: resolvedRoute, from: source, includingBranches: origin.branches.isEmpty
+        ) else {
             log.departureWarning(.routeDroppedNoDeclaration(routeType: routeType))
             return nil
         }
@@ -76,43 +78,6 @@ extension RouterEngine {
         log.departureDebug(.routeMatched(route: resolvedRoute, match: match))
         log.departureDebug(.routeAcceptedAppend(route: resolvedRoute))
         return await appendRoute(resolvedRoute, after: match, origin: origin)
-    }
-
-    func declarationIsCurrent(_ match: ResolvedRouteTarget) -> Bool {
-        let definitions = match.declaration.isGlobal ? root.definitions.globals : match.presentingScope.definitions
-        return definitions?.routeBinding(for: match.declaration.routeType)?.declaration == match.declaration
-    }
-
-    func declaration(for route: any Route, origin: RouteRequestOrigin) -> DeclarationBinding<ResolvedRouteTarget>? {
-        guard let global = root.definitions.globals?.routeBinding(for: type(of: route)) else {
-            return tree.firstDeclaration(including: type(of: route), origin: origin)
-        }
-        return global.map { declaration in
-            let foreground = currentRouteScope
-            let presentingForeground = foreground.ancestry.first { scope in
-                // A committed destination can mount through its presenter. An unmounted
-                // branch has no presentation origin, so it stops that chain.
-                sequence(first: scope) { $0.presentationOrigin }.contains {
-                    $0.isAvailableForPresentation && $0.presentationHostID != nil
-                }
-            }
-            if presentingForeground == nil {
-                log.departureDebug(.globalRouteWithoutPresentationHost(routeType: declaration.routeType))
-            }
-
-            // Keep existing occurrences in their slots, including a destination
-            // whose native presentation is still mounting.
-            let equal = foreground.ancestry.first {
-                $0.presentationDeclaration == declaration && $0.route?._isEqual(to: route) == true
-            }
-            let current = foreground.presentationDeclaration == declaration ? foreground : presentingForeground
-            let anchor = equal?.presentationOrigin
-                ?? (current?.presentationDeclaration == declaration ? current?.presentationOrigin : nil)
-                ?? presentingForeground
-                ?? foreground
-            return ResolvedRouteTarget(presentingScope: anchor, declaringScope: anchor,
-                declaration: declaration, lookupStrategy: .global)
-        }
     }
 
     private func resolveRouteChain(startingWith route: any Route) async -> (any Route)? {

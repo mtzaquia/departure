@@ -11,7 +11,7 @@ struct NavigationOperationTests {
             Branches { Branch("host") { testPush(destination(SettingsRoute.self)) } }
         })
         let branch = try #require(engine.root.branchScopes["host"])
-        let match = try #require(engine.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        let match = try #require(engine.tree.resolvePresentation(of: SettingsRoute())?.declaration)
         let operation = RouterEngine.NavigationOperation(awaitingHost: .init(route: SettingsRoute(), match: match))
         engine.replacePendingRoute(.presentation(operation))
         var started = false, completed = false

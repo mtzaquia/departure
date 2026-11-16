@@ -232,7 +232,7 @@ import Testing
         let router = Router(engine: engine, scope: engine.root)
         #expect(engine.root.routeAttachments.count == 1)
         #expect(engine.root.definitions.presentationStyles == [.push])
-        guard case .conflict? = engine.tree.firstDeclaration(including: SettingsRoute.self) else {
+        guard case .conflict? = engine.tree.resolvePresentation(of: SettingsRoute()) else {
             Issue.record("A conflicting route key must remain a lookup barrier")
             return
         }
@@ -278,7 +278,7 @@ import Testing
     @Test func duplicateTypeIsRecordedAsConflictWithinScope() {
         let engine = RouterEngine(routes: RootRouteMap { testSheet(settings); testPush(settings) })
         #expect(engine.root.routeAttachments.isEmpty)
-        guard case .conflict? = engine.tree.firstDeclaration(including: SettingsRoute.self) else {
+        guard case .conflict? = engine.tree.resolvePresentation(of: SettingsRoute()) else {
             Issue.record("Expected a conflicting declaration")
             return
         }

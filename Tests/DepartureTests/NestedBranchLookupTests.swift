@@ -48,7 +48,7 @@ struct NestedBranchLookupTests {
         let detail = try #require(branch.path.last)
         await owner.root.present(MessageRoute())
         let modal = try #require(engine.tree.rootPath.last)
-        let match = try #require(engine.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        let match = try #require(engine.tree.resolvePresentation(of: SettingsRoute())?.declaration)
         #expect(match.presentingScope === (declaredAtBranchRoot ? branch : detail))
         #expect(match.declaringScope === engine.root)
         #expect(match.branchID == AnyHashable("wallet"))
@@ -84,7 +84,7 @@ struct NestedBranchLookupTests {
         await owner.root.present(HomeDetailRoute())
         let detail = try #require(inner.path.last)
         await owner.root.present(MessageRoute())
-        let match = try #require(engine.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        let match = try #require(engine.tree.resolvePresentation(of: SettingsRoute())?.declaration)
         #expect(match.presentingScope === detail)
         #expect(match.declaringScope === engine.root)
         #expect(match.branchID == AnyHashable("outer"))
@@ -103,7 +103,7 @@ struct NestedBranchLookupTests {
         ])
         outer.setActiveBranch("inner")
 
-        let match = try #require(router.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        let match = try #require(router.tree.resolvePresentation(of: SettingsRoute())?.declaration)
         #expect(match.presentingScope === outer)
         #expect(match.lookupStrategy == .currentPath)
         #if DEBUG
@@ -128,7 +128,7 @@ struct NestedBranchLookupTests {
             RouteScopeDeclaration(routes: testDeclaration(testDestination(SettingsRoute.self), presentation: .init(style: .cover(.slide)))._routeDeclarations),
         ])
 
-        let match = try #require(router.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        let match = try #require(router.tree.resolvePresentation(of: SettingsRoute())?.declaration)
         #expect(match.presentingScope === inner)
         await router.present(SettingsRoute())
         #expect(inner.path.last?.route is SettingsRoute)
@@ -138,7 +138,7 @@ struct NestedBranchLookupTests {
 
     @Test func lazyDeclarationRemainsAvailableWithoutLocalOverride() async throws {
         let (router, outer, inner) = makeNestedBranches(hasLazyDeclaration: true)
-        let match = try #require(router.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        let match = try #require(router.tree.resolvePresentation(of: SettingsRoute())?.declaration)
         #expect(match.presentingScope === outer)
         await router.present(SettingsRoute())
         #expect(outer.path.last?.route is SettingsRoute)
@@ -160,7 +160,7 @@ struct NestedBranchLookupTests {
         }
 
         #expect(router.currentRouteScope === inner)
-        let match = try #require(router.tree.firstDeclaration(including: SettingsRoute.self)?.declaration)
+        let match = try #require(router.tree.resolvePresentation(of: SettingsRoute())?.declaration)
         #expect(match.presentingScope === container)
         await router.present(SettingsRoute())
         #expect(outer.path.first === container)
