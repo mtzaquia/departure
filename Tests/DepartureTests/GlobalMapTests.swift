@@ -340,17 +340,104 @@ struct GlobalMapTests {
 
         await owner.current.present(StartupCover())
         let cover = engine.currentRouteScope
-        let presenter = branchMounted ? home : root
+        let presenter = branchMounted ? foreground : root
+        let presenterHost = branchMounted && hasUnmountedDetail
+            ? installPresentationHost(foreground, in: engine)
+            : branchHost ?? rootHost
         #expect(cover.route is StartupCover)
         #expect(cover.presentationOrigin === presenter)
         #expect(engine.routePresentationBinding(from: presenter, matching: .cover(.fade),
-            hostedBy: branchHost ?? rootHost).wrappedValue?.scope === cover)
+            hostedBy: presenterHost).wrappedValue?.scope === cover)
         #expect(root.activeBranch == AnyHashable("home"))
         let branchPath = branchMounted ? originalBranchPath + [ObjectIdentifier(cover)] : originalBranchPath
         #expect(home.path.scopes.map(ObjectIdentifier.init) == branchPath)
         #expect(settings.path.isEmpty)
         #expect(await owner.current.unwind(from: StartupCover.self))
         #expect(home.path.scopes.map(ObjectIdentifier.init) == originalBranchPath)
+    }
+
+    @Test func globalSheetWaitsForAMountingCoverInsteadOfReplacingIt() async throws {
+        let owner = RootRouter(), engine = owner.engine, root = engine.root
+        _ = WithRouter(routes: RootRouteMap {
+            Branches {
+                Branch("home") { testCover(testDestination(AppModal.self)) }
+                Branch("settings") {}
+            }
+            GlobalMap { testSheet(testDestination(SecondFactor.self)) }
+        }, router: owner) { EmptyView() }
+        let home = try #require(root.branchScopes["home"])
+        installPresentationHost(root, in: engine)
+        let homeHost = installPresentationHost(home, in: engine)
+
+        await owner.current.present(AppModal())
+        let cover = engine.currentRouteScope
+        #expect(cover.route is AppModal)
+        #expect(!cover.isAvailableForPresentation)
+
+        await owner.current.present(SecondFactor())
+        let sheet = engine.currentRouteScope
+        #expect(cover.belongs(to: engine.tree))
+        #expect(sheet.route is SecondFactor)
+        #expect(sheet.presentationOrigin === cover)
+        #expect(engine.routePresentation(from: home, matching: .cover(.slide), hostedBy: homeHost)?.scope === cover)
+        #expect(engine.routePresentation(from: home, matching: .sheet, hostedBy: homeHost) == nil)
+
+        let coverHost = installPresentationHost(cover, in: engine)
+        #expect(engine.routePresentation(from: cover, matching: .sheet, hostedBy: coverHost)?.scope === sheet)
+    }
+
+    @Test func globalSheetKeepsAMountingPushOnTheBranchPath() async throws {
+        let owner = branchFixture(), engine = owner.engine, root = engine.root
+        let home = try #require(root.branchScopes["home"])
+        installPresentationHost(root, in: engine)
+        let homeHost = installPresentationHost(home, in: engine)
+
+        await owner.current.present(AppDetail())
+        let detail = engine.currentRouteScope
+        #expect(detail.route is AppDetail)
+        #expect(!detail.isAvailableForPresentation)
+
+        await owner.current.present(SecondFactor())
+        let sheet = engine.currentRouteScope
+        #expect(sheet.route is SecondFactor)
+        #expect(sheet.presentationOrigin === detail)
+        #expect(home.path.first === detail)
+        #expect(engine.routePresentation(from: home, matching: .push, hostedBy: homeHost)?.scope === detail)
+        #expect(engine.routePresentation(from: home, matching: .sheet, hostedBy: homeHost) == nil)
+
+        let detailHost = installPresentationHost(detail, in: engine)
+        #expect(engine.routePresentation(from: detail, matching: .sheet, hostedBy: detailHost)?.scope === sheet)
+        #expect(await owner.current.unwind(from: SecondFactor.self))
+        #expect(engine.currentRouteScope === detail)
+    }
+
+    @Test func globalSheetKeepsAMountingCoverAboveAMountedCover() async {
+        let owner = RootRouter(), engine = owner.engine, root = engine.root
+        _ = WithRouter(routes: RootRouteMap {
+            testCover(testDestination(AppModal.self)) { testCover(testDestination(SecondLock.self)) }
+            GlobalMap { testSheet(testDestination(SecondFactor.self)) }
+        }, router: owner) { EmptyView() }
+        installPresentationHost(root, in: engine)
+
+        await owner.current.present(AppModal())
+        let outer = engine.currentRouteScope
+        let outerHost = installPresentationHost(outer, in: engine)
+        await owner.current.present(SecondLock())
+        let inner = engine.currentRouteScope
+        #expect(inner.route is SecondLock)
+        #expect(!inner.isAvailableForPresentation)
+
+        await owner.current.present(SecondFactor())
+        let sheet = engine.currentRouteScope
+        #expect(sheet.route is SecondFactor)
+        #expect(sheet.presentationOrigin === inner)
+        #expect(root.lane.modal === outer)
+        #expect(outer.lane.modal === inner)
+        #expect(inner.lane.modal === sheet)
+        #expect(engine.routePresentation(from: outer, matching: .cover(.slide), hostedBy: outerHost)?.scope === inner)
+
+        let innerHost = installPresentationHost(inner, in: engine)
+        #expect(engine.routePresentation(from: inner, matching: .sheet, hostedBy: innerHost)?.scope === sheet)
     }
 
     @Test func mountingBranchKeepsTheFallbackCoverAndItsReplacementInTheRootSlot() async throws {

@@ -89,10 +89,14 @@ extension RouterEngine {
         }
         return global.map { declaration in
             let foreground = currentRouteScope
-            let hostedForeground = foreground.ancestry.first {
-                $0.isAvailableForPresentation && $0.presentationHostID != nil
+            let presentingForeground = foreground.ancestry.first { scope in
+                // A committed destination can mount through its presenter. An unmounted
+                // branch has no presentation origin, so it stops that chain.
+                sequence(first: scope) { $0.presentationOrigin }.contains {
+                    $0.isAvailableForPresentation && $0.presentationHostID != nil
+                }
             }
-            if hostedForeground == nil {
+            if presentingForeground == nil {
                 log.departureDebug(.globalRouteWithoutPresentationHost(routeType: declaration.routeType))
             }
 
@@ -101,10 +105,10 @@ extension RouterEngine {
             let equal = foreground.ancestry.first {
                 $0.presentationDeclaration == declaration && $0.route?._isEqual(to: route) == true
             }
-            let current = foreground.presentationDeclaration == declaration ? foreground : hostedForeground
+            let current = foreground.presentationDeclaration == declaration ? foreground : presentingForeground
             let anchor = equal?.presentationOrigin
                 ?? (current?.presentationDeclaration == declaration ? current?.presentationOrigin : nil)
-                ?? hostedForeground
+                ?? presentingForeground
                 ?? foreground
             return ResolvedRouteTarget(presentingScope: anchor, declaringScope: anchor,
                 declaration: declaration, lookupStrategy: .global)
