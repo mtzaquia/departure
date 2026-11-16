@@ -89,13 +89,22 @@ extension RouterEngine {
         }
         return global.map { declaration in
             let foreground = currentRouteScope
-            // Global availability does not make the catalog root the presentation anchor.
-            // Reuse an equal ancestor or replace the current occurrence in its existing slot.
+            let hostedForeground = foreground.ancestry.first {
+                $0.isAvailableForPresentation && $0.presentationHostID != nil
+            }
+            if hostedForeground == nil {
+                log.departureDebug(.globalRouteWithoutPresentationHost(routeType: declaration.routeType))
+            }
+
+            // Keep existing occurrences in their slots, including a destination
+            // whose native presentation is still mounting.
             let equal = foreground.ancestry.first {
                 $0.presentationDeclaration == declaration && $0.route?._isEqual(to: route) == true
             }
+            let current = foreground.presentationDeclaration == declaration ? foreground : hostedForeground
             let anchor = equal?.presentationOrigin
-                ?? (foreground.presentationDeclaration == declaration ? foreground.presentationOrigin : nil)
+                ?? (current?.presentationDeclaration == declaration ? current?.presentationOrigin : nil)
+                ?? hostedForeground
                 ?? foreground
             return ResolvedRouteTarget(presentingScope: anchor, declaringScope: anchor,
                 declaration: declaration, lookupStrategy: .global)

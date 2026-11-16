@@ -263,15 +263,16 @@ struct MacOSPresentationTests {
         #expect(router.engine.root.routeAttachments.count == 1)
     }
 
-    @Test func globalFadeCoverPresentsAndDismissesAsSheet() async throws {
-        let router = RouterEngine()
+    @Test func globalFadeCoverPresentsAndDismissesAsSheetBeforeTheBranchMounts() async throws {
+        let owner = RootRouter(), router = owner.engine
         let recorder = MacOSDismissRecorder()
         let host = WithRouter(routes: RootRouteMap {
             GlobalMap {
                 testCover(RouteDestination(MacOSFadeRoute.self) { route, _ in route.destination() }, transition: .fade)
             }
-        }, router: RootRouter(engine: router)) {
-            Color.clear.frame(width: 320, height: 240).routing()
+            Branches { Branch("home") {} }
+        }, router: owner) {
+            Text("Starting up").frame(width: 320, height: 240)
         }
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 320, height: 240),
@@ -281,12 +282,17 @@ struct MacOSPresentationTests {
         window.contentView = NSHostingView(rootView: host)
         window.orderFront(nil)
         defer { window.close() }
-        try #require(await waitUntil { router.root.isInstalledInView })
-        await router.present(MacOSFadeRoute(recorder: recorder))
+        try #require(await waitUntil { router.root.isAvailableForPresentation && router.root.presentationHostID != nil })
+        let home = try #require(router.root.branchScopes["home"])
+        #expect(router.currentRouteScope === home)
+        #expect(home.presentationHostID == nil)
+        await owner.current.present(MacOSFadeRoute(recorder: recorder))
+        let cover = try #require(router.root.path.last)
+        #expect(cover.presentationOrigin === router.root)
         #expect(await waitUntil { window.attachedSheet != nil && recorder.dismiss != nil })
-        #expect(router.currentRouteScope.route is MacOSFadeRoute)
         recorder.dismiss?()
         #expect(await waitUntil { window.attachedSheet == nil && router.root.path.isEmpty })
+        #expect(router.currentRouteScope === home)
     }
 
     private func waitUntil(_ condition: () -> Bool) async -> Bool {

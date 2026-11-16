@@ -128,6 +128,7 @@ enum DepartureLogEvent {
     case routeDroppedBranchActivationFailed(branch: AnyHashable)
     case routeDroppedResolution
     case routeLookupStarted(routeType: any Route.Type, activePath: String)
+    case globalRouteWithoutPresentationHost(routeType: any Route.Type)
     case routeNoOpEquivalent(route: any Route, currentRoute: any Route)
     case routeMatched(route: any Route, match: RouterEngine.ResolvedRouteTarget)
     case routePendingWaitingForActivatedBranchHost(route: any Route, branch: AnyHashable)
@@ -409,6 +410,8 @@ extension DepartureLogEvent {
             "looking up \(departureDebugName(for: routeType))"
                 + " | strategy=surviving navigation ancestry, nearest scope first"
                 + "\n  active path: \(activePath)"
+        case let .globalRouteWithoutPresentationHost(routeType):
+            "no mounted presentation host for global \(departureDebugName(for: routeType)) in foreground ancestry"
         case let .routeNoOpEquivalent(route, currentRoute):
             "kept \(currentRoute.departureDebugDescription) — already equivalent to \(route.departureDebugDescription)"
         case let .routeMatched(route, match):

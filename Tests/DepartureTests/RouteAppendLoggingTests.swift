@@ -26,6 +26,12 @@ import Testing
 
 #if DEBUG
 @MainActor @Suite struct RouteAppendLoggingTests {
+    @Test func hostlessGlobalDiagnosticIdentifiesTheRouteType() {
+        let event = DepartureLogEvent.globalRouteWithoutPresentationHost(routeType: SettingsRoute.self)
+        #expect(event.logLevel == .normal)
+        #expect(event.message == "no mounted presentation host for global SettingsRoute in foreground ancestry")
+    }
+
     @Test func missingStackHostExplainsTheRequiredPlacement() {
         #expect(DepartureWarningEvent.pushHostOutsideNavigationStack.renderedMessage ==
             "[route] ⊘ cannot push from an automatic routing host outside a NavigationStack. "
